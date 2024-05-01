@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <!-- <link href="aos-master/dist/aos.css" rel="stylesheet"> -->
+    
+    <link rel="stylesheet" href="css/styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+    <title>Test</title>
+</head>
+<body>
+    
+    <div class="website oscuro">
+        <div class="btn-modo activ">
+            <div class="btn-modo__btn activ"></div>
+        </div>
+    
+        <div class="header oscuro">
+            <div class="header__logo">
+                <img src="img/tijera-y-peine.png" alt="marca">
+            </div>
+            <div class="header__menu">
+                <div class=" header__desk desk">
+                    <a onclick="ctaAgendar.click();">Agendate</a>
+                    <a href="#ubicacion">Ubicacion</a>
+                    <a href="#productos">Productos</a>
+                    <a href="#contacto">Contacto</a>
+                    <a onclick="ctaEquipo();">Equipo</a>
+                </div>
+                <div class="header__mobile oscuro mobile cerrado">
+                    <div class="line-menu"></div>
+                    <div class="line-menu"></div>
+                    <div class="line-menu"></div>
+                </div>
+            </div>
+        </div>
+        <div class="header__menu-mobile oscuro mobile ocultar">
+            <a onclick="ctaAgendar.click();">Agendate</a>
+            <a href="#ubicacion">Ubicacion</a>
+            <a href="#productos">Productos</a>
+            <a href="#contacto">Contacto</a>
+            <a onclick="ctaEquipo();">Equipo</a>
+        </div>
+
+        <div class="fondo-oscuro activar-fondo-oscuro ocultar"  id="agendar">
+            <div class="agendar">
+                <!-- Calendly inline widget begin -->
+                <div class="calendly-inline-widget" data-url="https://calendly.com/mati-moran-castro/barb" style="min-width:320px;height:700px;"></div>
+                <script type="text/javascript" src="https://assets.calendly.com/assets/external/widget.js" async></script>
+                <!-- Calendly inline widget end -->
+            </div>
+            <div class="cerrar-agenda">
+                <img src="img/cerrar.webp" alt="cerrar">
+            </div>
+        </div>
+
+
+        <div class="banner">
+            <img src="img/barber-fondo.webp" alt="barberia">
+            <div class="banner__boton" id="cta-agendar">
+                <p>AGENDATE</p>
+            </div>
+        </div>
+
+  
+        <div class="contenido oscuro">
+
+            <div class="fotos" data-aos="fade-up">
+                <div class="fotos__titulo">
+                    <h2>Fotos</h2>
+                </div>
+                <div class="fotos__cont">
+                    <div class="fotos__cont-img ">
+                        <img src="img/corte1.webp" alt="corte">
+                     
+                    </div>
+                    <div class="fotos__cont-img">
+                        <img src="img/corte2.webp" alt="corte">
+                    </div>
+                    <div class="fotos__cont-img">
+                        <img src="img/corte3_1.webp" alt="corte">
+                    </div>
+                    <div class="fotos__cont-img">
+                        <img src="img/corte4_1.webp" alt="corte">
+                    </div>
+                    <div class="fotos__cont-img">
+                        <img src="img/corte5.webp" alt="corte">
+                    </div>
+                    <div class="fotos__cont-img ">
+                        <img src="img/corte1.webp" alt="corte">
+                     
+                    </div>
+                    <div class="fotos__cont-img">
+                        <img src="img/corte2.webp" alt="corte">
+                    </div>
+                    <div class="fotos__cont-img">
+                        <img src="img/corte3_1.webp" alt="corte">
+                    </div>
+                    <div class="fotos__cont-img">
+                        <img src="img/corte4_1.webp" alt="corte">
+                    </div>
+                    <div class="fotos__cont-img">
+                        <img src="img/corte5.webp" alt="corte">
+                    </div>
+                </div>
+            </div>
+            
+
+            <div class="fotos" data-aos="fade-up" id="productos">
+                <div class="fotos__titulo">
+                    <h2>Productos</h2>
+                </div>
+                <div class="fotos__cont">
+                    <div class="fotos__cont-img">
+                        <img src="img/producto.webp" alt="corte">
+                    </div>
+                    <div class="fotos__cont-img">
+                        <img src="img/producto1.webp" alt="corte">
+                    </div>
+                    <div class="fotos__cont-img">
+                        <img src="img/producto2.webp" alt="corte">
+                    </div>
+                    <div class="fotos__cont-img">
+                        <img src="img/producto3.webp" alt="corte">
+                    </div>
+                    <div class="fotos__cont-img">
+                        <img src="img/producto5.webp" alt="corte">
+                    </div>
+                    <div class="fotos__cont-img">
+                        <img src="img/producto.webp" alt="corte">
+                    </div>
+                    <div class="fotos__cont-img">
+                        <img src="img/producto1.webp" alt="corte">
+                    </div>
+                    <div class="fotos__cont-img">
+                        <img src="img/producto2.webp" alt="corte">
+                    </div>
+                    <div class="fotos__cont-img">
+                        <img src="img/producto3.webp" alt="corte">
+                    </div>
+                    <div class="fotos__cont-img">
+                        <img src="img/producto5.webp" alt="corte">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+
+        <div class="ubicacion oscuro" data-aos="fade-up" id="ubicacion">
+            <div class="ubicacion__titulo">
+                <h2>Ubicacion</h2>
+            </div>
+            <div class="ubicacion__cont">
+                <iframe src="https://www.google.com/maps/embed?pb=!1m14!1m12!1m3!1d13103.758613706066!2d-55.91841384439697!3d-34.80746006357401!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!5e0!3m2!1ses!2suy!4v1706298979708!5m2!1ses!2suy" width="100%" max-width="1200" height="300" style="border:0;" allowfullscreen="" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
+            </div>
+        </div>
+
+        <div class="footer">
+            <div class="footer__info" id="contacto">
+                <p><span>Direccion:</span> Calle1 1010, Esquina Calle2</p>
+                <p><span>Contacto:</span> 099123456</p>
+
+            </div>
+            <div class="footer__redes">
+                <img onclick="window.location.href='https://api.whatsapp.com/send?phone=099804693'" src="img/whatsapp.webp" alt="wpp">
+                <img  src="img/instagram.webp" alt="instagram">
+                <img src="img/facebook.webp" alt="facebook">
+            </div>
+
+            <div class="footer__enlaces">
+                <a onclick="ctaAgendar.click();">Agendate</a>
+                <a href="#productos">Productos</a>
+                <a onclick="ctaEquipo();">Equipo</a>
+            </div>
+        </div>
+    </div>
+
+
+    <script src="js/index.js"></script>
+    <!-- <script src="aos-master/dist/aos.js"></script>
+    <script>
+        AOS.init();
+      </script> -->
+</body>
+</html>
