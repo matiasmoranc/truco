@@ -1,190 +1,2028 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
+
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <!-- <link href="aos-master/dist/aos.css" rel="stylesheet"> -->
-    <meta property="og:site_name" content="Barberia">
-    <meta property="og:title" content="Tu Barberia">
-    <meta property="og:image" content="https://uruwebb.github.io/barber/img/barberia.png">  
-    <link rel="stylesheet" href="css/styles.css">
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&display=swap" rel="stylesheet">
-    <title>Test</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Torneo de Truco</title>
+  <style>
+    :root {
+      --bg: #0f1320;
+      --panel: #151a2c;
+      --muted: #9aa4b2;
+      --text: #e8ecf3;
+      --acc: #48a3ff;
+      --ok: #22c55e;
+      --warn: #f59e0b;
+      --bad: #ef4444;
+      --br: 16px;
+    }
+
+    b {
+      font-size: 1.2rem;
+    }
+
+    * {
+      box-sizing: border-box
+    }
+
+    tr {
+      background: #1f1f1f;
+    }
+
+    /* Chrome, Safari, Edge, Opera */
+    .inpScore::-webkit-inner-spin-button,
+    .inpScore::-webkit-outer-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+
+    /* Firefox
+    .inpScore[type=number] {
+      -moz-appearance: textfield;
+    } */
+
+
+    body {
+      margin: 0;
+      background: #000000;
+      color: var(--text);
+      font: 16px/1.35 system-ui, Segoe UI, Roboto, Helvetica, Arial, sans-serif
+    }
+
+    header {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+      position: sticky;
+      top: 0;
+      background: linear-gradient(180deg, rgb(0 0 0 / 95%), #f95300);
+      backdrop-filter: blur(6px);
+      z-index: 5;
+      border-bottom: 1px solid rgba(255, 255, 255, .06)
+    }
+
+    header h1 {
+      display: flex;
+      align-items: center;
+      font-size: 3rem;
+      text-align: center;
+      justify-content: center;
+      width: 100%;
+      margin: 0;
+      letter-spacing: .3px
+    }
+
+    header .actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    button,
+    select,
+    input[type="number"],
+    input[type="text"],
+    textarea {
+      background: #0f1427;
+      border: 1px solid rgba(255, 255, 255, .12);
+      color: var(--text);
+      padding: 0px 6px;
+      min-height: 40px;
+      border-radius: 10px
+    }
+
+    button {
+      cursor: pointer;
+      transition: .15s ease;
+      box-shadow: 0 1px 0 rgba(255, 255, 255, .06) inset
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+      border-color: rgba(255, 255, 255, .25)
+    }
+
+    button.primary {
+      background: linear-gradient(180deg, #2a6bff, #1248c7);
+      border: none
+    }
+
+    button.ghost {
+      background: transparent;
+      border: 1px dashed rgba(255, 255, 255, .18)
+    }
+
+    main {
+      display: flex;
+      gap: 16px;
+    }
+
+    @media (max-width: 1100px) {
+      main {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .card {
+      background: #000000;
+      border: 1px solid rgba(255, 255, 255, .08);
+      border-radius: var(--br);
+      padding: 14px
+    }
+
+    .card h2 {
+      margin: 6px 4px 12px;
+      font-size: 16px;
+      color: #c9d6e3
+    }
+
+    .grid.cols-2 .card {
+      border: 1px solid rgb(255 255 255 / 47%);
+    }
+
+    .row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 5px;
+    }
+
+    .grid {
+      display: grid;
+      gap: 10px
+    }
+
+    .grid.cols-2 {
+      grid-template-columns: repeat(2, minmax(0, 1fr))
+    }
+
+    .grid.cols-3 {
+      grid-template-columns: repeat(3, minmax(0, 1fr))
+    }
+
+    .grid.cols-4 {
+      grid-template-columns: repeat(4, minmax(0, 1fr))
+    }
+
+    .muted {
+      color: white
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse
+    }
+
+    th,
+    td {
+      padding: 8px 10px;
+      border-bottom: 1px solid rgba(255, 255, 255, .07);
+      text-align: left;
+      font-size: 1.2rem;
+    }
+
+    th {
+      font-weight: 600;
+      color: #ffffff;
+      background: #f95300;
+      position: sticky;
+      top: 0
+    }
+
+    .small {
+      font-size: 20px;
+    }
+
+    .teams .small {
+      font-size: 25px;
+      font-weight: 700;
+    }
+
+    .tag {
+      display: none;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 12px;
+      background: #0d1a33;
+      border: 1px solid rgba(255, 255, 255, .08)
+    }
+
+    .success {
+      color: var(--ok)
+    }
+
+    .danger {
+      color: var(--bad)
+    }
+
+    .warn {
+      color: var(--warn)
+    }
+
+    .split {
+      display: flex;
+      gap: 10px
+    }
+
+    .split>* {
+      flex: 1
+    }
+
+    .pilltabs {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-bottom: 8px
+    }
+
+    .pilltabs button {
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, .16);
+      background: #0e152a
+    }
+
+    .pilltabs button.active {
+      background: #17306b;
+      border-color: #3157cf
+    }
+
+    /* Tabs de la vista pública */
+    .public-tabs,
+    .public-subtabs {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin: 0 0 10px 0;
+    }
+
+    .public-tabs button,
+    .public-subtabs button {
+      padding: 8px 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, .16);
+      background: #0e152a;
+      color: #e8ecf3;
+      cursor: pointer;
+    }
+
+    .public-tabs button.active,
+    .public-subtabs button.active {
+      background: #17306b;
+      border-color: #3157cf;
+    }
+
+    .right {
+      float: right
+    }
+
+    .center {
+      text-align: center
+    }
+
+    .bracket {
+      display: grid;
+      grid-auto-flow: column;
+      gap: 10px;
+      overflow: auto
+    }
+
+    .brcol {
+      display: grid;
+      gap: 10px;
+      min-width: 260px
+    }
+
+    .match {
+      background: #494949;
+      border: 1px solid rgba(255, 255, 255, .08);
+      border-radius: 12px;
+      padding: 8px
+    }
+
+    .match.finished {
+      border: 3px solid #f95300;
+      /* naranja */
+    }
+
+    .match.finished .center.small.muted {
+      opacity: 1;
+    }
+
+    .match .teams {
+      display: grid;
+      grid-template-columns: 1fr 40px auto 40px 1fr;
+      gap: 10px;
+      align-items: center;
+      justify-items: center
+    }
+
+    .match input {
+      width: 60px;
+      text-align: center
+    }
+
+    .footer {
+      padding: 10px 16px;
+      color: var(--muted);
+      text-align: center
+    }
+
+    .kbd {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      background: #0d152b;
+      border: 1px solid rgba(255, 255, 255, .12);
+      padding: 2px 6px;
+      border-radius: 6px
+    }
+
+    .alert {
+      padding: 10px 12px;
+      border-radius: 12px;
+      background: #0e1a2f;
+      border: 1px solid rgba(255, 255, 255, .1)
+    }
+
+    .notice {
+      font-size: 13px;
+      color: #b3c1cf
+    }
+
+    /* Vista pública: ancho completo y 2 columnas */
+    body.public main {
+      grid-template-columns: 1fr;
+    }
+
+    .public #publicPanel {
+      grid-column: 1 / -1;
+      width: 100%;
+    }
+
+    /* Columnas con scroll independiente en Partidos (vista pública) */
+    .public-two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      align-items: stretch;
+      /* que ambas panes ocupen el alto */
+    }
+
+    /* Cada pane scrollea por separado */
+    .public-two-col .pane {
+      /* ajustá el 160px si tu header ocupa más/menos */
+      height: calc(100vh - 160px);
+      overflow: auto;
+      padding-right: 4px;
+      /* evita que el scroll tape contenido */
+    }
+
+    /* En mobile, una sola columna y sin alto fijo */
+    @media (max-width: 900px) {
+      .public-two-col {
+        grid-template-columns: 1fr;
+      }
+
+      .public-two-col .pane {
+        height: auto;
+        overflow: visible;
+      }
+    }
+
+    /* Resaltado de clasificados (top-2 en grupos, top-16 en liga) */
+    tr.adv {
+      background: rgb(235 119 0 / 29%)
+        /* verde suave */
+    }
+
+    tr.adv td {
+      border-bottom-color: rgba(255, 255, 255, 0.29);
+    }
+
+    /* Ocultar scrollbar pero mantener scroll funcional */
+    .public-two-col .pane {
+      scrollbar-width: none;
+      /* Firefox */
+      -ms-overflow-style: none;
+      /* IE y Edge antiguos */
+    }
+
+    .public-two-col .pane::-webkit-scrollbar {
+      /* Chrome, Safari */
+      display: none;
+    }
+
+    .pane .card .card {
+      border: none;
+      margin-top: 0 !important;
+    }
+
+    /* Vista pública: sin botones */
+    body.public-view header .actions {
+      display: none;
+    }
+
+    /* Vista admin (por defecto, sin public-view) */
+    header {
+      height: 60px;
+      /* mitad de alto */
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    body.public-view header {
+      height: 120px;
+      /* o lo que usabas antes */
+    }
+
+    body:not(.public) header {
+      height: 60px;
+    }
+
+    /* mitad de alto en admin */
+    body:not(.public) header h1 img {
+      height: 45px !important;
+      margin-top: 3px;
+    }
+
+    /* mitad de alto en admin */
+    body:not(.public) header h1 {
+      font-size: 20px !important;
+    }
+
+    /* mitad de alto en admin */
+    body:not(.public) header .actions {
+      display: flex;
+    }
+
+    /* aseguramos que se vean */
+
+    /* Vista pública: sin botones (y si querés, alto original) */
+    body.public header .actions {
+      display: none;
+    }
+
+    body.public header {
+      height: 120px;
+    }
+
+    /* o el valor que usabas antes */
+    /* Contenedor principal */
+    .ko-bracket {
+      position: relative;
+      padding: 28px 20px;
+      background: linear-gradient(180deg, #0a0f14, #0c1418);
+      color: #e8f3fb;
+      min-height: 75vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      border-radius: 12px;
+      box-shadow: 0 6px 24px rgba(2, 10, 18, .6);
+      overflow: hidden;
+      font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    }
+
+    /* 3 zonas: izquierda | centro (copa) | derecha */
+    .ko-three {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      gap: 28px;
+      align-items: start;
+    }
+
+    /* cada lado es un grid de columnas (una por ronda) acercándose a la copa */
+    .ko-side {
+      display: grid;
+      grid-auto-flow: column;
+      grid-auto-columns: minmax(220px, 1fr);
+      gap: 18px;
+      align-items: start;
+    }
+
+    .ko-side.left {
+      justify-content: end;
+      align-items: center;
+    }
+
+    /* pega columnas al centro */
+    .ko-side.right {
+      justify-content: start;
+      align-items: center;
+    }
+
+    .ko-round {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .ko-round__title {
+      text-align: center;
+      font-weight: 700;
+      font-size: .92rem;
+      color: #bfe5ff;
+    }
+
+    /* Tarjeta de partido */
+    .ko-card {
+      background: rgba(255, 255, 255, .03);
+      border: 1px solid rgba(255, 255, 255, .06);
+      border-radius: 10px;
+      padding: 10px 12px;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      row-gap: 6px;
+      column-gap: 10px;
+      min-height: 58px;
+    }
+
+    .ko-card.finished {
+      background: linear-gradient(90deg, rgba(20, 120, 80, .14), rgba(20, 80, 50, .06));
+      border-color: rgba(30, 200, 120, .14);
+    }
+
+    .team {
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .score {
+      font-weight: 800;
+      min-width: 38px;
+      text-align: center;
+      background: rgba(0, 0, 0, .25);
+      border-radius: 6px;
+      padding: 0px 8px;
+    }
+
+    .muted {
+      opacity: .6;
+      font-weight: 500;
+    }
+
+    /* Copa centro */
+    .ko-center {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 120px;
+      flex-direction: column-reverse;
+      gap: 20px;
+    }
+
+    .ko-center .trophy {
+      width: 120px;
+      height: 120px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 30% 30%, #ffd36b 0%, #e6a800 60%, #b37300 100%);
+      box-shadow: 0 6px 30px rgba(0, 0, 0, .6), 0 0 24px rgba(230, 160, 20, .12);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 42px;
+      font-weight: 900;
+      color: #2b1b00;
+      transform: rotate(-6deg);
+    }
+
+    @media (max-width: 980px) {
+      .ko-side {
+        grid-auto-columns: minmax(160px, 1fr);
+        gap: 12px;
+      }
+
+      .ko-center .trophy {
+        width: 86px;
+        height: 86px;
+        font-size: 28px;
+      }
+    }
+
+    .ko-round {
+      display: flex;
+      flex-direction: column;
+      gap: 40px;
+      margin: 0 .6rem;
+    }
+
+    .ko-round-title {
+      text-align: center;
+      font-weight: 600;
+      font-size: 1.5rem;
+      opacity: .8;
+      margin-bottom: .3rem;
+    }
+
+    /* Si la columna es de Octavos → partidos más angostos */
+    .ko-round[data-round-label="Octavos"] .ko-match {
+      min-width: 240px;
+    }
+
+    /* Para el resto (cuando no es Octavos) → partidos más anchos */
+    .ko-round:not([data-round-label="Octavos"]) .ko-match {
+      min-width: 230px;
+    }
+
+    .ko-match {
+      border: 1.5px solid var(--ko-border, #444);
+      border-radius: 10px;
+      padding: .5rem .6rem;
+      min-width: 230px;
+      background: #f95300;
+    }
+
+    .ko-match.empty {
+      opacity: .40;
+      border-style: dashed;
+      background: #f95300;
+    }
+
+    .ko-match .team {
+      display: flex;
+      justify-content: space-between;
+      gap: .5rem;
+    }
+
+    .ko-match .team+.team {
+      margin-top: .35rem;
+      border-top: 1px solid rgba(255, 255, 255, .08);
+      padding-top: .35rem;
+    }
+
+    .ko-match .name {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 1.15rem;
+      max-width: 180px;
+    }
+
+    .ko-match .score {
+      font-variant-numeric: tabular-nums;
+      min-width: 2em;
+      font-size: 1.4rem;
+      text-align: right;
+    }
+
+    .ko-champ {
+      margin-top: 12px;
+      padding: 12px 16px;
+      border-radius: 12px;
+      background: #101820;
+      border: 1px solid rgba(255, 255, 255, .08);
+      text-align: center;
+      font-size: 4rem;
+    }
+
+    .ko-champ b {
+      font-weight: 700;
+    }
+  </style>
 </head>
+
 <body>
-    
-    <div class="website oscuro">
-        <div class="btn-modo activ">
-            <div class="btn-modo__btn activ"></div>
-        </div>
-    
-        <div class="header oscuro">
-            <div class="header__logo">
-                <img src="img/tijera-y-peine.png" alt="marca">
-            </div>
-            <div class="header__menu">
-                <div class=" header__desk desk">
-                    <a onclick="ctaAgendar.click();">Agendate</a>
-                    <a href="#ubicacion">Ubicacion</a>
-                    <a href="#productos">Productos</a>
-                    <a href="#contacto">Contacto</a>
-                    <a onclick="ctaEquipo();">Equipo</a>
-                </div>
-                <div class="header__mobile oscuro mobile cerrado">
-                    <div class="line-menu"></div>
-                    <div class="line-menu"></div>
-                    <div class="line-menu"></div>
-                </div>
-            </div>
-        </div>
-        <div class="header__menu-mobile oscuro mobile ocultar">
-            <a onclick="ctaAgendar.click();">Agendate</a>
-            <a href="#ubicacion">Ubicacion</a>
-            <a href="#productos">Productos</a>
-            <a href="#contacto">Contacto</a>
-            <a onclick="ctaEquipo();">Equipo</a>
-        </div>
+  <header>
+    <h1><img style="height: 85px; border-radius: 100%; margin-right: 20px;" src="img/cup.jpg" alt="cup">BRUJAS TRUCO CUP
+      2025</h1>
+    <div class="actions">
+      <button id="btnNew" title="Crear torneo">Nuevo</button>
+      <!-- <button id="btnSave" class="ghost" title="Guardar en archivo">Exportar JSON</button>
+      <input id="fileImport" type="file" accept="application/json" hidden>
+      <button id="btnImport" class="ghost" title="Cargar desde archivo">Importar JSON</button> -->
+      <button id="btnOpenPublic" title="Abrir vista pública (solo lectura)">Abrir vista pública</button>
+    </div>
+  </header>
 
-        <div class="fondo-oscuro activar-fondo-oscuro ocultar"  id="agendar">
-            <div class="agendar">
-                <!-- Calendly inline widget begin -->
-                <div class="calendly-inline-widget" data-url="https://calendly.com/mati-moran-castro/barb" style="min-width:320px;height:700px;"></div>
-                <script type="text/javascript" src="https://assets.calendly.com/assets/external/widget.js" async></script>
-                <!-- Calendly inline widget end -->
-            </div>
-            <div class="cerrar-agenda">
-                <img src="img/cerrar.webp" alt="cerrar">
-            </div>
-        </div>
+  <main>
+    <section class="card" id="adminPanel">
+      <h2>⚙️ Administración</h2>
+      <div id="adminContent"></div>
+    </section>
 
+    <section class="card" id="publicPanel">
+      <div id="publicContent"></div>
+    </section>
+  </main>
 
-        <div class="banner">
-            <img src="img/barber-fondo.webp" alt="barberia">
-            <div class="banner__boton" id="cta-agendar">
-                <p>AGENDATE</p>
-            </div>
-        </div>
+  <!-- <div class="footer small">Brujas Truco Cup - 2025.</div> -->
 
-  
-        <div class="contenido oscuro">
+  <script>
+    /******************** Estado ********************/
+    const LS_KEY = 'truco_tournament_v1';
+    const VIEW_PUBLIC = new URLSearchParams(location.search).get('view') === 'public' || location.hash === '#public';
+    const state = loadState() || createDefaultState();
+    // Canal entre pestañas (si el browser lo soporta)
+    const bc = ('BroadcastChannel' in window) ? new BroadcastChannel('truco_tournament_channel') : null;
 
-            <div class="fotos" data-aos="fade-up">
-                <div class="fotos__titulo">
-                    <h2>Fotos</h2>
-                </div>
-                <div class="fotos__cont">
-                    <div class="fotos__cont-img ">
-                        <img src="img/corte1.webp" alt="corte">
-                     
-                    </div>
-                    <div class="fotos__cont-img">
-                        <img src="img/corte2.webp" alt="corte">
-                    </div>
-                    <div class="fotos__cont-img">
-                        <img src="img/corte3_1.webp" alt="corte">
-                    </div>
-                    <div class="fotos__cont-img">
-                        <img src="img/corte4_1.webp" alt="corte">
-                    </div>
-                    <div class="fotos__cont-img">
-                        <img src="img/corte5.webp" alt="corte">
-                    </div>
-                    <div class="fotos__cont-img ">
-                        <img src="img/corte1.webp" alt="corte">
-                     
-                    </div>
-                    <div class="fotos__cont-img">
-                        <img src="img/corte2.webp" alt="corte">
-                    </div>
-                    <div class="fotos__cont-img">
-                        <img src="img/corte3_1.webp" alt="corte">
-                    </div>
-                    <div class="fotos__cont-img">
-                        <img src="img/corte4_1.webp" alt="corte">
-                    </div>
-                    <div class="fotos__cont-img">
-                        <img src="img/corte5.webp" alt="corte">
-                    </div>
-                </div>
-            </div>
-            
+    // Si estamos en vista pública, marcamos el body
+    // Marcar / desmarcar el body según la vista
+    if (VIEW_PUBLIC) {
+      document.body.classList.add('public');
+    } else {
+      document.body.classList.remove('public');
+    }
 
-            <div class="fotos" data-aos="fade-up" id="productos">
-                <div class="fotos__titulo">
-                    <h2>Productos</h2>
-                </div>
-                <div class="fotos__cont">
-                    <div class="fotos__cont-img">
-                        <img src="img/producto.webp" alt="corte">
-                    </div>
-                    <div class="fotos__cont-img">
-                        <img src="img/producto1.webp" alt="corte">
-                    </div>
-                    <div class="fotos__cont-img">
-                        <img src="img/producto2.webp" alt="corte">
-                    </div>
-                    <div class="fotos__cont-img">
-                        <img src="img/producto3.webp" alt="corte">
-                    </div>
-                    <div class="fotos__cont-img">
-                        <img src="img/producto5.webp" alt="corte">
-                    </div>
-                    <div class="fotos__cont-img">
-                        <img src="img/producto.webp" alt="corte">
-                    </div>
-                    <div class="fotos__cont-img">
-                        <img src="img/producto1.webp" alt="corte">
-                    </div>
-                    <div class="fotos__cont-img">
-                        <img src="img/producto2.webp" alt="corte">
-                    </div>
-                    <div class="fotos__cont-img">
-                        <img src="img/producto3.webp" alt="corte">
-                    </div>
-                    <div class="fotos__cont-img">
-                        <img src="img/producto5.webp" alt="corte">
-                    </div>
-                </div>
-            </div>
-        </div>
+    /******************** Utilidades ********************/
+    function uid(p = 'id') { return p + '_' + Math.random().toString(36).slice(2, 9) }
+   function saveState() {
+      // Clonamos el estado y removemos la parte de UI (local a cada pestaña)
+      const toSave = JSON.parse(JSON.stringify(state));
+      delete toSave.ui;
+
+      localStorage.setItem(LS_KEY, JSON.stringify(toSave));
+      if (bc) bc.postMessage({ type: 'state_update', ts: Date.now() });
+    }
+
+    function loadState() { try { const s = localStorage.getItem(LS_KEY); return s ? JSON.parse(s) : null } catch (e) { return null } }
+    function resetState() { localStorage.removeItem(LS_KEY) }
+    function clone(o) { return JSON.parse(JSON.stringify(o)) }
+    function shuffle(a) { a = [...a]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1));[a[i], a[j]] = [a[j], a[i]] } return a }
+
+    function assert(cond, msg) { if (!cond) throw new Error(msg || 'Error') }
+
+    // === utils: nombres de parejas ===
+    function getPairById(id) {
+      return (state.pairs || []).find(p => p.id === id) || null;
+    }
+
+    function pairName(id) {
+      const p = getPairById(id);
+      if (!p) return String(id);
+      // Cubrimos varios esquemas posibles de tu objeto "pair"
+      if (p.name) return p.name;
+      if (Array.isArray(p.players)) return p.players.join(' & ');
+      if (p.a && p.b) return `${p.a} & ${p.b}`;
+      if (p.player1 && p.player2) return `${p.player1} & ${p.player2}`;
+      return String(id);
+    }
+
+    /******************** Modelo ********************/
+    function createDefaultState() {
+      return {
+        meta: { title: 'Torneo de Truco', format: null },
+        config: { numPairs: 16, playoffSize: 16 }, // 16 = Octavos, 8 = Cuartos
+        pairs: [],
+        groups: {},
+        groupMatches: [],
+        leagueMatches: [],
+        playoffs: { stage: 'none', brackets: { R16: [], QF: [], SF: [], F: [] }, championId: null },
+        ui: { publicTab: 'matches', tableView: 'auto' } // 👈 NUEVO
+      }
+    }
 
 
-        <div class="ubicacion oscuro" data-aos="fade-up" id="ubicacion">
-            <div class="ubicacion__titulo">
-                <h2>Ubicacion</h2>
-            </div>
-            <div class="ubicacion__cont">
-                <iframe src="https://www.google.com/maps/embed?pb=!1m14!1m12!1m3!1d13103.758613706066!2d-55.91841384439697!3d-34.80746006357401!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!5e0!3m2!1ses!2suy!4v1706298979708!5m2!1ses!2suy" width="100%" max-width="1200" height="300" style="border:0;" allowfullscreen="" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
-            </div>
-        </div>
+    /******************** Render raíz ********************/
+    const adminContent = document.getElementById('adminContent');
+    const publicContent = document.getElementById('publicContent');
 
-        <div class="footer">
-            <div class="footer__info" id="contacto">
-                <p><span>Direccion:</span> Calle1 1010, Esquina Calle2</p>
-                <p><span>Contacto:</span> 099123456</p>
+  function replaceState(latest) {
+    // Guardamos el UI local actual (pestaña pública) y lo restauramos
+    const keepUI = state.ui ? JSON.parse(JSON.stringify(state.ui)) : null;
 
-            </div>
-            <div class="footer__redes">
-                <img onclick="window.location.href='https://api.whatsapp.com/send?phone=099804693'" src="img/whatsapp.webp" alt="wpp">
-                <img  src="img/instagram.webp" alt="instagram">
-                <img src="img/facebook.webp" alt="facebook">
-            </div>
+    // Limpiamos estado actual
+    for (const k in state) delete state[k];
 
-            <div class="footer__enlaces">
-                <a onclick="ctaAgendar.click();">Agendate</a>
-                <a href="#productos">Productos</a>
-                <a onclick="ctaEquipo();">Equipo</a>
-            </div>
-        </div>
+    // Ignoramos la `ui` entrante y aplicamos el resto
+    const { ui: _ignoredUI, ...rest } = latest || {};
+    Object.assign(state, rest);
+
+    // Restauramos UI local o creamos defaults
+    state.ui = keepUI || { publicTab: 'matches', tableView: 'auto' };
+  }
+
+    // Sólo la vista pública escucha y re-renderiza
+    if (VIEW_PUBLIC) {
+      // Fallback universal: evento 'storage' (se dispara en otras pestañas)
+      window.addEventListener('storage', (e) => {
+        if (e.key === LS_KEY && e.newValue) {
+          try {
+            const latest = JSON.parse(e.newValue);
+            replaceState(latest);
+            render();
+          } catch (_) { }
+        }
+      });
+
+      // BroadcastChannel: más rápido y confiable si existe
+      if (bc) {
+        bc.onmessage = (ev) => {
+          if (ev.data && ev.data.type === 'state_update') {
+            const latest = loadState();
+            if (latest) {
+              replaceState(latest);
+              render();
+            }
+          }
+        };
+      }
+    }
+
+    function render() {
+      if (VIEW_PUBLIC) {
+        document.getElementById('adminPanel').style.display = 'none';
+      } else {
+        document.getElementById('publicPanel').style.display = 'none';
+
+      }
+      adminContent.innerHTML = renderAdmin();
+      publicContent.innerHTML = renderPublic();
+      setupPublicGroupNav();
+      bindAdminEvents();
+      bindPublicEvents();
+
+    }
+
+    /******************** Administración ********************/
+    function renderAdmin() {
+      document.body.classList.remove("public-view");
+      document.body.classList.add("admin-view");
+
+      const canGroups = [16, 20, 24].includes(state.config.numPairs);
+      const canLeague = state.config.numPairs >= 10 && state.config.numPairs <= 30;
+      const fmt = state.meta.format;
+
+      let html = '';
+
+      html += `<div class="grid cols-3">
+    <div class="card small">
+      <div class="row" style="align-items:center; justify-content:space-between">
+        <label>Nombre del torneo</label>
+        <input id="inpTitle" type="text" value="${escapeHtml(state.meta.title)}" placeholder="Torneo de Truco"/>
+      </div>
+      <div class="row" style="margin-top:8px;align-items:center;justify-content:space-between">
+        <label>Cantidad de parejas</label>
+        <input id="inpNumPairs" type="number" min="15" max="25" value="${state.config.numPairs}"/>
+      </div>
+      <div class="alert" style="margin-top:8px">Para <b>Grupos</b>: exactamente 16, 20 o 24 parejas. Para <b>Liga</b>: entre 15 y 25 parejas.</div>
+      <div class="row" style="margin-top:8px">
+        <button id="btnSetFormatGroups" ${canGroups ? '' : 'disabled'} ${fmt === 'grupos' ? 'class="primary"' : ''}>Formato: Grupos</button>
+        <button id="btnSetFormatLeague" ${canLeague ? '' : 'disabled'} ${fmt === 'liga' ? 'class="primary"' : ''}>Formato: Liga</button>
+        <button id="btnOpenNames" class="ghost">Cargar nombres</button>
+      </div>
     </div>
 
+   <div class="card small">
+      <div class="row" style="align-items:center;justify-content:space-between">
+        <label>Clasifican a playoffs</label>
+        <select id="selPlayoffSize">
+          <option value="16" ${state.config.playoffSize === 16 ? 'selected' : ''}>16 (Octavos)</option>
+          <option value="8"  ${state.config.playoffSize === 8 ? 'selected' : ''}>8 (Cuartos)</option>
+        </select>
+      </div>
+      <div class="notice" style="margin-top:8px">
+        ${state.meta.format === 'grupos'
+          ? `Con ${state.config.playoffSize} clasificados → <b>${Math.max(1, Math.floor((state.config.playoffSize || 16) / 4))} por grupo</b>`
+          : `En liga clasifican los <b>top ${state.config.playoffSize}</b>`}
+      </div>
+    </div>
 
-    <script src="js/index.js"></script>
-    <!-- <script src="aos-master/dist/aos.js"></script>
-    <script>
-        AOS.init();
-      </script> -->
+    <div class="card small">
+      <div class="row" style="gap:8px;flex-wrap:wrap">
+        <button id="btnGenerate" class="primary">Generar fixtures</button>
+        <button id="btnClearScores" class="ghost">Borrar resultados</button>
+        <button id="btnReset" class="ghost danger">Reiniciar todo</button>
+        <span class="muted" style="align-self:center;">Auto‑guardado activo</span>
+      </div>
+      <div class="row" style="margin-top:6px">
+        <span class="kbd">Ctrl+S</span>&nbsp;<span class="muted">Exporta JSON</span>
+      </div>
+    </div>
+  </div>`;
+
+      // Nombres de parejas
+      html += renderPairEditor();
+
+      // Sección según formato
+      if (state.meta.format === 'grupos') {
+        html += renderGroupsAdmin();
+      } else if (state.meta.format === 'liga') {
+        html += renderLeagueAdmin();
+      } else {
+        html += `<div class="alert" style="margin-top:12px">Elegí un formato y generá los fixtures.</div>`
+      }
+
+      // Playoffs admin
+      html += renderPlayoffsAdmin();
+
+      return html;
+    }
+
+    function renderPairEditor() {
+      const n = state.config.numPairs;
+      // Asegurar cantidad en el array
+      while (state.pairs.length < n) { state.pairs.push({ id: uid('P'), name: `Pareja ${state.pairs.length + 1}` }) }
+      if (state.pairs.length > n) { state.pairs = state.pairs.slice(0, n) }
+
+      let rows = '';
+      state.pairs.forEach((p, i) => {
+        rows += `<tr>
+      <td class="small">#${(i + 1).toString().padStart(2, '0')}</td>
+      <td><input data-id="${p.id}" class="inpPairName" type="text" value="${escapeHtml(p.name)}"></td>
+    </tr>`
+      })
+      return `<div class="card" style="margin-top:12px">
+    <h2>📝 Nombres de parejas (${n})</h2>
+    <div style="max-height:260px;overflow:auto;border-radius:12px">
+      <table>
+        <thead><tr><th style="width:80px">N°</th><th>Nombre</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <button id="btnRandomize" class="ghost">Mezclar orden</button>
+      <button id="btnNormalize" class="ghost">Auto‑completar vacíos</button>
+    </div>
+  </div>`
+    }
+
+    /******************** Grupos ********************/
+    function renderGroupsAdmin() {
+      const g = state.groups; const has = Object.keys(g).length === 4;
+      let html = `<div class="card" style="margin-top:12px">
+    <h2>📦 Fase de Grupos</h2>
+    <div class="row">
+      <button id="btnMakeGroups" class="primary">Dividir en 4 grupos</button>
+      <span class="muted">16/20/24 parejas → todos contra todos dentro del grupo. 3 pts victoria.</span>
+    </div>`;
+      if (has) {
+        html += `<div class="grid cols-4" style="margin-top:10px">`;
+        for (const key of ['A', 'B', 'C', 'D']) {
+          const list = g[key] || [];
+          html += `<div class="card"><div class="row" style="justify-content:space-between"><b>Grupo ${key}</b><span class="tag">${list.length} parejas</span></div>`;
+          html += `<ol class="small">${list.map(id => `<li>${escapeHtml(nameOf(id))}</li>`).join('')}</ol>`;
+          html += `</div>`
+        }
+        html += `</div>`
+      }
+      if (state.groupMatches?.length) {
+        html += renderGroupMatchesEditor();
+        html += renderGroupTables();
+      }
+      html += `</div>`;
+      return html;
+    }
+
+    function renderGroupMatchesEditor() {
+      let blocks = '';
+      for (const key of ['A', 'B', 'C', 'D']) {
+        const ms = state.groupMatches.filter(m => m.group === key);
+        if (!ms.length) continue;
+        blocks += `<div class="card" style="margin-top:10px">
+      <div class="row" style="justify-content:space-between;align-items:center"><b>Partidos Grupo ${key}</b><span class="muted small">Cargá resultado: puntos de juego</span></div>
+      <div class="grid cols-2">${ms.map(m => matchEditorRow(m)).join('')}</div>
+    </div>`
+      }
+      return blocks;
+    }
+
+    function matchEditorRow(m) {
+      const finished = (m.scoreA != null && m.scoreB != null) ? 'finished' : '';
+      return `<div class="match ${finished}">
+    <div class="teams">
+      <div style="justify-self:start">${escapeHtml(nameOf(m.aId))}</div>
+      <input class="inpScore" data-mid="${m.id}" data-side="A" type="number" min="0" step="1" value="${valOr(m.scoreA, '')}" placeholder="A"/>
+      <div class="center small muted">vs</div>
+      <input class="inpScore" data-mid="${m.id}" data-side="B" type="number" min="0" step="1" value="${valOr(m.scoreB, '')}" placeholder="B"/>
+      <div style="justify-self:end">${escapeHtml(nameOf(m.bId))}</div>
+    </div>
+  </div>`;
+    }
+
+    function renderGroupTables() {
+      let html = `<div class="grid cols-2" style="margin-top:10px">`;
+      for (const key of ['A', 'B', 'C', 'D']) {
+        const groupIds = state.groups[key] || []; if (!groupIds.length) continue;
+        const table = computeTable(groupIds, state.groupMatches.filter(m => m.group === key));
+        html += tableHtml(`Tabla Grupo ${key}`, table, true, getPerGroupQualifiers());
+      }
+      html += `</div>`;
+      return html;
+    }
+
+    /******************** Liga ********************/
+    function renderLeagueAdmin() {
+      let html = `<div class="card" style="margin-top:12px">
+    <h2>🧮 Fase de Liga</h2>
+    <div class="row">
+     + <button id="btnMakeLeague" class="primary">Generar fixture (todos contra todos)</button>
++ <span class="muted">Cada pareja juega 1 partido por ronda. Tabla general define clasificados.</span>
+    </div>`;
+      if (state.leagueMatches?.length) {
+        const R = Math.max(0, ...state.leagueMatches.map(m => m.round || 0));
+        html += `<div class="card" style="margin-top:10px">
+      <div class="pilltabs">${Array.from({ length: R }, (_, i) => i + 1)
+            .map(r => `<button class="tabRound ${activeRoundClass(r)}" data-round="${r}">Ronda ${r}</button>`).join('')
+          }</div>
+      <div class="row"><span class="tag">Total partidos: ${state.leagueMatches.length}</span></div>
+      <div id="leagueRounds">${renderLeagueRound(1)}</div>
+    </div>`;
+        const table = computeTable(state.pairs.map(p => p.id), state.leagueMatches);
+        function tableHtml(title, table, showGroupPlace, highlightTop = 0) {
+          let rows = '';
+          table.forEach((t, i) => {
+            const adv = highlightTop && i < highlightTop ? 'adv' : '';
+            rows += `<tr class="${adv}">
+      <td>${(i + 1)}</td>
+      <td>${escapeHtml(t.name)}</td>
+      <td>${t.pts}</td>
+      <td>${t.pj}</td>
+      <td>${t.gf}</td>
+      <td>${t.ga}</td>
+      <td>${t.gd}</td>
+    </tr>`;
+          });
+          return `<div class="card">
+    ${title ? `<div class="row" style="justify-content:space-between;align-items:center"><b>${title}</b><span class="tag">${table.length} parejas</span></div>` : ''}
+    <div style="overflow:auto;border-radius:12px">
+      <table>
+        <thead><tr><th>#</th><th>Pareja</th><th>Pts</th><th>PJ</th><th>+PJ</th><th>-PJ</th><th>Dif</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  </div>`;
+        } html += tableHtml('Tabla General Liga', table, false, state.config.playoffSize || 16);
+      }
+      html += `</div>`;
+      return html;
+    }
+    function activeRoundClass(r) { return r === 1 ? 'active' : '' }
+    function renderLeagueRound(r) {
+      const ms = state.leagueMatches.filter(m => m.round === r);
+      if (!ms.length) return `<div class="muted">Sin partidos en esta ronda.</div>`
+      return `<div class="grid cols-2">${ms.map(m => matchEditorRow(m)).join('')}</div>`
+    }
+
+    /******************** Playoffs ********************/
+    function renderPlayoffsAdmin() {
+      if (state.meta.format === null) return '';
+      let html = `<div class="card" style="margin-top:12px">
+    <h2>🥊 Playoffs</h2>
+    <div class="row">`;
+
+      if (state.playoffs.stage === 'none') {
+        const size = state.config.playoffSize || 16;
+        const label = size === 16 ? 'Armar Octavos (16)' : 'Armar Cuartos (8)';
+        html += `<button id="btnSeedKO" class="primary">${label}</button><span class="muted">Seeding automático</span>`;
+      } else {
+        html += `<button id="btnRebuildKO" class="ghost">Rearmar desde tablas</button>`;
+      }
+      html += `</div>`;
+
+      if (state.playoffs.stage !== 'none') {
+        html += renderBracket('Octavos', 'R16');
+      }
+      if (state.playoffs.brackets.QF?.length) {
+        html += renderBracket('Cuartos', 'QF');
+      }
+      if (state.playoffs.brackets.SF?.length) {
+        html += renderBracket('Semifinal', 'SF');
+      }
+      if (state.playoffs.brackets.F?.length) {
+        html += renderBracket('Final', 'F');
+        if (state.playoffs.championId) {
+          html += `<div class="alert" style="margin-top:10px"><b>🏅 Campeón:</b> ${escapeHtml(nameOf(state.playoffs.championId))}</div>`
+        }
+      }
+
+      html += `</div>`;
+      return html;
+    }
+
+    function renderBracket(title, key) {
+      const ms = state.playoffs.brackets[key] || [];
+      const stageTitle = key === 'R16' ? 'Octavos' : key === 'QF' ? 'Cuartos' : key === 'SF' ? 'Semifinal' : 'Final';
+      const nextBtn = key === 'R16' ? 'btnAdvanceQF' : key === 'QF' ? 'btnAdvanceSF' : key === 'SF' ? 'btnAdvanceF' : 'btnFinish';
+      return `<div class="card" style="margin-top:10px">
+    <div class="row" style="justify-content:space-between;align-items:center"><b>${stageTitle}</b><button class="primary" id="${nextBtn}">${key === 'F' ? 'Cerrar torneo' : 'Avanzar'}</button></div>
+    <div class="grid cols-2">${ms.map(m => matchEditorRow(m)).join('')}</div>
+  </div>`
+    }
+
+    /******************** Vista pública ********************/
+    function matchReadOnlyRow(m) {
+      const finished = (m.scoreA != null && m.scoreB != null) ? 'finished' : '';
+      return `<div class="match ${finished}"><div class="teams">
+    <div style="justify-self:start;    font-size: 20px;
+    line-height: 1;">${escapeHtml(nameOf(m.aId))}</div>
+    <div class="center small muted">${valOr(m.scoreA, '-')}</div>
+    <div class="center small muted">vs</div>
+    <div class="center small muted">${valOr(m.scoreB, '-')}</div>
+    <div style="justify-self:end;    font-size: 20px;
+    line-height: 1;">${escapeHtml(nameOf(m.bId))}</div>
+  </div></div>`;
+    }
+
+    function renderPublicGroupRounds() {
+      if (!state.groupMatches?.length) return `<div class="muted small">Sin calendario generado.</div>`;
+      let out = '';
+      for (const key of ['A', 'B', 'C', 'D']) {
+        const ms = state.groupMatches.filter(m => m.group === key);
+        if (!ms.length) continue;
+        const maxRound = Math.max(...ms.map(m => m.round || 1));
+        out += `<div class="card" style="margin-top:8px"><b>Calendario Grupo ${key}</b>`;
+        for (let r = 1; r <= maxRound; r++) {
+          const list = ms.filter(m => (m.round || 1) === r);
+          if (!list.length) continue;
+          out += `<div class="card" style="margin-top:8px"><div class="row" style="justify-content:space-between;align-items:center"><span class="tag">${list.length} partidos</span></div><div class="grid cols-2">${list.map(matchReadOnlyRow).join('')}</div></div>`
+        }
+        out += `</div>`;
+      }
+      return out;
+    }
+
+    function renderLeaguePublicRounds() {
+      if (!state.leagueMatches?.length) return `<div class="muted small">Sin partidos generados.</div>`;
+      let out = '';
+      const R = Math.max(0, ...state.leagueMatches.map(m => m.round || 0));
+      const allIds = state.pairs.map(p => p.id);
+      for (let r = 1; r <= R; r++) {
+        const list = state.leagueMatches.filter(m => m.round === r);
+        if (!list.length) continue;
+        // detectar libres (N impar)
+        const played = new Set(list.flatMap(m => [m.aId, m.bId]));
+        const libres = allIds.filter(id => !played.has(id));
+        const libresHtml = libres.length
+          ? `<div class="muted small" style="margin-top:6px">Libre: ${libres.map(id => pairName(id)).join(', ')}</div>`
+          : '';
+        out += `<div class="card" style="margin-top:8px">
+      <b>Ronda ${r}</b>
+      <div class="grid cols-2">${list.map(matchReadOnlyRow).join('')}</div>
+      ${libresHtml}
+    </div>`;
+      }
+      return out;
+    }
+
+    function renderPublicTabs() {
+      if (!state.ui) state.ui = {};
+      if (!state.ui.publicTab) state.ui.publicTab = 'matches';
+      if (!state.ui.tableView) state.ui.tableView = 'grupos';
+
+      const isGroups = state.meta?.format === 'grupos';
+
+      // 👇 Si es vista pública y formato grupos, bloquear "general"
+      if (VIEW_PUBLIC && isGroups) {
+        state.ui.tableView = 'grupos';
+      }
+
+      const tabs = `
+    <div class="public-tabs">
+      <button type="button" class="pubtab ${state.ui.publicTab === 'matches' ? 'active' : ''}" data-tab="matches">📅 Partidos</button>
+      <button type="button" class="pubtab ${state.ui.publicTab === 'tables' ? 'active' : ''}" data-tab="tables">📊 Tablas</button>
+      <button type="button" class="pubtab ${state.ui.publicTab === 'ko' ? 'active' : ''}" data-tab="ko">🥊 Llaves</button>
+    </div>
+  `;
+
+      // 👇 Subtabs (Grupos / General) SOLO si NO es pública
+      const showSubtabs = (state.ui.publicTab === 'tables' && isGroups && !VIEW_PUBLIC);
+
+      const subtabs = showSubtabs ? `
+    <div class="public-subtabs">
+      <button type="button" class="pubsubtab ${state.ui.tableView !== 'general' ? 'active' : ''}" data-sub="grupos">Tabla de Grupos</button>
+      <button type="button" class="pubsubtab ${state.ui.tableView === 'general' ? 'active' : ''}" data-sub="general">Tabla General</button>
+    </div>
+  ` : '';
+
+      return tabs + subtabs;
+    }
+
+
+
+    // === NAV DE GRUPOS (solo en formato "grupos") ===
+    function renderPublicGroupsNav() {
+      // No muestres nada si no es formato grupos
+      if (!state?.meta || state.meta.format !== 'grupos') return '';
+
+      const groups = state.groups || {};
+      // Orden fijo A-D (ajustá si tenés más)
+      const order = ['a', 'b', 'c', 'd'];
+
+      // Armamos las entradas sólo para grupos con jugadores
+      const entries = order
+        .filter(k => Array.isArray(groups[k]) && groups[k].length > 0)
+        .map(k => ({
+          key: k,
+          label: `Grupo ${k.toUpperCase()}`,
+          target: `#group-${k}` // <-- tu render de grupos debe usar estos IDs en cada sección
+        }));
+
+      if (!entries.length) return '';
+
+      const chips = entries.map(e => `
+    <button type="button"
+            class="chip"
+            data-scroll-target="${e.target}">
+      ${e.label}
+    </button>`
+      ).join('');
+
+      return `
+    <div id="publicGroupNav" class="public-group-nav">
+      ${chips}
+    </div>`;
+    }
+
+    // Reemplazar COMPLETO
+    function renderPublicMatchesView() {
+
+      if (state.meta.format === 'grupos') {
+        // — GRUPOS —
+        const left = `${renderPublicGroupsNav()}${renderPublicGroupRounds()}`;
+        const right = renderPublicTablesView(); // respeta sub-tab "General" vs "Grupos"
+        return `
+      <div class="public-two-col">
+        <div class="pane" id="pane-calendario">${left}</div>
+        <div class="pane" id="pane-tablas">${right}</div>
+      </div>`;
+      } else {
+        // — LIGA —
+        const left = renderLeaguePublicRounds(); // rondas de liga
+        const right = renderPublicTablesView();   // Tabla General (Liga)
+        return `
+      <div class="public-two-col">
+        <div class="pane" id="pane-calendario">${left}</div>
+        <div class="pane" id="pane-tablas">${right}</div>
+      </div>`;
+      }
+    }
+
+
+
+    function renderPublicTablesView() {
+      const isGroups = state.meta?.format === 'grupos';
+
+      // 👉 En vista pública + formato grupos: SIEMPRE tablas por grupo
+      if (VIEW_PUBLIC && isGroups) {
+        return renderGroupTables();
+      }
+
+      if (isGroups) {
+        // En preview (admin) podés mantener el toggle si quisieras:
+        if (state.ui.tableView === 'general') {
+          const allIds = state.pairs.map(p => p.id);
+          const table = computeTable(allIds, state.groupMatches);
+          return tableHtml('Tabla General (Grupos)', table, false, state.config.playoffSize || 16);
+        }
+        return renderGroupTables();
+      }
+
+      // Liga
+      const table = computeTable(state.pairs.map(p => p.id), state.leagueMatches);
+      return tableHtml('Tabla General (Liga)', table, false, state.config.playoffSize || 16);
+    }
+
+    // Mapea tu estructura {playoffs.brackets: {R16,QF,SF,F}} al formato del bracket visual
+    function buildKnockoutRoundsFromState(st) {
+      // Orden real de llaves en tu estado
+      const order = ['R16', 'QF', 'SF', 'F']; // Octavos → Final
+      const src = st?.playoffs?.brackets || {};
+      const rounds = [];
+
+      for (const key of order) {
+        const ms = src[key];
+        if (!ms || !ms.length) continue;
+
+        // Cada ronda debe ser un ARRAY de partidos con { a:{name,score}, b:{name,score} }
+        const roundMatches = ms.map((m, i) => ({
+          id: m.id || `${key}-${i}`,
+          a: { name: pairName(m.aId) || '—', score: (m.scoreA ?? null) },
+          b: { name: pairName(m.bId) || '—', score: (m.scoreB ?? null) },
+          finished: (m.scoreA != null && m.scoreB != null)
+        }));
+
+        rounds.push(roundMatches);
+      }
+
+      return rounds;
+    }
+
+
+    // Render principal: divide cada ronda en mitad izquierda y mitad derecha
+    function renderKOBracketSym(rounds, rootSel = '#ko-bracket-root') {
+      const root = document.querySelector(rootSel);
+      if (!root) return;
+
+      const left = root.querySelector('.ko-side.left');
+      const right = root.querySelector('.ko-side.right');
+      const finalSlot = root.querySelector('.final-slot');
+      if (!left || !right || !finalSlot) return;
+
+      const normalized = ensureBracketSkeleton(rounds);
+      const firstRoundMatches = normalized?.[0]?.length || 0;
+
+      // limpiar
+      left.innerHTML = '';
+      right.innerHTML = '';
+      finalSlot.innerHTML = '';
+
+      const lastIndex = normalized.length - 1;
+
+      // acumulamos columnas y luego las insertamos
+      const leftCols = [];
+      const rightCols = [];
+
+      normalized.forEach((roundMatches, rIndex) => {
+        const label = roundLabel(firstRoundMatches, rIndex);
+
+        // Final al centro
+        if (rIndex === lastIndex) {
+          const m = roundMatches[0];
+          finalSlot.appendChild(makeRoundColumn([m], label, { center: true }));
+          return;
+        }
+
+        const half = Math.ceil(roundMatches.length / 2);
+        const leftSlice = roundMatches.slice(0, half);
+        const rightSlice = roundMatches.slice(half);
+
+        // Izquierda: de Octavos→…→Semis hacia la copa (orden normal)
+        leftCols.push(makeRoundColumn(leftSlice, label));
+
+        // Derecha: queremos pegar a la copa primero la ronda más “alta”.
+        // Por eso vamos acumulando y luego invertimos el orden insertando al inicio.
+        rightCols.unshift(makeRoundColumn(rightSlice, label, { mirror: true }));
+      });
+
+      // Insertar en DOM
+      leftCols.forEach(col => left.appendChild(col));
+      rightCols.forEach(col => right.appendChild(col));
+    }
+
+    // Crea una columna de una ronda (varios partidos)
+    function makeRoundColumn(matches, label, opts = {}) {
+      const col = document.createElement('div');
+      col.className = 'ko-round';
+      col.setAttribute('data-round-label', label);
+
+      // Optional: título de la ronda
+      const h = document.createElement('div');
+      h.className = 'ko-round-title';
+      h.textContent = label;
+      col.appendChild(h);
+
+      matches.forEach((m) => {
+        const el = makeMatchBox(m);
+        col.appendChild(el);
+      });
+
+      return col;
+    }
+
+    // Dibuja un partido (incluso vacío)
+    function makeMatchBox(m) {
+      const box = document.createElement('div');
+      const aName = (m?.a?.name || '').trim();
+      const bName = (m?.b?.name || '').trim();
+      const isEmpty = !aName && !bName;
+
+      box.className = 'ko-match' + (isEmpty ? ' empty' : '');
+
+      box.innerHTML = `
+    <div class="team t-a">
+      <span class="name">${aName || '—'}</span>
+      <span class="score">${Number.isFinite(m?.a?.score) ? m.a.score : ''}</span>
+    </div>
+    <div class="team t-b">
+      <span class="name">${bName || '—'}</span>
+      <span class="score">${Number.isFinite(m?.b?.score) ? m.b.score : ''}</span>
+    </div>
+  `;
+      return box;
+    }
+
+    function roundColumn(col, side) {
+      const el = document.createElement('div');
+      el.className = 'ko-round';
+      el.innerHTML = `<div class="ko-round__title">${col.title}</div>`;
+      col.matches.forEach(m => el.appendChild(matchCard(m)));
+      return el;
+    }
+
+    function matchCard(m) {
+      // Si no hay nombres (todavía), mostrar “Pendiente” con estilo tenue
+      const aN = (m?.aName && m.aName !== '—') ? m.aName : 'Pendiente';
+      const bN = (m?.bName && m.bName !== '—') ? m.bName : 'Pendiente';
+      const aMuted = aN === 'Pendiente' ? 'muted' : '';
+      const bMuted = bN === 'Pendiente' ? 'muted' : '';
+
+      const card = document.createElement('div');
+      card.className = 'ko-card' + (m?.finished ? ' finished' : '');
+      card.innerHTML = `
+    <div class="team ${aMuted}">${escapeHtml(aN)}</div>
+    <div class="score">${m?.aScore ?? ''}</div>
+    <div class="team ${bMuted}">${escapeHtml(bN)}</div>
+    <div class="score">${m?.bScore ?? ''}</div>
+  `;
+      return card;
+    }
+
+    // helpers mínimos
+    function escapeHtml(s) { if (!s && s !== 0) return ''; return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]); }
+
+    // Si no tenés banderas, devolvé string vacío (el componente tolera vacío)
+    function getFlagForPair(pairId) {
+      // Ejemplos de dónde podrías guardar flags:
+      // return state.pairs.find(p=>p.id===pairId)?.flag || '';
+      // return state.flags?.[pairId] || '';
+      return '';
+    }
+
+    function renderPublicKOView() {
+      if (!state.playoffs || state.playoffs.stage === 'none') {
+        return `<div class="alert">Aún no se armaron las llaves.</div>`;
+      }
+      return `
+    <!-- Contenedor de la vista KO -->
+    <div id="ko-bracket-root" class="ko-bracket">
+      <div class="ko-three">
+        <div class="ko-side left"  data-side="left"></div>
+        <div class="ko-center"><div class="trophy">🏆</div></div>
+        <div class="ko-side right" data-side="right"></div>
+      </div>
+    </div>
+  `;
+    }
+
+
+
+    function renderPublic() {
+      // estado base
+      if (!state.ui) state.ui = {};
+      if (!state.meta?.format) {
+        return `<div class="alert">Aún no hay torneo configurado.</div>`;
+      }
+
+      // clases de modo
+      document.body.classList.add("public-view");
+      document.body.classList.remove("admin-view");
+
+      // defaults defensivos
+      if (!state.ui.publicTab) state.ui.publicTab = 'matches';
+      if (!state.ui.tableView) state.ui.tableView = 'auto';
+
+      // 👉 En vista pública + formato grupos: bloquear "general"
+      if (VIEW_PUBLIC && state.meta.format === 'grupos') {
+        state.ui.tableView = 'grupos';
+      }
+
+      // Tabs superiores (no dupliques tabs en sub-vistas)
+      const tabs = renderPublicTabs();
+
+      // Contenido según pestaña
+      let content = '';
+      if (state.ui.publicTab === 'matches') {
+        // Izq: calendario | Der: SIEMPRE tablas por grupo si el formato es "grupos"
+        content = renderPublicMatchesView();
+      } else if (state.ui.publicTab === 'tables') {
+        // En pública + grupos, esta función debe devolver solo tablas por grupo
+        content = renderPublicTablesView();
+      } else { // 'ko'
+        const championHtml =
+          (VIEW_PUBLIC && state.playoffs?.stage === 'DONE' && state.playoffs?.championId)
+            ? `<div class="ko-champ">🏅 <b>Campeón:</b> ${escapeHtml(nameOf(state.playoffs.championId))}</div>`
+            : '';
+
+        content = `
+      <div id="ko-bracket-root" class="ko-bracket">
+        <div class="ko-three">
+          <div class="ko-side left"  data-side="left"></div>
+          <div class="ko-center">
+            <img style="height: 200px;border-radius: 100%;/* margin-right: 20px; */" src="img/cup.jpg" alt="cup">
+            <div class="final-slot"></div>
+          </div>
+          <div class="ko-side right" data-side="right"></div>
+        </div>
+      </div>
+      ${championHtml}
+    `;
+      }
+
+      // Ensamblar salida
+      const html = `${tabs}${content}`;
+
+      // Si estamos en "Llaves", montar el bracket una vez que el HTML ya está en el DOM
+      if (state.ui.publicTab === 'ko') {
+        requestAnimationFrame(() => {
+          try {
+            const rounds = buildKnockoutRoundsFromState(state);
+            renderKOBracketSym(rounds, '#ko-bracket-root');
+          } catch (e) {
+            console.error('Error renderKOBracketSym:', e);
+          }
+        });
+      }
+
+      return html;
+    }
+
+
+
+    function renderBracketReadOnly(key) {
+      const title = key === 'R16' ? 'Octavos' : 'QF' === key ? 'Cuartos' : key === 'SF' ? 'Semifinal' : 'Final';
+      const ms = state.playoffs.brackets[key];
+      return `<div class="card" style="margin-top:8px">
+    <b>${title}</b>
+    <div class="grid cols-2">${ms.map(m => `<div class="match"><div class="teams">
+      <div>${escapeHtml(nameOf(m.aId))}</div><div class="center small muted">vs</div><div class="right">${escapeHtml(nameOf(m.bId))}</div>
+      <div class="center small muted">${valOr(m.scoreA, '-')}</div><div></div><div class="center small muted">${valOr(m.scoreB, '-')}</div>
+    </div></div>`).join('')}</div>
+  </div>`
+    }
+
+    /******************** Tabla de posiciones ********************/
+    function computeTable(idList, matches) {
+      const base = new Map(idList.map(id => [id, { id, name: nameOf(id), pts: 0, pj: 0, gf: 0, ga: 0, gd: 0 }]));
+      for (const m of matches) {
+        if (m.scoreA == null || m.scoreB == null) continue;
+        const A = base.get(m.aId), B = base.get(m.bId);
+        A.pj++; B.pj++;
+        A.gf += +m.scoreA; A.ga += +m.scoreB; A.gd = A.gf - A.ga;
+        B.gf += +m.scoreB; B.ga += +m.scoreA; B.gd = B.gf - B.ga;
+        if (+m.scoreA > +m.scoreB) { A.pts += 3 }
+        else if (+m.scoreB > +m.scoreA) { B.pts += 3 }
+        else { A.pts += 1; B.pts += 1 } // por si cargan empate
+      }
+      return Array.from(base.values()).sort((a, b) => (b.pts - a.pts) || (b.gd - a.gd) || (b.gf - a.gf) || a.name.localeCompare(b.name));
+    }
+
+    function tableHtml(title, table, showGroupPlace, highlightTop = 0) {
+      let rows = '';
+      table.forEach((t, i) => {
+        const adv = highlightTop && i < highlightTop ? 'adv' : '';
+        rows += `<tr class="${adv}">
+      <td>${(i + 1)}</td>
+      <td>${escapeHtml(t.name)}</td>
+      <td>${t.pts}</td>
+      <td>${t.pj}</td>
+      <td>${t.gf}</td>
+      <td>${t.ga}</td>
+      <td>${t.gd}</td>
+    </tr>`;
+      });
+      return `<div class="card">
+    ${title ? `<div class="row" style="justify-content:space-between;align-items:center"><b>${title}</b><span class="tag">${table.length} parejas</span></div>` : ''}
+    <div style="overflow:auto;border-radius:12px">
+      <table>
+        <thead><tr><th>#</th><th>Pareja</th><th>Pts</th><th>PJ</th><th>+</th><th>-</th><th>Dif</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  </div>`;
+    }
+
+    /******************** Helpers de nombres/valores ********************/
+    function nameOf(id) { return state.pairs.find(p => p.id === id)?.name || '—' }
+    function valOr(v, f) { return (v === 0 || v) ? v : f }
+    function escapeHtml(s) { return String(s).replace(/[&<>"']/g, m => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[m])) }
+
+
+    function getPerGroupQualifiers() {
+      return state.meta.format === 'grupos'
+        ? Math.max(1, Math.floor((state.config.playoffSize || 16) / 4))
+        : 0;
+    }
+
+    /******************** Generación de grupos / partidos ********************/
+    function roundRobinSchedule(ids) {
+      const arr = ids.slice();
+      if (arr.length % 2 === 1) arr.push(null);
+      const n = arr.length, half = n / 2, rounds = n - 1;
+      let teams = arr.slice();
+      const out = [];
+      for (let r = 1; r <= rounds; r++) {
+        for (let i = 0; i < half; i++) {
+          const a = teams[i], b = teams[n - 1 - i];
+          if (a != null && b != null) out.push({ aId: a, bId: b, round: r });
+        }
+        teams.splice(1, 0, teams.pop());
+      }
+      return out;
+    }
+
+    function makeGroups() {
+      const ids = state.pairs.map(p => p.id);
+      const shuffled = shuffle(ids);
+      state.groups = { A: [], B: [], C: [], D: [] };
+      shuffled.forEach((id, i) => { state.groups[['A', 'B', 'C', 'D'][i % 4]].push(id) })
+      state.groupMatches = [];
+      for (const k of ['A', 'B', 'C', 'D']) {
+        const g = state.groups[k];
+        const sched = roundRobinSchedule(g);
+        for (const s of sched) {
+          state.groupMatches.push({ id: uid('GM'), group: k, aId: s.aId, bId: s.bId, round: s.round, scoreA: null, scoreB: null });
+        }
+      }
+    }
+
+    /******************** Generación de liga ********************/
+    function makeLeague() {
+      const ids = (state.pairs || []).map(p => p.id);
+      const N = ids.length;
+
+      // Validaciones
+      if (N < 5) {
+        toast('Para que cada pareja juegue exactamente 4 partidos sin repetir rivales, se necesitan al menos 5 parejas.', 'warn');
+        return;
+      }
+
+      if (N % 2 !== 0) {
+        toast('Con cantidad impar de parejas no se puede garantizar 4 partidos por pareja en 4 rondas sin repetir. Agregá/quitá una pareja para que sea par.', 'error');
+        return;
+      }
+
+      // Round-robin estándar (método del círculo)
+      const full = roundRobinSchedule(ids); // genera N-1 rondas
+      // Tomamos SOLO las primeras 4 rondas → cada pareja juega 1 por ronda, total 4
+      const first4 = full.filter(s => s.round >= 1 && s.round <= 4);
+
+      state.leagueMatches = first4.map(s => ({
+        id: uid('LM'),
+        aId: s.aId,
+        bId: s.bId,
+        round: s.round,
+        scoreA: null,
+        scoreB: null
+      }));
+
+      // guardar + render
+      if (typeof saveAndRender === 'function') {
+        saveAndRender();
+      } else {
+        try { localStorage.setItem('trucoState', JSON.stringify(state)); } catch (e) { }
+        render();
+      }
+    }
+
+
+    /******************** Playoffs (siempre 16 clasificados) ********************/
+    function seedFromGroups(size) {
+      const per = Math.max(1, Math.floor(size / 4)); // 2 si size=8, 4 si size=16
+      const rankByGroup = []; // [[A1,A2,..],[B1,..],[C1,..],[D1,..]]
+      for (const k of ['A', 'B', 'C', 'D']) {
+        const ids = state.groups[k];
+        if (!ids || !ids.length) continue;
+        const table = computeTable(ids, state.groupMatches.filter(m => m.group === k));
+        rankByGroup.push(table.map(x => x.id));
+      }
+      // Interleaving por “nivel”: A1,B1,C1,D1, A2,B2,...
+      const seeded = [];
+      for (let r = 0; r < per; r++) {
+        for (let gi = 0; gi < rankByGroup.length; gi++) {
+          const id = rankByGroup[gi][r];
+          if (id) seeded.push(id);
+        }
+      }
+      // Tomar exactamente 'size' y armar llaves 1vsN, 2vs(N-1), ...
+      const idsFlat = seeded.slice(0, size);
+      return makeBracketPairs(idsFlat);
+    }
+
+
+    function seedFromLeague(size) {
+      const table = computeTable(state.pairs.map(p => p.id), state.leagueMatches);
+      const top = table.slice(0, size).map(t => t.id);
+      return makeBracketPairs(top);
+    }
+
+    function mKO(aId, bId) { return { id: uid('KO'), aId, bId, scoreA: null, scoreB: null, winnerId: null } }
+    function makeBracketPairs(ids) {
+      const n = ids.length;
+      const out = [];
+      for (let i = 0; i < Math.floor(n / 2); i++) {
+        out.push({
+          id: uid('KO'),
+          aId: ids[i],
+          bId: ids[n - 1 - i],
+          scoreA: null,
+          scoreB: null,
+          winnerId: null
+        });
+      }
+      return out;
+    }
+
+
+    function advanceStage(fromKey, toKey) {
+      const from = state.playoffs.brackets[fromKey];
+      if (!from || from.some(m => m.scoreA == null || m.scoreB == null || m.scoreA === m.scoreB)) {
+        alert('Completá todos los resultados (sin empates).'); return;
+      }
+      const winners = from.map(m => (m.scoreA > m.scoreB ? m.aId : m.bId));
+      if (toKey === 'F') {
+        state.playoffs.brackets.F = [mKO(winners[0], winners[1])];
+        state.playoffs.stage = 'F';
+      } else if (toKey === 'SF') {
+        state.playoffs.brackets.SF = [mKO(winners[0], winners[1]), mKO(winners[2], winners[3])];
+        state.playoffs.stage = 'SF';
+      } else if (toKey === 'QF') {
+        state.playoffs.brackets.QF = [mKO(winners[0], winners[1]), mKO(winners[2], winners[3]), mKO(winners[4], winners[5]), mKO(winners[6], winners[7])];
+        state.playoffs.stage = 'QF';
+      }
+    }
+
+    function closeTournament() {
+      const F = state.playoffs.brackets.F;
+      if (!F?.length || F[0].scoreA == null || F[0].scoreB == null || F[0].scoreA === F[0].scoreB) {
+        alert('Cargá el resultado de la Final.'); return;
+      }
+      state.playoffs.championId = F[0].scoreA > F[0].scoreB ? F[0].aId : F[0].bId;
+      state.playoffs.stage = 'DONE';
+    }
+
+    /******************** Bindings ********************/
+    function bindAdminEvents() {
+      // Título / cantidad
+      document.getElementById('inpTitle').oninput = e => { state.meta.title = e.target.value; saveState() };
+      document.getElementById('inpTitle').onblur = e => { state.meta.title = e.target.value; saveAndRerender() };
+      document.getElementById('inpNumPairs').onchange = e => { state.config.numPairs = Math.max(15, Math.min(25, +e.target.value || 15)); saveAndRerender() };
+      const selPS = document.getElementById('selPlayoffSize');
+      if (selPS) selPS.onchange = e => {
+        state.config.playoffSize = +e.target.value;
+        saveAndRerender();
+      };
+
+      // Formatos
+      const btnG = document.getElementById('btnSetFormatGroups'); if (btnG) btnG.onclick = () => { state.meta.format = 'grupos'; saveAndRerender() };
+      const btnL = document.getElementById('btnSetFormatLeague');
+      if (btnL) btnL.onclick = () => {
+        state.meta.format = 'liga';
+        if (!state.ui) state.ui = {};
+        state.ui.tableView = 'general';
+        saveAndRerender();
+      };
+      // Nombres
+      document.querySelectorAll('.inpPairName').forEach(inp => {
+        inp.oninput = e => { const id = e.target.dataset.id; const p = state.pairs.find(x => x.id === id); if (p) { p.name = e.target.value } saveState() };
+      });
+      const btnRandomize = document.getElementById('btnRandomize'); if (btnRandomize) btnRandomize.onclick = () => { state.pairs = shuffle(state.pairs); saveAndRerender() };
+      const btnNormalize = document.getElementById('btnNormalize'); if (btnNormalize) btnNormalize.onclick = () => {
+        state.pairs.forEach((p, i) => { if (!p.name || !p.name.trim()) p.name = `Pareja ${i + 1}` }); saveAndRerender()
+      };
+
+      // Fixtures
+      const btnMakeGroups = document.getElementById('btnMakeGroups'); if (btnMakeGroups) btnMakeGroups.onclick = () => { makeGroups(); saveAndRerender() };
+      const btnMakeLeague = document.getElementById('btnMakeLeague'); if (btnMakeLeague) btnMakeLeague.onclick = () => { makeLeague(); saveAndRerender() };
+
+      // Resultados inputs
+      document.querySelectorAll('.inpScore').forEach(inp => {
+        inp.onchange = e => {
+          const mid = e.target.dataset.mid; const side = e.target.dataset.side;
+          const setVal = (arr) => { const m = arr.find(x => x.id === mid); if (m) { if (side === 'A') m.scoreA = toIntOrNull(e.target.value); else m.scoreB = toIntOrNull(e.target.value) } }
+          setVal(state.groupMatches); setVal(state.leagueMatches);
+          for (const k of ['R16', 'QF', 'SF', 'F']) { const arr = state.playoffs.brackets[k]; const m = arr.find(x => x.id === mid); if (m) { if (side === 'A') m.scoreA = toIntOrNull(e.target.value); else m.scoreB = toIntOrNull(e.target.value) } }
+          saveAndRerender()
+        }
+      });
+
+      // Playoffs
+      const btnSeed = document.getElementById('btnSeedKO');
+      if (btnSeed) btnSeed.onclick = () => {
+        const size = state.config.playoffSize || 16;
+        const r = state.meta.format === 'grupos' ? seedFromGroups(size) : seedFromLeague(size);
+        state.playoffs.brackets = { R16: [], QF: [], SF: [], F: [] };
+        if (size === 16) {
+          state.playoffs.stage = 'R16';
+          state.playoffs.brackets.R16 = r;
+        } else {
+          state.playoffs.stage = 'QF';
+          state.playoffs.brackets.QF = r;
+        }
+        state.playoffs.championId = null;
+        saveAndRerender();
+      };
+      const btnRebuild = document.getElementById('btnRebuildKO'); if (btnRebuild) btnRebuild.onclick = () => {
+        state.playoffs = { stage: 'none', brackets: { R16: [], QF: [], SF: [], F: [] }, championId: null }; saveAndRerender();
+      };
+      const btnQF = document.getElementById('btnAdvanceQF'); if (btnQF) btnQF.onclick = () => { advanceStage('R16', 'QF'); saveAndRerender() };
+      const btnSF = document.getElementById('btnAdvanceSF'); if (btnSF) btnSF.onclick = () => { advanceStage('QF', 'SF'); saveAndRerender() };
+      const btnF = document.getElementById('btnAdvanceF'); if (btnF) btnF.onclick = () => { advanceStage('SF', 'F'); saveAndRerender() };
+      const btnFin = document.getElementById('btnFinish'); if (btnFin) btnFin.onclick = () => { closeTournament(); saveAndRerender() };
+
+      // Otros
+      const btnOpenNames = document.getElementById('btnOpenNames'); if (btnOpenNames) btnOpenNames.onclick = () => {
+        window.scrollTo({ top: document.body.scrollHeight / 4, behavior: 'smooth' })
+      };
+      const btnClear = document.getElementById('btnClearScores'); if (btnClear) btnClear.onclick = () => {
+        if (!confirm('¿Borrar todos los resultados?')) return;
+        [...state.groupMatches, ...state.leagueMatches, ...state.playoffs.brackets.R16, ...state.playoffs.brackets.QF, ...state.playoffs.brackets.SF, ...state.playoffs.brackets.F].forEach(m => { if (m) { m.scoreA = null; m.scoreB = null; if ('winnerId' in m) m.winnerId = null } });
+        saveAndRerender();
+      };
+      const btnReset = document.getElementById('btnReset'); if (btnReset) btnReset.onclick = () => {
+        if (!confirm('Esto borrará el torneo actual. ¿Continuar?')) return;
+        resetState(); Object.assign(state, createDefaultState()); saveAndRerender();
+      };
+    }
+
+    // === BEHAVIOR: scroll suave dentro de #pane-calendario hacia cada grupo ===
+    function setupPublicGroupNav() {
+      // Si no es formato grupos, normalmente no existirá el nav; salimos.
+      if (state?.meta?.format !== 'grupos') return;
+
+      const nav = document.getElementById('publicGroupNav');
+      const pane = document.getElementById('pane-calendario'); // contenedor con scroll
+
+      if (!nav || !pane) return;
+
+      // Delegación: un solo listener para todos los chips
+      nav.onclick = (e) => {
+        const btn = e.target.closest('[data-scroll-target]');
+        if (!btn) return;
+
+        const sel = btn.getAttribute('data-scroll-target');
+        const target = document.querySelector(sel);
+        if (!target) return;
+
+        const paneTop = pane.getBoundingClientRect().top;
+        const targetTop = target.getBoundingClientRect().top;
+        const delta = targetTop - paneTop;
+
+        pane.scrollTo({ top: pane.scrollTop + delta - 8, behavior: 'smooth' });
+      };
+    }
+    function bindPublicEvents() {
+      // pestañas de rondas (liga) – ya lo tenías
+      document.querySelectorAll('.tabRound').forEach(btn => {
+        btn.onclick = () => {
+          document.querySelectorAll('.tabRound').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          const r = +btn.dataset.round;
+          document.getElementById('leagueRounds').innerHTML = renderLeagueRound(r);
+          bindAdminEvents(); // para inputs de score
+        }
+      });
+
+      // Tabs principales
+      document.querySelectorAll('.pubtab').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.preventDefault(); e.stopPropagation();
+          state.ui = state.ui || {};
+          state.ui.publicTab = btn.dataset.tab;
+          saveAndRerender();
+        });
+      });
+
+      // Subtabs de Tablas
+      document.querySelectorAll('.pubsubtab').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.preventDefault(); e.stopPropagation();
+          state.ui = state.ui || {};
+          state.ui.tableView = (btn.dataset.sub === 'general') ? 'general' : 'grupos';
+          saveAndRerender();
+        });
+      });
+    }
+
+
+
+
+    /* Helpers */
+    function formatDate(d) {
+      if (!d) return '';
+      const dt = new Date(d);
+      if (isNaN(dt)) return d;
+      return dt.toLocaleDateString(undefined, { day: '2-digit', month: 'short' });
+    }
+    function escapeUrl(u) { return u ? u : 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="30" height="20"></svg>'; }
+
+    function ensureBracketSkeleton(rounds) {
+      // rounds: [R0, R1, ...] donde R0 es la 1ª ronda con PARTIDOS
+      const firstRoundMatches = rounds?.[0]?.length || 0; // ej: 8 partidos en Octavos
+      if (!firstRoundMatches) return rounds;
+
+      const participants = firstRoundMatches * 2;               // ej: 16 jugadores
+      const targetRounds = Math.ceil(Math.log2(participants));  // ej: 4 rondas (Oct, Cuar, Semi, Final)
+
+      // cantidad de PARTIDOS esperados por ronda:
+      // r=0 → participants/2; r=1 → participants/4; ...; última ronda → 1
+      const expectedMatchCounts = Array.from({ length: targetRounds }, (_, r) =>
+        Math.max(1, Math.ceil(participants / Math.pow(2, r + 1)))
+      );
+
+      const out = (rounds || []).map(r => (r ? r.slice() : []));
+
+      // Asegurar todas las rondas y sus placeholders
+      for (let r = 0; r < targetRounds; r++) {
+        if (!out[r]) out[r] = [];
+        while (out[r].length < expectedMatchCounts[r]) {
+          const i = out[r].length;
+          out[r].push({
+            id: `ph_${r}_${i}`,
+            a: { name: '', score: null },
+            b: { name: '', score: null },
+            winner: null,
+            placeholder: true,
+          });
+        }
+      }
+      return out.slice(0, targetRounds);
+    }
+
+    function roundLabel(firstRoundMatches, rIndex) {
+      // ahora decidimos por PARTICIPANTES
+      const participants = firstRoundMatches * 2; // ej: 8 partidos ⇒ 16 participantes ⇒ incluye Octavos
+      const labels16 = ['Octavos', 'Cuartos', 'Semifinal', 'Final'];
+      const labels8 = ['Cuartos', 'Semifinal', 'Final'];
+      const table = (participants >= 16) ? labels16 : labels8;
+      return table[rIndex] || `R${rIndex + 1}`;
+    }
+
+
+    /* ======= Ejemplo: cómo invocar (adapta a tu `state`) ======= */
+    if (window.__EXAMPLE_KO !== true) {
+      window.__EXAMPLE_KO = true; // evita reinserciones duplicadas
+      // si ya tenés state.knockoutRounds en tu app, cambialo a eso en lugar de exampleData
+      const exampleData = [
+        {
+          name: 'Octavos', matches: [
+            { id: 'a1', home: { name: 'ARG', flag: 'https://flagcdn.com/ar.svg', score: 3 }, away: { name: 'MEX', flag: 'https://flagcdn.com/mx.svg', score: 1 }, date: '2025-08-03', finished: true },
+            { id: 'a2', home: { name: 'BRA', flag: 'https://flagcdn.com/br.svg', score: 2 }, away: { name: 'CHI', flag: 'https://flagcdn.com/cl.svg', score: 0 }, date: '2025-08-03', finished: true },
+            { id: 'a3', home: { name: 'URU', flag: 'https://flagcdn.com/uy.svg', score: 1 }, away: { name: 'PAR', flag: 'https://flagcdn.com/py.svg', score: 2 }, date: '2025-08-04', finished: false },
+            { id: 'a4', home: { name: 'COL', flag: 'https://flagcdn.com/co.svg', score: 0 }, away: { name: 'PER', flag: 'https://flagcdn.com/pe.svg', score: 0 }, date: '2025-08-04', finished: false }
+          ]
+        },
+        {
+          name: 'Cuartos', matches: [
+            { id: 'b1', home: { name: 'ARG', flag: 'https://flagcdn.com/ar.svg', score: 3 }, away: { name: 'BRA', flag: 'https://flagcdn.com/br.svg', score: 2 }, date: '2025-08-10', finished: true },
+            { id: 'b2', home: { name: 'PAR', flag: 'https://flagcdn.com/py.svg', score: 2 }, away: { name: 'COL', flag: 'https://flagcdn.com/co.svg', score: 1 }, date: '2025-08-11', finished: false }
+          ]
+        },
+        {
+          name: 'Semis', matches: [
+            { id: 'c1', home: { name: 'ARG', flag: 'https://flagcdn.com/ar.svg', score: '', }, away: { name: 'PAR', flag: 'https://flagcdn.com/py.svg', score: '' }, date: '2025-08-17', finished: false }
+          ]
+        },
+        {
+          name: 'Final', matches: [
+            { id: 'f1', home: { name: 'ARG', flag: 'https://flagcdn.com/ar.svg', score: '' }, away: { name: 'PAR', flag: 'https://flagcdn.com/py.svg', score: '' }, date: '2025-08-24', finished: false }
+          ]
+        }
+      ];
+
+    }
+
+    function toIntOrNull(v) { const n = parseInt(v, 10); return Number.isFinite(n) ? n : null }
+
+    function saveAndRerender() { saveState(); render() }
+
+    /******************** Acciones header ********************/
+    const btnNew = document.getElementById('btnNew'); btnNew.onclick = () => { if (confirm('Crear un torneo nuevo? Se perderán cambios no guardados.')) { Object.assign(state, createDefaultState()); saveAndRerender() } }
+    // const btnSave = document.getElementById('btnSave'); btnSave.onclick=()=>{
+    //   const blob = new Blob([JSON.stringify(state,null,2)], {type:'application/json'});
+    //   const a = document.createElement('a'); a.href=URL.createObjectURL(blob); a.download = (state.meta.title||'torneo_truco')+'.json'; a.click(); URL.revokeObjectURL(a.href);
+    // }
+    // const btnImport = document.getElementById('btnImport'); const fileImport = document.getElementById('fileImport');
+    // btnImport.onclick=()=>fileImport.click();
+    // fileImport.onchange=(e)=>{
+    //   const f = e.target.files[0]; if(!f) return; const rd = new FileReader(); rd.onload=()=>{ try{ const data = JSON.parse(rd.result); Object.assign(state, data); saveAndRerender() }catch(err){ alert('Archivo inválido') } }; rd.readAsText(f)
+    // }
+
+    const btnOpenPublic = document.getElementById('btnOpenPublic'); btnOpenPublic.onclick = () => { window.open(location.pathname + '?view=public#public', '_blank') }
+
+    // Ctrl+S → exportar
+    // window.addEventListener('keydown', (e)=>{ if((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='s'){ e.preventDefault(); btnSave.click() } })
+
+    /******************** Tests (smoke) ********************/
+    (function selfTests() {
+      try {
+        // Test 1: roundRobinSchedule con 4 equipos
+        const ids4 = ['a', 'b', 'c', 'd'];
+        const sched4 = roundRobinSchedule(ids4);
+        console.assert(sched4.length === 6, 'RR 4 equipos debe tener 6 partidos');
+        const rounds4 = Math.max(...sched4.map(x => x.round));
+        console.assert(rounds4 === 3, 'RR 4 equipos debe tener 3 rondas');
+
+        // Test 2: computeTable suma PJ y puntos
+        const table = computeTable(['A', 'B', 'C'], [
+          { aId: 'A', bId: 'B', scoreA: 10, scoreB: 5 },
+          { aId: 'C', bId: 'A', scoreA: 7, scoreB: 1 },
+          { aId: 'B', bId: 'C', scoreA: 3, scoreB: 2 }
+        ]);
+        const a = table.find(t => t.id === 'A');
+        const b = table.find(t => t.id === 'B');
+        const c = table.find(t => t.id === 'C');
+        console.assert(a && a.pj === 2, 'A debería tener PJ=2');
+        console.assert(b && b.pj === 2, 'B debería tener PJ=2');
+        console.assert(c && c.pj === 2, 'C debería tener PJ=2');
+
+        // Test 3: escapeHtml básico
+        console.assert(escapeHtml('<>"&').includes('&lt;') && escapeHtml('<>"&').includes('&amp;'), 'escapeHtml debe escapar');
+
+        console.log('%c[OK] Self-tests pasaron', 'color:#22c55e');
+      } catch (err) {
+        console.warn('Self-tests error:', err);
+      }
+    })();
+
+    /******************** Inicializar ********************/
+    render();
+    // Modo público puro: ocultar admin y título
+    if (VIEW_PUBLIC) { document.title = (state.meta.title || 'Torneo de Truco') + ' — Público' }
+  </script>
 </body>
+
 </html>
