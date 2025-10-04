@@ -1735,16 +1735,49 @@
       document.getElementById('inpTitle').oninput = e => { state.meta.title = e.target.value; saveState() };
       document.getElementById('inpTitle').onblur = e => { state.meta.title = e.target.value; saveAndRerender() };
       document.getElementById('inpNumPairs').onchange = e => { state.config.numPairs = Math.max(16, Math.min(30, +e.target.value || 16)); saveAndRerender() };
-      const selPS = document.getElementById('selPlayoffSize');
-      if (selPS) selPS.onchange = e => {
+
+      const numPairsInput = document.getElementById('inpNumPairs');
+      if (numPairsInput) {
+        let prevNumPairs = state.config.numPairs;
+        numPairsInput.onfocus = () => { prevNumPairs = state.config.numPairs; };
+        numPairsInput.onchange = (e) => {
+          if (!guardOrStop(e, 'Acción: cambiar cantidad de parejas.')) {
+            e.target.value = prevNumPairs; // revertir UI
+            return;
+          }
+          state.config.numPairs = Math.max(16, Math.min(30, +e.target.value || 16));
+          saveAndRerender();
+        };
+      }
+
+     const selPS = document.getElementById('selPlayoffSize');
+    if (selPS) {
+      let prevPS = state.config.playoffSize;
+      selPS.onfocus = () => { prevPS = state.config.playoffSize; };
+      selPS.onchange = (e) => {
+        if (!guardOrStop(e, 'Acción: cambiar cantidad de clasificados a playoffs.')) {
+          // revertir selección visual
+          Array.from(selPS.options).forEach(o => { o.selected = (+o.value === prevPS); });
+          return;
+        }
         state.config.playoffSize = +e.target.value;
         saveAndRerender();
       };
+    }
+
+
 
       // Formatos
-      const btnG = document.getElementById('btnSetFormatGroups'); if (btnG) btnG.onclick = () => { state.meta.format = 'grupos'; saveAndRerender() };
+     const btnG = document.getElementById('btnSetFormatGroups');
+      if (btnG) btnG.onclick = (e) => {
+        if (!guardOrStop(e, 'Acción: cambiar a formato de Grupos.')) return;
+        state.meta.format = 'grupos';
+        saveAndRerender();
+      };
+
       const btnL = document.getElementById('btnSetFormatLeague');
-      if (btnL) btnL.onclick = () => {
+      if (btnL) btnL.onclick = (e) => {
+        if (!guardOrStop(e, 'Acción: cambiar a formato de Liga.')) return;
         state.meta.format = 'liga';
         if (!state.ui) state.ui = {};
         state.ui.tableView = 'general';
@@ -1754,14 +1787,30 @@
       document.querySelectorAll('.inpPairName').forEach(inp => {
         inp.oninput = e => { const id = e.target.dataset.id; const p = state.pairs.find(x => x.id === id); if (p) { p.name = e.target.value } saveState() };
       });
-      const btnRandomize = document.getElementById('btnRandomize'); if (btnRandomize) btnRandomize.onclick = () => { state.pairs = shuffle(state.pairs); saveAndRerender() };
+         // === Randomizar parejas ===
+    const btnRandomize = document.getElementById('btnRandomize');
+    if (btnRandomize) {
+      btnRandomize.onclick = (e) => {
+        if (!guardOrStop(e, 'Acción: randomizar el orden de las parejas.')) return;
+        randomizePairs(); // o el nombre exacto de tu función de random
+        saveAndRerender();
+      };
+    }
       const btnNormalize = document.getElementById('btnNormalize'); if (btnNormalize) btnNormalize.onclick = () => {
         state.pairs.forEach((p, i) => { if (!p.name || !p.name.trim()) p.name = `Pareja ${i + 1}` }); saveAndRerender()
       };
 
       // Fixtures
-      const btnMakeGroups = document.getElementById('btnMakeGroups'); if (btnMakeGroups) btnMakeGroups.onclick = () => { makeGroups(); saveAndRerender() };
-      const btnMakeLeague = document.getElementById('btnMakeLeague'); if (btnMakeLeague) btnMakeLeague.onclick = () => { makeLeague(); saveAndRerender() };
+     const btnMakeGroups = document.getElementById('btnMakeGroups');
+      if (btnMakeGroups) btnMakeGroups.onclick = (e) => {
+        if (!guardOrStop(e, 'Acción: generar grupos y su fixture.')) return;
+        makeGroups(); saveAndRerender();
+      };
+      const btnMakeLeague = document.getElementById('btnMakeLeague');
+      if (btnMakeLeague) btnMakeLeague.onclick = (e) => {
+        if (!guardOrStop(e, 'Acción: generar fixture de liga.')) return;
+        makeLeague(); saveAndRerender();
+      };
 
       // Resultados inputs
       document.querySelectorAll('.inpScore').forEach(inp => {
@@ -1915,6 +1964,31 @@
         }
       }
       return out.slice(0, targetRounds);
+    }
+
+    // === Detección de datos cargados (scores ya ingresados) ===
+    function hasLoadedScores() {
+      const anyIn = arr => Array.isArray(arr) && arr.some(m => m && (m.scoreA != null || m.scoreB != null));
+      const p = state.playoffs?.brackets || {};
+      return (
+        anyIn(state.groupMatches) ||
+        anyIn(state.leagueMatches) ||
+        anyIn(p.R16) || anyIn(p.QF) || anyIn(p.SF) || anyIn(p.F)
+      );
+    }
+
+    // Mensaje estándar
+    function confirmDangerChange(msgExtra='') {
+      const base = '⚠️ Hay resultados cargados. Si continuás, podrías perder/invalidar parte del fixture o las llaves.';
+      return confirm([base, msgExtra].filter(Boolean).join('\n\n'));
+    }
+
+    // Atajo: bloquea la acción si hay scores y no confirman
+    function guardOrStop(e, msgExtra='') {
+      if (!hasLoadedScores()) return true;
+      const ok = confirmDangerChange(msgExtra);
+      if (!ok && e && e.preventDefault) e.preventDefault();
+      return ok;
     }
 
     function roundLabel(firstRoundMatches, rIndex) {
