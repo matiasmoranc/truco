@@ -229,4 +229,8 @@ $('player-actions').querySelector('.pass-button').addEventListener('click',()=>t
 $('close-config').addEventListener('click',()=>showView('setup-view'));
 $('save-config').addEventListener('click',()=>{try{const cfg=JSON.parse($('firebase-config').value);if(!firebaseConfigValid(cfg))throw new Error('missing');state.config=cfg;localStorage.setItem(storageKey,JSON.stringify(cfg));toast('Configuración guardada.',true);runPendingAction();}catch{toast('Pegá una configuración Firebase válida.',true);}});
 state.config=loadConfig();
+try {
+  const bundled = await import('./firebase-config.js');
+  if (firebaseConfigValid(bundled.firebaseConfig)) state.config = bundled.firebaseConfig;
+} catch { /* Optional during initial setup. */ }
 if(location.search.includes('demo=mesa'))demoStart('table');
