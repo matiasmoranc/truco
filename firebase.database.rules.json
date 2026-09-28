@@ -3,6 +3,7 @@
     ".read": false,
     ".write": false,
     "rooms": {
+      ".read": "auth != null",
       "$room": {
         "public": {
           ".read": "auth != null",
