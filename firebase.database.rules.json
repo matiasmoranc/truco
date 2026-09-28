@@ -13,8 +13,8 @@
     "hands": {
       "$room": {
         "$uid": {
-          ".read": "auth != null && auth.uid === $uid",
-          ".write": "auth != null && (auth.uid === $uid || auth.uid === root.child('rooms').child($room).child('public').child('table').child('uid').val())"
+          ".read": "auth != null && auth.uid == $uid",
+          ".write": "auth != null && (auth.uid == $uid || auth.uid == root.child('rooms').child($room).child('public').child('table').child('uid').val())"
         }
       }
     }
