@@ -207,7 +207,9 @@ function envidoValue(card, muestra) {
 function hasFlor(hand, muestra) {
   const pieces = hand.filter((card)=>pieceOrder(card,muestra)>0);
   const suits = hand.reduce((all,card)=>{all[card.suit]=(all[card.suit]||0)+1;return all;},{});
-  return pieces.length>=2 || Object.values(suits).some((n)=>n===3) || (pieces.length>=1 && Object.values(suits).some((n)=>n===2));
+  const nonPieces=hand.filter((card)=>!pieceOrder(card,muestra));
+  const twoSameSuit=nonPieces.length===2&&nonPieces[0].suit===nonPieces[1].suit;
+  return pieces.length>=2 || Object.values(suits).some((n)=>n===3) || (pieces.length===1&&twoSameSuit);
 }
 function handEnvido(hand, muestra) {
   const values=hand.map((card)=>envidoValue(card,muestra));let best=Math.max(...values);
