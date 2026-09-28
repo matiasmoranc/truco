@@ -48,6 +48,8 @@
           </div>
           <label class="field-label" for="player-name">TU NOMBRE</label>
           <input id="player-name" class="name-input" maxlength="18" placeholder="Ej. Matias" autocomplete="nickname" />
+          <label class="field-label target-label" for="target-points">SE JUEGA A</label>
+          <select id="target-points" class="name-input target-select"><option value="10">10 puntos</option><option value="20">20 puntos</option><option value="30" selected>30 puntos</option><option value="40">40 puntos</option><option value="50">50 puntos</option><option value="60">60 puntos</option></select>
           <button class="button primary full-button" id="enter-room">Crear mesa <span class="arrow">↗</span></button>
           <p class="setup-note"><span>✦</span> Los demás encontrarán esta mesa en “Mesas abiertas”.</p>
         </div>
@@ -79,24 +81,25 @@
         <header class="game-topbar"><button class="mini-brand" id="game-home"><b>T</b> TRUCO</button><span class="room-pill" id="game-room-code">MESA · —</span><span class="connection"><span class="live-dot"></span> EN VIVO</span></header>
         <div class="game-layout">
           <aside class="scoreboard">
-            <div class="score-label">PUNTOS <span>·</span> A 15</div>
+            <div class="score-label">TANTOS <span>·</span> A <b id="score-target">30</b></div>
             <div class="score-row"><span class="team-dot red-dot"></span><span class="team-name" id="score-name-1">Nosotros</span><strong id="score-1">0</strong></div>
+            <div class="tally" id="tally-1" aria-label="Palitos de Jugador 1"></div>
             <div class="score-row"><span class="team-dot"></span><span class="team-name" id="score-name-2">Ellos</span><strong id="score-2">0</strong></div>
-            <div class="score-progress"><i id="score-progress-1"></i><i id="score-progress-2"></i></div>
+            <div class="tally" id="tally-2" aria-label="Palitos de Jugador 2"></div>
             <div class="hand-label">MANO <span id="hand-number">01</span></div>
           </aside>
           <section class="felt-area" id="felt-area">
             <div class="felt-ring ring-a"></div><div class="felt-ring ring-b"></div>
             <div class="opponent-info"><span class="avatar avatar-opponent" id="opponent-avatar">J</span><span><strong id="opponent-name">Esperando…</strong><small>CONTRARIO</small></span><span class="card-back-stack"><i></i><i></i><i></i></span></div>
-            <div class="center-table"><div class="deck-stack" id="deck-stack"><span>♣</span></div><div class="table-hint" id="table-hint">LA MESA<br />ESTÁ LISTA</div><div class="trick-cards" id="trick-cards"></div></div>
+            <div class="center-table"><div class="deck-stack" id="deck-stack"><span>♣</span></div><div class="muestra-card hidden" id="muestra-card"></div><div class="table-hint" id="table-hint">LA MESA<br />ESTÁ LISTA</div><div class="trick-cards" id="trick-cards"></div></div>
             <div class="table-divider"></div>
             <div class="my-player-info"><span class="avatar avatar-me" id="my-avatar">M</span><span><strong id="my-name">Vos</strong><small>JUGÁS VOS</small></span><span class="turn-badge" id="turn-badge">TU TURNO</span></div>
             <div class="hand" id="hand"></div>
-            <div class="player-actions" id="player-actions"><button class="call-button" disabled>TRUCO <span>↗</span></button><button class="pass-button" disabled>ENVIDO</button></div>
+            <div class="player-actions" id="player-actions"></div>
           </section>
           <aside class="side-panel"><div class="side-title">PARTIDA <span>EN CURSO</span></div><div class="round-feed" id="round-feed"><div class="feed-item"><i></i><span>Esperando la primera jugada</span></div></div><div class="side-bottom"><span class="deck-count"><i>▧</i> <b id="deck-count">40</b> cartas en el mazo</span><button id="sound-toggle" class="sound-button">♫ Sonido <span>OFF</span></button></div></aside>
         </div>
-        <div class="mobile-score"><span><i class="team-dot red-dot"></i><b id="mobile-score-1">0</b></span><small>·</small><span><i class="team-dot"></i><b id="mobile-score-2">0</b></span><small>·</small><span>MANO <b id="mobile-hand">01</b></span><button id="mobile-history">PARTIDA ↗</button></div>
+        <div class="mobile-score"><span class="mobile-team-score"><i class="team-dot red-dot"></i><b id="mobile-score-1">0</b></span><div class="tally mobile-tally" id="mobile-tally-1"></div><small>·</small><span class="mobile-team-score"><i class="team-dot"></i><b id="mobile-score-2">0</b></span><div class="tally mobile-tally" id="mobile-tally-2"></div><small class="mobile-target">A <b id="mobile-target">30</b></small><span class="mobile-hand-label">MANO <b id="mobile-hand">01</b></span><button id="mobile-history">PARTIDA ↗</button></div>
         <div class="toast" id="toast" role="status"></div>
       </section>
 
