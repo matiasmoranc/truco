@@ -20,7 +20,7 @@ Abrí `index.html` con un servidor estático y elegí **Explorar una demo**. La 
 
 - Truco uruguayo a dos jugadores, con tres cartas por jugador y una muestra visible por mano.
 - Piezas de la muestra (2, 4, 5, caballo y sota), alcahuete cuando la muestra es una pieza, matas y orden de cartas.
-- Envido, real envido, falta envido, flor, truco, retruco y vale cuatro.
+- Envido, real envido, falta envido, flor, con flor envido, contra flor al resto, truco, retruco y vale cuatro.
 - Tanteador configurable antes de abrir la mesa: 10, 20, 30, 40, 50 o 60. Los tantos se muestran como palitos en grupos de cinco.
 - La mano se define por dos de tres bazas; los empates se resuelven dando ventaja a quien ganó primero o a la mano cuando todas quedan pardas.
 
