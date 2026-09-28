@@ -417,7 +417,7 @@ function escapeHtml(value='') { return String(value).replace(/[&<>"']/g,(ch)=>({
 function demoStart(role) {
   state.demo=true; state.roomCode='DEMO1'; state.playerId=role; const deck=shuffleDeck();
   state.hand=role==='table'?[]:deck.slice(role==='player1'?0:3,role==='player1'?3:6);
-  state.room={status:'started',table:{name:'La mesa'},players:{player1:{name:'Matias'},player2:{name:'Nico'}},scores:{player1:4,player2:3},handNumber:7,deckCount:28,turn:'player1',trickNo:2,trickCards:[{playerId:'player2',name:'Nico',card:deck[13]}],feed:[{text:'Nico jugó 7 de copa.',time:Date.now()},{text:'Matias se llevó la baza anterior.',time:Date.now()}]};
+  state.room={status:'started',targetPoints:30,muestra:deck[6],table:{name:'La mesa'},players:{player1:{name:'Matias'},player2:{name:'Nico'}},scores:{player1:4,player2:3},handNumber:7,deckCount:33,turn:'player1',mano:'player1',trickNo:2,trickCards:[{playerId:'player2',name:'Nico',card:deck[13]}],feed:[{text:'Nico jugó 7 de copa.',time:Date.now()},{text:'Matias se llevó la baza anterior.',time:Date.now()}]};
   $('game-room-code').textContent='MESA · DEMO1'; renderGame(); showView('game-view');
 }
 function demoPlay(card) {
