@@ -1,8 +1,8 @@
 const FIREBASE_VERSION = '12.4.0';
 const $ = (id) => document.getElementById(id);
-const views = ['welcome-view', 'setup-view', 'waiting-view', 'game-view', 'config-view'];
+const views = ['welcome-view', 'setup-view', 'lobby-view', 'waiting-view', 'game-view', 'config-view'];
 const storageKey = 'truco-firebase-config';
-let state = { role: 'mesa', joining: false, config: null, firebase: null, roomCode: null, uid: null, playerId: null, unsubscribe: null, privateUnsubscribe: null, room: null, hand: [], demo: false, nextAction: null };
+let state = { role: 'table', joining: false, config: null, firebase: null, roomCode: null, selectedRoom: null, uid: null, playerId: null, unsubscribe: null, privateUnsubscribe: null, lobbyUnsubscribe: null, room: null, hand: [], demo: false, nextAction: null };
 
 function showView(id) { views.forEach((name) => $(name).classList.toggle('active', name === id)); }
 function toast(message, global = false) {
@@ -14,18 +14,14 @@ function cleanName(value, fallback) { return value.trim().slice(0,18) || fallbac
 function pickRole(role) {
   state.role = role;
   document.querySelectorAll('.role-card').forEach((card) => card.classList.toggle('selected', card.dataset.role === role));
-  $('enter-room').innerHTML = `${state.joining ? 'Unirme a la mesa' : (role === 'mesa' ? 'Crear mesa' : 'Crear mesa como jugador')} <span class="arrow">↗</span>`;
+  const label = role === 'table' ? 'la mesa' : role === 'player1' ? 'Jugador 1' : 'Jugador 2';
+  $('enter-room').innerHTML = `Crear mesa como ${label} <span class="arrow">↗</span>`;
 }
-function configureSetup(joining) {
-  state.joining = joining;
-  $('room-code-wrap').classList.toggle('hidden', !joining);
-  $('role-options').classList.toggle('single', !joining);
-  $('role-options').querySelectorAll('.role-card').forEach((card) => {
-    card.classList.toggle('hidden', joining ? card.dataset.role === 'mesa' : card.dataset.role !== 'mesa');
-  });
-  if (joining && state.role === 'mesa') pickRole('player1');
-  if (!joining) pickRole('mesa');
-  $('enter-room').innerHTML = `${joining ? 'Unirme a la mesa' : 'Crear mesa'} <span class="arrow">↗</span>`;
+function configureSetup() {
+  state.joining = false;
+  $('role-options').classList.remove('single');
+  $('role-options').querySelectorAll('.role-card').forEach((card) => card.classList.remove('hidden'));
+  pickRole('table');
   showView('setup-view');
 }
 function firebaseConfigValid(config) { return !!(config && config.apiKey && config.databaseURL && config.projectId && config.appId); }
@@ -49,38 +45,72 @@ async function firebaseServices() {
 async function runPendingAction() {
   const action = state.nextAction; state.nextAction = null;
   if (action === 'enter') await enterRoom();
+  if (action === 'lobby') await openLobby();
 }
 function showConfig() {
   $('firebase-config').value = state.config ? JSON.stringify(state.config, null, 2) : '';
   showView('config-view');
 }
 async function enterRoom() {
-  const name = cleanName($('player-name').value, state.role === 'mesa' ? 'La mesa' : 'Jugador');
-  if (state.joining && $('room-code').value.trim().length < 5) { toast('Ingresá el código de 5 letras.'); return; }
+  const name = cleanName($('player-name').value, state.role === 'table' ? 'La mesa' : 'Jugador');
   if (!firebaseConfigValid(state.config)) { state.nextAction = 'enter'; showConfig(); return; }
   try {
     const fb = await firebaseServices();
     if (state.joining) {
-      const code = $('room-code').value.trim().toUpperCase();
+      const code = state.selectedRoom;
       const roomRef = fb.ref(fb.db, `rooms/${code}/public`);
       const snap = await fb.get(roomRef);
       if (!snap.exists()) { toast('No encontramos esa mesa. Revisá el código.'); return; }
+      const room = snap.val();
+      if (room.status !== 'waiting') { toast('Esa mesa ya empezó. Elegí otra.'); openLobby(); return; }
       const seat = state.role;
-      const seatRef = fb.ref(fb.db, `rooms/${code}/public/players/${seat}`);
+      const seatPath = seat === 'table' ? `rooms/${code}/public/table` : `rooms/${code}/public/players/${seat}`;
+      const seatRef = fb.ref(fb.db, seatPath);
       const claim = await fb.runTransaction(seatRef, (current) => current == null ? { uid: state.uid, name, online: true } : current);
-      if (!claim.committed || claim.snapshot.val()?.uid !== state.uid) { toast('Ese lugar ya está ocupado.'); return; }
+      if (!claim.committed || claim.snapshot.val()?.uid !== state.uid) { toast('Ese lugar ya está ocupado. Elegí otro puesto.'); openLobby(); return; }
       state.roomCode = code; state.playerId = seat;
     } else {
-      if (state.role !== 'mesa') { toast('Para crear una mesa, elegí el lugar de la mesa.'); return; }
-      const code = makeCode(); state.roomCode = code; state.playerId = 'table';
-      const initial = { public: { status: 'waiting', createdAt: Date.now(), table: { uid: state.uid, name }, players: { player1: null, player2: null }, scores: { player1: 0, player2: 0 }, handNumber: 1, deckCount: 40, trickCards: [], feed: [{ text: 'Mesa creada. Que se sienten los jugadores.', time: Date.now() }] } };
-      await fb.set(fb.ref(fb.db, `rooms/${code}/public`), initial.public);
+      const code = makeCode(); state.roomCode = code; state.playerId = state.role;
+      const person = { uid: state.uid, name, online: true };
+      const initial = { status: 'waiting', createdAt: Date.now(), table: state.role === 'table' ? person : null, players: { player1: state.role === 'player1' ? person : null, player2: state.role === 'player2' ? person : null }, scores: { player1: 0, player2: 0 }, handNumber: 1, deckCount: 40, trickCards: [], feed: [{ text: `${name} abrió una mesa. Faltan los demás.`, time: Date.now() }] };
+      await fb.set(fb.ref(fb.db, `rooms/${code}/public`), initial);
     }
     localStorage.setItem('truco-last-seat', JSON.stringify({ code: state.roomCode, role: state.playerId }));
+    if (state.lobbyUnsubscribe) { state.lobbyUnsubscribe(); state.lobbyUnsubscribe = null; }
     watchRoom(); renderWaiting(); showView('waiting-view');
   } catch (error) {
     console.error(error); toast(firebaseError(error));
   }
+}
+async function openLobby() {
+  if (!firebaseConfigValid(state.config)) { state.nextAction = 'lobby'; showConfig(); return; }
+  try {
+    const fb = await firebaseServices();
+    showView('lobby-view');
+    $('open-room-list').innerHTML = '<p class="muted">Buscando mesas abiertas…</p>';
+    if (state.lobbyUnsubscribe) state.lobbyUnsubscribe();
+    state.lobbyUnsubscribe = fb.onValue(fb.ref(fb.db, 'rooms'), (snapshot) => renderLobby(snapshot.val() || {}), (error) => {
+      console.error(error); $('open-room-list').innerHTML = '<p class="muted">No pudimos cargar las mesas. Revisá las reglas de Firebase.</p>';
+    });
+  } catch (error) {
+    console.error(error); toast(firebaseError(error));
+  }
+}
+function renderLobby(rooms) {
+  const open = Object.entries(rooms).filter(([, value]) => value?.public?.status === 'waiting' && (!value.public.table || !value.public.players?.player1 || !value.public.players?.player2)).sort((a,b) => (b[1].public.createdAt || 0) - (a[1].public.createdAt || 0));
+  if (!open.length) { $('open-room-list').innerHTML = '<div class="empty-lobby"><span>♣</span><strong>No hay mesas abiertas todavía</strong><p>Creá una mesa y elegí si vas a jugar o a llevar el tanteador.</p></div>'; return; }
+  $('open-room-list').innerHTML = open.map(([code, value]) => {
+    const room = value.public, players = room.players || {}, seats = [['table','La mesa',room.table],['player1','Jugador 1',players.player1],['player2','Jugador 2',players.player2]];
+    const title = room.table?.name || players.player1?.name || players.player2?.name || 'Mesa abierta';
+    const available = seats.filter(([, , person]) => !person);
+    return `<article class="lobby-card"><div class="lobby-card-top"><div><p class="eyebrow">MESA ABIERTA</p><h3>${escapeHtml(title)}</h3></div><span class="lobby-count">${3-available.length}/3</span></div><div class="lobby-seats">${seats.map(([key,label,person]) => `<span class="lobby-seat ${person?'taken':''}">${person ? `${escapeHtml(label)}: ${escapeHtml(person.name || 'Ocupado')}` : `${escapeHtml(label)} · libre`}</span>`).join('')}</div><div class="lobby-join-options">${available.map(([key,label]) => `<button class="button ${key==='table'?'lobby-table-button':'lobby-player-button'}" data-room="${code}" data-seat="${key}">Unirme como ${label}<span>↗</span></button>`).join('')}</div></article>`;
+  }).join('');
+}
+function joinOpenRoom(code, seat) {
+  state.joining = true; state.selectedRoom = code; state.role = seat;
+  const name = cleanName($('lobby-name').value, seat === 'table' ? 'La mesa' : 'Jugador');
+  $('player-name').value = name;
+  enterRoom();
 }
 function firebaseError(error) {
   if (error?.code === 'auth/operation-not-allowed') return 'Activá el inicio de sesión anónimo en Firebase y volvé a intentar.';
@@ -109,14 +139,13 @@ function watchPrivateHand() {
 function renderWaiting() {
   if (!state.room) return;
   const players = state.room.players || {};
-  $('room-code-display').textContent = state.roomCode.split('').join(' ');
-  $('room-status').textContent = players.player1 && players.player2 ? 'MESA COMPLETA' : 'ESPERANDO JUGADORES';
+  $('room-status').textContent = state.room.table && players.player1 && players.player2 ? 'MESA COMPLETA' : 'ESPERANDO LUGARES';
   const seatData = [['table','LA MESA',state.room.table],['player1','JUGADOR 1',players.player1],['player2','JUGADOR 2',players.player2]];
   $('seats').innerHTML = seatData.map(([key,label,value]) => `<div class="seat"><span class="seat-icon">${key==='table'?'♣':key==='player1'?'♠':'♥'}</span><span class="seat-name"><strong>${escapeHtml(value?.name || (key==='table'?'La mesa':'Esperando jugador…'))}</strong><small>${label}</small></span><span class="seat-state ${value?'ready':''}">${value?'LISTO':'ESPERANDO'}</span></div>`).join('');
-  const ready = !!(players.player1 && players.player2);
+  const ready = !!(state.room.table && players.player1 && players.player2);
   $('start-game').disabled = !(ready && state.playerId === 'table');
-  $('waiting-hint').textContent = state.playerId === 'table' ? (ready ? 'Ya están todos. ¡A jugar!' : 'Esperando que se unan los dos jugadores') : 'Compartí el código y esperá a que la mesa reparta';
-  $('game-room-code').textContent = `MESA · ${state.roomCode}`;
+  $('waiting-hint').textContent = state.playerId === 'table' ? (ready ? 'Ya están todos. ¡A jugar!' : 'Esperando que se unan los dos jugadores') : 'Esperá a que la mesa reparta';
+  $('game-room-code').textContent = 'MESA ABIERTA';
 }
 function shuffleDeck() {
   const suits = [{name:'oro',symbol:'♦',red:true},{name:'copa',symbol:'♥',red:true},{name:'espada',symbol:'♠',red:false},{name:'basto',symbol:'♣',red:false}];
@@ -185,7 +214,7 @@ function renderGame() {
   $('score-1').textContent=room.scores?.player1||0; $('score-2').textContent=room.scores?.player2||0; $('mobile-score-1').textContent=room.scores?.player1||0; $('mobile-score-2').textContent=room.scores?.player2||0;
   $('score-progress-1').style.flex=(room.scores?.player1||0)+1; $('score-progress-2').style.flex=(room.scores?.player2||0)+1;
   $('hand-number').textContent=String(room.handNumber||1).padStart(2,'0'); $('mobile-hand').textContent=String(room.handNumber||1).padStart(2,'0'); $('deck-count').textContent=room.deckCount??40;
-  $('game-room-code').textContent=`MESA · ${state.roomCode}`;
+  $('game-room-code').textContent='MESA ABIERTA';
   $('my-name').textContent=isTable?tableName:(mine?.name||'Vos'); $('my-avatar').textContent=(isTable?tableName:(mine?.name||'V')).slice(0,1).toUpperCase();
   $('opponent-name').textContent=isTable?'Los jugadores':(opponent?.name||'Esperando rival'); $('opponent-avatar').textContent=(isTable?'♠':(opponent?.name||'J').slice(0,1)).toUpperCase();
   const myTurn=state.demo||(!isTable&&room.turn===state.playerId);
@@ -212,8 +241,10 @@ function demoPlay(card) {
   if(state.room.trickCards.length===2){const winner=cardStrength(state.room.trickCards[0].card)>=cardStrength(state.room.trickCards[1].card)?state.room.trickCards[0].playerId:state.room.trickCards[1].playerId;state.room.scores[winner]++;state.room.feed.unshift({text:`${state.room.players[winner].name} se lleva la baza.`,time:Date.now()});setTimeout(()=>{state.room.trickCards=[];state.room.turn='player1';if(!state.hand.length){state.hand=shuffleDeck().slice(0,3);state.room.handNumber++;}renderGame();},700);} else state.room.turn=state.playerId==='player1'?'player2':'player1'; renderGame(); toast('Jugada de demostración.');
 }
 
-$('create-room').addEventListener('click',()=>configureSetup(false));
-$('show-join').addEventListener('click',()=>configureSetup(true));
+$('create-room').addEventListener('click',()=>configureSetup());
+$('show-join').addEventListener('click',openLobby);
+$('back-lobby').addEventListener('click',()=>{if(state.lobbyUnsubscribe){state.lobbyUnsubscribe();state.lobbyUnsubscribe=null;}showView('welcome-view');});
+$('open-room-list').addEventListener('click',(event)=>{const button=event.target.closest('[data-room][data-seat]');if(button)joinOpenRoom(button.dataset.room,button.dataset.seat);});
 $('role-options').querySelectorAll('.role-card').forEach((card)=>{
   card.addEventListener('click',()=>{
     if(!card.classList.contains('hidden')) pickRole(card.dataset.role);
@@ -223,12 +254,10 @@ $('back-home').addEventListener('click',()=>showView('welcome-view'));
 $('enter-room').addEventListener('click',enterRoom);
 $('demo-button').addEventListener('click',()=>demoStart('player1'));
 $('start-game').addEventListener('click',async()=>{try{await startGame();}catch(error){console.error(error);toast(firebaseError(error));}});
-$('copy-code').addEventListener('click',async()=>{try{await navigator.clipboard.writeText(state.roomCode);toast('Código copiado.');}catch{toast(`Código: ${state.roomCode}`);}});
 $('leave-room').addEventListener('click',()=>{if(state.unsubscribe)state.unsubscribe();if(state.privateUnsubscribe)state.privateUnsubscribe();state.room=null;state.demo=false;showView('welcome-view');});
 $('game-home').addEventListener('click',()=>{if(state.demo){state.demo=false;showView('welcome-view');return;}showView('waiting-view');});
 $('mobile-history').addEventListener('click',()=>toast('La partida queda a la vista en la pantalla de mesa.'));
 $('sound-toggle').addEventListener('click',()=>toast('El sonido se agrega en una próxima versión.'));
-$('show-join').addEventListener('click',()=>{$('room-code').value='';});
 $('player-actions').querySelector('.call-button').addEventListener('click',()=>toast('Los cantos se habilitan al definir la variante de reglas.'));
 $('player-actions').querySelector('.pass-button').addEventListener('click',()=>toast('Los cantos se habilitan al definir la variante de reglas.'));
 $('close-config').addEventListener('click',()=>showView('setup-view'));
