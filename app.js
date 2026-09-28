@@ -400,9 +400,9 @@ function renderGame() {
   $('hand').innerHTML=isTable?'':state.hand.map((card) => `<button class="hand-card ${card.red?'card-red':''}" data-card="${card.id}" ${!myTurn?'disabled':''}><span class="card-rank">${card.label}</span><span class="card-suit">${card.suit}</span><span class="card-value">${card.suit.toUpperCase()}</span></button>`).join('');
   document.querySelectorAll('.hand-card').forEach((button) => button.addEventListener('click', () => {const card=state.hand.find((item)=>item.id===button.dataset.card); if(card) playCard(card);}));
   $('trick-cards').innerHTML=isTable?(room.trickCards||[]).map(({name,card})=>`<div class="played-card ${card.red?'card-red':''}"><span class="card-rank">${card.label}</span><span class="card-suit">${card.suit}</span><span class="card-who">${escapeHtml(name)}</span></div>`).join(''):'';
-  const sample=room.muestra;$('muestra-card').classList.toggle('hidden',!sample);$('muestra-card').innerHTML=sample?`<span>${sample.label}</span><b>${sample.suit}</b><small>MUESTRA</small>`:'';$('deck-stack').classList.toggle('hidden',!isTable||!!sample);
+  const sample=room.muestra;$('muestra-card').classList.toggle('hidden',!sample);$('muestra-card').innerHTML=sample?`<span>${sample.label}</span><b>${sample.suit}</b><small>MUESTRA</small>`:'';$('deck-stack').classList.toggle('hidden',!isTable);
   $('table-hint').classList.toggle('hidden',!isTable||(room.trickCards||[]).length>0);
-  const visibleFeed=(room.feed||[]).filter(({text=''})=>isTable||!/\bjugó\b/i.test(text));
+  const visibleFeed=(room.feed||[]).filter(({text=''})=>isTable||!/\bjug[oó]/i.test(text));
   $('round-feed').innerHTML=visibleFeed.slice(0,7).map(({text})=>`<div class="feed-item"><i></i><span>${escapeHtml(text)}</span></div>`).join('');
   const actions=$('player-actions');actions.classList.toggle('hidden',isTable||room.status==='complete');
   const pending=room.pendingBet, other=state.playerId==='player1'?'player2':'player1';

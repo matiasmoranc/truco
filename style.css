@@ -43,7 +43,7 @@
 @media(max-height:700px) and (min-width:701px){.welcome{padding-top:12px;padding-bottom:12px;gap:10px}.home-content{gap:30px}.home-intro{gap:16px}.home-lobby{padding:12px}.open-room-list{margin-top:9px}.lobby-card{padding:8px 10px}.lobby-seats{margin:5px 0}.welcome-foot{font-size:7px}}
 
 /* En teléfonos, el paño ocupa el alto disponible y cada rol ve su propia vista. */
-.player-mode .deck-stack,.player-mode .trick-cards,.player-mode .table-hint,.player-mode .card-back-stack{display:none!important}
+.player-mode .deck-stack,.player-mode .trick-cards,.player-mode .table-hint,.player-mode .card-back-stack,.player-mode .deck-count{display:none!important}
 .table-mode .muestra-card,.player-mode .muestra-card{top:17%;left:50%;transform:translate(-50%,-50%) rotate(-8deg);z-index:3}
 @media(max-width:640px){
   .game{height:100dvh;min-height:0;overflow:hidden}
