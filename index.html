@@ -28,8 +28,8 @@
           </div>
         </div>
         <div class="welcome-actions">
-          <button class="button primary" id="create-room"><span>Armar una mesa</span><span class="arrow">↗</span></button>
-          <button class="button text-button" id="show-join">Tengo un código <span>→</span></button>
+          <button class="button primary" id="create-room"><span>Crear una mesa</span><span class="arrow">↗</span></button>
+          <button class="button text-button" id="show-join">Ver mesas abiertas <span>→</span></button>
           <button class="demo-link" id="demo-button">Explorar una demo <span>↗</span></button>
         </div>
         <footer class="welcome-foot"><span>2 JUGADORES</span><span class="foot-dash"></span><span>1 MESA</span><span class="foot-dash"></span><span>UNA PARTIDA</span></footer>
@@ -42,15 +42,25 @@
           <h2>¿Quién sos<br />en esta mesa?</h2>
           <p class="muted">Elegí tu lugar y ponete un nombre.</p>
           <div class="role-options" id="role-options">
-            <button class="role-card selected" data-role="mesa"><span class="role-number">01</span><span class="role-glyph table-glyph">♣</span><span class="role-title">La mesa</span><span class="role-desc">Mazo, cartas jugadas y puntos</span><span class="radio"></span></button>
+            <button class="role-card selected" data-role="table"><span class="role-number">01</span><span class="role-glyph table-glyph">♣</span><span class="role-title">La mesa</span><span class="role-desc">Mazo, cartas jugadas y puntos</span><span class="radio"></span></button>
             <button class="role-card" data-role="player1"><span class="role-number">02</span><span class="role-glyph">♠</span><span class="role-title">Jugador 1</span><span class="role-desc">Tus cartas y tus jugadas</span><span class="radio"></span></button>
             <button class="role-card" data-role="player2"><span class="role-number">03</span><span class="role-glyph red-suit">♥</span><span class="role-title">Jugador 2</span><span class="role-desc">Tus cartas y tus jugadas</span><span class="radio"></span></button>
           </div>
           <label class="field-label" for="player-name">TU NOMBRE</label>
           <input id="player-name" class="name-input" maxlength="18" placeholder="Ej. Matias" autocomplete="nickname" />
-          <div class="room-code-wrap hidden" id="room-code-wrap"><label class="field-label" for="room-code">CÓDIGO DE MESA</label><input id="room-code" class="name-input code-input" maxlength="5" placeholder="ABCDE" autocomplete="off" /></div>
           <button class="button primary full-button" id="enter-room">Crear mesa <span class="arrow">↗</span></button>
-          <p class="setup-note"><span>✦</span> El código se comparte con los otros dos dispositivos.</p>
+          <p class="setup-note"><span>✦</span> Los demás encontrarán esta mesa en “Mesas abiertas”.</p>
+        </div>
+      </section>
+
+      <section class="lobby-view view" id="lobby-view">
+        <header class="topbar"><button class="icon-button" id="back-lobby" aria-label="Volver">←</button><span class="mini-brand"><b>T</b> TRUCO</span><span class="connection"><span class="live-dot"></span> EN VIVO</span></header>
+        <div class="lobby-content">
+          <p class="eyebrow">SUMATE A UNA PARTIDA</p>
+          <h2>Mesas<br />abiertas.</h2>
+          <label class="field-label" for="lobby-name">TU NOMBRE</label>
+          <input id="lobby-name" class="name-input" maxlength="18" placeholder="Ej. Matias" autocomplete="nickname" />
+          <div class="open-room-list" id="open-room-list"><p class="muted">Buscando mesas abiertas…</p></div>
         </div>
       </section>
 
@@ -59,7 +69,7 @@
         <div class="waiting-content">
           <p class="eyebrow">MESA CREADA · <span id="room-status">ESPERANDO JUGADORES</span></p>
           <h2>Que no falte<br /><em>nadie.</em></h2>
-          <div class="code-card"><span class="field-label">CÓDIGO PARA UNIRSE</span><strong id="room-code-display">— — — — —</strong><button id="copy-code" class="copy-button">Copiar código</button></div>
+          <div class="code-card notice"><span class="field-label">MESA ABIERTA</span><strong>Los demás pueden sumarse desde “Mesas abiertas”.</strong></div>
           <div class="seats" id="seats"></div>
           <div class="waiting-bottom"><button class="button primary full-button" id="start-game" disabled>Repartir las cartas <span class="arrow">↗</span></button><p id="waiting-hint">Esperando que se unan los dos jugadores</p></div>
         </div>
