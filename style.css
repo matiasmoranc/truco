@@ -45,6 +45,7 @@
 /* En teléfonos, el paño ocupa el alto disponible y cada rol ve su propia vista. */
 .player-mode .deck-stack,.player-mode .trick-cards,.player-mode .table-hint,.player-mode .card-back-stack,.player-mode .deck-count{display:none!important}
 .table-mode .muestra-card,.player-mode .muestra-card{top:17%;left:50%;transform:translate(-50%,-50%) rotate(-8deg);z-index:3}
+.table-mode .deck-stack{top:50%;left:auto;right:4%;transform:translateY(-50%)}
 @media(max-width:640px){
   .game{height:100dvh;min-height:0;overflow:hidden}
   .game-topbar{flex:0 0 54px}
@@ -61,6 +62,7 @@
   .table-mode .played-card{width:clamp(54px,17vw,72px);height:clamp(78px,24vw,104px)}
   .table-mode .played-card .card-rank{font-size:24px}
   .table-mode .played-card .card-suit{font-size:22px}
+  .table-mode .deck-stack{right:7%;width:50px;height:72px}
   .table-mode .muestra-card{top:18%;z-index:3}
   .table-mode .table-hint{top:calc(50% + 67px)}
   .player-mode .opponent-info,.player-mode .table-divider,.player-mode .deck-stack,.player-mode .trick-cards,.player-mode .table-hint,.player-mode .card-back-stack{display:none!important}
