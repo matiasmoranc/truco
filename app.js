@@ -402,7 +402,8 @@ function renderGame() {
   $('trick-cards').innerHTML=isTable?(room.trickCards||[]).map(({name,card})=>`<div class="played-card ${card.red?'card-red':''}"><span class="card-rank">${card.label}</span><span class="card-suit">${card.suit}</span><span class="card-who">${escapeHtml(name)}</span></div>`).join(''):'';
   const sample=room.muestra;$('muestra-card').classList.toggle('hidden',!sample);$('muestra-card').innerHTML=sample?`<span>${sample.label}</span><b>${sample.suit}</b><small>MUESTRA</small>`:'';$('deck-stack').classList.toggle('hidden',!isTable||!!sample);
   $('table-hint').classList.toggle('hidden',!isTable||(room.trickCards||[]).length>0);
-  $('round-feed').innerHTML=(room.feed||[]).slice(0,7).map(({text})=>`<div class="feed-item"><i></i><span>${escapeHtml(text)}</span></div>`).join('');
+  const visibleFeed=(room.feed||[]).filter(({text=''})=>isTable||!/\bjugó\b/i.test(text));
+  $('round-feed').innerHTML=visibleFeed.slice(0,7).map(({text})=>`<div class="feed-item"><i></i><span>${escapeHtml(text)}</span></div>`).join('');
   const actions=$('player-actions');actions.classList.toggle('hidden',isTable||room.status==='complete');
   const pending=room.pendingBet, other=state.playerId==='player1'?'player2':'player1';
   const canEnvido=!room.envidoClosed&&(room.playedCount||0)===0&&!room.flors?.[state.playerId]&&!room.flors?.[other]&&!hasFlor(state.hand,room.muestra);
