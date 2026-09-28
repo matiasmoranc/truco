@@ -383,6 +383,8 @@ async function playCard(card) {
 function renderGame() {
   if (!state.room) return;
   const room = state.room, players=room.players||{}, isTable=state.playerId==='table', mine=players[state.playerId], opponent=players[state.playerId==='player1'?'player2':'player1'];
+  $('game-view').classList.toggle('table-mode', isTable);
+  $('game-view').classList.toggle('player-mode', !isTable);
   const tableName=room.table?.name||'La mesa';
   $('score-name-1').textContent=players.player1?.name||'Jugador 1'; $('score-name-2').textContent=players.player2?.name||'Jugador 2';
   $('score-1').textContent=room.scores?.player1||0; $('score-2').textContent=room.scores?.player2||0; $('mobile-score-1').textContent=room.scores?.player1||0; $('mobile-score-2').textContent=room.scores?.player2||0;
@@ -395,11 +397,11 @@ function renderGame() {
   $('opponent-name').textContent=isTable?'Los jugadores':(opponent?.name||'Esperando rival'); $('opponent-avatar').textContent=(isTable?'♠':(opponent?.name||'J').slice(0,1)).toUpperCase();
   const myTurn=state.demo||(!isTable&&room.turn===state.playerId&&room.status==='started');
   $('turn-badge').textContent=isTable?'MESA':myTurn?'TU TURNO':'ESPERÁ'; $('turn-badge').classList.toggle('waiting-turn',!myTurn);
-  $('hand').innerHTML=isTable?'<p class="table-hint">VISTA DE MESA<br>LAS MANOS SON PRIVADAS</p>':state.hand.map((card) => `<button class="hand-card ${card.red?'card-red':''}" data-card="${card.id}" ${!myTurn?'disabled':''}><span class="card-rank">${card.label}</span><span class="card-suit">${card.suit}</span><span class="card-value">${card.suit.toUpperCase()}</span></button>`).join('');
+  $('hand').innerHTML=isTable?'':state.hand.map((card) => `<button class="hand-card ${card.red?'card-red':''}" data-card="${card.id}" ${!myTurn?'disabled':''}><span class="card-rank">${card.label}</span><span class="card-suit">${card.suit}</span><span class="card-value">${card.suit.toUpperCase()}</span></button>`).join('');
   document.querySelectorAll('.hand-card').forEach((button) => button.addEventListener('click', () => {const card=state.hand.find((item)=>item.id===button.dataset.card); if(card) playCard(card);}));
-  $('trick-cards').innerHTML=(room.trickCards||[]).map(({name,card})=>`<div class="played-card ${card.red?'card-red':''}"><span class="card-rank">${card.label}</span><span class="card-suit">${card.suit}</span><span class="card-who">${escapeHtml(name)}</span></div>`).join('');
-  const sample=room.muestra;$('muestra-card').classList.toggle('hidden',!sample);$('muestra-card').innerHTML=sample?`<span>${sample.label}</span><b>${sample.suit}</b><small>MUESTRA</small>`:'';$('deck-stack').classList.toggle('hidden',!!sample);
-  $('table-hint').classList.toggle('hidden',(room.trickCards||[]).length>0);
+  $('trick-cards').innerHTML=isTable?(room.trickCards||[]).map(({name,card})=>`<div class="played-card ${card.red?'card-red':''}"><span class="card-rank">${card.label}</span><span class="card-suit">${card.suit}</span><span class="card-who">${escapeHtml(name)}</span></div>`).join(''):'';
+  const sample=room.muestra;$('muestra-card').classList.toggle('hidden',!sample);$('muestra-card').innerHTML=sample?`<span>${sample.label}</span><b>${sample.suit}</b><small>MUESTRA</small>`:'';$('deck-stack').classList.toggle('hidden',!isTable||!!sample);
+  $('table-hint').classList.toggle('hidden',!isTable||(room.trickCards||[]).length>0);
   $('round-feed').innerHTML=(room.feed||[]).slice(0,7).map(({text})=>`<div class="feed-item"><i></i><span>${escapeHtml(text)}</span></div>`).join('');
   const actions=$('player-actions');actions.classList.toggle('hidden',isTable||room.status==='complete');
   const pending=room.pendingBet, other=state.playerId==='player1'?'player2':'player1';

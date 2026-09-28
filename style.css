@@ -41,3 +41,34 @@
 @media(max-width:700px){.welcome{padding:15px 18px 12px;gap:11px}.home-content{grid-template-columns:1fr;gap:13px;align-content:start}.home-intro{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:10px}.home-heading .eyebrow{font-size:7px;margin-bottom:7px}.welcome .home-heading h1{font-size:clamp(25px,7vw,34px)}.home-heading .intro{font-size:11px;margin-top:5px}.home-actions{width:132px}.home-actions .primary{height:42px;padding:0 10px;font-size:11px}.home-actions .arrow{font-size:17px}.home-actions .demo-link{font-size:9px;margin-top:7px}.home-lobby{padding:12px}.home-lobby-heading{align-items:center;gap:10px}.home-section-title h2{font-size:22px}.home-lobby-heading p{font-size:9px;margin-top:4px}.live-pill{font-size:6px;padding:4px 5px}.home-name{width:116px}.home-name .field-label{font-size:6px}.home-name .name-input{height:31px;font-size:10px}.open-room-list{margin-top:10px;gap:6px}.lobby-card{padding:8px 9px}.lobby-card h3{font-size:14px}.lobby-seats{margin:5px 0;gap:4px}.lobby-seat{font-size:7px;padding:3px 5px}.lobby-join-options{gap:5px}.lobby-join-options .button{height:28px;font-size:7px;padding:0 7px}.empty-lobby{padding:12px 8px}.empty-lobby>span{font-size:17px}.empty-lobby strong{font-size:13px}.empty-lobby p{font-size:9px}.welcome-foot{font-size:7px;gap:7px}.welcome-foot .foot-dash{width:11px}}
 @media(max-width:380px){.welcome{padding:12px 13px 10px;gap:8px}.home-content{gap:9px}.home-intro{grid-template-columns:minmax(0,1fr) 118px}.home-heading .eyebrow{font-size:6px}.welcome .home-heading h1{font-size:25px}.home-heading .intro{font-size:10px}.home-actions .primary{font-size:10px}.home-lobby{padding:9px}.home-lobby-heading p{font-size:8px}.home-name{width:100px}.home-name .name-input{height:29px}.home-lobby-heading{gap:5px}.home-section-title{gap:6px}.home-section-title h2{font-size:20px}.lobby-seat{font-size:6px}.lobby-join-options .button{font-size:6px}}
 @media(max-height:700px) and (min-width:701px){.welcome{padding-top:12px;padding-bottom:12px;gap:10px}.home-content{gap:30px}.home-intro{gap:16px}.home-lobby{padding:12px}.open-room-list{margin-top:9px}.lobby-card{padding:8px 10px}.lobby-seats{margin:5px 0}.welcome-foot{font-size:7px}}
+
+/* En teléfonos, el paño ocupa el alto disponible y cada rol ve su propia vista. */
+.player-mode .deck-stack,.player-mode .trick-cards,.player-mode .table-hint,.player-mode .card-back-stack{display:none!important}
+.table-mode .muestra-card,.player-mode .muestra-card{top:17%;left:50%;transform:translate(-50%,-50%) rotate(-8deg);z-index:3}
+@media(max-width:640px){
+  .game{height:100dvh;min-height:0;overflow:hidden}
+  .game-topbar{flex:0 0 54px}
+  .game-layout{display:block;flex:1 1 0;height:auto;min-height:0;overflow:hidden}
+  .felt-area{width:100%;height:100%;min-height:0;padding:14px 12px}
+  .mobile-score{position:relative;flex:0 0 54px}
+  .table-divider{display:none}
+  .center-table{top:50%;left:50%;width:100%;height:170px;transform:translate(-50%,-50%)}
+  .muestra-card{top:17%;left:50%;width:53px;height:77px;transform:translate(-50%,-50%) rotate(-8deg)}
+  .muestra-card span,.muestra-card b{font-size:19px}
+  .table-mode .opponent-info{position:absolute;top:15px;left:14px;width:calc(100% - 28px);max-width:none;margin:0}
+  .table-mode .my-player-info{position:absolute;bottom:14px;left:14px;width:calc(100% - 28px);max-width:none;margin:0}
+  .table-mode .hand,.table-mode .player-actions{display:none}
+  .table-mode .played-card{width:clamp(54px,17vw,72px);height:clamp(78px,24vw,104px)}
+  .table-mode .played-card .card-rank{font-size:24px}
+  .table-mode .played-card .card-suit{font-size:22px}
+  .table-mode .muestra-card{top:18%;z-index:3}
+  .table-mode .table-hint{top:calc(50% + 67px)}
+  .player-mode .opponent-info,.player-mode .table-divider,.player-mode .deck-stack,.player-mode .trick-cards,.player-mode .table-hint,.player-mode .card-back-stack{display:none!important}
+  .player-mode .my-player-info{position:absolute;top:16px;left:14px;width:calc(100% - 28px);max-width:none;margin:0}
+  .player-mode .center-table{top:18px;left:50%;width:70px;height:82px;transform:translateX(-50%)}
+  .player-mode .muestra-card{top:90px;z-index:3}
+  .player-mode .hand{position:absolute;top:50%;left:50%;width:calc(100% - 20px);max-width:360px;min-height:0;height:auto;margin:0;gap:8px;transform:translate(-50%,-50%)}
+  .player-mode .hand-card{width:clamp(74px,23vw,100px);height:clamp(104px,22dvh,132px);flex:0 1 clamp(74px,23vw,100px)}
+  .player-mode .player-actions{position:absolute;left:50%;bottom:12px;width:calc(100% - 24px);max-width:430px;min-height:0;margin:0;transform:translateX(-50%);gap:6px}
+  .player-mode .player-actions .pass-button,.player-mode .player-actions .call-button{flex:0 1 auto}
+}
