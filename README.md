@@ -8,18 +8,17 @@ Abrí `index.html` con un servidor estático y elegí **Explorar una demo**. La 
 
 ## Conectar partidas entre dispositivos
 
-1. Creá un proyecto Firebase y agregá una aplicación web.
-2. Habilitá **Authentication → Sign-in method → Anonymous**.
-3. Creá una **Realtime Database** y copiá la configuración web del proyecto.
-4. La configuración web ya está cargada en `firebase-config.js`. No pegues claves de cuenta de servicio ni credenciales privadas.
-5. En los otros dos dispositivos, abrí la misma web, elegí **Tengo un código**, seleccioná Jugador 1 o Jugador 2 e ingresá el código que aparece en la mesa.
-6. Cuando estén los tres conectados, la mesa puede repartir.
+1. Habilitá **Authentication → Sign-in method → Anonymous** en Firebase.
+2. La configuración web ya está cargada en `firebase-config.js`. No pegues claves de cuenta de servicio ni credenciales privadas.
+3. Una persona crea una mesa y elige su lugar: mesa, Jugador 1 o Jugador 2.
+4. En los demás dispositivos, abrí la misma web, tocá **Ver mesas abiertas** y elegí un puesto libre.
+5. Cuando la mesa y ambos jugadores estén conectados, la mesa puede repartir.
 
-`firebase.json` deja preparado el despliegue del sitio y las reglas con Firebase CLI (`firebase deploy --only hosting,database`). También podés importar `firebase.database.rules.json` desde Firebase Console. La autenticación anónima es necesaria. Estas reglas separan las cartas privadas y evitan que un usuario lea la mano de otro; el acceso a partidas públicas todavía permite que cualquier usuario autenticado modifique el estado. Son adecuadas para probar el juego, no para una partida competitiva o con premios.
+`firebase.json` deja preparado el despliegue del sitio y las reglas con Firebase CLI (`firebase deploy --only hosting,database`). También podés importar `firebase.database.rules.json` desde Firebase Console. La regla de lectura en `rooms` permite que usuarios autenticados vean la lista de mesas abiertas; las manos se mantienen separadas y cada jugador solo puede leer la suya. El acceso a partidas públicas todavía permite que cualquier usuario autenticado modifique el estado. Son reglas para probar el juego, no para una partida competitiva o con premios.
 
 ## Alcance inicial
 
-- Crear mesa con código y asignar los dos lugares de jugador.
+- Crear mesas y elegir un puesto libre desde la lista en vivo.
 - Sincronizar el estado en tiempo real.
 - Repartir tres cartas a cada jugador y mantener sus manos privadas.
 - Mostrar cartas jugadas, mazo, turno y tanteador en la vista de mesa.
