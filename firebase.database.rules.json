@@ -1,0 +1,22 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "rooms": {
+      "$room": {
+        "public": {
+          ".read": "auth != null",
+          ".write": "auth != null"
+        }
+      }
+    },
+    "hands": {
+      "$room": {
+        "$uid": {
+          ".read": "auth != null && auth.uid === $uid",
+          ".write": "auth != null && (auth.uid === $uid || auth.uid === root.child('rooms').child($room).child('public').child('table').child('uid').val())"
+        }
+      }
+    }
+  }
+}

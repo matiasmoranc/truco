@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#10291f" />
+    <meta name="description" content="Una mesa de truco para jugar entre amigos, cada uno desde su celular." />
+    <title>Truco — La mesa está servida</title>
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <div class="grain" aria-hidden="true"></div>
+    <main id="app" class="app-shell">
+      <section class="welcome view active" id="welcome-view">
+        <header class="brand-lockup"><span class="brand-mark">T</span><span>TRUCO<span class="brand-period">.</span></span></header>
+        <div class="welcome-copy">
+          <p class="eyebrow"><span class="live-dot"></span> LA MESA ESTÁ SERVIDA</p>
+          <h1>Las cartas<br />ya están <em>repartidas.</em></h1>
+          <p class="intro">Jueguen frente a frente. Cada uno en su celular; la mesa, en el medio.</p>
+          <div class="device-story" aria-label="Dos jugadores y una mesa">
+            <div class="story-player"><span class="story-icon">♠</span><span>JUGADOR 1</span></div>
+            <span class="story-line"></span><div class="story-table"><span>♣</span></div><span class="story-line"></span>
+            <div class="story-player"><span class="story-icon">♥</span><span>JUGADOR 2</span></div>
+          </div>
+        </div>
+        <div class="welcome-actions">
+          <button class="button primary" id="create-room"><span>Armar una mesa</span><span class="arrow">↗</span></button>
+          <button class="button text-button" id="show-join">Tengo un código <span>→</span></button>
+          <button class="demo-link" id="demo-button">Explorar una demo <span>↗</span></button>
+        </div>
+        <footer class="welcome-foot"><span>2 JUGADORES</span><span class="foot-dash"></span><span>1 MESA</span><span class="foot-dash"></span><span>UNA PARTIDA</span></footer>
+      </section>
+
+      <section class="setup view" id="setup-view">
+        <header class="topbar"><button class="icon-button" id="back-home" aria-label="Volver">←</button><span class="mini-brand"><b>T</b> TRUCO</span><span class="step-count">01 <i>/ 02</i></span></header>
+        <div class="setup-content">
+          <p class="eyebrow">ANTES DE REPARTIR</p>
+          <h2>¿Quién sos<br />en esta mesa?</h2>
+          <p class="muted">Elegí tu lugar y ponete un nombre.</p>
+          <div class="role-options" id="role-options">
+            <button class="role-card selected" data-role="mesa"><span class="role-number">01</span><span class="role-glyph table-glyph">♣</span><span class="role-title">La mesa</span><span class="role-desc">Mazo, cartas jugadas y puntos</span><span class="radio"></span></button>
+            <button class="role-card" data-role="player1"><span class="role-number">02</span><span class="role-glyph">♠</span><span class="role-title">Jugador 1</span><span class="role-desc">Tus cartas y tus jugadas</span><span class="radio"></span></button>
+            <button class="role-card" data-role="player2"><span class="role-number">03</span><span class="role-glyph red-suit">♥</span><span class="role-title">Jugador 2</span><span class="role-desc">Tus cartas y tus jugadas</span><span class="radio"></span></button>
+          </div>
+          <label class="field-label" for="player-name">TU NOMBRE</label>
+          <input id="player-name" class="name-input" maxlength="18" placeholder="Ej. Matias" autocomplete="nickname" />
+          <div class="room-code-wrap hidden" id="room-code-wrap"><label class="field-label" for="room-code">CÓDIGO DE MESA</label><input id="room-code" class="name-input code-input" maxlength="5" placeholder="ABCDE" autocomplete="off" /></div>
+          <button class="button primary full-button" id="enter-room">Crear mesa <span class="arrow">↗</span></button>
+          <p class="setup-note"><span>✦</span> El código se comparte con los otros dos dispositivos.</p>
+        </div>
+      </section>
+
+      <section class="waiting view" id="waiting-view">
+        <header class="topbar"><button class="icon-button" id="leave-room" aria-label="Salir">←</button><span class="mini-brand"><b>T</b> TRUCO</span><span class="connection"><span class="live-dot"></span> EN VIVO</span></header>
+        <div class="waiting-content">
+          <p class="eyebrow">MESA CREADA · <span id="room-status">ESPERANDO JUGADORES</span></p>
+          <h2>Que no falte<br /><em>nadie.</em></h2>
+          <div class="code-card"><span class="field-label">CÓDIGO PARA UNIRSE</span><strong id="room-code-display">— — — — —</strong><button id="copy-code" class="copy-button">Copiar código</button></div>
+          <div class="seats" id="seats"></div>
+          <div class="waiting-bottom"><button class="button primary full-button" id="start-game" disabled>Repartir las cartas <span class="arrow">↗</span></button><p id="waiting-hint">Esperando que se unan los dos jugadores</p></div>
+        </div>
+      </section>
+
+      <section class="game view" id="game-view">
+        <header class="game-topbar"><button class="mini-brand" id="game-home"><b>T</b> TRUCO</button><span class="room-pill" id="game-room-code">MESA · —</span><span class="connection"><span class="live-dot"></span> EN VIVO</span></header>
+        <div class="game-layout">
+          <aside class="scoreboard">
+            <div class="score-label">PUNTOS <span>·</span> A 15</div>
+            <div class="score-row"><span class="team-dot red-dot"></span><span class="team-name" id="score-name-1">Nosotros</span><strong id="score-1">0</strong></div>
+            <div class="score-row"><span class="team-dot"></span><span class="team-name" id="score-name-2">Ellos</span><strong id="score-2">0</strong></div>
+            <div class="score-progress"><i id="score-progress-1"></i><i id="score-progress-2"></i></div>
+            <div class="hand-label">MANO <span id="hand-number">01</span></div>
+          </aside>
+          <section class="felt-area" id="felt-area">
+            <div class="felt-ring ring-a"></div><div class="felt-ring ring-b"></div>
+            <div class="opponent-info"><span class="avatar avatar-opponent" id="opponent-avatar">J</span><span><strong id="opponent-name">Esperando…</strong><small>CONTRARIO</small></span><span class="card-back-stack"><i></i><i></i><i></i></span></div>
+            <div class="center-table"><div class="deck-stack" id="deck-stack"><span>♣</span></div><div class="table-hint" id="table-hint">LA MESA<br />ESTÁ LISTA</div><div class="trick-cards" id="trick-cards"></div></div>
+            <div class="table-divider"></div>
+            <div class="my-player-info"><span class="avatar avatar-me" id="my-avatar">M</span><span><strong id="my-name">Vos</strong><small>JUGÁS VOS</small></span><span class="turn-badge" id="turn-badge">TU TURNO</span></div>
+            <div class="hand" id="hand"></div>
+            <div class="player-actions" id="player-actions"><button class="call-button" disabled>TRUCO <span>↗</span></button><button class="pass-button" disabled>ENVIDO</button></div>
+          </section>
+          <aside class="side-panel"><div class="side-title">PARTIDA <span>EN CURSO</span></div><div class="round-feed" id="round-feed"><div class="feed-item"><i></i><span>Esperando la primera jugada</span></div></div><div class="side-bottom"><span class="deck-count"><i>▧</i> <b id="deck-count">40</b> cartas en el mazo</span><button id="sound-toggle" class="sound-button">♫ Sonido <span>OFF</span></button></div></aside>
+        </div>
+        <div class="mobile-score"><span><i class="team-dot red-dot"></i><b id="mobile-score-1">0</b></span><small>·</small><span><i class="team-dot"></i><b id="mobile-score-2">0</b></span><small>·</small><span>MANO <b id="mobile-hand">01</b></span><button id="mobile-history">PARTIDA ↗</button></div>
+        <div class="toast" id="toast" role="status"></div>
+      </section>
+
+      <section class="config-view view" id="config-view">
+        <header class="topbar"><button class="icon-button" id="close-config" aria-label="Cerrar">×</button><span class="mini-brand"><b>T</b> TRUCO</span><span></span></header>
+        <div class="config-content"><p class="eyebrow">UN PASO MÁS</p><h2>Conectá<br />la partida.</h2><p class="muted">Para jugar desde tres dispositivos necesitamos una base compartida. Pegá aquí la configuración web de Firebase.</p><textarea id="firebase-config" placeholder='{"apiKey":"…","databaseURL":"https://…firebasedatabase.app","projectId":"…","appId":"…"}'></textarea><button class="button primary full-button" id="save-config">Guardar y continuar <span class="arrow">↗</span></button><p class="config-foot">La configuración web de Firebase identifica tu proyecto; no es una contraseña. Las reglas de seguridad deben limitar el acceso a las mesas.</p></div>
+      </section>
+
+      <section class="toast-global" id="global-toast" role="status"></section>
+    </main>
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
