@@ -10,29 +10,27 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="./style.css?v=20260928-2" />
+    <link rel="stylesheet" href="./style.css?v=20260928-3" />
   </head>
   <body>
     <div class="grain" aria-hidden="true"></div>
     <main id="app" class="app-shell">
       <section class="welcome view active" id="welcome-view">
-        <header class="brand-lockup"><span class="brand-mark">T</span><span>TRUCO<span class="brand-period">.</span></span></header>
-        <div class="welcome-copy">
-          <p class="eyebrow"><span class="live-dot"></span> LA MESA ESTÁ SERVIDA</p>
-          <h1>Las cartas<br />ya están <em>repartidas.</em></h1>
-          <p class="intro">Jueguen frente a frente. Cada uno en su celular; la mesa, en el medio.</p>
-          <div class="device-story" aria-label="Dos jugadores y una mesa">
-            <div class="story-player"><span class="story-icon">♠</span><span>JUGADOR 1</span></div>
-            <span class="story-line"></span><div class="story-table"><span>♣</span></div><span class="story-line"></span>
-            <div class="story-player"><span class="story-icon">♥</span><span>JUGADOR 2</span></div>
-          </div>
+        <header class="home-topbar">
+          <div class="brand-lockup"><span class="brand-mark">T</span><span>TRUCO<span class="brand-period">.</span></span></div>
+          <span class="connection"><span class="live-dot"></span>TRUCO URUGUAYO</span>
+        </header>
+        <div class="home-content">
+          <section class="home-intro">
+            <div class="home-heading"><p class="eyebrow">UNA MESA, TRES DISPOSITIVOS</p><h1>Truco uruguayo</h1><p class="intro">Creá una mesa o sumate a una partida abierta.</p></div>
+            <div class="home-actions"><button class="button primary" id="create-room"><span>Crear mesa</span><span class="arrow">↗</span></button><button class="demo-link" id="demo-button">Probar demo <span>↗</span></button></div>
+          </section>
+          <section class="home-lobby" aria-labelledby="home-lobby-title">
+            <div class="home-lobby-heading"><div><div class="home-section-title"><h2 id="home-lobby-title">Mesas abiertas</h2><span class="live-pill"><i></i> EN VIVO</span></div><p>Elegí un lugar libre para entrar.</p></div><label class="home-name"><span class="field-label">TU NOMBRE</span><input id="lobby-name" class="name-input" maxlength="18" placeholder="Ej. Matias" autocomplete="nickname" /></label></div>
+            <div class="open-room-list" id="open-room-list"><p class="muted">Conectando con las mesas…</p></div>
+          </section>
         </div>
-        <div class="welcome-actions">
-          <button class="button primary" id="create-room"><span>Crear una mesa</span><span class="arrow">↗</span></button>
-          <button class="button text-button" id="show-join">Ver mesas abiertas <span>→</span></button>
-          <button class="demo-link" id="demo-button">Explorar una demo <span>↗</span></button>
-        </div>
-        <footer class="welcome-foot"><span>2 JUGADORES</span><span class="foot-dash"></span><span>1 MESA</span><span class="foot-dash"></span><span>UNA PARTIDA</span></footer>
+        <footer class="welcome-foot"><span>2 JUGADORES</span><span class="foot-dash"></span><span>1 MESA</span><span class="foot-dash"></span><span>CON MUESTRA</span></footer>
       </section>
 
       <section class="setup view" id="setup-view">
@@ -52,17 +50,6 @@
           <select id="target-points" class="name-input target-select"><option value="10">10 puntos</option><option value="20">20 puntos</option><option value="30" selected>30 puntos</option><option value="40">40 puntos</option><option value="50">50 puntos</option><option value="60">60 puntos</option></select>
           <button class="button primary full-button" id="enter-room">Crear mesa <span class="arrow">↗</span></button>
           <p class="setup-note"><span>✦</span> Los demás encontrarán esta mesa en “Mesas abiertas”.</p>
-        </div>
-      </section>
-
-      <section class="lobby-view view" id="lobby-view">
-        <header class="topbar"><button class="icon-button" id="back-lobby" aria-label="Volver">←</button><span class="mini-brand"><b>T</b> TRUCO</span><span class="connection"><span class="live-dot"></span> EN VIVO</span></header>
-        <div class="lobby-content">
-          <p class="eyebrow">SUMATE A UNA PARTIDA</p>
-          <h2>Mesas<br />abiertas.</h2>
-          <label class="field-label" for="lobby-name">TU NOMBRE</label>
-          <input id="lobby-name" class="name-input" maxlength="18" placeholder="Ej. Matias" autocomplete="nickname" />
-          <div class="open-room-list" id="open-room-list"><p class="muted">Buscando mesas abiertas…</p></div>
         </div>
       </section>
 
@@ -110,6 +97,6 @@
 
       <section class="toast-global" id="global-toast" role="status"></section>
     </main>
-    <script type="module" src="./app.js?v=20260928-4"></script>
+    <script type="module" src="./app.js?v=20260928-5"></script>
   </body>
 </html>

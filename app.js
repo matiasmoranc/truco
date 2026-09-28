@@ -1,6 +1,6 @@
 const FIREBASE_VERSION = '12.4.0';
 const $ = (id) => document.getElementById(id);
-const views = ['welcome-view', 'setup-view', 'lobby-view', 'waiting-view', 'game-view', 'config-view'];
+const views = ['welcome-view', 'setup-view', 'waiting-view', 'game-view', 'config-view'];
 const storageKey = 'truco-firebase-config';
 let state = { role: 'table', joining: false, config: null, firebase: null, roomCode: null, selectedRoom: null, uid: null, playerId: null, unsubscribe: null, privateUnsubscribe: null, lobbyUnsubscribe: null, room: null, hand: [], demo: false, nextAction: null };
 
@@ -87,14 +87,16 @@ async function openLobby() {
   if (!firebaseConfigValid(state.config)) { state.nextAction = 'lobby'; showConfig(); return; }
   try {
     const fb = await firebaseServices();
-    showView('lobby-view');
+    showView('welcome-view');
     $('open-room-list').innerHTML = '<p class="muted">Buscando mesas abiertas…</p>';
     if (state.lobbyUnsubscribe) state.lobbyUnsubscribe();
     state.lobbyUnsubscribe = fb.onValue(fb.ref(fb.db, 'rooms'), (snapshot) => renderLobby(snapshot.val() || {}), (error) => {
       console.error(error); $('open-room-list').innerHTML = '<p class="muted">No pudimos cargar las mesas. Revisá las reglas de Firebase.</p>';
     });
   } catch (error) {
-    console.error(error); toast(firebaseError(error));
+    console.error(error);
+    $('open-room-list').innerHTML = '<p class="muted">No pudimos cargar las mesas. Revisá la conexión y las reglas de Firebase.</p>';
+    toast(firebaseError(error));
   }
 }
 function renderLobby(rooms) {
@@ -123,7 +125,7 @@ function watchRoom() {
   const fb = state.firebase;
   if (state.unsubscribe) state.unsubscribe();
   state.unsubscribe = fb.onValue(fb.ref(fb.db, `rooms/${state.roomCode}/public`), (snapshot) => {
-    if (!snapshot.exists()) { toast('La mesa ya no está disponible.'); showView('welcome-view'); return; }
+    if (!snapshot.exists()) { toast('La mesa ya no está disponible.'); showView('welcome-view'); openLobby(); return; }
     state.room = snapshot.val();
     if (state.room.status === 'started' || state.room.status === 'complete') { showView('game-view'); watchPrivateHand(); renderGame(); }
     else if (state.room.status === 'waiting') { renderWaiting(); if (!$('waiting-view').classList.contains('active')) showView('waiting-view'); }
@@ -432,20 +434,18 @@ function demoPlay(card) {
 }
 
 $('create-room').addEventListener('click',()=>configureSetup());
-$('show-join').addEventListener('click',openLobby);
-$('back-lobby').addEventListener('click',()=>{if(state.lobbyUnsubscribe){state.lobbyUnsubscribe();state.lobbyUnsubscribe=null;}showView('welcome-view');});
 $('open-room-list').addEventListener('click',(event)=>{const button=event.target.closest('[data-room][data-seat]');if(button)joinOpenRoom(button.dataset.room,button.dataset.seat);});
 $('role-options').querySelectorAll('.role-card').forEach((card)=>{
   card.addEventListener('click',()=>{
     if(!card.classList.contains('hidden')) pickRole(card.dataset.role);
   });
 });
-$('back-home').addEventListener('click',()=>showView('welcome-view'));
+$('back-home').addEventListener('click',()=>{showView('welcome-view');openLobby();});
 $('enter-room').addEventListener('click',enterRoom);
 $('demo-button').addEventListener('click',()=>demoStart('player1'));
 $('start-game').addEventListener('click',async()=>{try{await startGame();}catch(error){console.error(error);toast(firebaseError(error));}});
-$('leave-room').addEventListener('click',()=>{if(state.unsubscribe)state.unsubscribe();if(state.privateUnsubscribe)state.privateUnsubscribe();state.room=null;state.demo=false;showView('welcome-view');});
-$('game-home').addEventListener('click',()=>{if(state.demo){state.demo=false;showView('welcome-view');return;}showView('waiting-view');});
+$('leave-room').addEventListener('click',()=>{if(state.unsubscribe)state.unsubscribe();if(state.privateUnsubscribe)state.privateUnsubscribe();state.room=null;state.demo=false;showView('welcome-view');openLobby();});
+$('game-home').addEventListener('click',()=>{if(state.demo){state.demo=false;showView('welcome-view');openLobby();return;}showView('waiting-view');});
 $('mobile-history').addEventListener('click',()=>toast('La partida queda a la vista en la pantalla de mesa.'));
 $('sound-toggle').addEventListener('click',()=>toast('El sonido se agrega en una próxima versión.'));
 $('player-actions').querySelector('.call-button').addEventListener('click',()=>toast('Los cantos se habilitan al definir la variante de reglas.'));
@@ -458,3 +458,4 @@ try {
   if (firebaseConfigValid(bundled.firebaseConfig)) state.config = bundled.firebaseConfig;
 } catch { /* Optional during initial setup. */ }
 if(location.search.includes('demo=mesa'))demoStart('table');
+else if (firebaseConfigValid(state.config)) openLobby();
