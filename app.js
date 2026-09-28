@@ -448,8 +448,6 @@ $('leave-room').addEventListener('click',()=>{if(state.unsubscribe)state.unsubsc
 $('game-home').addEventListener('click',()=>{if(state.demo){state.demo=false;showView('welcome-view');openLobby();return;}showView('waiting-view');});
 $('mobile-history').addEventListener('click',()=>toast('La partida queda a la vista en la pantalla de mesa.'));
 $('sound-toggle').addEventListener('click',()=>toast('El sonido se agrega en una próxima versión.'));
-$('player-actions').querySelector('.call-button').addEventListener('click',()=>toast('Los cantos se habilitan al definir la variante de reglas.'));
-$('player-actions').querySelector('.pass-button').addEventListener('click',()=>toast('Los cantos se habilitan al definir la variante de reglas.'));
 $('close-config').addEventListener('click',()=>showView('setup-view'));
 $('save-config').addEventListener('click',()=>{try{const cfg=JSON.parse($('firebase-config').value);if(!firebaseConfigValid(cfg))throw new Error('missing');state.config=cfg;localStorage.setItem(storageKey,JSON.stringify(cfg));toast('Configuración guardada.',true);runPendingAction();}catch{toast('Pegá una configuración Firebase válida.',true);}});
 state.config=loadConfig();
