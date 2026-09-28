@@ -11,11 +11,11 @@ Abrí `index.html` con un servidor estático y elegí **Explorar una demo**. La 
 1. Creá un proyecto Firebase y agregá una aplicación web.
 2. Habilitá **Authentication → Sign-in method → Anonymous**.
 3. Creá una **Realtime Database** y copiá la configuración web del proyecto.
-4. Abrí la app, elegí **Armar una mesa** y pegá la configuración cuando la solicite. Se guarda en el navegador de ese dispositivo.
+4. La configuración web ya está cargada en `firebase-config.js`. No pegues claves de cuenta de servicio ni credenciales privadas.
 5. En los otros dos dispositivos, abrí la misma web, elegí **Tengo un código**, seleccioná Jugador 1 o Jugador 2 e ingresá el código que aparece en la mesa.
 6. Cuando estén los tres conectados, la mesa puede repartir.
 
-Podés importar `firebase.database.rules.json` como reglas iniciales de Realtime Database. La autenticación anónima es necesaria. Estas reglas separan las cartas privadas y evitan que un usuario lea la mano de otro; el acceso a partidas públicas todavía permite que cualquier usuario autenticado modifique el estado. Son adecuadas para probar el juego, no para una partida competitiva o con premios.
+`firebase.json` deja preparado el despliegue del sitio y las reglas con Firebase CLI (`firebase deploy --only hosting,database`). También podés importar `firebase.database.rules.json` desde Firebase Console. La autenticación anónima es necesaria. Estas reglas separan las cartas privadas y evitan que un usuario lea la mano de otro; el acceso a partidas públicas todavía permite que cualquier usuario autenticado modifique el estado. Son adecuadas para probar el juego, no para una partida competitiva o con premios.
 
 ## Alcance inicial
 
@@ -27,4 +27,4 @@ Podés importar `firebase.database.rules.json` como reglas iniciales de Realtime
 
 ## Privacidad y seguridad
 
-La configuración web de Firebase se guarda en el almacenamiento local de cada navegador. No contiene la contraseña del proyecto. No subas credenciales de administrador ni claves privadas al repositorio. Para publicar el juego, endurecé las reglas de base de datos para limitar también quién puede modificar cada mesa.
+La configuración web de Firebase no es una contraseña y puede incluirse en el sitio. No subas credenciales de administrador ni claves privadas al repositorio. Para publicar el juego, endurecé las reglas de base de datos para limitar también quién puede modificar cada mesa.
