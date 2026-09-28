@@ -214,6 +214,11 @@ function demoPlay(card) {
 
 $('create-room').addEventListener('click',()=>configureSetup(false));
 $('show-join').addEventListener('click',()=>configureSetup(true));
+$('role-options').querySelectorAll('.role-card').forEach((card)=>{
+  card.addEventListener('click',()=>{
+    if(!card.classList.contains('hidden')) pickRole(card.dataset.role);
+  });
+});
 $('back-home').addEventListener('click',()=>showView('welcome-view'));
 $('enter-room').addEventListener('click',enterRoom);
 $('demo-button').addEventListener('click',()=>demoStart('player1'));
