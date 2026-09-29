@@ -42,6 +42,10 @@
 @media(max-width:380px){.welcome{padding:12px 13px 10px;gap:8px}.home-content{gap:9px}.home-intro{grid-template-columns:minmax(0,1fr) 118px}.home-heading .eyebrow{font-size:6px}.welcome .home-heading h1{font-size:25px}.home-heading .intro{font-size:10px}.home-actions .primary{font-size:10px}.home-lobby{padding:9px}.home-lobby-heading p{font-size:8px}.home-name{width:100px}.home-name .name-input{height:29px}.home-lobby-heading{gap:5px}.home-section-title{gap:6px}.home-section-title h2{font-size:20px}.lobby-seat{font-size:6px}.lobby-join-options .button{font-size:6px}}
 @media(max-height:700px) and (min-width:701px){.welcome{padding-top:12px;padding-bottom:12px;gap:10px}.home-content{gap:30px}.home-intro{gap:16px}.home-lobby{padding:12px}.open-room-list{margin-top:9px}.lobby-card{padding:8px 10px}.lobby-seats{margin:5px 0}.welcome-foot{font-size:7px}}
 
+/* La muestra queda junto al mazo y solo aparece en la vista de mesa. */
+.player-mode .muestra-card{display:none!important}
+.table-mode .muestra-card{top:calc(50% + 105px);left:auto;right:4%;transform:translateY(-50%) rotate(-8deg)}
+
 /* En teléfonos, el paño ocupa el alto disponible y cada rol ve su propia vista. */
 .player-mode .deck-stack,.player-mode .trick-cards,.player-mode .table-hint,.player-mode .card-back-stack,.player-mode .deck-count{display:none!important}
 .table-mode .muestra-card,.player-mode .muestra-card{top:17%;left:50%;transform:translate(-50%,-50%) rotate(-8deg);z-index:3}
@@ -63,12 +67,12 @@
   .table-mode .played-card .card-rank{font-size:24px}
   .table-mode .played-card .card-suit{font-size:22px}
   .table-mode .deck-stack{right:7%;width:50px;height:72px}
-  .table-mode .muestra-card{top:18%;z-index:3}
+  .table-mode .muestra-card{top:calc(50% + 81px);right:7%;z-index:3}
   .table-mode .table-hint{top:calc(50% + 67px)}
   .player-mode .opponent-info,.player-mode .table-divider,.player-mode .deck-stack,.player-mode .trick-cards,.player-mode .table-hint,.player-mode .card-back-stack{display:none!important}
   .player-mode .my-player-info{position:absolute;top:16px;left:14px;width:calc(100% - 28px);max-width:none;margin:0}
   .player-mode .center-table{top:18px;left:50%;width:70px;height:82px;transform:translateX(-50%)}
-  .player-mode .muestra-card{top:90px;z-index:3}
+  .player-mode .muestra-card{display:none!important}
   .player-mode .hand{position:absolute;top:50%;left:50%;width:calc(100% - 20px);max-width:360px;min-height:0;height:auto;margin:0;gap:8px;transform:translate(-50%,-50%)}
   .player-mode .hand-card{width:clamp(74px,23vw,100px);height:clamp(104px,22dvh,132px);flex:0 1 clamp(74px,23vw,100px)}
   .player-mode .player-actions{position:absolute;left:50%;bottom:12px;width:calc(100% - 24px);max-width:430px;min-height:0;margin:0;transform:translateX(-50%);gap:6px}

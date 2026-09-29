@@ -2,7 +2,7 @@ const FIREBASE_VERSION = '12.4.0';
 const $ = (id) => document.getElementById(id);
 const views = ['welcome-view', 'setup-view', 'waiting-view', 'game-view', 'config-view'];
 const storageKey = 'truco-firebase-config';
-let state = { role: 'table', joining: false, config: null, firebase: null, roomCode: null, selectedRoom: null, uid: null, playerId: null, unsubscribe: null, privateUnsubscribe: null, lobbyUnsubscribe: null, room: null, hand: [], demo: false, nextAction: null };
+let state = { role: 'table', joining: false, config: null, firebase: null, roomCode: null, selectedRoom: null, uid: null, playerId: null, unsubscribe: null, privateUnsubscribe: null, lobbyUnsubscribe: null, room: null, hand: [], demo: false, nextAction: null, resolutionTimer: null, resolutionTimerKey: null, playActionInFlight: false };
 
 function showView(id) { views.forEach((name) => $(name).classList.toggle('active', name === id)); }
 function toast(message, global = false) {
@@ -127,6 +127,11 @@ function watchRoom() {
   state.unsubscribe = fb.onValue(fb.ref(fb.db, `rooms/${state.roomCode}/public`), (snapshot) => {
     if (!snapshot.exists()) { toast('La mesa ya no está disponible.'); showView('welcome-view'); openLobby(); return; }
     state.room = snapshot.val();
+    if(state.playerId==='table'&&state.room.status==='started'&&!state.room.resolvingTrick&&state.room.trickCards?.length===2&&(state.room.tricks||[]).length>0){
+      const previousWinner=state.room.tricks.at(-1)?.winner;
+      writeRoom({trickCards:[],turn:previousWinner||state.room.mano||'player1'}).catch((error)=>{console.error(error);toast(firebaseError(error));});
+    }
+    if (state.playerId === 'table') scheduleTableResolution();
     if (state.room.status === 'started' || state.room.status === 'complete') { showView('game-view'); watchPrivateHand(); renderGame(); }
     else if (state.room.status === 'waiting') { renderWaiting(); if (!$('waiting-view').classList.contains('active')) showView('waiting-view'); }
   });
@@ -179,7 +184,7 @@ async function startGame() {
   patches[`rooms/${state.roomCode}/public/flors`] = {};
   patches[`rooms/${state.roomCode}/public/envidoClosed`] = false;
   patches[`rooms/${state.roomCode}/public/playedCount`] = 0;
-  patches[`rooms/${state.roomCode}/public/feed`] = [{text:`Se repartieron tres cartas y se dio vuelta la muestra: ${muestra.label} ${muestra.suit}. Juega primero Jugador 1.`,time:Date.now()}];
+  patches[`rooms/${state.roomCode}/public/feed`] = [{text:'Se repartieron tres cartas. Juega primero Jugador 1.',time:Date.now()}];
   await fb.update(fb.ref(fb.db), patches);
 }
 function pieceOrder(card, muestra) {
@@ -278,8 +283,7 @@ async function answerBet(answer) {
     const scores={...state.room.scores};scores[bet.caller]=(scores[bet.caller]||0)+points;
     const status=scores[bet.caller]>=targetPoints(state.room)?'complete':'started';
     const msg=`${state.room.players[bet.responder].name} no quiere. ${state.room.players[bet.caller].name} suma ${points}.`;
-    await writeRoom({scores,status,pendingBet:status==='complete'?null:(bet.suspendedBet||null),envidoClosed:true,feed:topFeed(state.room,msg)});
-    if(bet.type==='truco'&&status!=='complete')setTimeout(()=>nextHand(bet.caller,scores,state.room.handNumber||1,msg).catch((e)=>{console.error(e);toast(firebaseError(e));}),1200);
+    await writeRoom({scores,status,pendingBet:status==='complete'?null:(bet.suspendedBet||null),envidoClosed:true,pendingNextHand:bet.type==='truco'&&status!=='complete'?{id:`declined:${Date.now()}`,winner:bet.caller,message:msg}:null,feed:topFeed(state.room,msg)});
     return;
   }
   if(bet.type==='envido'){
@@ -316,8 +320,13 @@ async function callFlor() {
   }
 }
 async function settleHand(tricks, room) {
-  const wins={player1:0,player2:0};let firstWinner=null;
-  for(const trick of tricks){if(trick.winner){wins[trick.winner]++;if(!firstWinner)firstWinner=trick.winner;}if(wins.player1===2)return'player1';if(wins.player2===2)return'player2';}
+  const wins={player1:0,player2:0};let firstWinner=null,tieNeedsNextWinner=false;
+  for(const trick of tricks){
+    if(!trick.winner){tieNeedsNextWinner=true;continue;}
+    if(tieNeedsNextWinner)return trick.winner;
+    wins[trick.winner]++;if(!firstWinner)firstWinner=trick.winner;
+    if(wins.player1===2)return'player1';if(wins.player2===2)return'player2';
+  }
   if(tricks.length<3)return null;
   let winner=null;
   if(wins.player1!==wins.player2)winner=wins.player1>wins.player2?'player1':'player2';
@@ -336,15 +345,52 @@ async function nextHand(winner, scores, handNumber, message) {
   patches[`rooms/${state.roomCode}/public/trucoLevel`]=1;patches[`rooms/${state.roomCode}/public/pendingBet`]=null;
   patches[`rooms/${state.roomCode}/public/lastTrucoCaller`]=null;
   patches[`rooms/${state.roomCode}/public/flors`]={};patches[`rooms/${state.roomCode}/public/envidoClosed`]=false;patches[`rooms/${state.roomCode}/public/playedCount`]=0;
-  patches[`rooms/${state.roomCode}/public/feed`]=[{text:`${message} Nueva muestra: ${muestra.label} ${muestra.suit}.`,time:Date.now()},...(state.room.feed||[]).slice(0,6)];
+  patches[`rooms/${state.roomCode}/public/resolvingTrick`]=false;patches[`rooms/${state.roomCode}/public/resolutionId`]=null;patches[`rooms/${state.roomCode}/public/resolvedWinner`]=null;patches[`rooms/${state.roomCode}/public/resolvedTrickWinner`]=null;patches[`rooms/${state.roomCode}/public/handComplete`]=false;patches[`rooms/${state.roomCode}/public/pendingNextHand`]=null;
+  patches[`rooms/${state.roomCode}/public/feed`]=[{text:`${message} Se reparte la siguiente mano.`,time:Date.now()},...(state.room.feed||[]).slice(0,6)];
   await state.firebase.update(state.firebase.ref(state.firebase.db),patches);
+}
+function scheduleTableResolution() {
+  const room=state.room;
+  if(!room||state.playerId!=='table')return;
+  const isTrick=room.resolvingTrick&&room.trickCards?.length===2;
+  const isRedeal=!!room.pendingNextHand;
+  if(!isTrick&&!isRedeal){state.resolutionTimerKey=null;clearTimeout(state.resolutionTimer);state.resolutionTimer=null;return;}
+  const key=isTrick?`trick:${room.resolutionId}`:`redeal:${room.pendingNextHand.id}`;
+  if(state.resolutionTimerKey===key)return;
+  clearTimeout(state.resolutionTimer);state.resolutionTimerKey=key;
+  state.resolutionTimer=setTimeout(async()=>{
+    try{
+      const current=state.room;
+      if(isTrick&&current?.resolvingTrick&&current.resolutionId===room.resolutionId){
+        const winner=current.resolvedWinner, trickWinner=current.resolvedTrickWinner;
+        if(current.handComplete&&winner){
+          const scores={...current.scores},points=Number(current.trucoLevel)||1;
+          scores[winner]=(scores[winner]||0)+points;
+          const florists=Object.keys(current.flors||{});
+          if(florists.length===1)scores[florists[0]]=(scores[florists[0]]||0)+3;
+          const msg=`${current.players[winner].name} gana la mano y suma ${points} ${points===1?'tanto':'tantos'}.${florists.length===1?' Además cobra 3 por la flor.':''}`;
+          if(Math.max(...Object.values(scores))>=targetPoints(current)){
+            await writeRoom({scores,status:'complete',trickCards:[],resolvingTrick:false,resolutionId:null,resolvedWinner:null,resolvedTrickWinner:null,handComplete:false,feed:topFeed(current,msg)});
+          }else await nextHand(winner,scores,current.handNumber||1,msg);
+        }else{
+          await writeRoom({trickCards:[],resolvingTrick:false,resolutionId:null,resolvedWinner:null,resolvedTrickWinner:null,handComplete:false,trickNo:(Number(current.trickNo)||1)+1,turn:trickWinner||current.mano||'player1',feed:topFeed(current,trickWinner?`${current.players[trickWinner].name} gana la baza.`:'Baza parda. Sigue la mano.')});
+        }
+      }else if(isRedeal&&state.room?.pendingNextHand?.id===room.pendingNextHand.id){
+        const pending=state.room.pendingNextHand;
+        if(state.room.status!=='complete')await nextHand(pending.winner,state.room.scores||{},state.room.handNumber||1,pending.message||'La mano terminó.');
+        else await writeRoom({pendingNextHand:null});
+      }
+    }catch(error){console.error(error);toast(firebaseError(error));}
+    finally{state.resolutionTimer=null;state.resolutionTimerKey=null;}
+  },2000);
 }
 async function playCard(card) {
   if (state.demo) { demoPlay(card); return; }
-  if (!state.room || state.playerId==='table' || state.room.turn !== state.playerId || state.room.pendingBet) return;
+  if (!state.room || state.playerId==='table' || state.room.turn !== state.playerId || state.room.pendingBet || state.room.resolvingTrick || state.playActionInFlight || !state.hand.some((item)=>item.id===card.id)) return;
+  state.playActionInFlight=true;
   const fb = state.firebase; const newHand = state.hand.filter((item) => item.id !== card.id);
   const previousTrick = state.room.trickCards || [];
-  const played = [...previousTrick, { playerId:state.playerId, name:state.room.players[state.playerId].name, card }];
+  const played = [...previousTrick.slice(-1), { playerId:state.playerId, name:state.room.players[state.playerId].name, card }];
   const other = state.playerId === 'player1' ? 'player2' : 'player1';
   const patches = {};
   patches[`hands/${state.roomCode}/${state.uid}/hand`] = newHand;
@@ -359,26 +405,20 @@ async function playCard(card) {
     const a = played[0], b = played[1], winner = cardStrength(a.card,muestra) === cardStrength(b.card,muestra) ? null : cardStrength(a.card,muestra)>cardStrength(b.card,muestra) ? a.playerId : b.playerId;
     const tricks=[...(state.room.tricks||[]),{winner,played}], trickNo=(state.room.trickNo||1);
     const decided=await settleHand(tricks,state.room), ended=!!decided || trickNo>=3;
+    const handWinner=ended?(decided||await settleHand(tricks,state.room)):null;
+    const resolutionId=`${state.room.handNumber||1}:${trickNo}:${Date.now()}`;
     patches[`rooms/${state.roomCode}/public/trickCards`] = played;
     patches[`rooms/${state.roomCode}/public/tricks`] = tricks;
-    patches[`rooms/${state.roomCode}/public/turn`] = winner || state.room.mano || 'player1';
-    patches[`rooms/${state.roomCode}/public/trickNo`] = trickNo+1;
+    patches[`rooms/${state.roomCode}/public/turn`] = null;
+    patches[`rooms/${state.roomCode}/public/resolvingTrick`] = true;
+    patches[`rooms/${state.roomCode}/public/resolutionId`] = resolutionId;
+    patches[`rooms/${state.roomCode}/public/resolvedTrickWinner`] = winner;
+    patches[`rooms/${state.roomCode}/public/resolvedWinner`] = handWinner;
+    patches[`rooms/${state.roomCode}/public/handComplete`] = ended;
     patches[`rooms/${state.roomCode}/public/playedCount`] = (state.room.playedCount||0)+1;
     patches[`rooms/${state.roomCode}/public/feed`] = topFeed(state.room,winner?`${state.room.players[winner].name} gana la baza.`:'Baza parda.');
-    if (ended) {
-      const handWinner=decided||await settleHand(tricks,state.room), points=Number(state.room.trucoLevel)||1,scores={...state.room.scores};
-      scores[handWinner]=(scores[handWinner]||0)+points;
-      const florists=Object.keys(state.room.flors||{});
-      if(florists.length===1)scores[florists[0]]=(scores[florists[0]]||0)+3;
-      const florMessage=florists.length===1?` Además cobra 3 por la flor.`:'';
-      const msg=`${state.room.players[handWinner].name} gana la mano y suma ${points} ${points===1?'tanto':'tantos'}.${florMessage}`;
-      const goal=Math.max(...Object.values(scores))>=targetPoints(state.room);
-      patches[`rooms/${state.roomCode}/public/scores`]=scores;patches[`rooms/${state.roomCode}/public/status`]=goal?'complete':'started';
-      patches[`rooms/${state.roomCode}/public/feed`]=topFeed(state.room,msg);
-      if(!goal) setTimeout(()=>nextHand(handWinner,scores,state.room.handNumber||1,msg).catch((e)=>{console.error(e);toast(firebaseError(e));}),1300);
-    }
   }
-  await fb.update(fb.ref(fb.db), patches);
+  try{await fb.update(fb.ref(fb.db), patches);}catch(error){console.error(error);toast(firebaseError(error));}finally{state.playActionInFlight=false;}
 }
 function renderGame() {
   if (!state.room) return;
@@ -395,12 +435,12 @@ function renderGame() {
   $('game-room-code').textContent='MESA ABIERTA';
   $('my-name').textContent=isTable?tableName:(mine?.name||'Vos'); $('my-avatar').textContent=(isTable?tableName:(mine?.name||'V')).slice(0,1).toUpperCase();
   $('opponent-name').textContent=isTable?'Los jugadores':(opponent?.name||'Esperando rival'); $('opponent-avatar').textContent=(isTable?'♠':(opponent?.name||'J').slice(0,1)).toUpperCase();
-  const myTurn=state.demo||(!isTable&&room.turn===state.playerId&&room.status==='started');
+  const myTurn=state.demo||(!isTable&&room.turn===state.playerId&&room.status==='started'&&!room.resolvingTrick);
   $('turn-badge').textContent=isTable?'MESA':myTurn?'TU TURNO':'ESPERÁ'; $('turn-badge').classList.toggle('waiting-turn',!myTurn);
   $('hand').innerHTML=isTable?'':state.hand.map((card) => `<button class="hand-card ${card.red?'card-red':''}" data-card="${card.id}" ${!myTurn?'disabled':''}><span class="card-rank">${card.label}</span><span class="card-suit">${card.suit}</span><span class="card-value">${card.suit.toUpperCase()}</span></button>`).join('');
   document.querySelectorAll('.hand-card').forEach((button) => button.addEventListener('click', () => {const card=state.hand.find((item)=>item.id===button.dataset.card); if(card) playCard(card);}));
   $('trick-cards').innerHTML=isTable?(room.trickCards||[]).map(({name,card})=>`<div class="played-card ${card.red?'card-red':''}"><span class="card-rank">${card.label}</span><span class="card-suit">${card.suit}</span><span class="card-who">${escapeHtml(name)}</span></div>`).join(''):'';
-  const sample=room.muestra;$('muestra-card').classList.toggle('hidden',!sample);$('muestra-card').innerHTML=sample?`<span>${sample.label}</span><b>${sample.suit}</b><small>MUESTRA</small>`:'';$('deck-stack').classList.toggle('hidden',!isTable);
+  const sample=room.muestra;$('muestra-card').classList.toggle('hidden',!isTable||!sample);$('muestra-card').innerHTML=isTable&&sample?`<span>${sample.label}</span><b>${sample.suit}</b><small>MUESTRA</small>`:'';$('deck-stack').classList.toggle('hidden',!isTable);
   $('table-hint').classList.toggle('hidden',!isTable||(room.trickCards||[]).length>0);
   const visibleFeed=(room.feed||[]).filter(({text=''})=>isTable||!/\bjug[oó]/i.test(text));
   $('round-feed').innerHTML=visibleFeed.slice(0,7).map(({text})=>`<div class="feed-item"><i></i><span>${escapeHtml(text)}</span></div>`).join('');
