@@ -126,8 +126,8 @@
 .player-mode .hand{gap:0}
 .player-mode .hand-card{margin:0 -12px}
 .player-mode .hand-card:nth-child(1){z-index:1;transform:rotate(-12deg) translate(10px,7px)}
-.player-mode .hand-card:nth-child(2){z-index:3;transform:translateY(-5px)}
-.player-mode .hand-card:nth-child(3){z-index:2;transform:rotate(12deg) translate(-10px,7px)}
+.player-mode .hand-card:nth-child(2){z-index:2;transform:translateY(-1px)}
+.player-mode .hand-card:nth-child(3){z-index:3;transform:rotate(12deg) translate(-10px,7px)}
 @media(max-width:900px){.scoreboard{padding:20px 10px}.scoreboard-grid{gap:5px}.scoreboard .tally-group{flex-basis:clamp(12px,3vw,18px);width:clamp(12px,3vw,18px);height:clamp(12px,3vw,18px)}}
 @media(max-width:640px){
   .game-topbar{flex:0 0 54px}
@@ -149,7 +149,7 @@
   .player-mode .hand{top:51%;gap:0;padding:0 8px}
   .player-mode .hand-card{width:clamp(83px,27vw,104px);height:clamp(116px,22dvh,138px);flex:0 1 clamp(83px,27vw,104px);margin:0 -24px}
   .player-mode .hand-card:nth-child(1){transform:rotate(-12deg) translate(11px,8px)}
-  .player-mode .hand-card:nth-child(2){transform:translateY(-6px)}
+  .player-mode .hand-card:nth-child(2){transform:translateY(-2px)}
   .player-mode .hand-card:nth-child(3){transform:rotate(12deg) translate(-11px,8px)}
 }
 @media(max-width:370px){.demo-device-switcher{gap:3px}.demo-device-switcher button{padding:0 7px;font-size:8px}.mobile-score{padding-left:9px;padding-right:9px}}
