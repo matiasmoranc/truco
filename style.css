@@ -158,3 +158,72 @@
 /* El tanteador crece hacia abajo: cada cuadrado ocupa su propia fila. */
 .scoreboard .tally-half,.mobile-score .tally-half{flex-direction:column;flex-wrap:nowrap;align-items:flex-start;align-content:flex-start;gap:7px}
 .scoreboard .tally-group,.mobile-score .tally-group{flex:0 0 clamp(15px,3vw,24px)}
+
+/* Vistas limpias: mesa y jugadores muestran solo lo necesario para jugar. */
+.game-topbar .room-pill,.game-topbar .connection{display:none}
+.game-topbar{justify-content:flex-start}
+.table-mode .game-layout{grid-template-columns:minmax(220px,270px) minmax(0,1fr)}
+.table-mode .scoreboard{padding:22px 18px}
+.table-mode .scoreboard-head h2{font-size:clamp(12px,1.1vw,15px)}
+.table-mode .scoreboard .tally-half{gap:10px;padding:14px 8px 0}
+.table-mode .scoreboard .tally-group{flex-basis:clamp(25px,3.2vw,34px);width:clamp(25px,3.2vw,34px);height:clamp(25px,3.2vw,34px)}
+.table-mode .scoreboard .tally-group i,.table-mode .scoreboard .tally-group b{height:3px}
+.table-mode .scoreboard .tally-group i:nth-child(1),.table-mode .scoreboard .tally-group i:nth-child(3){width:3px}
+.table-mode .scoreboard .tally-group i:nth-child(2),.table-mode .scoreboard .tally-group i:nth-child(4){height:3px}
+.table-mode .side-panel,.table-mode .felt-ring,.table-mode .opponent-info,.table-mode .my-player-info,.table-mode .table-divider,.table-mode .table-hint{display:none!important}
+.table-mode .center-table{height:min(68%,520px);width:min(760px,94%);top:50%;left:50%;transform:translate(-50%,-50%)}
+.table-mode .deck-stack{width:clamp(88px,9vw,126px);height:clamp(126px,13vw,178px);font-size:42px}
+.table-mode .muestra-card{width:clamp(74px,7.2vw,102px);height:clamp(108px,10.5vw,148px);top:calc(50% + clamp(58px,6vw,83px));right:7%;left:auto;transform:translateY(-50%) rotate(-8deg)}
+.table-mode .muestra-card span,.table-mode .muestra-card b{font-size:clamp(27px,3vw,38px)}
+.table-mode .muestra-card small{font-size:8px}
+.table-mode .played-card{width:clamp(94px,9vw,128px);height:clamp(138px,13vw,184px)}
+.table-mode .played-card .card-rank{font-size:clamp(34px,4vw,48px)}
+.table-mode .played-card .card-suit{font-size:clamp(31px,3.5vw,44px)}
+.player-mode .game-layout{display:block;min-height:0;height:auto;flex:1}
+.player-mode .side-panel,.player-mode .scoreboard,.player-mode .mobile-score,.player-mode .felt-ring,.player-mode .opponent-info,.player-mode .center-table,.player-mode .table-divider{display:none!important}
+.player-mode .felt-area{height:100%;min-height:0;padding:14px 12px;background:radial-gradient(ellipse at center,#204a36,#193b2b 52%,#153324 100%)}
+.player-mode .my-player-info{position:absolute;top:15px;left:50%;width:auto;margin:0;transform:translateX(-50%);justify-content:center}
+.player-mode .my-player-info>span:not(.turn-badge){display:none!important}
+.player-mode .turn-badge{margin:0;font-size:10px;padding:8px 12px}
+.player-mode .hand{top:50%;left:50%;width:calc(100% - 30px);max-width:470px;min-height:0;height:auto;margin:0;transform:translate(-50%,-50%)}
+.player-mode .hand-card{width:clamp(96px,11vw,145px);height:clamp(142px,16vw,206px);flex-basis:clamp(96px,11vw,145px);margin:0 -25px}
+.player-mode .hand-card .card-rank{font-size:clamp(32px,4vw,46px)}
+.player-mode .hand-card .card-suit{font-size:clamp(28px,3.3vw,40px)}
+.player-mode .player-actions{position:absolute;left:50%;bottom:22px;width:min(680px,calc(100% - 28px));max-width:none;transform:translateX(-50%);gap:9px}
+.player-mode .player-actions .call-button,.player-mode .player-actions .pass-button{height:46px;padding:0 18px;font-size:11px}
+@media(max-width:900px){
+  .table-mode .scoreboard{padding:18px 12px}
+  .table-mode .scoreboard-grid{gap:8px}
+  .table-mode .scoreboard .tally-group{flex-basis:clamp(22px,4vw,30px);width:clamp(22px,4vw,30px);height:clamp(22px,4vw,30px)}
+}
+@media(max-width:640px){
+  .game-topbar{height:50px;flex:0 0 50px;padding:0 14px}
+  .game-topbar .mini-brand{font-size:9px}
+  .table-mode .game-layout{display:flex;flex-direction:column;flex:1 1 0;height:auto;min-height:0}
+  .table-mode .scoreboard,.table-mode .side-panel{display:none!important}
+  .table-mode .felt-area{flex:1 1 0;width:100%;height:auto;min-height:0;padding:8px}
+  .table-mode .center-table{height:78%;width:100%;top:45%;}
+  .table-mode .deck-stack{width:clamp(92px,27vw,124px);height:clamp(134px,39vw,180px);font-size:38px}
+  .table-mode .muestra-card{width:clamp(72px,21vw,96px);height:clamp(106px,31vw,138px);top:calc(50% + clamp(60px,18vw,78px));right:5%}
+  .table-mode .played-card{width:clamp(88px,26vw,116px);height:clamp(130px,38vw,164px)}
+  .table-mode .played-card .card-rank{font-size:36px}
+  .table-mode .played-card .card-suit{font-size:32px}
+  .mobile-score{flex:0 0 clamp(190px,28dvh,250px);gap:7px;padding:10px 18px 12px;border-top:1px solid rgba(239,235,215,.2)}
+  .mobile-score-head{flex:0 0 22px}
+  .mobile-score-head h2{font-size:12px;letter-spacing:.14em}
+  .mobile-score-grid{gap:14px}
+  .mobile-score .mobile-tally{width:100%;max-width:none;flex-basis:auto}
+  .mobile-score .tally-half{width:100%}
+  .mobile-score .tally-half{gap:6px;padding:5px 10px 0}
+  .mobile-score .tally-group{flex-basis:25px;width:25px;height:25px}
+  .mobile-score .tally-group i,.mobile-score .tally-group b{height:2.5px}
+  .mobile-score .tally-group i:nth-child(1),.mobile-score .tally-group i:nth-child(3){width:2.5px}
+  .mobile-score .tally-group i:nth-child(2),.mobile-score .tally-group i:nth-child(4){height:2.5px}
+  .player-mode .game-layout{flex:1 1 0;display:flex;min-height:0;height:auto;overflow:hidden}
+  .player-mode .felt-area{flex:1 1 0;width:100%;padding:8px 12px;min-height:0}
+  .player-mode .my-player-info{top:12px}
+  .player-mode .hand{top:49%;width:calc(100% - 18px);max-width:380px;padding:0 6px}
+  .player-mode .hand-card{width:clamp(92px,29vw,116px);height:clamp(132px,40vw,158px);flex-basis:clamp(92px,29vw,116px);margin:0 -28px}
+  .player-mode .player-actions{bottom:14px;gap:6px}
+  .player-mode .player-actions .call-button,.player-mode .player-actions .pass-button{height:40px;padding:0 12px;font-size:9px;letter-spacing:.1em}
+}
