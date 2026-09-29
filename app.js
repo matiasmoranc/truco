@@ -2,7 +2,7 @@ const FIREBASE_VERSION = '12.4.0';
 const $ = (id) => document.getElementById(id);
 const views = ['welcome-view', 'setup-view', 'waiting-view', 'game-view', 'config-view'];
 const storageKey = 'truco-firebase-config';
-let state = { role: 'table', joining: false, config: null, firebase: null, roomCode: null, selectedRoom: null, uid: null, playerId: null, unsubscribe: null, privateUnsubscribe: null, lobbyUnsubscribe: null, room: null, hand: [], demo: false, nextAction: null, resolutionTimer: null, resolutionTimerKey: null, playActionInFlight: false };
+let state = { role: 'table', joining: false, config: null, firebase: null, roomCode: null, selectedRoom: null, uid: null, playerId: null, unsubscribe: null, privateUnsubscribe: null, lobbyUnsubscribe: null, room: null, hand: [], demo: false, nextAction: null, resolutionTimer: null, resolutionTimerKey: null, playActionInFlight: false, legacyRepairKey: null };
 
 function showView(id) { views.forEach((name) => $(name).classList.toggle('active', name === id)); }
 function toast(message, global = false) {
@@ -127,10 +127,7 @@ function watchRoom() {
   state.unsubscribe = fb.onValue(fb.ref(fb.db, `rooms/${state.roomCode}/public`), (snapshot) => {
     if (!snapshot.exists()) { toast('La mesa ya no está disponible.'); showView('welcome-view'); openLobby(); return; }
     state.room = snapshot.val();
-    if(state.playerId==='table'&&state.room.status==='started'&&!state.room.resolvingTrick&&state.room.trickCards?.length===2&&(state.room.tricks||[]).length>0){
-      const previousWinner=state.room.tricks.at(-1)?.winner;
-      writeRoom({trickCards:[],turn:previousWinner||state.room.mano||'player1'}).catch((error)=>{console.error(error);toast(firebaseError(error));});
-    }
+    if(state.playerId==='table'&&state.room.status==='started'&&!state.room.resolvingTrick&&state.room.trickCards?.length===2&&(state.room.tricks||[]).length>0)recoverLegacyTrick(state.room);
     if (state.playerId === 'table') scheduleTableResolution();
     if (state.room.status === 'started' || state.room.status === 'complete') { showView('game-view'); watchPrivateHand(); renderGame(); }
     else if (state.room.status === 'waiting') { renderWaiting(); if (!$('waiting-view').classList.contains('active')) showView('waiting-view'); }
@@ -383,6 +380,23 @@ function scheduleTableResolution() {
     }catch(error){console.error(error);toast(firebaseError(error));}
     finally{state.resolutionTimer=null;state.resolutionTimerKey=null;}
   },2000);
+}
+async function recoverLegacyTrick(room) {
+  const key=`${state.roomCode}:${room.handNumber||1}:${room.trickNo||1}`;
+  if(state.legacyRepairKey===key)return;
+  state.legacyRepairKey=key;
+  try{
+    const tricks=Array.isArray(room.tricks)?room.tricks:[],wins={player1:0,player2:0};
+    for(const trick of tricks)if(trick.winner)wins[trick.winner]++;
+    const handWasOver=wins.player1>=2||wins.player2>=2||(Number(room.trickNo)||1)>3;
+    if(handWasOver){
+      const winner=await settleHand(tricks,room)||room.mano||'player1';
+      await writeRoom({trickCards:[],pendingNextHand:{id:`recovery:${key}`,winner,message:'La mano anterior terminó. Se reparte una nueva.'}});
+    }else{
+      const previousWinner=tricks.at(-1)?.winner;
+      await writeRoom({trickCards:[],turn:previousWinner||room.mano||'player1'});
+    }
+  }catch(error){console.error(error);state.legacyRepairKey=null;toast(firebaseError(error));}
 }
 async function playCard(card) {
   if (state.demo) { demoPlay(card); return; }
