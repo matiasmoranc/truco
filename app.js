@@ -445,6 +445,7 @@ function renderGame() {
   $('score-target').textContent=targetPoints(room);
   $('tally-1').innerHTML=renderTally(room.scores?.player1||0,targetPoints(room));$('tally-2').innerHTML=renderTally(room.scores?.player2||0,targetPoints(room));
   $('mobile-target').textContent=targetPoints(room);$('mobile-tally-1').innerHTML=renderTally(room.scores?.player1||0,targetPoints(room));$('mobile-tally-2').innerHTML=renderTally(room.scores?.player2||0,targetPoints(room));
+  $('board-target').textContent=targetPoints(room);$('board-tally-1').innerHTML=renderTally(room.scores?.player1||0,targetPoints(room));$('board-tally-2').innerHTML=renderTally(room.scores?.player2||0,targetPoints(room));
   $('hand-number').textContent=String(room.handNumber||1).padStart(2,'0'); $('mobile-hand').textContent=String(room.handNumber||1).padStart(2,'0'); $('deck-count').textContent=room.deckCount??40;
   $('game-room-code').textContent='MESA ABIERTA';
   $('my-name').textContent=isTable?tableName:(mine?.name||'Vos'); $('my-avatar').textContent=(isTable?tableName:(mine?.name||'V')).slice(0,1).toUpperCase();
@@ -507,7 +508,9 @@ $('demo-button').addEventListener('click',()=>demoStart('player1'));
 $('start-game').addEventListener('click',async()=>{try{await startGame();}catch(error){console.error(error);toast(firebaseError(error));}});
 $('leave-room').addEventListener('click',()=>{if(state.unsubscribe)state.unsubscribe();if(state.privateUnsubscribe)state.privateUnsubscribe();state.room=null;state.demo=false;showView('welcome-view');openLobby();});
 $('game-home').addEventListener('click',()=>{if(state.demo){state.demo=false;showView('welcome-view');openLobby();return;}showView('waiting-view');});
-$('mobile-history').addEventListener('click',()=>toast('La partida queda a la vista en la pantalla de mesa.'));
+$('mobile-history').addEventListener('click',()=>{$('tally-board').classList.remove('hidden');$('tally-board-close').focus();});
+$('tally-board-close').addEventListener('click',()=>{$('tally-board').classList.add('hidden');$('mobile-history').focus();});
+document.addEventListener('keydown',(event)=>{if(event.key==='Escape'&&!$('tally-board').classList.contains('hidden'))$('tally-board-close').click();});
 $('sound-toggle').addEventListener('click',()=>toast('El sonido se agrega en una próxima versión.'));
 $('close-config').addEventListener('click',()=>showView('setup-view'));
 $('save-config').addEventListener('click',()=>{try{const cfg=JSON.parse($('firebase-config').value);if(!firebaseConfigValid(cfg))throw new Error('missing');state.config=cfg;localStorage.setItem(storageKey,JSON.stringify(cfg));toast('Configuración guardada.',true);runPendingAction();}catch{toast('Pegá una configuración Firebase válida.',true);}});
