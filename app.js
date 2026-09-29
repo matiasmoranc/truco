@@ -2,8 +2,7 @@ const FIREBASE_VERSION = '12.4.0';
 const $ = (id) => document.getElementById(id);
 const views = ['welcome-view', 'setup-view', 'waiting-view', 'game-view', 'config-view'];
 const storageKey = 'truco-firebase-config';
-let state = { role: 'table', joining: false, config: null, firebase: null, roomCode: null, selectedRoom: null, uid: null, playerId: null, unsubscribe: null, privateUnsubscribe: null, lobbyUnsubscribe: null, room: null, hand: [], demo: false, nextAction: null, resolutionTimer: null, resolutionTimerKey: null, playActionInFlight: false, legacyRepairKey: null };
-let tallyBoardTrigger = null;
+let state = { role: 'table', joining: false, config: null, firebase: null, roomCode: null, selectedRoom: null, uid: null, playerId: null, unsubscribe: null, privateUnsubscribe: null, lobbyUnsubscribe: null, room: null, hand: [], demo: false, demoHands: {}, nextAction: null, resolutionTimer: null, resolutionTimerKey: null, playActionInFlight: false, legacyRepairKey: null };
 
 function showView(id) { views.forEach((name) => $(name).classList.toggle('active', name === id)); }
 function toast(message, global = false) {
@@ -440,14 +439,12 @@ function renderGame() {
   const room = state.room, players=room.players||{}, isTable=state.playerId==='table', mine=players[state.playerId], opponent=players[state.playerId==='player1'?'player2':'player1'];
   $('game-view').classList.toggle('table-mode', isTable);
   $('game-view').classList.toggle('player-mode', !isTable);
+  $('demo-device-switcher').classList.toggle('hidden',!state.demo);
+  $('demo-device-switcher').querySelectorAll('[data-demo-role]').forEach((button)=>button.setAttribute('aria-pressed',String(button.dataset.demoRole===state.playerId)));
   const tableName=room.table?.name||'La mesa';
-  $('score-name-1').textContent=players.player1?.name||'Jugador 1'; $('score-name-2').textContent=players.player2?.name||'Jugador 2';
-  $('score-1').textContent=room.scores?.player1||0; $('score-2').textContent=room.scores?.player2||0; $('mobile-score-1').textContent=room.scores?.player1||0; $('mobile-score-2').textContent=room.scores?.player2||0;
-  $('score-target').textContent=targetPoints(room);
   $('tally-1').innerHTML=renderTally(room.scores?.player1||0,targetPoints(room));$('tally-2').innerHTML=renderTally(room.scores?.player2||0,targetPoints(room));
-  $('mobile-target').textContent=targetPoints(room);$('mobile-tally-1').innerHTML=renderTally(room.scores?.player1||0,targetPoints(room));$('mobile-tally-2').innerHTML=renderTally(room.scores?.player2||0,targetPoints(room));
-  $('board-target').textContent=targetPoints(room);$('board-tally-1').innerHTML=renderTally(room.scores?.player1||0,targetPoints(room));$('board-tally-2').innerHTML=renderTally(room.scores?.player2||0,targetPoints(room));
-  $('hand-number').textContent=String(room.handNumber||1).padStart(2,'0'); $('mobile-hand').textContent=String(room.handNumber||1).padStart(2,'0'); $('deck-count').textContent=room.deckCount??40;
+  $('mobile-tally-1').innerHTML=renderTally(room.scores?.player1||0,targetPoints(room));$('mobile-tally-2').innerHTML=renderTally(room.scores?.player2||0,targetPoints(room));
+  $('deck-count').textContent=room.deckCount??40;
   $('game-room-code').textContent='MESA ABIERTA';
   $('my-name').textContent=isTable?tableName:(mine?.name||'Vos'); $('my-avatar').textContent=(isTable?tableName:(mine?.name||'V')).slice(0,1).toUpperCase();
   $('opponent-name').textContent=isTable?'Los jugadores':(opponent?.name||'Esperando rival'); $('opponent-avatar').textContent=(isTable?'♠':(opponent?.name||'J').slice(0,1)).toUpperCase();
@@ -474,7 +471,7 @@ function renderGame() {
     }else if(!buttons.length)buttons.push('<span class="action-wait">ESPERÁ TU TURNO</span>');
   }
   actions.innerHTML=buttons.join('');
-  actions.querySelectorAll('[data-action]').forEach((button)=>button.addEventListener('click',()=>{const act=button.dataset.action;if(['yes','no','raise'].includes(act)||act.startsWith('raise-'))answerBet(act);else if(act==='reveal')revealEnvido();else if(act==='flor')callFlor();else callBet(act);}));
+  actions.querySelectorAll('[data-action]').forEach((button)=>button.addEventListener('click',()=>{if(state.demo){toast('En la prueba podés cambiar de vista y jugar cartas.');return;}const act=button.dataset.action;if(['yes','no','raise'].includes(act)||act.startsWith('raise-'))answerBet(act);else if(act==='reveal')revealEnvido();else if(act==='flor')callFlor();else callBet(act);}));
   $('turn-badge').textContent=isTable?'MESA':pending?(pending.responder===state.playerId?'RESPONDÉ':'ESPERANDO'):myTurn?'TU TURNO':'ESPERÁ';$('turn-badge').classList.toggle('waiting-turn',!myTurn||!!pending);
   if(room.status==='complete') toast('¡Partida terminada!');
 }
@@ -486,14 +483,25 @@ function renderTally(points,target){
 function escapeHtml(value='') { return String(value).replace(/[&<>"']/g,(ch)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch])); }
 
 function demoStart(role) {
-  state.demo=true; state.roomCode='DEMO1'; state.playerId=role; const deck=shuffleDeck();
-  state.hand=role==='table'?[]:deck.slice(role==='player1'?0:3,role==='player1'?3:6);
+  state.demo=true;state.roomCode='DEMO1';state.playerId=role;const deck=shuffleDeck();
+  state.demoHands={player1:deck.slice(0,3),player2:deck.slice(3,6)};state.hand=role==='table'?[]:[...state.demoHands[role]];
   state.room={status:'started',targetPoints:30,muestra:deck[6],table:{name:'La mesa'},players:{player1:{name:'Matias'},player2:{name:'Nico'}},scores:{player1:4,player2:3},handNumber:7,deckCount:33,turn:'player1',mano:'player1',trickNo:2,trickCards:[{playerId:'player2',name:'Nico',card:deck[13]}],feed:[{text:'Nico jugó 7 de copa.',time:Date.now()},{text:'Matias se llevó la baza anterior.',time:Date.now()}]};
-  $('game-room-code').textContent='MESA · DEMO1'; renderGame(); showView('game-view');
+  $('game-room-code').textContent='MESA · DEMO1';renderGame();showView('game-view');
+}
+function switchDemoRole(role) {
+  if(!state.demo||!['table','player1','player2'].includes(role))return;
+  state.playerId=role;state.hand=role==='table'?[]:[...(state.demoHands[role]||[])];renderGame();
 }
 function demoPlay(card) {
-  state.hand=state.hand.filter((c)=>c.id!==card.id); state.room.trickCards=[...(state.room.trickCards||[]),{playerId:state.playerId,name:state.room.players[state.playerId].name,card}]; state.room.deckCount--;
-  if(state.room.trickCards.length===2){const winner=cardStrength(state.room.trickCards[0].card)>=cardStrength(state.room.trickCards[1].card)?state.room.trickCards[0].playerId:state.room.trickCards[1].playerId;state.room.scores[winner]++;state.room.feed.unshift({text:`${state.room.players[winner].name} se lleva la baza.`,time:Date.now()});setTimeout(()=>{state.room.trickCards=[];state.room.turn='player1';if(!state.hand.length){state.hand=shuffleDeck().slice(0,3);state.room.handNumber++;}renderGame();},700);} else state.room.turn=state.playerId==='player1'?'player2':'player1'; renderGame(); toast('Jugada de demostración.');
+  const player=state.playerId;if(player==='table')return;
+  state.demoHands[player]=(state.demoHands[player]||[]).filter((item)=>item.id!==card.id);state.hand=[...state.demoHands[player]];
+  state.room.trickCards=[...(state.room.trickCards||[]),{playerId:player,name:state.room.players[player].name,card}];state.room.deckCount--;
+  if(state.room.trickCards.length===2){
+    const winner=cardStrength(state.room.trickCards[0].card)>=cardStrength(state.room.trickCards[1].card)?state.room.trickCards[0].playerId:state.room.trickCards[1].playerId;
+    state.room.scores[winner]++;state.room.feed.unshift({text:`${state.room.players[winner].name} se lleva la baza.`,time:Date.now()});
+    setTimeout(()=>{state.room.trickCards=[];state.room.turn=winner||'player1';if(!state.demoHands.player1.length&&!state.demoHands.player2.length){const nextDeck=shuffleDeck();state.demoHands={player1:nextDeck.slice(0,3),player2:nextDeck.slice(3,6)};}state.hand=state.playerId==='table'?[]:[...(state.demoHands[state.playerId]||[])];state.room.handNumber++;renderGame();},700);
+  }else state.room.turn=player==='player1'?'player2':'player1';
+  renderGame();toast('Jugada de demostración.');
 }
 
 $('create-room').addEventListener('click',()=>configureSetup());
@@ -509,12 +517,7 @@ $('demo-button').addEventListener('click',()=>demoStart('player1'));
 $('start-game').addEventListener('click',async()=>{try{await startGame();}catch(error){console.error(error);toast(firebaseError(error));}});
 $('leave-room').addEventListener('click',()=>{if(state.unsubscribe)state.unsubscribe();if(state.privateUnsubscribe)state.privateUnsubscribe();state.room=null;state.demo=false;showView('welcome-view');openLobby();});
 $('game-home').addEventListener('click',()=>{if(state.demo){state.demo=false;showView('welcome-view');openLobby();return;}showView('waiting-view');});
-$('open-scoreboard').addEventListener('click',(event)=>openTallyBoard(event.currentTarget));
-$('mobile-history').addEventListener('click',(event)=>openTallyBoard(event.currentTarget));
-function openTallyBoard(trigger){tallyBoardTrigger=trigger;$('tally-board').classList.remove('hidden');$('tally-board-close').focus();}
-function closeTallyBoard(){$('tally-board').classList.add('hidden');tallyBoardTrigger?.focus();tallyBoardTrigger=null;}
-$('tally-board-close').addEventListener('click',closeTallyBoard);
-document.addEventListener('keydown',(event)=>{if(event.key==='Escape'&&!$('tally-board').classList.contains('hidden'))closeTallyBoard();});
+$('demo-device-switcher').addEventListener('click',(event)=>{const button=event.target.closest('[data-demo-role]');if(button)switchDemoRole(button.dataset.demoRole);});
 $('sound-toggle').addEventListener('click',()=>toast('El sonido se agrega en una próxima versión.'));
 $('close-config').addEventListener('click',()=>showView('setup-view'));
 $('save-config').addEventListener('click',()=>{try{const cfg=JSON.parse($('firebase-config').value);if(!firebaseConfigValid(cfg))throw new Error('missing');state.config=cfg;localStorage.setItem(storageKey,JSON.stringify(cfg));toast('Configuración guardada.',true);runPendingAction();}catch{toast('Pegá una configuración Firebase válida.',true);}});

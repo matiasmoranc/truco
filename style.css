@@ -95,56 +95,61 @@
   .mobile-tally .tally-group{width:22px;height:19px;flex:0 0 9px;transform:scale(.4);transform-origin:top left;margin-right:-13px}
 }
 
-/* Tanteador ampliado: dos equipos, división a mitad de la partida y palitos en grupos de cinco. */
-.tally-board{position:absolute;inset:0;z-index:25;display:flex;flex-direction:column;padding:max(18px,env(safe-area-inset-top)) 6vw max(20px,env(safe-area-inset-bottom));background:#ededee;color:#737985}
-.tally-board-close{position:absolute;top:max(10px,env(safe-area-inset-top));right:12px;width:34px;height:34px;border:0;background:transparent;color:#777e88;font-size:30px;font-weight:300;line-height:1}
-.tally-board-header{display:grid;grid-template-columns:1fr 48px 1fr;align-items:center;gap:4px;min-height:66px;text-align:center}
-.tally-board-header h2{margin:0;font-family:'DM Sans',sans-serif;font-size:clamp(19px,5.5vw,33px);font-weight:300;letter-spacing:.08em;color:#747a85}
-.tally-board-mark{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:#648092}
-.tally-board-mark span{font-size:31px;line-height:1}.tally-board-mark small{font-size:8px;letter-spacing:.13em;color:#848a92}.tally-board-mark b{font-size:10px}
-.tally-board-grid{display:grid;grid-template-columns:minmax(0,1fr) 2px minmax(0,1fr);gap:10px;flex:1;min-height:0;padding:2vh 0 5vh}
-.tally-board-team{display:flex;min-width:0;min-height:0}
-.tally-board-marks{display:flex;flex-direction:column;width:100%;max-width:none;height:100%;min-height:0;margin:0;gap:0}
-.tally-board .tally-half{display:flex;flex:1;flex-wrap:wrap;align-content:flex-start;align-items:flex-start;gap:clamp(5px,2vw,12px);min-height:0;padding:3vh 7% 0}
-.tally-board .tally-midline{height:2px;flex:0 0 2px;background:#c4c8cd}
-.tally-board-divider{align-self:stretch;background:#c4c8cd}
-.tally-board .tally-group{display:block;position:relative;flex:0 0 auto;width:clamp(50px,15vw,86px);height:clamp(50px,15vw,86px);padding:0;gap:0}
-.tally-board .tally-group i{position:absolute;display:block;margin:0;padding:0;background:#7e848e;border-radius:1px}
-.tally-board .tally-group i:nth-child(1){left:0;top:0;width:clamp(2px,.65vw,4px);height:100%}
-.tally-board .tally-group i:nth-child(2){left:0;bottom:0;width:100%;height:clamp(2px,.65vw,4px)}
-.tally-board .tally-group i:nth-child(3){right:0;top:0;width:clamp(2px,.65vw,4px);height:100%}
-.tally-board .tally-group i:nth-child(4){left:0;top:0;width:100%;height:clamp(2px,.65vw,4px)}
-.tally-board .tally-group b{position:absolute;left:0;bottom:0;top:auto;width:141%;height:clamp(2px,.65vw,4px);background:#7e848e;border-radius:1px;transform:rotate(-45deg);transform-origin:left center}
-@media(min-width:641px){.tally-board{padding-left:max(8vw,70px);padding-right:max(8vw,70px)}.tally-board-grid{gap:24px}.tally-board .tally-half{padding-left:14%;padding-right:14%}}
-
-/* Tanteador compacto de la mesa: grupos de cinco y corte fijo en la mitad del objetivo. */
-.score-label{display:block;width:max-content;max-width:100%;padding:0;border:0;background:none;text-align:left;cursor:pointer}
-.score-label i{margin-left:4px;color:var(--gold);font-style:normal}
-.scoreboard .tally{width:calc(100% - 14px);max-width:none;height:46px;min-height:0;gap:0;margin:0 0 13px 14px}
-.scoreboard .tally-half{height:21px;min-height:21px;flex:0 0 21px;flex-wrap:nowrap;gap:2px;overflow:hidden}
-.scoreboard .tally-midline{width:100%;height:2px;flex:0 0 2px;background:rgba(239,235,215,.32)}
-.scoreboard .tally-group{display:block;position:relative;flex:0 0 20px;width:20px;height:19px;padding:0;gap:0}
-.scoreboard .tally-group i{position:absolute;display:block;width:2px;height:auto;margin:0;padding:0;border-radius:1px;background:var(--gold)}
-.scoreboard .tally-group i:nth-child(1){left:0;top:0;width:2px;height:100%}
-.scoreboard .tally-group i:nth-child(2){left:0;bottom:0;width:100%;height:2px}
-.scoreboard .tally-group i:nth-child(3){right:0;top:0;width:2px;height:100%}
-.scoreboard .tally-group i:nth-child(4){left:0;top:0;width:100%;height:2px}
-.scoreboard .tally-group b{left:0;top:auto;right:auto;bottom:0;width:27px;height:2px;background:var(--red);transform:rotate(-45deg);transform-origin:left center}
-@media(max-width:900px){.scoreboard .tally-group{flex-basis:16px;width:16px;height:16px}.scoreboard .tally-group b{width:23px}}
+/* Marcador siempre visible en el paño; cada grupo usa cuatro lados y el quinto palito diagonal. */
+.game{height:100dvh;min-height:0;overflow:hidden}
+.game-layout{flex:1;min-height:0}
+.scoreboard{display:flex;flex-direction:column;gap:12px;min-width:0;min-height:0;padding:24px 14px;background:radial-gradient(ellipse at center,#204a36,#193b2b 52%,#153324 100%)}
+.scoreboard-head{display:grid;grid-template-columns:1fr 1fr;align-items:center;gap:8px;text-align:center;flex:0 0 auto}
+.scoreboard-head h2,.mobile-score-head h2{margin:0;color:#e6e5d8;font-size:clamp(8px,1vw,12px);font-weight:500;letter-spacing:.13em;white-space:nowrap}
+.scoreboard-grid{display:grid;grid-template-columns:minmax(0,1fr) 1px minmax(0,1fr);gap:8px;flex:1;min-height:0}
+.scoreboard-divider,.mobile-score-divider{align-self:stretch;background:rgba(239,235,215,.35)}
+.scoreboard .tally-table,.mobile-score .mobile-tally{display:flex;flex-direction:column;width:100%;max-width:none;height:100%;min-height:0;flex:1;margin:0;gap:0}
+.scoreboard .tally-half,.mobile-score .tally-half{display:flex;flex:1;flex-wrap:wrap;align-content:flex-start;align-items:flex-start;gap:5px;min-height:0;padding:8px 4px 0;overflow:hidden}
+.scoreboard .tally-midline,.mobile-score .tally-midline{width:100%;height:2px;flex:0 0 2px;background:rgba(239,235,215,.35)}
+.scoreboard .tally-group,.mobile-score .tally-group{display:block;position:relative;flex:0 0 clamp(15px,3vw,24px);width:clamp(15px,3vw,24px);height:clamp(15px,3vw,24px);padding:0;margin:0;gap:0}
+.scoreboard .tally-group i,.mobile-score .tally-group i{position:absolute;display:block;width:2px;height:auto;margin:0;padding:0;border-radius:1px;background:#d7d8cf}
+.scoreboard .tally-group i:nth-child(1),.mobile-score .tally-group i:nth-child(1){left:0;top:0;width:2px;height:100%}
+.scoreboard .tally-group i:nth-child(2),.mobile-score .tally-group i:nth-child(2){left:0;bottom:0;width:100%;height:2px}
+.scoreboard .tally-group i:nth-child(3),.mobile-score .tally-group i:nth-child(3){right:0;top:0;width:2px;height:100%}
+.scoreboard .tally-group i:nth-child(4),.mobile-score .tally-group i:nth-child(4){left:0;top:0;width:100%;height:2px}
+.scoreboard .tally-group b,.mobile-score .tally-group b{position:absolute;left:0;right:auto;top:auto;bottom:0;width:141%;height:2px;background:#d7d8cf;border-radius:1px;transform:rotate(-45deg);transform-origin:left center}
+.tally-board,.tally-board-close,.tally-board-header,.tally-board-grid,.tally-board-divider{display:none!important}
+.demo-device-switcher{z-index:30;display:flex;flex:0 0 44px;align-items:center;justify-content:center;gap:7px;padding:4px 10px;background:#0e241b;border-top:1px solid rgba(239,235,215,.16)}
+.demo-device-switcher>span{margin-right:4px;color:#99a69c;font-size:8px;letter-spacing:.14em}
+.demo-device-switcher button{height:30px;padding:0 12px;border:1px solid rgba(239,235,215,.22);border-radius:4px;background:transparent;color:#d8ded8;font-size:10px}
+.demo-device-switcher button[aria-pressed="true"]{border-color:var(--gold);background:rgba(216,184,117,.14);color:#f2d99f}
+.player-mode .scoreboard{display:none!important}
+.player-mode .game-layout{grid-template-columns:minmax(460px,1fr) 225px}
+.player-mode .side-panel{display:none}
+.player-mode .mobile-score{display:none!important}
+.player-mode .hand-card{transform-origin:bottom center}
+.player-mode .hand{gap:0}
+.player-mode .hand-card{margin:0 -12px}
+.player-mode .hand-card:nth-child(1){z-index:1;transform:rotate(-12deg) translate(10px,7px)}
+.player-mode .hand-card:nth-child(2){z-index:3;transform:translateY(-5px)}
+.player-mode .hand-card:nth-child(3){z-index:2;transform:rotate(12deg) translate(-10px,7px)}
+@media(max-width:900px){.scoreboard{padding:20px 10px}.scoreboard-grid{gap:5px}.scoreboard .tally-group{flex-basis:clamp(12px,3vw,18px);width:clamp(12px,3vw,18px);height:clamp(12px,3vw,18px)}}
 @media(max-width:640px){
-  .mobile-score{justify-content:space-between;gap:2px;padding:0 6px}
-  .mobile-score-value{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
-  .mobile-team-label{display:inline!important;font-size:6px!important;letter-spacing:.02em!important;color:#c4c8cd!important}
-  .mobile-score .mobile-tally{display:flex;width:48px;max-width:48px;height:22px;min-height:0;flex:0 0 48px;flex-direction:column;flex-wrap:nowrap;gap:1px;margin:0;overflow:hidden}
-  .mobile-tally .tally-half{height:9px;min-height:9px;flex:0 0 9px;flex-wrap:nowrap;gap:1px;overflow:hidden}
-  .mobile-tally .tally-midline{width:100%;height:2px;min-height:2px;flex:0 0 2px;margin:0;background:rgba(239,235,215,.42)}
-  .mobile-tally .tally-group{display:block;position:relative;width:7px;height:7px;flex:0 0 7px;padding:0;margin:0;gap:0;transform:none}
-  .mobile-tally .tally-group i{position:absolute;display:block;width:1px;height:auto;margin:0;padding:0;border-radius:0;background:#d8b875}
-  .mobile-tally .tally-group i:nth-child(1){left:0;top:0;width:1px;height:100%}
-  .mobile-tally .tally-group i:nth-child(2){left:0;bottom:0;width:100%;height:1px}
-  .mobile-tally .tally-group i:nth-child(3){right:0;top:0;width:1px;height:100%}
-  .mobile-tally .tally-group i:nth-child(4){left:0;top:0;width:100%;height:1px}
-  .mobile-tally .tally-group b{position:absolute;left:0;right:auto;top:auto;bottom:0;width:10px;height:1px;background:#d8b875;transform:rotate(-45deg);transform-origin:left center}
-  .mobile-score button{position:static;right:auto;padding:0 3px;background:none;color:var(--gold);font-size:7px;letter-spacing:.07em;white-space:nowrap}
+  .game-topbar{flex:0 0 54px}
+  .game-layout{display:flex;flex-direction:column;flex:1 1 0;height:auto;min-height:0;overflow:hidden}
+  .scoreboard,.side-panel{display:none!important}
+  .felt-area{flex:1 1 0;width:100%;height:auto;min-height:0;padding:14px 12px}
+  .mobile-score{display:none;flex:0 0 clamp(104px,17dvh,142px);flex-direction:column;gap:4px;padding:8px 14px 10px;background:radial-gradient(ellipse at center,#204a36,#193b2b 52%,#153324 100%);border-top:1px solid rgba(239,235,215,.2)}
+  .table-mode .mobile-score{display:flex}
+  .mobile-score-head{display:grid;grid-template-columns:1fr 1fr;gap:6px;text-align:center;flex:0 0 18px;align-items:center}
+  .mobile-score-grid{display:grid;grid-template-columns:minmax(0,1fr) 1px minmax(0,1fr);gap:8px;flex:1;min-height:0}
+  .mobile-score .tally-half{gap:clamp(3px,1.3vw,8px);padding:5px 7px 0}
+  .mobile-score .tally-group{flex-basis:clamp(14px,5vw,22px);width:clamp(14px,5vw,22px);height:clamp(14px,5vw,22px)}
+  .mobile-score .tally-group i,.mobile-score .tally-group b{height:2px}
+  .mobile-score .tally-group i:nth-child(1),.mobile-score .tally-group i:nth-child(3){width:2px}
+  .mobile-score .tally-group i:nth-child(2),.mobile-score .tally-group i:nth-child(4){height:2px}
+  .demo-device-switcher{flex:0 0 44px;gap:5px;padding:4px 5px}
+  .demo-device-switcher>span{font-size:7px;margin-right:1px}
+  .demo-device-switcher button{height:30px;padding:0 9px;font-size:9px}
+  .player-mode .hand{top:51%;gap:0;padding:0 8px}
+  .player-mode .hand-card{width:clamp(83px,27vw,104px);height:clamp(116px,22dvh,138px);flex:0 1 clamp(83px,27vw,104px);margin:0 -24px}
+  .player-mode .hand-card:nth-child(1){transform:rotate(-12deg) translate(11px,8px)}
+  .player-mode .hand-card:nth-child(2){transform:translateY(-6px)}
+  .player-mode .hand-card:nth-child(3){transform:rotate(12deg) translate(-11px,8px)}
 }
-@media(max-width:370px){.mobile-score{gap:1px;padding:0 4px}.mobile-team-label{font-size:5px!important}.mobile-score .mobile-tally{width:43px;max-width:43px;flex-basis:43px}.mobile-score button{font-size:6px;padding:0 2px}.mobile-target,.mobile-hand-label{font-size:6px!important}}
+@media(max-width:370px){.demo-device-switcher{gap:3px}.demo-device-switcher button{padding:0 7px;font-size:8px}.mobile-score{padding-left:9px;padding-right:9px}}

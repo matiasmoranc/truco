@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="./style.css?v=20260929-8" />
+    <link rel="stylesheet" href="./style.css?v=20260929-9" />
   </head>
   <body>
     <div class="grain" aria-hidden="true"></div>
@@ -68,12 +68,8 @@
         <header class="game-topbar"><button class="mini-brand" id="game-home"><b>T</b> TRUCO</button><span class="room-pill" id="game-room-code">MESA · —</span><span class="connection"><span class="live-dot"></span> EN VIVO</span></header>
         <div class="game-layout">
           <aside class="scoreboard">
-            <button class="score-label" id="open-scoreboard" aria-label="Abrir tanteador">TANTOS <span>·</span> A <b id="score-target">30</b> <i aria-hidden="true">↗</i></button>
-            <div class="score-row"><span class="team-dot red-dot"></span><span class="team-name" id="score-name-1">Nosotros</span><strong id="score-1">0</strong></div>
-            <div class="tally" id="tally-1" aria-label="Palitos de Jugador 1"></div>
-            <div class="score-row"><span class="team-dot"></span><span class="team-name" id="score-name-2">Ellos</span><strong id="score-2">0</strong></div>
-            <div class="tally" id="tally-2" aria-label="Palitos de Jugador 2"></div>
-            <div class="hand-label">MANO <span id="hand-number">01</span></div>
+            <div class="scoreboard-head"><h2>NOSOTROS</h2><h2>ELLOS</h2></div>
+            <div class="scoreboard-grid"><div class="tally tally-table" id="tally-1" aria-label="Palitos de Nosotros"></div><div class="scoreboard-divider" aria-hidden="true"></div><div class="tally tally-table" id="tally-2" aria-label="Palitos de Ellos"></div></div>
           </aside>
           <section class="felt-area" id="felt-area">
             <div class="felt-ring ring-a"></div><div class="felt-ring ring-b"></div>
@@ -86,12 +82,13 @@
           </section>
           <aside class="side-panel"><div class="side-title">PARTIDA <span>EN CURSO</span></div><div class="round-feed" id="round-feed"><div class="feed-item"><i></i><span>Esperando la primera jugada</span></div></div><div class="side-bottom"><span class="deck-count"><i>▧</i> <b id="deck-count">40</b> cartas en el mazo</span><button id="sound-toggle" class="sound-button">♫ Sonido <span>OFF</span></button></div></aside>
         </div>
-        <div class="mobile-score"><span class="mobile-score-value" id="mobile-score-1" aria-hidden="true">0</span><span class="mobile-team-label">NOS</span><div class="tally mobile-tally" id="mobile-tally-1" aria-label="Palitos de Nosotros"></div><small>·</small><span class="mobile-score-value" id="mobile-score-2" aria-hidden="true">0</span><span class="mobile-team-label">ELLOS</span><div class="tally mobile-tally" id="mobile-tally-2" aria-label="Palitos de Ellos"></div><small class="mobile-target">A <b id="mobile-target">30</b></small><span class="mobile-hand-label">MANO <b id="mobile-hand">01</b></span><button id="mobile-history">TANTEADOR ↗</button></div>
-        <section class="tally-board hidden" id="tally-board" role="dialog" aria-modal="true" aria-label="Tanteador">
-          <button class="tally-board-close" id="tally-board-close" aria-label="Volver a la mesa">×</button>
-          <header class="tally-board-header"><h2>NOSOTROS</h2><div class="tally-board-mark"><span>⚙</span><small>A <b id="board-target">10</b></small></div><h2>ELLOS</h2></header>
-          <div class="tally-board-grid"><div class="tally-board-team"><div class="tally tally-board-marks" id="board-tally-1"></div></div><div class="tally-board-divider"></div><div class="tally-board-team"><div class="tally tally-board-marks" id="board-tally-2"></div></div></div>
+        <section class="mobile-score">
+          <div class="mobile-score-head"><h2>NOSOTROS</h2><h2>ELLOS</h2></div>
+          <div class="mobile-score-grid"><div class="tally mobile-tally" id="mobile-tally-1" aria-label="Palitos de Nosotros"></div><div class="mobile-score-divider" aria-hidden="true"></div><div class="tally mobile-tally" id="mobile-tally-2" aria-label="Palitos de Ellos"></div></div>
         </section>
+        <div class="demo-device-switcher hidden" id="demo-device-switcher" role="group" aria-label="Cambiar dispositivo de prueba">
+          <span>PROBAR VISTA</span><button type="button" data-demo-role="table" aria-pressed="false">Mesa</button><button type="button" data-demo-role="player1" aria-pressed="false">Jugador 1</button><button type="button" data-demo-role="player2" aria-pressed="false">Jugador 2</button>
+        </div>
         <div class="toast" id="toast" role="status"></div>
       </section>
 
@@ -102,6 +99,6 @@
 
       <section class="toast-global" id="global-toast" role="status"></section>
     </main>
-    <script type="module" src="./app.js?v=20260929-8"></script>
+    <script type="module" src="./app.js?v=20260929-9"></script>
   </body>
 </html>
