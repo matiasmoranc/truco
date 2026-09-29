@@ -3,6 +3,7 @@ const $ = (id) => document.getElementById(id);
 const views = ['welcome-view', 'setup-view', 'waiting-view', 'game-view', 'config-view'];
 const storageKey = 'truco-firebase-config';
 let state = { role: 'table', joining: false, config: null, firebase: null, roomCode: null, selectedRoom: null, uid: null, playerId: null, unsubscribe: null, privateUnsubscribe: null, lobbyUnsubscribe: null, room: null, hand: [], demo: false, nextAction: null, resolutionTimer: null, resolutionTimerKey: null, playActionInFlight: false, legacyRepairKey: null };
+let tallyBoardTrigger = null;
 
 function showView(id) { views.forEach((name) => $(name).classList.toggle('active', name === id)); }
 function toast(message, global = false) {
@@ -508,9 +509,12 @@ $('demo-button').addEventListener('click',()=>demoStart('player1'));
 $('start-game').addEventListener('click',async()=>{try{await startGame();}catch(error){console.error(error);toast(firebaseError(error));}});
 $('leave-room').addEventListener('click',()=>{if(state.unsubscribe)state.unsubscribe();if(state.privateUnsubscribe)state.privateUnsubscribe();state.room=null;state.demo=false;showView('welcome-view');openLobby();});
 $('game-home').addEventListener('click',()=>{if(state.demo){state.demo=false;showView('welcome-view');openLobby();return;}showView('waiting-view');});
-$('mobile-history').addEventListener('click',()=>{$('tally-board').classList.remove('hidden');$('tally-board-close').focus();});
-$('tally-board-close').addEventListener('click',()=>{$('tally-board').classList.add('hidden');$('mobile-history').focus();});
-document.addEventListener('keydown',(event)=>{if(event.key==='Escape'&&!$('tally-board').classList.contains('hidden'))$('tally-board-close').click();});
+$('open-scoreboard').addEventListener('click',(event)=>openTallyBoard(event.currentTarget));
+$('mobile-history').addEventListener('click',(event)=>openTallyBoard(event.currentTarget));
+function openTallyBoard(trigger){tallyBoardTrigger=trigger;$('tally-board').classList.remove('hidden');$('tally-board-close').focus();}
+function closeTallyBoard(){$('tally-board').classList.add('hidden');tallyBoardTrigger?.focus();tallyBoardTrigger=null;}
+$('tally-board-close').addEventListener('click',closeTallyBoard);
+document.addEventListener('keydown',(event)=>{if(event.key==='Escape'&&!$('tally-board').classList.contains('hidden'))closeTallyBoard();});
 $('sound-toggle').addEventListener('click',()=>toast('El sonido se agrega en una próxima versión.'));
 $('close-config').addEventListener('click',()=>showView('setup-view'));
 $('save-config').addEventListener('click',()=>{try{const cfg=JSON.parse($('firebase-config').value);if(!firebaseConfigValid(cfg))throw new Error('missing');state.config=cfg;localStorage.setItem(storageKey,JSON.stringify(cfg));toast('Configuración guardada.',true);runPendingAction();}catch{toast('Pegá una configuración Firebase válida.',true);}});

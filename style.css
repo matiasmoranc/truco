@@ -116,3 +116,18 @@
 .tally-board .tally-group i:nth-child(4){left:0;top:0;width:100%;height:clamp(2px,.65vw,4px)}
 .tally-board .tally-group b{position:absolute;left:0;bottom:0;top:auto;width:141%;height:clamp(2px,.65vw,4px);background:#7e848e;border-radius:1px;transform:rotate(-45deg);transform-origin:left center}
 @media(min-width:641px){.tally-board{padding-left:max(8vw,70px);padding-right:max(8vw,70px)}.tally-board-grid{gap:24px}.tally-board .tally-half{padding-left:14%;padding-right:14%}}
+
+/* Tanteador compacto de la mesa: grupos de cinco y corte fijo en la mitad del objetivo. */
+.score-label{display:block;width:max-content;max-width:100%;padding:0;border:0;background:none;text-align:left;cursor:pointer}
+.score-label i{margin-left:4px;color:var(--gold);font-style:normal}
+.scoreboard .tally{width:calc(100% - 14px);max-width:none;height:46px;min-height:0;gap:0;margin:0 0 13px 14px}
+.scoreboard .tally-half{height:21px;min-height:21px;flex:0 0 21px;flex-wrap:nowrap;gap:2px;overflow:hidden}
+.scoreboard .tally-midline{width:100%;height:2px;flex:0 0 2px;background:rgba(239,235,215,.32)}
+.scoreboard .tally-group{display:block;position:relative;flex:0 0 20px;width:20px;height:19px;padding:0;gap:0}
+.scoreboard .tally-group i{position:absolute;display:block;width:2px;height:auto;margin:0;padding:0;border-radius:1px;background:var(--gold)}
+.scoreboard .tally-group i:nth-child(1){left:0;top:0;width:2px;height:100%}
+.scoreboard .tally-group i:nth-child(2){left:0;bottom:0;width:100%;height:2px}
+.scoreboard .tally-group i:nth-child(3){right:0;top:0;width:2px;height:100%}
+.scoreboard .tally-group i:nth-child(4){left:0;top:0;width:100%;height:2px}
+.scoreboard .tally-group b{left:0;top:auto;right:auto;bottom:0;width:27px;height:2px;background:var(--red);transform:rotate(-45deg);transform-origin:left center}
+@media(max-width:900px){.scoreboard .tally-group{flex-basis:16px;width:16px;height:16px}.scoreboard .tally-group b{width:23px}}

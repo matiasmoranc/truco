@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="./style.css?v=20260929-6" />
+    <link rel="stylesheet" href="./style.css?v=20260929-7" />
   </head>
   <body>
     <div class="grain" aria-hidden="true"></div>
@@ -68,7 +68,7 @@
         <header class="game-topbar"><button class="mini-brand" id="game-home"><b>T</b> TRUCO</button><span class="room-pill" id="game-room-code">MESA · —</span><span class="connection"><span class="live-dot"></span> EN VIVO</span></header>
         <div class="game-layout">
           <aside class="scoreboard">
-            <div class="score-label">TANTOS <span>·</span> A <b id="score-target">30</b></div>
+            <button class="score-label" id="open-scoreboard" aria-label="Abrir tanteador">TANTOS <span>·</span> A <b id="score-target">30</b> <i aria-hidden="true">↗</i></button>
             <div class="score-row"><span class="team-dot red-dot"></span><span class="team-name" id="score-name-1">Nosotros</span><strong id="score-1">0</strong></div>
             <div class="tally" id="tally-1" aria-label="Palitos de Jugador 1"></div>
             <div class="score-row"><span class="team-dot"></span><span class="team-name" id="score-name-2">Ellos</span><strong id="score-2">0</strong></div>
@@ -102,6 +102,6 @@
 
       <section class="toast-global" id="global-toast" role="status"></section>
     </main>
-    <script type="module" src="./app.js?v=20260929-6"></script>
+    <script type="module" src="./app.js?v=20260929-7"></script>
   </body>
 </html>
