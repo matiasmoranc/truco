@@ -209,11 +209,13 @@ function envidoValue(card, muestra) {
   return [10,11,12].includes(Number(card.rank)) ? 0 : Number(card.rank);
 }
 function hasFlor(hand, muestra) {
+  // Flor: tres del mismo palo, dos o más piezas, o una pieza y dos del mismo palo.
   const pieces = hand.filter((card)=>pieceOrder(card,muestra)>0);
   const suits = hand.reduce((all,card)=>{all[card.suit]=(all[card.suit]||0)+1;return all;},{});
   const nonPieces=hand.filter((card)=>!pieceOrder(card,muestra));
   const twoSameSuit=nonPieces.length===2&&nonPieces[0].suit===nonPieces[1].suit;
-  return pieces.length>=2 || Object.values(suits).some((n)=>n===3) || (pieces.length===1&&twoSameSuit);
+  const threeSameSuit=Object.values(suits).some((n)=>n===3);
+  return threeSameSuit || pieces.length>=2 || (pieces.length===1&&twoSameSuit);
 }
 function handEnvido(hand, muestra) {
   const values=hand.map((card)=>envidoValue(card,muestra));let best=Math.max(...values);
