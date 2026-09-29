@@ -79,3 +79,8 @@
   .player-mode .player-actions .pass-button,.player-mode .player-actions .call-button{flex:0 1 auto}
 }
 @media(max-width:640px){.game-layout{display:flex;flex-direction:column}.felt-area{flex:1 1 auto;height:auto}}
+
+/* Reglas finales: prevalecen sobre el posicionamiento base y los estilos móviles. */
+.player-mode .muestra-card{display:none!important}
+.table-mode .muestra-card{top:calc(50% + 105px);left:auto;right:4%;transform:translateY(-50%) rotate(-8deg)}
+@media(max-width:640px){.table-mode .muestra-card{top:calc(50% + 81px);right:7%;left:auto;transform:translateY(-50%) rotate(-8deg)}}
