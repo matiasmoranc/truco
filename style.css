@@ -227,3 +227,11 @@
   .player-mode .player-actions{bottom:14px;gap:6px}
   .player-mode .player-actions .call-button,.player-mode .player-actions .pass-button{height:40px;padding:0 12px;font-size:9px;letter-spacing:.1em}
 }
+
+/* Centrar mazo y muestra juntos en el paño de la mesa. */
+.table-mode .deck-stack{left:50%;right:auto;transform:translate(-50%,-50%)}
+.table-mode .muestra-card{left:50%;right:auto;transform:translate(-50%,-50%) rotate(-8deg)}
+@media(max-width:640px){
+  .table-mode .deck-stack{left:50%;right:auto;transform:translate(-50%,-50%)}
+  .table-mode .muestra-card{left:50%;right:auto;transform:translate(-50%,-50%) rotate(-8deg)}
+}
