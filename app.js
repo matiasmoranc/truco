@@ -476,7 +476,11 @@ function renderGame() {
   $('turn-badge').textContent=isTable?'MESA':pending?(pending.responder===state.playerId?'RESPONDÉ':'ESPERANDO'):myTurn?'TU TURNO':'ESPERÁ';$('turn-badge').classList.toggle('waiting-turn',!myTurn||!!pending);
   if(room.status==='complete') toast('¡Partida terminada!');
 }
-function renderTally(points,target){const n=Math.min(Math.max(0,Number(points)||0),Number(target)||30),groups=[];for(let left=n;left>0;left-=5){const count=Math.min(5,left);groups.push(`<span class="tally-group ${count===5?'full':''}" aria-hidden="true">${Array.from({length:Math.min(count,4)},()=>'<i></i>').join('')}${count===5?'<b></b>':''}</span>`);}return groups.join('');}
+function renderTally(points,target){
+  const limit=Number(target)||30,n=Math.min(Math.max(0,Number(points)||0),limit),middle=Math.ceil(limit/2);
+  const marks=(count)=>{const groups=[];for(let left=count;left>0;left-=5){const size=Math.min(5,left);groups.push(`<span class="tally-group ${size===5?'full':''}" aria-hidden="true">${Array.from({length:Math.min(size,4)},()=>'<i></i>').join('')}${size===5?'<b></b>':''}</span>`);}return groups.join('');};
+  return `<span class="tally-half">${marks(Math.min(n,middle))}</span><i class="tally-midline" aria-hidden="true"></i><span class="tally-half">${marks(Math.max(0,n-middle))}</span>`;
+}
 function escapeHtml(value='') { return String(value).replace(/[&<>"']/g,(ch)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch])); }
 
 function demoStart(role) {
