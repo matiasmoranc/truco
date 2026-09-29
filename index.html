@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="./style.css?v=20260929-7" />
+    <link rel="stylesheet" href="./style.css?v=20260929-8" />
   </head>
   <body>
     <div class="grain" aria-hidden="true"></div>
@@ -86,7 +86,7 @@
           </section>
           <aside class="side-panel"><div class="side-title">PARTIDA <span>EN CURSO</span></div><div class="round-feed" id="round-feed"><div class="feed-item"><i></i><span>Esperando la primera jugada</span></div></div><div class="side-bottom"><span class="deck-count"><i>▧</i> <b id="deck-count">40</b> cartas en el mazo</span><button id="sound-toggle" class="sound-button">♫ Sonido <span>OFF</span></button></div></aside>
         </div>
-        <div class="mobile-score"><span class="mobile-team-score"><i class="team-dot red-dot"></i><b id="mobile-score-1">0</b></span><div class="tally mobile-tally" id="mobile-tally-1"></div><small>·</small><span class="mobile-team-score"><i class="team-dot"></i><b id="mobile-score-2">0</b></span><div class="tally mobile-tally" id="mobile-tally-2"></div><small class="mobile-target">A <b id="mobile-target">30</b></small><span class="mobile-hand-label">MANO <b id="mobile-hand">01</b></span><button id="mobile-history">PARTIDA ↗</button></div>
+        <div class="mobile-score"><span class="mobile-score-value" id="mobile-score-1" aria-hidden="true">0</span><span class="mobile-team-label">NOS</span><div class="tally mobile-tally" id="mobile-tally-1" aria-label="Palitos de Nosotros"></div><small>·</small><span class="mobile-score-value" id="mobile-score-2" aria-hidden="true">0</span><span class="mobile-team-label">ELLOS</span><div class="tally mobile-tally" id="mobile-tally-2" aria-label="Palitos de Ellos"></div><small class="mobile-target">A <b id="mobile-target">30</b></small><span class="mobile-hand-label">MANO <b id="mobile-hand">01</b></span><button id="mobile-history">TANTEADOR ↗</button></div>
         <section class="tally-board hidden" id="tally-board" role="dialog" aria-modal="true" aria-label="Tanteador">
           <button class="tally-board-close" id="tally-board-close" aria-label="Volver a la mesa">×</button>
           <header class="tally-board-header"><h2>NOSOTROS</h2><div class="tally-board-mark"><span>⚙</span><small>A <b id="board-target">10</b></small></div><h2>ELLOS</h2></header>
@@ -102,6 +102,6 @@
 
       <section class="toast-global" id="global-toast" role="status"></section>
     </main>
-    <script type="module" src="./app.js?v=20260929-7"></script>
+    <script type="module" src="./app.js?v=20260929-8"></script>
   </body>
 </html>

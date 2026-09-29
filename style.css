@@ -131,3 +131,20 @@
 .scoreboard .tally-group i:nth-child(4){left:0;top:0;width:100%;height:2px}
 .scoreboard .tally-group b{left:0;top:auto;right:auto;bottom:0;width:27px;height:2px;background:var(--red);transform:rotate(-45deg);transform-origin:left center}
 @media(max-width:900px){.scoreboard .tally-group{flex-basis:16px;width:16px;height:16px}.scoreboard .tally-group b{width:23px}}
+@media(max-width:640px){
+  .mobile-score{justify-content:space-between;gap:2px;padding:0 6px}
+  .mobile-score-value{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+  .mobile-team-label{display:inline!important;font-size:6px!important;letter-spacing:.02em!important;color:#c4c8cd!important}
+  .mobile-score .mobile-tally{display:flex;width:48px;max-width:48px;height:22px;min-height:0;flex:0 0 48px;flex-direction:column;flex-wrap:nowrap;gap:1px;margin:0;overflow:hidden}
+  .mobile-tally .tally-half{height:9px;min-height:9px;flex:0 0 9px;flex-wrap:nowrap;gap:1px;overflow:hidden}
+  .mobile-tally .tally-midline{width:100%;height:2px;min-height:2px;flex:0 0 2px;margin:0;background:rgba(239,235,215,.42)}
+  .mobile-tally .tally-group{display:block;position:relative;width:7px;height:7px;flex:0 0 7px;padding:0;margin:0;gap:0;transform:none}
+  .mobile-tally .tally-group i{position:absolute;display:block;width:1px;height:auto;margin:0;padding:0;border-radius:0;background:#d8b875}
+  .mobile-tally .tally-group i:nth-child(1){left:0;top:0;width:1px;height:100%}
+  .mobile-tally .tally-group i:nth-child(2){left:0;bottom:0;width:100%;height:1px}
+  .mobile-tally .tally-group i:nth-child(3){right:0;top:0;width:1px;height:100%}
+  .mobile-tally .tally-group i:nth-child(4){left:0;top:0;width:100%;height:1px}
+  .mobile-tally .tally-group b{position:absolute;left:0;right:auto;top:auto;bottom:0;width:10px;height:1px;background:#d8b875;transform:rotate(-45deg);transform-origin:left center}
+  .mobile-score button{position:static;right:auto;padding:0 3px;background:none;color:var(--gold);font-size:7px;letter-spacing:.07em;white-space:nowrap}
+}
+@media(max-width:370px){.mobile-score{gap:1px;padding:0 4px}.mobile-team-label{font-size:5px!important}.mobile-score .mobile-tally{width:43px;max-width:43px;flex-basis:43px}.mobile-score button{font-size:6px;padding:0 2px}.mobile-target,.mobile-hand-label{font-size:6px!important}}
