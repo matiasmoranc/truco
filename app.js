@@ -2,7 +2,7 @@ const FIREBASE_VERSION = '12.4.0';
 const $ = (id) => document.getElementById(id);
 const views = ['welcome-view', 'setup-view', 'waiting-view', 'game-view', 'config-view'];
 const storageKey = 'truco-firebase-config';
-let state = { role: 'table', joining: false, config: null, firebase: null, roomCode: null, selectedRoom: null, uid: null, playerId: null, unsubscribe: null, privateUnsubscribe: null, lobbyUnsubscribe: null, room: null, hand: [], demo: false, demoHands: {}, nextAction: null, resolutionTimer: null, resolutionTimerKey: null, playActionInFlight: false, legacyRepairKey: null };
+let state = { role: 'table', joining: false, config: null, firebase: null, roomCode: null, selectedRoom: null, uid: null, playerId: null, unsubscribe: null, privateUnsubscribe: null, lobbyUnsubscribe: null, room: null, hand: [], demo: false, demoHands: {}, nextAction: null, resolutionTimer: null, resolutionTimerKey: null, playActionInFlight: false, legacyRepairKey: null, emptyHandRepairKey: null };
 
 function showView(id) { views.forEach((name) => $(name).classList.toggle('active', name === id)); }
 function toast(message, global = false) {
@@ -128,6 +128,7 @@ function watchRoom() {
     if (!snapshot.exists()) { toast('La mesa ya no está disponible.'); showView('welcome-view'); openLobby(); return; }
     state.room = snapshot.val();
     if(state.playerId==='table'&&state.room.status==='started'&&!state.room.resolvingTrick&&state.room.trickCards?.length===2&&(state.room.tricks||[]).length>0)recoverLegacyTrick(state.room);
+    if(state.playerId==='table')repairIncompleteHand(state.room);
     if (state.playerId === 'table') scheduleTableResolution();
     if (state.room.status === 'started' || state.room.status === 'complete') { showView('game-view'); watchPrivateHand(); renderGame(); }
     else if (state.room.status === 'waiting') { renderWaiting(); if (!$('waiting-view').classList.contains('active')) showView('waiting-view'); }
@@ -138,7 +139,9 @@ function watchPrivateHand() {
   if (state.privateUnsubscribe) state.privateUnsubscribe();
   const fb = state.firebase;
   state.privateUnsubscribe = fb.onValue(fb.ref(fb.db, `hands/${state.roomCode}/${state.uid}/hand`), (snapshot) => {
-    state.hand = snapshot.val() || []; renderGame();
+    state.hand = snapshot.val() || [];
+    if(state.room?.status==='started')fb.update(fb.ref(fb.db),{[`rooms/${state.roomCode}/public/handClaims/${state.playerId}`]:state.hand.length}).catch(()=>{});
+    renderGame();
   });
 }
 function renderWaiting() {
@@ -171,6 +174,7 @@ async function startGame() {
   patches[`rooms/${state.roomCode}/public/deckCount`] = 33;
   patches[`rooms/${state.roomCode}/public/muestra`] = muestra;
   patches[`rooms/${state.roomCode}/public/handCounts`] = {player1:3,player2:3};
+  patches[`rooms/${state.roomCode}/public/handClaims`] = {player1:3,player2:3};
   patches[`rooms/${state.roomCode}/public/turn`] = 'player1';
   patches[`rooms/${state.roomCode}/public/mano`] = 'player1';
   patches[`rooms/${state.roomCode}/public/trickCards`] = [];
@@ -342,6 +346,7 @@ async function nextHand(winner, scores, handNumber, message) {
   patches[`rooms/${state.roomCode}/public/trickNo`]=1;patches[`rooms/${state.roomCode}/public/trickCards`]=[];patches[`rooms/${state.roomCode}/public/tricks`]=[];
   patches[`rooms/${state.roomCode}/public/deckCount`]=33;patches[`rooms/${state.roomCode}/public/muestra`]=muestra;
   patches[`rooms/${state.roomCode}/public/handCounts`]={player1:3,player2:3};
+  patches[`rooms/${state.roomCode}/public/handClaims`]={player1:3,player2:3};
   patches[`rooms/${state.roomCode}/public/turn`]=winner;patches[`rooms/${state.roomCode}/public/mano`]=winner;
   patches[`rooms/${state.roomCode}/public/trucoLevel`]=1;patches[`rooms/${state.roomCode}/public/pendingBet`]=null;
   patches[`rooms/${state.roomCode}/public/lastTrucoCaller`]=null;
@@ -349,6 +354,15 @@ async function nextHand(winner, scores, handNumber, message) {
   patches[`rooms/${state.roomCode}/public/resolvingTrick`]=false;patches[`rooms/${state.roomCode}/public/resolutionId`]=null;patches[`rooms/${state.roomCode}/public/resolvedWinner`]=null;patches[`rooms/${state.roomCode}/public/resolvedTrickWinner`]=null;patches[`rooms/${state.roomCode}/public/handComplete`]=false;patches[`rooms/${state.roomCode}/public/pendingNextHand`]=null;
   patches[`rooms/${state.roomCode}/public/feed`]=[{text:`${message} Se reparte la siguiente mano.`,time:Date.now()},...(state.room.feed||[]).slice(0,6)];
   await state.firebase.update(state.firebase.ref(state.firebase.db),patches);
+}
+function repairIncompleteHand(room){
+  if(!room||room.status!=='started'||room.resolvingTrick||room.pendingNextHand||(room.trickCards||[]).length) return;
+  const claims=room.handClaims||{},p1=Number(claims.player1),p2=Number(claims.player2);
+  if(!Number.isFinite(p1)||!Number.isFinite(p2)||p1===p2||!((p1===0&&p2>0)||(p2===0&&p1>0))) return;
+  const key=`${room.handNumber||1}:${p1}:${p2}`;
+  if(state.emptyHandRepairKey===key)return;
+  state.emptyHandRepairKey=key;
+  writeRoom({pendingNextHand:{id:`empty-hand:${key}`,winner:room.mano||'player1',message:'Se detectó una mano incompleta. Se reparten nuevas cartas.'}}).catch(()=>{state.emptyHandRepairKey=null;});
 }
 function scheduleTableResolution() {
   const room=state.room;
@@ -421,6 +435,7 @@ async function playCard(card) {
   patches[`hands/${state.roomCode}/${state.uid}/hand`] = newHand;
   const handCounts={...(state.room.handCounts||{}),[state.playerId]:newHand.length};
   patches[`rooms/${state.roomCode}/public/handCounts`]=handCounts;
+  patches[`rooms/${state.roomCode}/public/handClaims/${state.playerId}`]=newHand.length;
   if (played.length < 2) {
     patches[`rooms/${state.roomCode}/public/trickCards`] = played;
     patches[`rooms/${state.roomCode}/public/turn`] = other;
@@ -472,7 +487,7 @@ function renderGame() {
   $('game-room-code').textContent='MESA ABIERTA';
   $('my-name').textContent=isTable?tableName:(mine?.name||'Vos'); $('my-avatar').textContent=(isTable?tableName:(mine?.name||'V')).slice(0,1).toUpperCase();
   $('opponent-name').textContent=isTable?'Los jugadores':(opponent?.name||'Esperando rival'); $('opponent-avatar').textContent=(isTable?'♠':(opponent?.name||'J').slice(0,1)).toUpperCase();
-  const myTurn=!isTable&&room.turn===state.playerId&&room.status==='started'&&!room.resolvingTrick;
+  const myTurn=!isTable&&room.turn===state.playerId&&room.status==='started'&&!room.resolvingTrick&&state.hand.length>0;
   $('turn-badge').textContent=isTable?'MESA':myTurn?'TU TURNO':'ESPERÁ'; $('turn-badge').classList.toggle('waiting-turn',!myTurn);
   $('hand').innerHTML=isTable?'':state.hand.map((card) => `<button class="hand-card sprite-card ${card.red?'card-red':''}" style="--sprite-position:${cardSpritePosition(card)}" aria-label="${cardAccessibleName(card)}" aria-disabled="${!myTurn}" data-card="${card.id}"><span class="sr-only">${cardAccessibleName(card)}</span></button>`).join('');
   document.querySelectorAll('.hand-card').forEach((button) => button.addEventListener('click', () => {const card=state.hand.find((item)=>item.id===button.dataset.card); if(card) playCard(card);}));
@@ -505,7 +520,7 @@ function renderGame() {
     const level=Number(room.trucoLevel)||1;if(level<4&&(level===1||room.lastTrucoCaller!==state.playerId))buttons.push(`<button class="call-button" data-action="${level===1?'truco':level===2?'retruco':'vale4'}">${level===1?'TRUCO':level===2?'RETRUCO':'VALE 4'}</button>`);
     }else if(!buttons.length)buttons.push('<span class="action-wait">ESPERÁ TU TURNO</span>');
   }
-  actions.innerHTML=buttons.join('');
+  actions.innerHTML=state.hand.length?buttons.join(''):'<span class="action-wait">ESPERANDO EL REPARTO…</span>';
   actions.querySelectorAll('[data-action]').forEach((button)=>button.addEventListener('click',()=>{if(state.demo){toast('En la prueba podés cambiar de vista y jugar cartas.');return;}const act=button.dataset.action;if(['yes','no','raise'].includes(act)||act.startsWith('raise-'))answerBet(act);else if(act==='reveal')revealEnvido();else if(act==='flor')callFlor();else callBet(act);}));
   $('turn-badge').textContent=isTable?'MESA':pending?(pending.responder===state.playerId?'RESPONDÉ':'ESPERANDO'):myTurn?'TU TURNO':'ESPERÁ';$('turn-badge').classList.toggle('waiting-turn',!myTurn||!!pending);
   if(room.status==='complete') toast('¡Partida terminada!');
