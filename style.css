@@ -274,3 +274,11 @@
   .table-mode .muestra-card{right:4%;top:calc(50% + clamp(88px,29vw,119px));width:clamp(72px,23vw,96px);height:clamp(106px,34vw,138px)}
   .table-mode .played-card{width:clamp(88px,26vw,116px);height:clamp(130px,38vw,164px)}
 }
+
+/* La muestra tiene el tamaño del mazo y sale hacia el centro, cruzada. */
+.table-mode .deck-stack{width:clamp(106px,10.8vw,151px);height:clamp(151px,15.6vw,214px)}
+.table-mode .muestra-card{width:clamp(106px,10.8vw,151px);height:clamp(151px,15.6vw,214px);top:50%;right:calc(5% + clamp(95px,10.2vw,142px));left:auto;z-index:1;transform:translateY(-50%) rotate(82deg)}
+@media(max-width:640px){
+  .table-mode .deck-stack{width:clamp(110px,36vw,149px);height:clamp(160px,52vw,216px)}
+  .table-mode .muestra-card{width:clamp(110px,36vw,149px);height:clamp(160px,52vw,216px);top:50%;right:calc(4% + clamp(100px,34vw,140px));left:auto;transform:translateY(-50%) rotate(82deg)}
+}
