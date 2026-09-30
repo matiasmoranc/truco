@@ -369,3 +369,67 @@
   .table-mode .played-card-player1{top:22%}
   .table-mode .played-card-player2{bottom:22%}
 }
+
+/* Tanteador: cada grupo conserva los palitos del truco, con cuatro lados
+   visibles y el quinto cruzando el cuadrado. */
+.table-mode .scoreboard .tally-group,
+.table-mode .mobile-score .tally-group{
+  position:relative;
+  display:block;
+  flex:0 0 34px;
+  width:34px;
+  height:34px;
+  min-width:34px;
+  min-height:34px;
+  margin:0;
+  padding:0;
+}
+.table-mode .scoreboard .tally-group i,
+.table-mode .mobile-score .tally-group i{
+  position:absolute;
+  display:block;
+  margin:0;
+  padding:0;
+  border-radius:2px;
+  background:#f0eee2;
+  opacity:1;
+  z-index:1;
+}
+.table-mode .scoreboard .tally-group i:nth-child(1),
+.table-mode .mobile-score .tally-group i:nth-child(1){left:0;top:0;width:4px;height:100%}
+.table-mode .scoreboard .tally-group i:nth-child(2),
+.table-mode .mobile-score .tally-group i:nth-child(2){left:0;bottom:0;width:100%;height:4px}
+.table-mode .scoreboard .tally-group i:nth-child(3),
+.table-mode .mobile-score .tally-group i:nth-child(3){right:0;top:0;width:4px;height:100%}
+.table-mode .scoreboard .tally-group i:nth-child(4),
+.table-mode .mobile-score .tally-group i:nth-child(4){left:0;top:0;width:100%;height:4px}
+.table-mode .scoreboard .tally-group b,
+.table-mode .mobile-score .tally-group b{
+  position:absolute;
+  left:0;
+  top:auto;
+  right:auto;
+  bottom:0;
+  display:block;
+  width:142%;
+  height:4px;
+  border-radius:2px;
+  background:#f0eee2;
+  opacity:1;
+  transform:rotate(-45deg);
+  transform-origin:left center;
+  z-index:2;
+}
+@media(max-width:640px){
+  .table-mode .mobile-score .tally-group{
+    flex-basis:30px;
+    width:30px;
+    height:30px;
+    min-width:30px;
+    min-height:30px;
+  }
+  .table-mode .mobile-score .tally-group i,
+  .table-mode .mobile-score .tally-group b{height:3px}
+  .table-mode .mobile-score .tally-group i:nth-child(1),
+  .table-mode .mobile-score .tally-group i:nth-child(3){width:3px}
+}
