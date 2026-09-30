@@ -436,6 +436,17 @@ async function playCard(card) {
   }
   try{await fb.update(fb.ref(fb.db), patches);}catch(error){console.error(error);toast(firebaseError(error));}finally{state.playActionInFlight=false;}
 }
+function cardSpritePosition(card) {
+  const rank=Number(card.rank), column=rank<=7?rank-1:rank-3;
+  const rows={'♠':0,'♥':1,'♦':2,'♣':3};
+  const row=rows[card.suit]??0;
+  return `${(column/9*100).toFixed(4)}% ${(row/3*100).toFixed(4)}%`;
+}
+function cardAccessibleName(card) {
+  const suits={'♠':'espadas','♥':'copas','♦':'oros','♣':'bastos'};
+  return `${card.label} de ${suits[card.suit]||card.suit}`;
+}
+
 function renderGame() {
   if (!state.room) return;
   const room = state.room, players=room.players||{}, isTable=state.playerId==='table', mine=players[state.playerId], opponent=players[state.playerId==='player1'?'player2':'player1'];
@@ -453,10 +464,10 @@ function renderGame() {
   const myTurn=!isTable&&room.turn===state.playerId&&room.status==='started'&&!room.resolvingTrick;
   $('turn-badge').textContent=isTable?'MESA':myTurn?'TU TURNO':'ESPERÁ'; $('turn-badge').classList.toggle('waiting-turn',!myTurn);
   const ownPlayed=!isTable&&!myTurn&&(room.trickCards||[]).length>0;
-  $('hand').innerHTML=isTable?'':state.hand.map((card) => `<button class="hand-card ${card.red?'card-red':''} ${ownPlayed?'hand-card-muted':''}" data-card="${card.id}" ${!myTurn?'disabled':''}><span class="card-rank">${card.label}</span><span class="card-suit">${card.suit}</span><span class="card-value">${card.suit.toUpperCase()}</span></button>`).join('');
+  $('hand').innerHTML=isTable?'':state.hand.map((card) => `<button class="hand-card sprite-card ${card.red?'card-red':''} ${ownPlayed?'hand-card-muted':''}" style="--sprite-position:${cardSpritePosition(card)}" aria-label="${cardAccessibleName(card)}" data-card="${card.id}" ${!myTurn?'disabled':''}><span class="sr-only">${cardAccessibleName(card)}</span></button>`).join('');
   document.querySelectorAll('.hand-card').forEach((button) => button.addEventListener('click', () => {const card=state.hand.find((item)=>item.id===button.dataset.card); if(card) playCard(card);}));
-  $('trick-cards').innerHTML=isTable?(room.trickCards||[]).map(({card})=>`<div class="played-card ${card.red?'card-red':''}"><span class="card-rank">${card.label}</span><span class="card-suit">${card.suit}</span></div>`).join(''):'';
-  const sample=room.muestra;$('muestra-card').classList.toggle('hidden',!isTable||!sample);$('muestra-card').innerHTML=isTable&&sample?`<span>${sample.label}</span><b>${sample.suit}</b><small>MUESTRA</small>`:'';$('deck-stack').classList.toggle('hidden',!isTable);
+  $('trick-cards').innerHTML=isTable?(room.trickCards||[]).map(({card})=>`<div class="played-card sprite-card ${card.red?'card-red':''}" style="--sprite-position:${cardSpritePosition(card)}" role="img" aria-label="${cardAccessibleName(card)}"><span class="sr-only">${cardAccessibleName(card)}</span></div>`).join(''):'';
+  const sample=room.muestra;$('muestra-card').classList.toggle('hidden',!isTable||!sample);$('muestra-card').classList.toggle('sprite-card',!!(isTable&&sample));$('muestra-card').style.setProperty('--sprite-position',sample?cardSpritePosition(sample):'0% 0%');$('muestra-card').setAttribute('aria-label',sample?`${cardAccessibleName(sample)}, muestra`:'Muestra');$('muestra-card').innerHTML=isTable&&sample?`<span class="sr-only">${cardAccessibleName(sample)}, muestra</span>`:'';$('deck-stack').classList.toggle('hidden',!isTable);
   $('table-hint').classList.toggle('hidden',!isTable||(room.trickCards||[]).length>0);
   const visibleFeed=(room.feed||[]).filter(({text=''})=>isTable||!/\bjug[oó]/i.test(text));
   $('round-feed').innerHTML=visibleFeed.slice(0,7).map(({text})=>`<div class="feed-item"><i></i><span>${escapeHtml(text)}</span></div>`).join('');

@@ -282,3 +282,13 @@
   .table-mode .deck-stack{width:clamp(110px,36vw,149px);height:clamp(160px,52vw,216px)}
   .table-mode .muestra-card{width:clamp(110px,36vw,149px);height:clamp(160px,52vw,216px);top:50%;right:calc(4% + clamp(100px,34vw,140px));left:auto;transform:translateY(-50%) rotate(82deg)}
 }
+
+/* Caras y dorso reales de la baraja Tatú, en una hoja de sprites 10 × 4. */
+.sprite-card{background-image:url('./assets/tatu-sprite.webp');background-size:1000% 400%;background-position:var(--sprite-position);background-repeat:no-repeat}
+.hand-card.sprite-card{padding:0;background-color:#f2eddf}
+.played-card.sprite-card{background-color:#f5f0df}
+.muestra-card.sprite-card{color:transparent;background-color:#f5f0df}
+.muestra-card.sprite-card .sr-only{display:block}
+.deck-stack{background-image:url('./assets/tatu-dorso.webp');background-size:100% 100%;background-position:center;background-repeat:no-repeat;color:transparent}
+.deck-stack span{display:none}
+.sr-only{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
