@@ -623,6 +623,7 @@ function demoAction(action){
 }
 function demoPlay(card) {
   const player=state.playerId;if(player==='table')return;
+  if(state.room.pendingBet){toast('Primero respondé el canto pendiente.');return;}
   if(state.room.turn!==player){toast('Todavía no es tu turno. Esperá la jugada del otro jugador.');return;}
   state.demoHands[player]=(state.demoHands[player]||[]).filter((item)=>item.id!==card.id);state.hand=[...state.demoHands[player]];state.room.playedCount=(state.room.playedCount||0)+1;
   state.room.trickCards=[...(state.room.trickCards||[]),{playerId:player,name:state.room.players[player].name,card}];state.room.deckCount--;
