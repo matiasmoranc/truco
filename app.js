@@ -72,7 +72,7 @@ async function enterRoom() {
     } else {
       const code = makeCode(); state.roomCode = code; state.playerId = state.role;
       const person = { uid: state.uid, name, online: true };
-      const targetPoints = Number($('target-points').value || 30);
+      const targetPoints = normalizeTargetPoints($('target-points').value);
       const initial = { status: 'waiting', createdAt: Date.now(), targetPoints, table: state.role === 'table' ? person : null, players: { player1: state.role === 'player1' ? person : null, player2: state.role === 'player2' ? person : null }, scores: { player1: 0, player2: 0 }, handNumber: 1, deckCount: 40, trickCards: [], feed: [{ text: `${name} abrió una mesa a ${targetPoints}. Faltan los demás.`, time: Date.now() }] };
       await fb.set(fb.ref(fb.db, `rooms/${code}/public`), initial);
     }
@@ -106,7 +106,7 @@ function renderLobby(rooms) {
     const room = value.public, players = room.players || {}, seats = [['table','La mesa',room.table],['player1','Jugador 1',players.player1],['player2','Jugador 2',players.player2]];
     const title = room.table?.name || players.player1?.name || players.player2?.name || 'Mesa abierta';
     const available = seats.filter(([, , person]) => !person);
-    return `<article class="lobby-card"><div class="lobby-card-top"><div><p class="eyebrow">MESA ABIERTA · A ${Number(room.targetPoints)||30} TANTOS</p><h3>${escapeHtml(title)}</h3></div><span class="lobby-count">${3-available.length}/3</span></div><div class="lobby-seats">${seats.map(([key,label,person]) => `<span class="lobby-seat ${person?'taken':''}">${person ? `${escapeHtml(label)}: ${escapeHtml(person.name || 'Ocupado')}` : `${escapeHtml(label)} · libre`}</span>`).join('')}</div><div class="lobby-join-options">${available.map(([key,label]) => `<button class="button ${key==='table'?'lobby-table-button':'lobby-player-button'}" data-room="${code}" data-seat="${key}">Unirme como ${label}<span>↗</span></button>`).join('')}</div></article>`;
+    return `<article class="lobby-card"><div class="lobby-card-top"><div><p class="eyebrow">MESA ABIERTA · A ${targetPoints(room)} TANTOS</p><h3>${escapeHtml(title)}</h3></div><span class="lobby-count">${3-available.length}/3</span></div><div class="lobby-seats">${seats.map(([key,label,person]) => `<span class="lobby-seat ${person?'taken':''}">${person ? `${escapeHtml(label)}: ${escapeHtml(person.name || 'Ocupado')}` : `${escapeHtml(label)} · libre`}</span>`).join('')}</div><div class="lobby-join-options">${available.map(([key,label]) => `<button class="button ${key==='table'?'lobby-table-button':'lobby-player-button'}" data-room="${code}" data-seat="${key}">Unirme como ${label}<span>↗</span></button>`).join('')}</div></article>`;
   }).join('');
 }
 function joinOpenRoom(code, seat) {
@@ -154,7 +154,7 @@ function renderWaiting() {
   $('start-game').disabled = !(ready && state.playerId === 'table');
   $('waiting-hint').textContent = state.playerId === 'table' ? (ready ? 'Ya están todos. ¡A jugar!' : 'Esperando que se unan los dos jugadores') : 'Esperá a que la mesa reparta';
   $('game-room-code').textContent = 'MESA ABIERTA';
-  $('start-game').textContent = `Repartir · a ${Number(state.room.targetPoints)||30} tantos`;
+  $('start-game').textContent = `Repartir · a ${targetPoints(state.room)} tantos`;
 }
 function shuffleDeck() {
   const suits = [{name:'oro',symbol:'♦',red:true},{name:'copa',symbol:'♥',red:true},{name:'espada',symbol:'♠',red:false},{name:'basto',symbol:'♣',red:false}];
@@ -231,7 +231,12 @@ function handEnvido(hand, muestra) {
 }
 function florValue(hand,muestra) { return 20+hand.reduce((n,card)=>n+(pieceOrder(card,muestra)?envidoValue(card,muestra)-20:envidoValue(card,muestra)),0); }
 function topFeed(room,text) { return [{text,time:Date.now()},...(room.feed||[]).slice(0,7)]; }
-function targetPoints(room) { return Number(room.targetPoints)||30; }
+const VALID_TARGET_POINTS=[10,20,30,40,50,60];
+function normalizeTargetPoints(value) {
+  const parsed=Number(value);
+  return VALID_TARGET_POINTS.includes(parsed)?parsed:30;
+}
+function targetPoints(room) { return normalizeTargetPoints(room?.targetPoints); }
 function faltanParaGanar(room) { return Math.max(1,targetPoints(room)-Math.max(Number(room.scores?.player1)||0,Number(room.scores?.player2)||0)); }
 async function writeRoom(changes) {
   const fb=state.firebase; const updates={};
@@ -527,9 +532,12 @@ function renderGame() {
   if(room.status==='complete') toast('¡Partida terminada!');
 }
 function renderTally(points,target){
-  const limit=Number(target)||30,n=Math.min(Math.max(0,Number(points)||0),limit),middle=Math.ceil(limit/2);
-  const marks=(count)=>{const groups=[];for(let left=count;left>0;left-=5){const size=Math.min(5,left);groups.push(`<span class="tally-group ${size===5?'full':''}" aria-hidden="true">${Array.from({length:Math.min(size,4)},()=>'<i></i>').join('')}${size===5?'<b></b>':''}</span>`);}return groups.join('');};
-  return `<span class="tally-half">${marks(Math.min(n,middle))}</span><i class="tally-midline" aria-hidden="true"></i><span class="tally-half">${marks(Math.max(0,n-middle))}</span>`;
+  const limit=normalizeTargetPoints(target),n=Math.min(Math.max(0,Number(points)||0),limit),slotsPerHalf=limit/10;
+  const marks=(count)=>Array.from({length:slotsPerHalf},(_,index)=>{
+    const size=Math.min(5,Math.max(0,count-index*5));
+    return `<span class="tally-group ${size===5?'full':''} ${size===0?'empty':''}" aria-hidden="true">${Array.from({length:Math.min(size,4)},()=>'<i></i>').join('')}${size===5?'<b></b>':''}${size===0?'<i></i><i></i><i></i><i></i>':''}</span>`;
+  }).join('');
+  return `<span class="tally-half">${marks(Math.min(n,limit/2))}</span><i class="tally-midline" aria-hidden="true"></i><span class="tally-half">${marks(Math.max(0,n-limit/2))}</span>`;
 }
 function escapeHtml(value='') { return String(value).replace(/[&<>"']/g,(ch)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch])); }
 
