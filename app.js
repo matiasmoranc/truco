@@ -170,6 +170,7 @@ async function startGame() {
   patches[`rooms/${state.roomCode}/public/status`] = 'started';
   patches[`rooms/${state.roomCode}/public/deckCount`] = 33;
   patches[`rooms/${state.roomCode}/public/muestra`] = muestra;
+  patches[`rooms/${state.roomCode}/public/handCounts`] = {player1:3,player2:3};
   patches[`rooms/${state.roomCode}/public/turn`] = 'player1';
   patches[`rooms/${state.roomCode}/public/mano`] = 'player1';
   patches[`rooms/${state.roomCode}/public/trickCards`] = [];
@@ -340,6 +341,7 @@ async function nextHand(winner, scores, handNumber, message) {
   patches[`rooms/${state.roomCode}/public/scores`]=scores;patches[`rooms/${state.roomCode}/public/handNumber`]=handNumber+1;
   patches[`rooms/${state.roomCode}/public/trickNo`]=1;patches[`rooms/${state.roomCode}/public/trickCards`]=[];patches[`rooms/${state.roomCode}/public/tricks`]=[];
   patches[`rooms/${state.roomCode}/public/deckCount`]=33;patches[`rooms/${state.roomCode}/public/muestra`]=muestra;
+  patches[`rooms/${state.roomCode}/public/handCounts`]={player1:3,player2:3};
   patches[`rooms/${state.roomCode}/public/turn`]=winner;patches[`rooms/${state.roomCode}/public/mano`]=winner;
   patches[`rooms/${state.roomCode}/public/trucoLevel`]=1;patches[`rooms/${state.roomCode}/public/pendingBet`]=null;
   patches[`rooms/${state.roomCode}/public/lastTrucoCaller`]=null;
@@ -403,6 +405,9 @@ async function recoverLegacyTrick(room) {
 async function playCard(card) {
   if (state.demo) { demoPlay(card); return; }
   if (!state.room || state.playerId==='table' || !state.hand.some((item)=>item.id===card.id)) return;
+  const players=state.room.players||{};
+  const other=state.playerId==='player1'?'player2':'player1';
+  if (!players[state.playerId] || !players[other]) { toast('La mesa necesita a los dos jugadores para continuar.'); return; }
   if (state.room.turn !== state.playerId || state.room.pendingBet || state.room.resolvingTrick) {
     toast('Todavía no es tu turno. Esperá la jugada del otro jugador.');
     return;
@@ -411,16 +416,17 @@ async function playCard(card) {
   state.playActionInFlight=true;
   const fb = state.firebase; const newHand = state.hand.filter((item) => item.id !== card.id);
   const previousTrick = state.room.trickCards || [];
-  const played = [...previousTrick.slice(-1), { playerId:state.playerId, name:state.room.players[state.playerId].name, card }];
-  const other = state.playerId === 'player1' ? 'player2' : 'player1';
+  const played = [...previousTrick.slice(-1), { playerId:state.playerId, name:players[state.playerId].name, card }];
   const patches = {};
   patches[`hands/${state.roomCode}/${state.uid}/hand`] = newHand;
+  const handCounts={...(state.room.handCounts||{}),[state.playerId]:newHand.length};
+  patches[`rooms/${state.roomCode}/public/handCounts`]=handCounts;
   if (played.length < 2) {
     patches[`rooms/${state.roomCode}/public/trickCards`] = played;
     patches[`rooms/${state.roomCode}/public/turn`] = other;
     patches[`rooms/${state.roomCode}/public/playedCount`] = (state.room.playedCount||0)+1;
     patches[`rooms/${state.roomCode}/public/envidoClosed`] = true;
-    patches[`rooms/${state.roomCode}/public/feed`] = topFeed(state.room,`${state.room.players[state.playerId].name} jugó ${card.label} ${card.suit}.`);
+    patches[`rooms/${state.roomCode}/public/feed`] = topFeed(state.room,`${players[state.playerId].name} jugó ${card.label} ${card.suit}.`);
   } else {
     const muestra=state.room.muestra;
     const a = played[0], b = played[1], winner = cardStrength(a.card,muestra) === cardStrength(b.card,muestra) ? null : cardStrength(a.card,muestra)>cardStrength(b.card,muestra) ? a.playerId : b.playerId;
@@ -565,6 +571,12 @@ $('muestra-card').addEventListener('pointermove',(event)=>{
 const endMuestraDrag=(event)=>{const card=$('muestra-card');if(card._drag?.pointerId===event.pointerId){card.releasePointerCapture?.(event.pointerId);card._drag=null;card.classList.remove('dragging');}};
 $('muestra-card').addEventListener('pointerup',endMuestraDrag);
 $('muestra-card').addEventListener('pointercancel',endMuestraDrag);
+let lastTouchEnd=0;
+document.addEventListener('touchend',(event)=>{
+  const now=Date.now();
+  if(now-lastTouchEnd<=320)event.preventDefault();
+  lastTouchEnd=now;
+},{passive:false});
 $('sound-toggle').addEventListener('click',()=>toast('El sonido se agrega en una próxima versión.'));
 $('close-config').addEventListener('click',()=>showView('setup-view'));
 $('save-config').addEventListener('click',()=>{try{const cfg=JSON.parse($('firebase-config').value);if(!firebaseConfigValid(cfg))throw new Error('missing');state.config=cfg;localStorage.setItem(storageKey,JSON.stringify(cfg));toast('Configuración guardada.',true);runPendingAction();}catch{toast('Pegá una configuración Firebase válida.',true);}});

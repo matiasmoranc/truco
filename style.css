@@ -433,3 +433,9 @@
   .table-mode .mobile-score .tally-group i:nth-child(1),
   .table-mode .mobile-score .tally-group i:nth-child(3){width:3px}
 }
+
+/* En celulares evita el zoom accidental al tocar dos veces. La muestra
+   conserva touch-action:none para poder arrastrarla. */
+html,body{touch-action:manipulation;-webkit-text-size-adjust:100%}
+button,a,input,select,textarea{touch-action:manipulation}
+.muestra-card{touch-action:none}
