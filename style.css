@@ -235,3 +235,42 @@
   .table-mode .deck-stack{left:50%;right:auto;transform:translate(-50%,-50%)}
   .table-mode .muestra-card{left:50%;right:auto;transform:translate(-50%,-50%) rotate(-8deg)}
 }
+
+/* Mesa: paño uniforme, tanteador integrado y mazo al costado. */
+.table-mode .game,
+.table-mode .game-layout,
+.table-mode .game-topbar,
+.table-mode .felt-area,
+.table-mode .scoreboard{background:#193b2b}
+.table-mode .game-topbar{border-bottom:0}
+.table-mode .game-layout{position:relative;display:block;min-height:0;height:auto;flex:1}
+.table-mode .felt-area{position:absolute;inset:0;width:100%;height:100%;min-height:0;padding:0}
+.table-mode .scoreboard{position:absolute;z-index:6;top:14px;left:14px;width:min(250px,65vw);height:150px;padding:8px 10px;gap:9px;border:0}
+.table-mode .scoreboard-head h2{font-size:clamp(11px,1.4vw,15px);letter-spacing:.14em;color:#e6e5d8}
+.table-mode .scoreboard-grid{grid-template-columns:minmax(0,1fr) 1px minmax(0,1fr);gap:9px;flex:1;min-height:0}
+.table-mode .scoreboard-divider{background:rgba(239,235,215,.42)}
+.table-mode .scoreboard .tally-half{flex-direction:column;flex-wrap:nowrap;align-items:flex-start;align-content:flex-start;gap:7px;padding:6px 4px 0;overflow:hidden}
+.table-mode .scoreboard .tally-group{flex:0 0 30px;width:30px;height:30px}
+.table-mode .scoreboard .tally-group i,.table-mode .scoreboard .tally-group b{background:#e4e3d6;height:3px}
+.table-mode .scoreboard .tally-group i:nth-child(1),.table-mode .scoreboard .tally-group i:nth-child(3){width:3px}
+.table-mode .scoreboard .tally-group i:nth-child(2),.table-mode .scoreboard .tally-group i:nth-child(4){height:3px}
+.table-mode .center-table{position:absolute;inset:0;width:100%;height:100%;top:0;left:0;transform:none}
+.table-mode .deck-stack{position:absolute;top:50%;left:auto;right:5%;width:clamp(106px,10.8vw,151px);height:clamp(151px,15.6vw,214px);font-size:clamp(34px,3.5vw,50px);transform:translateY(-50%)}
+.table-mode .muestra-card{top:calc(50% + clamp(105px,8.6vw,118px));left:auto;right:5%;z-index:1;transform:translateY(-50%) rotate(-8deg)}
+.table-mode .trick-cards{inset:0;align-items:center;justify-content:center}
+.table-mode .table-hint,.table-mode .mobile-score{display:none!important}
+@media(max-width:640px){
+  .table-mode .game-layout{display:block;flex:1 1 0;height:auto;min-height:0;overflow:hidden}
+  .table-mode .felt-area{position:absolute;inset:0;flex:none;width:100%;height:100%;padding:0}
+  .table-mode .scoreboard{display:flex!important;top:10px;left:10px;width:min(205px,64vw);height:130px;padding:6px 7px;gap:7px}
+  .table-mode .scoreboard-head h2{font-size:10px}
+  .table-mode .scoreboard-grid{gap:7px}
+  .table-mode .scoreboard .tally-half{gap:5px;padding:4px 3px 0}
+  .table-mode .scoreboard .tally-group{flex-basis:25px;width:25px;height:25px}
+  .table-mode .scoreboard .tally-group i,.table-mode .scoreboard .tally-group b{height:2.5px}
+  .table-mode .scoreboard .tally-group i:nth-child(1),.table-mode .scoreboard .tally-group i:nth-child(3){width:2.5px}
+  .table-mode .scoreboard .tally-group i:nth-child(2),.table-mode .scoreboard .tally-group i:nth-child(4){height:2.5px}
+  .table-mode .deck-stack{right:4%;width:clamp(110px,36vw,149px);height:clamp(160px,52vw,216px);font-size:38px}
+  .table-mode .muestra-card{right:4%;top:calc(50% + clamp(88px,29vw,119px));width:clamp(72px,23vw,96px);height:clamp(106px,34vw,138px)}
+  .table-mode .played-card{width:clamp(88px,26vw,116px);height:clamp(130px,38vw,164px)}
+}
