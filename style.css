@@ -446,3 +446,21 @@
 html,body{touch-action:manipulation;-webkit-text-size-adjust:100%}
 button,a,input,select,textarea{touch-action:manipulation}
 .muestra-card{touch-action:none}
+
+/* Cada mitad del tanteador tiene espacio propio: los palitos nunca pisan la
+   línea central y continúan bajando aun cuando la partida supera la mitad. */
+@media(max-width:640px){
+  .table-mode .scoreboard{
+    height:clamp(390px,52dvh,480px);
+    min-height:390px;
+  }
+  .table-mode .scoreboard-grid{
+    grid-template-rows:minmax(178px,1fr) 2px minmax(178px,1fr);
+    min-height:0;
+  }
+  .table-mode .scoreboard .tally-half{
+    min-height:178px;
+    overflow:visible;
+    flex:none;
+  }
+}
