@@ -287,7 +287,7 @@
 .sprite-card{background-image:url('./assets/tatu-sprite.webp');background-size:1000% 400%;background-position:var(--sprite-position);background-repeat:no-repeat}
 .hand-card.sprite-card{padding:0;background-color:#f2eddf}
 .played-card.sprite-card{background-color:#f5f0df}
-.muestra-card.sprite-card{color:transparent;background-color:#f5f0df;opacity:.4}
+.muestra-card.sprite-card{color:transparent;background-color:#f5f0df;opacity:1}
 .muestra-card.sprite-card .sr-only{display:block}
 .deck-stack{background-image:url('./assets/tatu-dorso.webp');background-size:100% 100%;background-position:center;background-repeat:no-repeat;color:transparent}
 .deck-stack span{display:none}
@@ -314,3 +314,14 @@
   .table-mode .played-card-player1{top:21%;left:50%;transform:translate(-50%,-50%) rotate(-7deg)}
   .table-mode .played-card-player2{bottom:21%;left:50%;transform:translate(-50%,50%) rotate(7deg)}
 }
+
+/* La muestra se ve al 40% del tamaño del mazo, sin transparencias. Se puede
+   sacar de debajo del mazo arrastrándola con el dedo o el mouse. */
+.table-mode .muestra-card.sprite-card{
+  opacity:1;
+  touch-action:none;
+  cursor:grab;
+  transform:translate(calc(-50% + var(--muestra-dx,0px)),calc(-50% + var(--muestra-dy,0px))) rotate(82deg) scale(.4);
+  z-index:12;
+}
+.table-mode .muestra-card.sprite-card.dragging{cursor:grabbing}

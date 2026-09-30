@@ -471,7 +471,18 @@ function renderGame() {
   $('hand').innerHTML=isTable?'':state.hand.map((card) => `<button class="hand-card sprite-card ${card.red?'card-red':''}" style="--sprite-position:${cardSpritePosition(card)}" aria-label="${cardAccessibleName(card)}" aria-disabled="${!myTurn}" data-card="${card.id}"><span class="sr-only">${cardAccessibleName(card)}</span></button>`).join('');
   document.querySelectorAll('.hand-card').forEach((button) => button.addEventListener('click', () => {const card=state.hand.find((item)=>item.id===button.dataset.card); if(card) playCard(card);}));
   $('trick-cards').innerHTML=isTable?(room.trickCards||[]).map(({card,playerId})=>`<div class="played-card played-card-${playerId||'player1'} sprite-card ${card.red?'card-red':''}" style="--sprite-position:${cardSpritePosition(card)}" role="img" aria-label="${cardAccessibleName(card)}"><span class="sr-only">${cardAccessibleName(card)}</span></div>`).join(''):'';
-  const sample=room.muestra;$('muestra-card').classList.toggle('hidden',!isTable||!sample);$('muestra-card').classList.toggle('sprite-card',!!(isTable&&sample));$('muestra-card').style.setProperty('--sprite-position',sample?cardSpritePosition(sample):'0% 0%');$('muestra-card').setAttribute('aria-label',sample?`${cardAccessibleName(sample)}, muestra`:'Muestra');$('muestra-card').innerHTML=isTable&&sample?`<span class="sr-only">${cardAccessibleName(sample)}, muestra</span>`:'';$('deck-stack').classList.toggle('hidden',!isTable);
+  const sample=room.muestra;
+  $('muestra-card').classList.toggle('hidden',!isTable||!sample);
+  $('muestra-card').classList.toggle('sprite-card',!!(isTable&&sample));
+  if (sample && $('muestra-card').dataset.cardId !== sample.id) {
+    $('muestra-card').dataset.cardId = sample.id;
+    $('muestra-card').style.setProperty('--muestra-dx','0px');
+    $('muestra-card').style.setProperty('--muestra-dy','0px');
+  }
+  $('muestra-card').style.setProperty('--sprite-position',sample?cardSpritePosition(sample):'0% 0%');
+  $('muestra-card').setAttribute('aria-label',sample?`${cardAccessibleName(sample)}, muestra`:'Muestra');
+  $('muestra-card').innerHTML=isTable&&sample?`<span class="sr-only">${cardAccessibleName(sample)}, muestra</span>`:'';
+  $('deck-stack').classList.toggle('hidden',!isTable);
   $('table-hint').classList.toggle('hidden',!isTable||(room.trickCards||[]).length>0);
   const visibleFeed=(room.feed||[]).filter(({text=''})=>isTable||!/\bjug[oó]/i.test(text));
   $('round-feed').innerHTML=visibleFeed.slice(0,7).map(({text})=>`<div class="feed-item"><i></i><span>${escapeHtml(text)}</span></div>`).join('');
@@ -540,6 +551,20 @@ $('start-game').addEventListener('click',async()=>{try{await startGame();}catch(
 $('leave-room').addEventListener('click',()=>{if(state.unsubscribe)state.unsubscribe();if(state.privateUnsubscribe)state.privateUnsubscribe();state.room=null;state.demo=false;showView('welcome-view');openLobby();});
 $('game-home').addEventListener('click',()=>{if(state.demo){state.demo=false;showView('welcome-view');openLobby();return;}showView('waiting-view');});
 $('demo-device-switcher').addEventListener('click',(event)=>{const button=event.target.closest('[data-demo-role]');if(button)switchDemoRole(button.dataset.demoRole);});
+$('muestra-card').addEventListener('pointerdown',(event)=>{
+  if (!state.demo && state.playerId !== 'table') return;
+  const card=$('muestra-card'); if(card.classList.contains('hidden')) return;
+  card.setPointerCapture?.(event.pointerId); card.classList.add('dragging');
+  card._drag={pointerId:event.pointerId,startX:event.clientX,startY:event.clientY,baseX:parseFloat(getComputedStyle(card).getPropertyValue('--muestra-dx'))||0,baseY:parseFloat(getComputedStyle(card).getPropertyValue('--muestra-dy'))||0};
+});
+$('muestra-card').addEventListener('pointermove',(event)=>{
+  const card=$('muestra-card'),drag=card._drag; if(!drag||drag.pointerId!==event.pointerId)return;
+  card.style.setProperty('--muestra-dx',`${drag.baseX+event.clientX-drag.startX}px`);
+  card.style.setProperty('--muestra-dy',`${drag.baseY+event.clientY-drag.startY}px`);
+});
+const endMuestraDrag=(event)=>{const card=$('muestra-card');if(card._drag?.pointerId===event.pointerId){card.releasePointerCapture?.(event.pointerId);card._drag=null;card.classList.remove('dragging');}};
+$('muestra-card').addEventListener('pointerup',endMuestraDrag);
+$('muestra-card').addEventListener('pointercancel',endMuestraDrag);
 $('sound-toggle').addEventListener('click',()=>toast('El sonido se agrega en una próxima versión.'));
 $('close-config').addEventListener('click',()=>showView('setup-view'));
 $('save-config').addEventListener('click',()=>{try{const cfg=JSON.parse($('firebase-config').value);if(!firebaseConfigValid(cfg))throw new Error('missing');state.config=cfg;localStorage.setItem(storageKey,JSON.stringify(cfg));toast('Configuración guardada.',true);runPendingAction();}catch{toast('Pegá una configuración Firebase válida.',true);}});
