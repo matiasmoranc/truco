@@ -301,8 +301,8 @@
 
 /* En la mesa las dos cartas jugadas ocupan posiciones enfrentadas. Quedan
    por encima del tanteador, tal como se ven sobre el paño real. */
-.table-mode .trick-cards{display:block;inset:0;z-index:20;pointer-events:none}
-.table-mode .played-card{position:absolute;width:clamp(106px,10.8vw,151px);height:clamp(151px,15.6vw,214px);z-index:20}
+.table-mode .trick-cards{display:block;inset:0;z-index:50;pointer-events:none}
+.table-mode .played-card{position:absolute;width:clamp(106px,10.8vw,151px);height:clamp(151px,15.6vw,214px);z-index:50}
 .table-mode .played-card-player1{top:22%;left:50%;transform:translate(-50%,-50%) rotate(-7deg)}
 .table-mode .played-card-player2{bottom:22%;left:50%;transform:translate(-50%,50%) rotate(7deg)}
 .table-mode .played-card-player1:nth-child(2),
@@ -325,7 +325,7 @@
   top:50%;
   right:calc(5% + clamp(55px,4vw,70px));
   left:auto;
-  transform:translate(calc(0px + var(--muestra-dx,0px)),calc(-50% + var(--muestra-dy,0px))) rotate(-8deg);
+  transform:translate(calc(0px + var(--muestra-dx,0px)),calc(-50% + var(--muestra-dy,0px))) rotate(82deg);
   z-index:1;
 }
 .table-mode .muestra-card.sprite-card.dragging{cursor:grabbing}
@@ -357,4 +357,14 @@
     left:27%;
     transform:translate(-50%,50%) rotate(7deg);
   }
+}
+
+/* Deja margen interior para que la carta de arriba no quede recortada por
+   el borde del paño del celular; las dos cartas quedan encima de la interfaz. */
+.table-mode .played-card{z-index:60}
+.table-mode .played-card-player1{top:18%}
+.table-mode .played-card-player2{bottom:18%}
+@media(max-width:640px){
+  .table-mode .played-card-player1{top:22%}
+  .table-mode .played-card-player2{bottom:22%}
 }
