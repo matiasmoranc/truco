@@ -292,3 +292,25 @@
 .deck-stack{background-image:url('./assets/tatu-dorso.webp');background-size:100% 100%;background-position:center;background-repeat:no-repeat;color:transparent}
 .deck-stack span{display:none}
 .sr-only{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
+
+/* Ajustes de juego: las cartas del jugador fuera de turno siguen visibles y
+   se puede tocarlas para recibir el aviso de turno. */
+.player-mode .hand-card:disabled,
+.player-mode .hand-card-muted{opacity:1!important;filter:none!important}
+.player-mode .hand-card[aria-disabled="true"]{cursor:not-allowed}
+
+/* En la mesa las dos cartas jugadas ocupan posiciones enfrentadas. Quedan
+   por encima del tanteador, tal como se ven sobre el paño real. */
+.table-mode .trick-cards{display:block;inset:0;z-index:20;pointer-events:none}
+.table-mode .played-card{position:absolute;width:clamp(106px,10.8vw,151px);height:clamp(151px,15.6vw,214px);z-index:20}
+.table-mode .played-card-player1{top:22%;left:50%;transform:translate(-50%,-50%) rotate(-7deg)}
+.table-mode .played-card-player2{bottom:22%;left:50%;transform:translate(-50%,50%) rotate(7deg)}
+.table-mode .played-card-player1:nth-child(2),
+.table-mode .played-card-player2:nth-child(2){transform:translate(-50%,-50%) rotate(-7deg)}
+.table-mode .played-card-player2:nth-child(2){transform:translate(-50%,50%) rotate(7deg)}
+
+@media(max-width:640px){
+  .table-mode .played-card{width:clamp(110px,36vw,149px);height:clamp(160px,52vw,216px)}
+  .table-mode .played-card-player1{top:21%;left:50%;transform:translate(-50%,-50%) rotate(-7deg)}
+  .table-mode .played-card-player2{bottom:21%;left:50%;transform:translate(-50%,50%) rotate(7deg)}
+}

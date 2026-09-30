@@ -381,7 +381,7 @@ function scheduleTableResolution() {
       }
     }catch(error){console.error(error);toast(firebaseError(error));}
     finally{state.resolutionTimer=null;state.resolutionTimerKey=null;}
-  },2000);
+  },3000);
 }
 async function recoverLegacyTrick(room) {
   const key=`${state.roomCode}:${room.handNumber||1}:${room.trickNo||1}`;
@@ -402,7 +402,12 @@ async function recoverLegacyTrick(room) {
 }
 async function playCard(card) {
   if (state.demo) { demoPlay(card); return; }
-  if (!state.room || state.playerId==='table' || state.room.turn !== state.playerId || state.room.pendingBet || state.room.resolvingTrick || state.playActionInFlight || !state.hand.some((item)=>item.id===card.id)) return;
+  if (!state.room || state.playerId==='table' || !state.hand.some((item)=>item.id===card.id)) return;
+  if (state.room.turn !== state.playerId || state.room.pendingBet || state.room.resolvingTrick) {
+    toast('Todavía no es tu turno. Esperá la jugada del otro jugador.');
+    return;
+  }
+  if (state.playActionInFlight) return;
   state.playActionInFlight=true;
   const fb = state.firebase; const newHand = state.hand.filter((item) => item.id !== card.id);
   const previousTrick = state.room.trickCards || [];
@@ -463,10 +468,9 @@ function renderGame() {
   $('opponent-name').textContent=isTable?'Los jugadores':(opponent?.name||'Esperando rival'); $('opponent-avatar').textContent=(isTable?'♠':(opponent?.name||'J').slice(0,1)).toUpperCase();
   const myTurn=!isTable&&room.turn===state.playerId&&room.status==='started'&&!room.resolvingTrick;
   $('turn-badge').textContent=isTable?'MESA':myTurn?'TU TURNO':'ESPERÁ'; $('turn-badge').classList.toggle('waiting-turn',!myTurn);
-  const ownPlayed=!isTable&&!myTurn&&(room.trickCards||[]).length>0;
-  $('hand').innerHTML=isTable?'':state.hand.map((card) => `<button class="hand-card sprite-card ${card.red?'card-red':''} ${ownPlayed?'hand-card-muted':''}" style="--sprite-position:${cardSpritePosition(card)}" aria-label="${cardAccessibleName(card)}" data-card="${card.id}" ${!myTurn?'disabled':''}><span class="sr-only">${cardAccessibleName(card)}</span></button>`).join('');
+  $('hand').innerHTML=isTable?'':state.hand.map((card) => `<button class="hand-card sprite-card ${card.red?'card-red':''}" style="--sprite-position:${cardSpritePosition(card)}" aria-label="${cardAccessibleName(card)}" aria-disabled="${!myTurn}" data-card="${card.id}"><span class="sr-only">${cardAccessibleName(card)}</span></button>`).join('');
   document.querySelectorAll('.hand-card').forEach((button) => button.addEventListener('click', () => {const card=state.hand.find((item)=>item.id===button.dataset.card); if(card) playCard(card);}));
-  $('trick-cards').innerHTML=isTable?(room.trickCards||[]).map(({card})=>`<div class="played-card sprite-card ${card.red?'card-red':''}" style="--sprite-position:${cardSpritePosition(card)}" role="img" aria-label="${cardAccessibleName(card)}"><span class="sr-only">${cardAccessibleName(card)}</span></div>`).join(''):'';
+  $('trick-cards').innerHTML=isTable?(room.trickCards||[]).map(({card,playerId})=>`<div class="played-card played-card-${playerId||'player1'} sprite-card ${card.red?'card-red':''}" style="--sprite-position:${cardSpritePosition(card)}" role="img" aria-label="${cardAccessibleName(card)}"><span class="sr-only">${cardAccessibleName(card)}</span></div>`).join(''):'';
   const sample=room.muestra;$('muestra-card').classList.toggle('hidden',!isTable||!sample);$('muestra-card').classList.toggle('sprite-card',!!(isTable&&sample));$('muestra-card').style.setProperty('--sprite-position',sample?cardSpritePosition(sample):'0% 0%');$('muestra-card').setAttribute('aria-label',sample?`${cardAccessibleName(sample)}, muestra`:'Muestra');$('muestra-card').innerHTML=isTable&&sample?`<span class="sr-only">${cardAccessibleName(sample)}, muestra</span>`:'';$('deck-stack').classList.toggle('hidden',!isTable);
   $('table-hint').classList.toggle('hidden',!isTable||(room.trickCards||[]).length>0);
   const visibleFeed=(room.feed||[]).filter(({text=''})=>isTable||!/\bjug[oó]/i.test(text));
@@ -508,6 +512,7 @@ function switchDemoRole(role) {
 }
 function demoPlay(card) {
   const player=state.playerId;if(player==='table')return;
+  if(state.room.turn!==player){toast('Todavía no es tu turno. Esperá la jugada del otro jugador.');return;}
   state.demoHands[player]=(state.demoHands[player]||[]).filter((item)=>item.id!==card.id);state.hand=[...state.demoHands[player]];
   state.room.trickCards=[...(state.room.trickCards||[]),{playerId:player,name:state.room.players[player].name,card}];state.room.deckCount--;
   if(state.room.trickCards.length===2){
@@ -516,7 +521,7 @@ function demoPlay(card) {
     const wins={player1:state.room.tricks.filter((trick)=>trick.winner==='player1').length,player2:state.room.tricks.filter((trick)=>trick.winner==='player2').length};
     const handWinner=wins.player1>=2?'player1':wins.player2>=2?'player2':state.room.tricks.length>=3?(wins.player1===wins.player2?(state.room.tricks.find((trick)=>trick.winner)?.winner||state.room.mano):wins.player1>wins.player2?'player1':'player2'):null;
     if(winner)state.room.feed.unshift({text:`${state.room.players[winner].name} se lleva la baza.`,time:Date.now()});
-    setTimeout(()=>{state.room.trickCards=[];if(handWinner){state.room.scores[handWinner]++;state.room.feed.unshift({text:`${state.room.players[handWinner].name} gana la mano (+1).`,time:Date.now()});state.room.tricks=[];state.room.handNumber++;state.room.deckCount=34;const nextDeck=shuffleDeck();state.demoHands={player1:nextDeck.slice(0,3),player2:nextDeck.slice(3,6)};state.room.turn=handWinner;state.room.mano=handWinner;state.room.trickNo=1;}else{state.room.turn=winner||state.room.mano;state.room.trickNo++;}state.hand=state.playerId==='table'?[]:[...(state.demoHands[state.playerId]||[])];renderGame();},2000);
+    setTimeout(()=>{state.room.trickCards=[];if(handWinner){state.room.scores[handWinner]++;state.room.feed.unshift({text:`${state.room.players[handWinner].name} gana la mano (+1).`,time:Date.now()});state.room.tricks=[];state.room.handNumber++;state.room.deckCount=34;const nextDeck=shuffleDeck();state.demoHands={player1:nextDeck.slice(0,3),player2:nextDeck.slice(3,6)};state.room.turn=handWinner;state.room.mano=handWinner;state.room.trickNo=1;}else{state.room.turn=winner||state.room.mano;state.room.trickNo++;}state.hand=state.playerId==='table'?[]:[...(state.demoHands[state.playerId]||[])];renderGame();},3000);
   }else state.room.turn=player==='player1'?'player2':'player1';
   renderGame();toast('Jugada de demostración.');
 }
