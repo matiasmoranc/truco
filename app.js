@@ -481,7 +481,7 @@ function cardAccessibleName(card) {
 function renderGame() {
   if (!state.room) return;
   const room = state.room, players=room.players||{}, isTable=state.playerId==='table', mine=players[state.playerId], opponent=players[state.playerId==='player1'?'player2':'player1'];
-  document.documentElement.style.setProperty('--tally-board-height',`${120+Math.ceil(targetPoints(room)/10)*80}px`);
+  document.documentElement.style.setProperty('--tally-board-height',`${50+(targetPoints(room)/10*42+12)*2}px`);
   $('game-view').classList.toggle('table-mode', isTable);
   $('game-view').classList.toggle('player-mode', !isTable);
   $('demo-device-switcher').classList.toggle('hidden',!state.demo);
@@ -532,12 +532,17 @@ function renderGame() {
   if(room.status==='complete') toast('¡Partida terminada!');
 }
 function renderTally(points,target){
-  const limit=normalizeTargetPoints(target),n=Math.min(Math.max(0,Number(points)||0),limit),slotsPerHalf=limit/10;
-  const marks=(count)=>Array.from({length:slotsPerHalf},(_,index)=>{
-    const size=Math.min(5,Math.max(0,count-index*5));
-    return `<span class="tally-group ${size===5?'full':''} ${size===0?'empty':''}" aria-hidden="true">${Array.from({length:Math.min(size,4)},()=>'<i></i>').join('')}${size===5?'<b></b>':''}${size===0?'<i></i><i></i><i></i><i></i>':''}</span>`;
-  }).join('');
-  return `<span class="tally-half">${marks(Math.min(n,limit/2))}</span><i class="tally-midline" aria-hidden="true"></i><span class="tally-half">${marks(Math.max(0,n-limit/2))}</span>`;
+  const limit=normalizeTargetPoints(target),n=Math.min(Math.max(0,Math.floor(Number(points)||0)),limit);
+  const halfHeight=(limit/10)*42+12,height=halfHeight*2;
+  const lines=[];
+  const line=(x1,y1,x2,y2)=>`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`;
+  for(let group=0;group<Math.ceil(n/5);group++){
+    const size=Math.min(5,n-group*5),slots=limit/10;
+    const y=6+(group%slots)*42+(group>=slots?halfHeight:0),x=6,s=30;
+    const sides=[[x,y,x,y+s],[x,y+s,x+s,y+s],[x+s,y+s,x+s,y],[x+s,y,x,y],[x,y+s,x+s,y]];
+    lines.push(...sides.slice(0,size).map(coords=>line(...coords)));
+  }
+  return `<svg class="score-sticks" xmlns="http://www.w3.org/2000/svg" width="90" height="${height}" viewBox="0 0 90 ${height}" role="img" aria-label="${n} puntos de ${limit}" style="display:block;width:100%;height:${height}px;overflow:visible"><line x1="0" y1="${halfHeight}" x2="90" y2="${halfHeight}" stroke="#efebd7" stroke-opacity=".42" stroke-width="2"/><g fill="none" stroke="#f0eee2" stroke-width="4" stroke-linecap="round">${lines.join('')}</g></svg>`;
 }
 function escapeHtml(value='') { return String(value).replace(/[&<>"']/g,(ch)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch])); }
 
