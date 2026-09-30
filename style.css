@@ -552,3 +552,10 @@ button,a,input,select,textarea{touch-action:manipulation}
 .table-mode .mobile-score .tally-group.empty b{
   opacity:.18;
 }
+
+/* Nuevo tanteador SVG: una única fila para ambas columnas. Los estilos
+   históricos de los palitos HTML ya no intervienen en sus coordenadas. */
+.table-mode .scoreboard-grid{grid-template-rows:1fr!important;align-items:start!important}
+.table-mode .scoreboard .tally-table{display:block!important;position:static!important;margin:0!important;padding:0!important}
+.table-mode .scoreboard .score-sticks{max-width:none!important;flex:none!important}
+.table-mode .scoreboard-divider{height:100%;align-self:stretch}
