@@ -284,6 +284,13 @@
   .table-mode .muestra-card{width:clamp(110px,36vw,149px);height:clamp(160px,52vw,216px);top:50%;right:calc(4% + clamp(100px,34vw,140px));left:auto;transform:translateY(-50%) rotate(82deg)}
 }
 
+/* El tanteador de la mesa crece hacia abajo sin recortar los palitos. */
+@media(max-width:640px){
+  .table-mode .scoreboard{height:clamp(210px,30dvh,300px);min-height:210px;overflow:visible}
+  .table-mode .scoreboard-grid{min-height:170px}
+  .table-mode .scoreboard .tally-half{overflow:visible;min-height:0;padding-top:7px;gap:6px}
+}
+
 /* Caras y dorso reales de la baraja Tatú, en una hoja de sprites 10 × 4. */
 .sprite-card{background-image:url('./assets/tatu-sprite.webp');background-size:1000% 400%;background-position:var(--sprite-position);background-repeat:no-repeat}
 .hand-card.sprite-card{padding:0;background-color:#f2eddf}
