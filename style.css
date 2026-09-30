@@ -543,3 +543,12 @@ button,a,input,select,textarea{touch-action:manipulation}
     padding-top:6px!important;
   }
 }
+
+/* Casilleros todavía sin puntos: conservan la forma del tanteador y dejan
+   claro dónde quedará cada cuadrado, sin confundirse con un punto anotado. */
+.table-mode .scoreboard .tally-group.empty i,
+.table-mode .mobile-score .tally-group.empty i,
+.table-mode .scoreboard .tally-group.empty b,
+.table-mode .mobile-score .tally-group.empty b{
+  opacity:.18;
+}
