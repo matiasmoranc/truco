@@ -315,13 +315,25 @@
   .table-mode .played-card-player2{bottom:21%;left:50%;transform:translate(-50%,50%) rotate(7deg)}
 }
 
-/* La muestra se ve al 40% del tamaño del mazo, sin transparencias. Se puede
-   sacar de debajo del mazo arrastrándola con el dedo o el mouse. */
+/* La muestra conserva el tamaño real de una carta, pero queda debajo del
+   mazo: aproximadamente el 40% inferior queda visible. Se puede sacar de
+   debajo del mazo arrastrándola con el dedo o el mouse. */
 .table-mode .muestra-card.sprite-card{
   opacity:1;
   touch-action:none;
   cursor:grab;
-  transform:translate(calc(-50% + var(--muestra-dx,0px)),calc(-50% + var(--muestra-dy,0px))) rotate(82deg) scale(.4);
-  z-index:12;
+  top:calc(50% + clamp(58px,6vw,84px));
+  right:5%;
+  left:auto;
+  transform:translate(calc(0px + var(--muestra-dx,0px)),calc(-50% + var(--muestra-dy,0px))) rotate(82deg);
+  z-index:1;
 }
 .table-mode .muestra-card.sprite-card.dragging{cursor:grabbing}
+.table-mode .deck-stack{z-index:2}
+.table-mode .played-card-player1{top:13%}
+.table-mode .played-card-player2{bottom:13%}
+@media(max-width:640px){
+  .table-mode .muestra-card.sprite-card{top:calc(50% + clamp(62px,20vw,92px));right:4%;}
+  .table-mode .played-card-player1{top:10%}
+  .table-mode .played-card-player2{bottom:10%}
+}
