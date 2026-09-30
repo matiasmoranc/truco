@@ -315,25 +315,46 @@
   .table-mode .played-card-player2{bottom:21%;left:50%;transform:translate(-50%,50%) rotate(7deg)}
 }
 
-/* La muestra conserva el tamaño real de una carta, pero queda debajo del
-   mazo: aproximadamente el 40% inferior queda visible. Se puede sacar de
-   debajo del mazo arrastrándola con el dedo o el mouse. */
+/* Posición final de la mesa: la muestra sale por la mitad izquierda del
+   mazo y queda debajo de él. El mazo tapa aproximadamente el 60%, por lo
+   que se ve cerca del 40% de la muestra, manteniendo el tamaño real. */
 .table-mode .muestra-card.sprite-card{
   opacity:1;
   touch-action:none;
   cursor:grab;
-  top:calc(50% + clamp(58px,6vw,84px));
-  right:5%;
+  top:50%;
+  right:calc(5% + clamp(68px,8vw,112px));
   left:auto;
-  transform:translate(calc(0px + var(--muestra-dx,0px)),calc(-50% + var(--muestra-dy,0px))) rotate(82deg);
+  transform:translate(calc(0px + var(--muestra-dx,0px)),calc(-50% + var(--muestra-dy,0px))) rotate(-8deg);
   z-index:1;
 }
 .table-mode .muestra-card.sprite-card.dragging{cursor:grabbing}
-.table-mode .deck-stack{z-index:2}
-.table-mode .played-card-player1{top:13%}
-.table-mode .played-card-player2{bottom:13%}
+.table-mode .deck-stack{z-index:4}
+
+/* Las jugadas quedan en la franja izquierda, lejos del mazo y la muestra. */
+.table-mode .played-card-player1{
+  top:13%;
+  left:36%;
+  transform:translate(-50%,-50%) rotate(-7deg);
+}
+.table-mode .played-card-player2{
+  bottom:13%;
+  left:36%;
+  transform:translate(-50%,50%) rotate(7deg);
+}
 @media(max-width:640px){
-  .table-mode .muestra-card.sprite-card{top:calc(50% + clamp(62px,20vw,92px));right:4%;}
-  .table-mode .played-card-player1{top:10%}
-  .table-mode .played-card-player2{bottom:10%}
+  .table-mode .muestra-card.sprite-card{
+    top:50%;
+    right:calc(4% + clamp(68px,20vw,94px));
+  }
+  .table-mode .played-card-player1{
+    top:10%;
+    left:27%;
+    transform:translate(-50%,-50%) rotate(-7deg);
+  }
+  .table-mode .played-card-player2{
+    bottom:10%;
+    left:27%;
+    transform:translate(-50%,50%) rotate(7deg);
+  }
 }
