@@ -451,16 +451,19 @@ button,a,input,select,textarea{touch-action:manipulation}
    línea central y continúan bajando aun cuando la partida supera la mitad. */
 @media(max-width:640px){
   .table-mode .scoreboard{
-    height:clamp(390px,52dvh,480px);
-    min-height:390px;
+    height:var(--tally-board-height,190px);
+    min-height:0;
+    background:transparent!important;
   }
   .table-mode .scoreboard-grid{
-    grid-template-rows:minmax(178px,1fr) 2px minmax(178px,1fr);
+    grid-template-rows:minmax(0,1fr) 2px minmax(0,1fr);
     min-height:0;
   }
   .table-mode .scoreboard .tally-half{
-    min-height:178px;
+    min-height:0;
     overflow:visible;
     flex:none;
   }
 }
+
+.table-mode .scoreboard{background:transparent!important}
