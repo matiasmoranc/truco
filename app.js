@@ -476,6 +476,7 @@ function cardAccessibleName(card) {
 function renderGame() {
   if (!state.room) return;
   const room = state.room, players=room.players||{}, isTable=state.playerId==='table', mine=players[state.playerId], opponent=players[state.playerId==='player1'?'player2':'player1'];
+  document.documentElement.style.setProperty('--tally-board-height',`${90+Math.ceil(targetPoints(room)/10)*55}px`);
   $('game-view').classList.toggle('table-mode', isTable);
   $('game-view').classList.toggle('player-mode', !isTable);
   $('demo-device-switcher').classList.toggle('hidden',!state.demo);
