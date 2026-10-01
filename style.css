@@ -559,3 +559,8 @@ button,a,input,select,textarea{touch-action:manipulation}
 .table-mode .scoreboard .tally-table{display:block!important;position:static!important;margin:0!important;padding:0!important}
 .table-mode .scoreboard .score-sticks{max-width:none!important;flex:none!important}
 .table-mode .scoreboard-divider{height:100%;align-self:stretch}
+
+.player-sound-toggle{position:absolute;right:12px;top:72px;z-index:80;padding:9px 12px;border:1px solid rgba(239,235,215,.4);border-radius:6px;background:#193b2b;color:#f0eee2;font-size:11px;touch-action:manipulation}
+.player-sound-toggle[aria-pressed="true"]{border-color:#d8b875;color:#f2d99f}
+.call-notice{position:absolute;left:16px;right:16px;top:122px;z-index:79;padding:14px 16px;border:1px solid #d8b875;border-radius:8px;background:#ead7a5;color:#15251b;text-align:center;font-size:16px;line-height:1.4;pointer-events:none}
+.table-mode .call-notice,.table-mode .player-sound-toggle{display:none!important}
