@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="./style.css?v=20261001-41" />
+    <link rel="stylesheet" href="./style.css?v=20261001-42" />
   </head>
   <body>
     <div class="grain" aria-hidden="true"></div>
@@ -67,6 +67,8 @@
       <section class="game view" id="game-view">
         <button type="button" id="player-sound-toggle" class="player-sound-toggle hidden" aria-pressed="false">Voz silenciada</button>
         <div id="call-notice" class="call-notice hidden" role="status" aria-live="assertive"></div>
+        <section id="opening-draw" class="opening-draw hidden" aria-live="polite"></section>
+        <section id="envido-picker" class="envido-picker hidden" aria-label="Declarar tantos de envido"></section>
         <header class="game-topbar"><button class="mini-brand" id="game-home"><b>T</b> TRUCO</button><span class="room-pill" id="game-room-code">MESA · —</span><span class="connection"><span class="live-dot"></span> EN VIVO</span></header>
         <div class="game-layout">
           <aside class="scoreboard">
@@ -101,6 +103,6 @@
 
       <section class="toast-global" id="global-toast" role="status"></section>
     </main>
-    <script type="module" src="./app.js?v=20261001-41"></script>
+    <script type="module" src="./app.js?v=20261001-42"></script>
   </body>
 </html>
