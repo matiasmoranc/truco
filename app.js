@@ -13,8 +13,6 @@ function makeCode() { return Array.from({length:5}, () => 'ABCDEFGHJKLMNPQRSTUVW
 const callSeen=new Map();
 let soundEnabled=localStorage.getItem('truco-call-sound')==='on';
 let voiceUnlocked=false;
-let voiceProfile=localStorage.getItem('truco-voice-profile')||'male1';
-const voiceProfiles={male1:{pitch:.65,rate:.9},male2:{pitch:.8,rate:1},female1:{pitch:1.2,rate:.9},female2:{pitch:1.4,rate:1}};
 function spokenCall(text=''){
   if(!/\b(canta|responde|quiere)\b/i.test(text))return null;
   if(/no quiere/i.test(text))return 'No quiero';
@@ -30,8 +28,7 @@ function speakCall(text){
   if(!soundEnabled||!voiceUnlocked||!('speechSynthesis' in window))return;
   window.speechSynthesis.cancel();
   const utterance=new SpeechSynthesisUtterance(text);
-  const profile=voiceProfiles[voiceProfile]||voiceProfiles.male1;
-  utterance.lang='es-UY';utterance.rate=profile.rate;utterance.pitch=profile.pitch;
+  utterance.lang='es-UY';utterance.rate=.88;utterance.pitch=.55;
   const voices=window.speechSynthesis.getVoices();
   utterance.voice=voices.find(v=>v.lang==='es-UY')||voices.find(v=>/^es[-_]/i.test(v.lang))||null;
   window.speechSynthesis.speak(utterance);
@@ -40,8 +37,6 @@ function renderCallNotice(){
   const notice=state.room?.callNotice,role=state.playerId;
   const button=$('player-sound-toggle');
   button.classList.toggle('hidden',role==='table');
-  $('player-voice-select').classList.toggle('hidden',role==='table');
-  $('player-voice-select').value=voiceProfile;
   button.textContent=soundEnabled?'Voz activada':'Voz silenciada';
   button.setAttribute('aria-pressed',String(soundEnabled));
   const el=$('call-notice');
@@ -217,9 +212,7 @@ let finishingDraw=false;
 let drawInFlight=false;
 function otherPlayer(player){return player==='player1'?'player2':'player1';}
 async function drawOpeningCard(){
-  const player=state.demo&&state.playerId==='table'
-    ?(['player1','player2'].find(id=>!state.room?.openingDraw?.cards?.[id]))
-    :state.playerId;
+  const player=state.playerId;
   if(drawInFlight||state.room?.status!=='drawing'||!['player1','player2'].includes(player)||state.room.openingDraw?.cards?.[player])return;
   drawInFlight=true;
   try{
@@ -229,7 +222,8 @@ async function drawOpeningCard(){
       opening.cards={...(opening.cards||{}),[player]:opening.pool[0]};
       opening.pool=opening.pool.slice(1);
       state.room.openingDraw=opening;renderGame();
-      await finishOpeningDraw();return;
+      if(opening.cards.player1&&opening.cards.player2)finishOpeningDraw();
+      return;
     }
     const fb=state.firebase;
     await fb.runTransaction(fb.ref(fb.db,`rooms/${state.roomCode}/public/openingDraw`),current=>{
@@ -608,12 +602,13 @@ function renderGame() {
   const drawing=room.status==='drawing';
   $('opening-draw').classList.toggle('hidden',!drawing);
   if(drawing){
-    const cards=room.openingDraw?.cards||{},canDraw=state.demo&&isTable?Object.keys(cards).length<2:!isTable&&!cards[state.playerId];
+    const cards=room.openingDraw?.cards||{},canDraw=!isTable&&!cards[state.playerId];
     const dealer=cards.player1&&cards.player2&&Number(cards.player1.rank)!==Number(cards.player2.rank)
       ?(Number(cards.player1.rank)>Number(cards.player2.rank)?'player1':'player2'):null;
     const mano=dealer?otherPlayer(dealer):null;
-    $('opening-draw').innerHTML=`<p>TOCÁ EL MAZO PARA SACAR UNA CARTA</p><button class="draw-deck deck-stack" id="draw-deck" ${canDraw?'':'disabled'} aria-label="Sacar carta para sortear repartidor"></button><div class="draw-results">${['player1','player2'].map(player=>`<div class="draw-result ${dealer===player?'draw-winner':''}"><span>${escapeHtml(players[player]?.name||player)}${dealer===player?' · REPARTE':mano===player?' · EMPIEZA':''}</span>${cards[player]?`<div class="draw-card sprite-card" style="--sprite-position:${cardSpritePosition(cards[player])}" aria-label="${cardAccessibleName(cards[player])}"></div><b>${escapeHtml(cardAccessibleName(cards[player]))}</b>`:'<p>Esperando carta</p>'}</div>`).join('')}</div><small>${escapeHtml(dealer?`${players[dealer]?.name} gana el saque y reparte. ${players[mano]?.name} empieza a jugar.`:room.feed?.[0]?.text||'')}</small>`;
-    $('draw-deck').addEventListener('click',()=>drawOpeningCard().catch(error=>{drawInFlight=false;toast(firebaseError(error));renderGame();}));
+    const prompt=isTable?'ESPERANDO QUE LOS JUGADORES TOQUEN SU MAZO':cards[state.playerId]?'CARTA ELEGIDA · ESPERÁ AL OTRO JUGADOR':'TOCÁ EL MAZO PARA SACAR UNA CARTA';
+    $('opening-draw').innerHTML=`<p>${prompt}</p><button class="draw-deck deck-stack" id="draw-deck" ${canDraw?'':'disabled'} aria-label="Sacar carta para sortear repartidor"></button><div class="draw-results">${['player1','player2'].map(player=>`<div class="draw-result ${dealer===player?'draw-winner':''}"><span>${escapeHtml(players[player]?.name||player)}${dealer===player?' · REPARTE':mano===player?' · EMPIEZA':''}</span>${cards[player]?`<div class="draw-card sprite-card" style="--sprite-position:${cardSpritePosition(cards[player])}" aria-label="${cardAccessibleName(cards[player])}"></div><b>${escapeHtml(cardAccessibleName(cards[player]))}</b>`:`<p>${isTable?'Esperando que toque el mazo':'Esperando carta'}</p>`}</div>`).join('')}</div><small>${escapeHtml(dealer?`${players[dealer]?.name} gana el saque y reparte. ${players[mano]?.name} empieza a jugar.`:room.feed?.[0]?.text||'')}</small>`;
+    if(canDraw)$('draw-deck').addEventListener('click',()=>drawOpeningCard().catch(error=>{drawInFlight=false;toast(firebaseError(error));renderGame();}));
     $('hand').innerHTML='';$('player-actions').innerHTML='';$('trick-cards').innerHTML='';$('deck-stack').classList.add('hidden');$('muestra-card').classList.add('hidden');$('envido-picker').classList.add('hidden');return;
   }
   const tableName=room.table?.name||'La mesa';
@@ -860,8 +855,3 @@ try {
 } catch { /* Optional during initial setup. */ }
 if(location.search.includes('demo=mesa'))demoStart('table');
 else if (firebaseConfigValid(state.config)) openLobby();
-
-$('player-voice-select').addEventListener('change',event=>{
-  voiceProfile=event.target.value;localStorage.setItem('truco-voice-profile',voiceProfile);
-  voiceUnlocked=true;if(soundEnabled)speakCall('Envido. Quiero. No quiero.');
-});

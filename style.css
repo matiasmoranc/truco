@@ -596,5 +596,3 @@ button,a,input,select,textarea{touch-action:manipulation}
 .opening-draw .draw-deck:not(:disabled):active{transform:scale(.96)!important}
 @keyframes draw-flip{from{opacity:.3;transform:rotateY(90deg)}to{opacity:1;transform:rotateY(0)}}
 @keyframes deck-pulse{50%{box-shadow:5px 6px 0 #142a1d,6px 7px 0 #b19e70,0 0 0 9px #d8b87522}}
-
-.player-voice-select{position:absolute;right:12px;top:112px;z-index:80;max-width:170px;padding:8px;border:1px solid #d8b875;border-radius:6px;background:#193b2b;color:#f0eee2;font-size:12px;touch-action:manipulation}.table-mode .player-voice-select{display:none!important}
