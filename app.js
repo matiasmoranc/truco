@@ -10,6 +10,46 @@ function toast(message, global = false) {
   clearTimeout(el._timer); el._timer = setTimeout(() => el.classList.remove('show'), 2400);
 }
 function makeCode() { return Array.from({length:5}, () => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random()*32)]).join(''); }
+const callSeen=new Map();
+let soundEnabled=localStorage.getItem('truco-call-sound')==='on';
+let voiceUnlocked=false;
+function spokenCall(text=''){
+  if(!/\b(canta|responde|quiere)\b/i.test(text))return null;
+  if(/no quiere/i.test(text))return 'No quiero';
+  if(/quiere/i.test(text))return 'Quiero';
+  return ['contra flor al resto','con flor envido','falta envido','real envido','envido','vale cuatro','retruco','truco','flor'].find(call=>text.toLowerCase().includes(call))||null;
+}
+function makeCallNotice(text){
+  const spoken=spokenCall(text);
+  if(!spoken||!['player1','player2'].includes(state.playerId))return null;
+  return {id:crypto.randomUUID(),from:state.playerId,to:state.playerId==='player1'?'player2':'player1',text,spoken,time:Date.now()};
+}
+function speakCall(text){
+  if(!soundEnabled||!voiceUnlocked||!('speechSynthesis' in window))return;
+  window.speechSynthesis.cancel();
+  const utterance=new SpeechSynthesisUtterance(text);
+  utterance.lang='es-UY';utterance.rate=.9;
+  const voices=window.speechSynthesis.getVoices();
+  utterance.voice=voices.find(v=>v.lang==='es-UY')||voices.find(v=>/^es[-_]/i.test(v.lang))||null;
+  window.speechSynthesis.speak(utterance);
+}
+function renderCallNotice(){
+  const notice=state.room?.callNotice,role=state.playerId;
+  const button=$('player-sound-toggle');
+  button.classList.toggle('hidden',role==='table');
+  button.textContent=soundEnabled?'Voz activada':'Voz silenciada';
+  button.setAttribute('aria-pressed',String(soundEnabled));
+  const el=$('call-notice');
+  const visible=notice?.to===role;
+  el.classList.toggle('hidden',!visible);
+  el.textContent=visible?notice.text:'';
+  if(!visible)return;
+  const key=`${state.roomCode}:${role}`;
+  if(callSeen.get(key)!==notice.id){
+    callSeen.set(key,notice.id);
+    if(Date.now()-notice.time<60000)speakCall(notice.spoken);
+  }
+}
 function cleanName(value, fallback) { return value.trim().slice(0,18) || fallback; }
 function pickRole(role) {
   state.role = role;
@@ -240,6 +280,8 @@ function targetPoints(room) { return normalizeTargetPoints(room?.targetPoints); 
 function faltanParaGanar(room) { return Math.max(1,targetPoints(room)-Math.max(Number(room.scores?.player1)||0,Number(room.scores?.player2)||0)); }
 async function writeRoom(changes) {
   const fb=state.firebase; const updates={};
+  const notice=makeCallNotice(changes.feed?.[0]?.text);
+  if(notice)changes={...changes,callNotice:notice};
   for(const [key,value] of Object.entries(changes)) updates[`rooms/${state.roomCode}/public/${key}`]=value;
   await fb.update(fb.ref(fb.db),updates);
 }
@@ -480,6 +522,7 @@ function cardAccessibleName(card) {
 
 function renderGame() {
   if (!state.room) return;
+  renderCallNotice();
   const room = state.room, players=room.players||{}, isTable=state.playerId==='table', mine=players[state.playerId], opponent=players[state.playerId==='player1'?'player2':'player1'];
   document.documentElement.style.setProperty('--tally-board-height',`${50+(targetPoints(room)/10*42+12)*2}px`);
   $('game-view').classList.toggle('table-mode', isTable);
@@ -558,7 +601,7 @@ function switchDemoRole(role) {
 }
 function demoOther(player){return player==='player1'?'player2':'player1';}
 function demoHand(player){return state.demoHands?.[player]||[];}
-function demoFeed(text){state.room.feed=[{text,time:Date.now()},...(state.room.feed||[])].slice(0,8);}
+function demoFeed(text){state.room.feed=[{text,time:Date.now()},...(state.room.feed||[])].slice(0,8);const notice=makeCallNotice(text);if(notice)state.room.callNotice=notice;}
 function demoScore(player,points,description){
   const amount=Math.max(0,Number(points)||0);if(!amount)return;
   state.room.scores[player]=(state.room.scores[player]||0)+amount;
@@ -686,7 +729,14 @@ document.addEventListener('touchend',(event)=>{
   if(now-lastTouchEnd<=320)event.preventDefault();
   lastTouchEnd=now;
 },{passive:false});
-$('sound-toggle').addEventListener('click',()=>toast('El sonido se agrega en una próxima versión.'));
+$('player-sound-toggle').addEventListener('click',()=>{
+  soundEnabled=!soundEnabled;voiceUnlocked=true;
+  localStorage.setItem('truco-call-sound',soundEnabled?'on':'off');
+  if(soundEnabled)speakCall('Sonido activado');else window.speechSynthesis?.cancel();
+  renderCallNotice();
+});
+document.addEventListener('click',()=>{if(soundEnabled&&!voiceUnlocked){voiceUnlocked=true;speakCall('Sonido activado');}},{capture:true});
+$('sound-toggle').addEventListener('click',()=>$('player-sound-toggle').click());
 $('close-config').addEventListener('click',()=>showView('setup-view'));
 $('save-config').addEventListener('click',()=>{try{const cfg=JSON.parse($('firebase-config').value);if(!firebaseConfigValid(cfg))throw new Error('missing');state.config=cfg;localStorage.setItem(storageKey,JSON.stringify(cfg));toast('Configuración guardada.',true);runPendingAction();}catch{toast('Pegá una configuración Firebase válida.',true);}});
 state.config=loadConfig();
