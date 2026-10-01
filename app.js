@@ -13,6 +13,8 @@ function makeCode() { return Array.from({length:5}, () => 'ABCDEFGHJKLMNPQRSTUVW
 const callSeen=new Map();
 let soundEnabled=localStorage.getItem('truco-call-sound')==='on';
 let voiceUnlocked=false;
+let voiceProfile=localStorage.getItem('truco-voice-profile')||'male1';
+const voiceProfiles={male1:{pitch:.65,rate:.9},male2:{pitch:.8,rate:1},female1:{pitch:1.2,rate:.9},female2:{pitch:1.4,rate:1}};
 function spokenCall(text=''){
   if(!/\b(canta|responde|quiere)\b/i.test(text))return null;
   if(/no quiere/i.test(text))return 'No quiero';
@@ -28,7 +30,8 @@ function speakCall(text){
   if(!soundEnabled||!voiceUnlocked||!('speechSynthesis' in window))return;
   window.speechSynthesis.cancel();
   const utterance=new SpeechSynthesisUtterance(text);
-  utterance.lang='es-UY';utterance.rate=.9;
+  const profile=voiceProfiles[voiceProfile]||voiceProfiles.male1;
+  utterance.lang='es-UY';utterance.rate=profile.rate;utterance.pitch=profile.pitch;
   const voices=window.speechSynthesis.getVoices();
   utterance.voice=voices.find(v=>v.lang==='es-UY')||voices.find(v=>/^es[-_]/i.test(v.lang))||null;
   window.speechSynthesis.speak(utterance);
@@ -37,6 +40,8 @@ function renderCallNotice(){
   const notice=state.room?.callNotice,role=state.playerId;
   const button=$('player-sound-toggle');
   button.classList.toggle('hidden',role==='table');
+  $('player-voice-select').classList.toggle('hidden',role==='table');
+  $('player-voice-select').value=voiceProfile;
   button.textContent=soundEnabled?'Voz activada':'Voz silenciada';
   button.setAttribute('aria-pressed',String(soundEnabled));
   const el=$('call-notice');
@@ -238,7 +243,7 @@ async function finishOpeningDraw(){
   if(state.room?.status!=='drawing'||!draw?.player1||!draw?.player2||finishingDraw)return;
   finishingDraw=true;
   try{
-    await new Promise(resolve=>setTimeout(resolve,1800));
+    await new Promise(resolve=>setTimeout(resolve,2000));
     if(Number(draw.player1.rank)===Number(draw.player2.rank)){
       if(state.demo){state.room.openingDraw={pool:shuffleDeck(),cards:{}};demoFeed('Empate en el saque. Vuelvan a tocar el mazo.');renderGame();}
       else await writeRoom({openingDraw:{pool:shuffleDeck(),cards:{}},feed:topFeed(state.room,'Empate en el saque. Vuelvan a tocar el mazo.')});
@@ -392,7 +397,7 @@ async function answerBet(answer) {
     const flowers=state.room.flors||{},winner=flowers.player1===flowers.player2?(state.room.mano||'player1'):(flowers.player1>flowers.player2?'player1':'player2');
     const scores={...state.room.scores};scores[winner]=(scores[winner]||0)+bet.stake;
     const status=scores[winner]>=targetPoints(state.room)?'complete':'started';
-    await writeRoom({scores,pendingBet:status==='complete'?null:(bet.suspendedBet||null),envidoClosed:true,feed:topFeed(state.room,`Flores: ${flowers.player1} a ${flowers.player2}. ${state.room.players[winner].name} suma ${bet.stake}.`),status});return;
+    await writeRoom({scores,pendingBet:status==='complete'?null:(bet.suspendedBet||null),envidoClosed:true,feed:topFeed(state.room,`${state.room.players[state.playerId].name} quiere. Flores: ${flowers.player1} a ${flowers.player2}. ${state.room.players[winner].name} suma ${bet.stake}.`),status});return;
   }
   await writeRoom({trucoLevel:bet.stake,pendingBet:null,feed:topFeed(state.room,`${state.room.players[state.playerId].name} quiere. El truco queda en ${bet.stake}.`) });
 }
@@ -751,6 +756,7 @@ function demoAnswerAction(answer){
     const value=answer==='raise-faltaflor'?faltanParaGanar(room):5;room.pendingBet={...bet,caller:player,responder:bet.caller,accepted:bet.stake,stake:value};demoFeed(`${room.players[player].name} responde ${value===5?'con flor envido':'contra flor al resto'}.`);renderGame();return;
   }
   if(answer==='no'){
+    demoFeed(`${room.players[player].name} no quiere.`);
     const points=bet.type==='truco'?Math.max(1,(bet.stake||2)-1):bet.type==='flor'?(bet.accepted||3):(bet.accepted||1);
     if(bet.type==='truco'){demoFinishHand(bet.caller,points);return;}
     demoScore(bet.caller,points,'suma por canto no querido');room.pendingBet=bet.suspendedBet||null;room.envidoClosed=true;renderGame();return;
@@ -758,7 +764,7 @@ function demoAnswerAction(answer){
   if(bet.type==='envido'){
     room.pendingBet={...bet,reveals:{},revealMode:true,revealTurn:room.mano};demoFeed(`${room.players[player].name} quiere. Declara primero ${room.players[room.mano].name}.`);renderGame();return;
   }
-  if(bet.type==='flor'){demoResolveFlor(bet);renderGame();return;}
+  if(bet.type==='flor'){demoFeed(`${room.players[player].name} quiere.`);demoResolveFlor(bet);renderGame();return;}
   room.trucoLevel=bet.stake;room.pendingBet=null;demoFeed(`${room.players[player].name} quiere. El truco queda en ${bet.stake}.`);renderGame();
 }
 function demoAction(action){
@@ -854,3 +860,8 @@ try {
 } catch { /* Optional during initial setup. */ }
 if(location.search.includes('demo=mesa'))demoStart('table');
 else if (firebaseConfigValid(state.config)) openLobby();
+
+$('player-voice-select').addEventListener('change',event=>{
+  voiceProfile=event.target.value;localStorage.setItem('truco-voice-profile',voiceProfile);
+  voiceUnlocked=true;if(soundEnabled)speakCall('Envido. Quiero. No quiero.');
+});
