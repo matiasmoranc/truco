@@ -581,3 +581,18 @@ button,a,input,select,textarea{touch-action:manipulation}
 .number-wheel button:disabled{color:#718479}
 .declaration-buttons{display:flex;gap:10px;justify-content:center;margin-top:12px}
 .envido-picker .call-button,.envido-picker .pass-button{height:42px}
+
+.opening-draw{justify-content:flex-start;overflow:auto;padding:clamp(45px,11dvh,110px) 18px 28px}
+.opening-draw>p{margin:0;max-width:320px;font-size:clamp(13px,4vw,18px);line-height:1.4}
+.draw-results{width:min(100%,420px);gap:clamp(20px,10vw,68px);align-items:flex-start}
+.draw-results>div{flex:1;max-width:150px;width:auto;min-width:0;gap:8px}
+.draw-results .draw-result>span{min-height:34px;display:flex;align-items:center;justify-content:center;font-size:clamp(12px,3.6vw,16px);line-height:1.2}
+.draw-results .draw-card{width:clamp(92px,27vw,128px);height:clamp(134px,39vw,186px);max-width:100%;transition:transform .35s ease;transform:rotateY(0deg);backface-visibility:hidden}
+.draw-results .draw-card[style]{animation:draw-flip .4s ease-out both}
+.draw-results .draw-result>b{font-size:12px;font-weight:500;color:#e5d49d}
+.draw-result.draw-winner{color:#f2d99f}
+.opening-draw small{max-width:320px;margin-top:4px;font-size:clamp(12px,3.6vw,15px);line-height:1.45;color:#e5d49d}
+.opening-draw .draw-deck:not(:disabled){cursor:pointer;animation:deck-pulse 1.5s ease-in-out infinite}
+.opening-draw .draw-deck:not(:disabled):active{transform:scale(.96)!important}
+@keyframes draw-flip{from{opacity:.3;transform:rotateY(90deg)}to{opacity:1;transform:rotateY(0)}}
+@keyframes deck-pulse{50%{box-shadow:5px 6px 0 #142a1d,6px 7px 0 #b19e70,0 0 0 9px #d8b87522}}

@@ -206,27 +206,42 @@ function shuffleDeck() {
 }
 async function startGame() {
   if(state.room?.status!=='waiting'||state.playerId!=='table')return;
-  await writeRoom({status:'drawing',openingDraw:null,feed:topFeed(state.room,'Cada jugador toca el mazo para sortear quién reparte.')});
+  await writeRoom({status:'drawing',openingDraw:{pool:shuffleDeck(),cards:{}},feed:topFeed(state.room,'Cada jugador toca el mazo para sortear quién reparte.')});
 }
 let finishingDraw=false;
+let drawInFlight=false;
 function otherPlayer(player){return player==='player1'?'player2':'player1';}
 async function drawOpeningCard(){
-  const player=state.playerId;
-  if(state.room?.status!=='drawing'||!['player1','player2'].includes(player)||state.room.openingDraw?.[player])return;
-  const card=shuffleDeck()[0];
-  if(state.demo){state.room.openingDraw={...(state.room.openingDraw||{}),[player]:card};await finishOpeningDraw();renderGame();return;}
-  const fb=state.firebase;
-  await fb.runTransaction(fb.ref(fb.db,`rooms/${state.roomCode}/public/openingDraw/${player}`),current=>current||card);
+  const player=state.demo&&state.playerId==='table'
+    ?(['player1','player2'].find(id=>!state.room?.openingDraw?.cards?.[id]))
+    :state.playerId;
+  if(drawInFlight||state.room?.status!=='drawing'||!['player1','player2'].includes(player)||state.room.openingDraw?.cards?.[player])return;
+  drawInFlight=true;
+  try{
+    if(state.demo){
+      const opening=state.room.openingDraw||{pool:shuffleDeck(),cards:{}};
+      if(!opening.pool?.length)return;
+      opening.cards={...(opening.cards||{}),[player]:opening.pool[0]};
+      opening.pool=opening.pool.slice(1);
+      state.room.openingDraw=opening;renderGame();
+      await finishOpeningDraw();return;
+    }
+    const fb=state.firebase;
+    await fb.runTransaction(fb.ref(fb.db,`rooms/${state.roomCode}/public/openingDraw`),current=>{
+      if(!current||current.cards?.[player]||!current.pool?.length)return;
+      return {...current,cards:{...(current.cards||{}),[player]:current.pool[0]},pool:current.pool.slice(1)};
+    });
+  }finally{drawInFlight=false;renderGame();}
 }
 async function finishOpeningDraw(){
-  const draw=state.room?.openingDraw;
+  const draw=state.room?.openingDraw?.cards;
   if(state.room?.status!=='drawing'||!draw?.player1||!draw?.player2||finishingDraw)return;
   finishingDraw=true;
   try{
     await new Promise(resolve=>setTimeout(resolve,1800));
     if(Number(draw.player1.rank)===Number(draw.player2.rank)){
-      if(state.demo){state.room.openingDraw=null;demoFeed('Empate en el sorteo. Toquen el mazo otra vez.');}
-      else await writeRoom({openingDraw:null,feed:topFeed(state.room,'Empate en el sorteo. Toquen el mazo otra vez.')});
+      if(state.demo){state.room.openingDraw={pool:shuffleDeck(),cards:{}};demoFeed('Empate en el saque. Vuelvan a tocar el mazo.');renderGame();}
+      else await writeRoom({openingDraw:{pool:shuffleDeck(),cards:{}},feed:topFeed(state.room,'Empate en el saque. Vuelvan a tocar el mazo.')});
       return;
     }
     const dealer=Number(draw.player1.rank)>Number(draw.player2.rank)?'player1':'player2';
@@ -588,9 +603,12 @@ function renderGame() {
   const drawing=room.status==='drawing';
   $('opening-draw').classList.toggle('hidden',!drawing);
   if(drawing){
-    const draw=room.openingDraw||{},canDraw=!isTable&&!draw[state.playerId];
-    $('opening-draw').innerHTML=`<p>TOCÁ EL MAZO PARA SORTEAR QUIÉN REPARTE</p><button class="draw-deck deck-stack" id="draw-deck" ${canDraw?'':'disabled'} aria-label="Sacar carta para sortear repartidor"></button><div class="draw-results">${['player1','player2'].map(player=>`<div><span>${escapeHtml(players[player]?.name||player)}</span>${draw[player]?`<div class="draw-card sprite-card" style="--sprite-position:${cardSpritePosition(draw[player])}" aria-label="${cardAccessibleName(draw[player])}"></div>`:'<p>Esperando carta</p>'}</div>`).join('')}</div><small>${escapeHtml(room.feed?.[0]?.text||'')}</small>`;
-    $('draw-deck').addEventListener('click',()=>drawOpeningCard().catch(error=>toast(firebaseError(error))));
+    const cards=room.openingDraw?.cards||{},canDraw=state.demo&&isTable?Object.keys(cards).length<2:!isTable&&!cards[state.playerId];
+    const dealer=cards.player1&&cards.player2&&Number(cards.player1.rank)!==Number(cards.player2.rank)
+      ?(Number(cards.player1.rank)>Number(cards.player2.rank)?'player1':'player2'):null;
+    const mano=dealer?otherPlayer(dealer):null;
+    $('opening-draw').innerHTML=`<p>TOCÁ EL MAZO PARA SACAR UNA CARTA</p><button class="draw-deck deck-stack" id="draw-deck" ${canDraw?'':'disabled'} aria-label="Sacar carta para sortear repartidor"></button><div class="draw-results">${['player1','player2'].map(player=>`<div class="draw-result ${dealer===player?'draw-winner':''}"><span>${escapeHtml(players[player]?.name||player)}${dealer===player?' · REPARTE':mano===player?' · EMPIEZA':''}</span>${cards[player]?`<div class="draw-card sprite-card" style="--sprite-position:${cardSpritePosition(cards[player])}" aria-label="${cardAccessibleName(cards[player])}"></div><b>${escapeHtml(cardAccessibleName(cards[player]))}</b>`:'<p>Esperando carta</p>'}</div>`).join('')}</div><small>${escapeHtml(dealer?`${players[dealer]?.name} gana el saque y reparte. ${players[mano]?.name} empieza a jugar.`:room.feed?.[0]?.text||'')}</small>`;
+    $('draw-deck').addEventListener('click',()=>drawOpeningCard().catch(error=>{drawInFlight=false;toast(firebaseError(error));renderGame();}));
     $('hand').innerHTML='';$('player-actions').innerHTML='';$('trick-cards').innerHTML='';$('deck-stack').classList.add('hidden');$('muestra-card').classList.add('hidden');$('envido-picker').classList.add('hidden');return;
   }
   const tableName=room.table?.name||'La mesa';
