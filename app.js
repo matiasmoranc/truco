@@ -14,6 +14,9 @@ const callSeen=new Map();
 let soundEnabled=localStorage.getItem('truco-call-sound')==='on';
 let voiceUnlocked=false;
 function spokenCall(text=''){
+  const points=text.match(/\bcanta (\d+) tantos\b/i);
+  if(points)return `${points[1]} tantos`;
+  if(/: son buenas\./i.test(text))return 'Son buenas';
   if(!/\b(canta|responde|quiere)\b/i.test(text))return null;
   if(/no quiere/i.test(text))return 'No quiero';
   if(/quiere/i.test(text))return 'Quiero';
@@ -408,7 +411,7 @@ async function revealEnvido(good=false) {
     const winner=good?first:second;
     changes={pendingBet:bet.suspendedBet||null,envidoClosed:true,envidoAudit:{reveals,winner,stake:bet.stake,handNumber:room.handNumber},feed:topFeed(room,good?`${room.players[player].name}: son buenas. Los ${bet.stake} puntos se verifican al terminar la mano.`:`${room.players[player].name} canta ${number} tantos. Los ${bet.stake} puntos se verifican al terminar la mano.`)};
   }
-  if(state.demo){Object.assign(room,changes);renderGame();}else await writeRoom(changes);
+  if(state.demo){const notice=makeCallNotice(changes.feed?.[0]?.text);if(notice)changes.callNotice=notice;Object.assign(room,changes);renderGame();}else await writeRoom(changes);
 }
 function auditEnvidoScores(room,scores,truth){
   const audit=room.envidoAudit;if(!audit)return scores;
