@@ -5,6 +5,30 @@ const storageKey = 'truco-firebase-config';
 let state = { role: 'table', joining: false, config: null, firebase: null, roomCode: null, selectedRoom: null, uid: null, playerId: null, unsubscribe: null, privateUnsubscribe: null, lobbyUnsubscribe: null, room: null, hand: [], demo: false, demoHands: {}, nextAction: null, resolutionTimer: null, resolutionTimerKey: null, playActionInFlight: false, legacyRepairKey: null, emptyHandRepairKey: null };
 
 function showView(id) { views.forEach((name) => $(name).classList.toggle('active', name === id)); }
+function suitSvg(suit){
+  const paths={
+    oro:'<path d="M24 3 42 24 24 45 6 24 24 3Z"/><path d="m24 11 11 13-11 13-11-13 11-13Z" class="suit-cutout"/>',
+    copa:'<path d="M5 8h38v5c0 12-7 20-16 22v5h9v5H12v-5h9v-5C12 33 5 25 5 13V8Z"/><path d="M10 13c0 9 5 15 14 18 9-3 14-9 14-18H10Z" class="suit-cutout"/>',
+    espada:'<path d="M24 3C19 12 6 20 6 31c0 8 6 12 13 10l-5 5h20l-5-5c7 2 13-2 13-10C42 20 29 12 24 3Z"/><path d="M24 12 12 29c-2 4 0 8 4 8 3 0 5-2 8-6 3 4 5 6 8 6 4 0 6-4 4-8L24 12Z" class="suit-cutout"/>',
+    basto:'<path d="M19 5c-8-6-17 2-12 10-9 4-5 17 5 16 3 0 5-1 7-4l2 7-7 7v4h20v-4l-7-7 2-7c2 3 4 4 7 4 10 1 14-12 5-16 5-8-4-16-12-10l-5 5-5-5Z"/><path d="M14 12c-3-3-6 0-4 3-4 1-3 6 1 6 2 0 3-1 4-3l5 11 2 1 2-1 5-11c1 2 2 3 4 3 4 0 5-5 1-6 2-3-1-6-4-3l-6 6-6-6Z" class="suit-cutout"/>'
+  };
+  return `<svg class="suit-icon suit-${suit}" viewBox="0 0 48 48" aria-hidden="true" focusable="false">${paths[suit]||paths.basto}</svg>`;
+}
+function setupSuitIcons(root=document){root.querySelectorAll('[data-suit-icon]').forEach(el=>{el.innerHTML=suitSvg(el.dataset.suitIcon);});}
+function updateMode(mode){
+  const two=mode==='two';$('device-mode').value=mode;
+  document.querySelectorAll('.mode-option').forEach(button=>{const selected=button.dataset.mode===mode;button.classList.toggle('selected',selected);button.setAttribute('aria-pressed',String(selected));});
+  const table=document.querySelector('#role-options [data-role="table"]');table.classList.toggle('hidden',two);
+  if(two&&state.role==='table')pickRole('player1');
+}
+function renderPointsPicker(){
+  const menu=$('points-picker-menu'),select=$('target-points');
+  menu.innerHTML=[10,20,30,40,50,60].map(points=>`<button type="button" class="points-option ${Number(select.value)===points?'selected':''}" role="option" aria-selected="${Number(select.value)===points}" data-points="${points}">${points}<span>puntos</span></button>`).join('');
+  $('points-picker-trigger').querySelector('span').textContent=`${select.value} puntos`;
+  menu.querySelectorAll('[data-points]').forEach(option=>option.addEventListener('click',()=>{
+    select.value=option.dataset.points;renderPointsPicker();menu.classList.add('hidden');$('points-picker-trigger').setAttribute('aria-expanded','false');
+  }));
+}
 function toast(message, global = false) {
   const el = $(global ? 'global-toast' : 'toast'); el.textContent = message; el.classList.add('show');
   clearTimeout(el._timer); el._timer = setTimeout(() => el.classList.remove('show'), 2400);
@@ -65,8 +89,8 @@ function configureSetup() {
   state.joining = false;
   $('role-options').classList.remove('single');
   $('role-options').querySelectorAll('.role-card').forEach((card) => card.classList.remove('hidden'));
-  $('device-mode').value = 'three';
-  pickRole('table');
+  updateMode('two');
+  pickRole('player1');
   showView('setup-view');
 }
 function firebaseConfigValid(config) { return !!(config && config.apiKey && config.databaseURL && config.projectId && config.appId); }
@@ -148,7 +172,7 @@ async function openLobby() {
 }
 function renderLobby(rooms) {
   const open = Object.entries(rooms).filter(([, value]) => value?.public?.status === 'waiting' && (!value.public.table || !value.public.players?.player1 || !value.public.players?.player2)).sort((a,b) => (b[1].public.createdAt || 0) - (a[1].public.createdAt || 0));
-  if (!open.length) { $('open-room-list').innerHTML = '<div class="empty-lobby"><span>♣</span><strong>No hay mesas abiertas todavía</strong></div>'; return; }
+  if (!open.length) { $('open-room-list').innerHTML = '<div class="empty-lobby"><span class="empty-lobby-icon" data-suit-icon="basto"></span><strong>No hay mesas abiertas todavía</strong></div>'; setupSuitIcons($('open-room-list')); return; }
   $('open-room-list').innerHTML = open.map(([code, value]) => {
     const room = value.public, players = room.players || {}, seats = (room.deviceMode === 'two' ? [] : [['table','La mesa',room.table]]).concat([['player1','Jugador 1',players.player1],['player2','Jugador 2',players.player2]]);
     const title = room.table?.name || players.player1?.name || players.player2?.name || 'Mesa abierta';
@@ -197,7 +221,7 @@ function renderWaiting() {
   const players = state.room.players || {};
   $('room-status').textContent = state.room.table && players.player1 && players.player2 ? 'MESA COMPLETA' : 'ESPERANDO LUGARES';
   const seatData = (state.room.deviceMode === 'two' ? [] : [['table','LA MESA',state.room.table]]).concat([['player1','JUGADOR 1',players.player1],['player2','JUGADOR 2',players.player2]]);
-  $('seats').innerHTML = seatData.map(([key,label,value]) => `<div class="seat"><span class="seat-icon">${key==='table'?'♣':key==='player1'?'♠':'♥'}</span><span class="seat-name"><strong>${escapeHtml(value?.name || (key==='table'?'La mesa':'Esperando jugador…'))}</strong><small>${label}</small></span><span class="seat-state ${value?'ready':''}">${value?'LISTO':'ESPERANDO'}</span></div>`).join('');
+  $('seats').innerHTML = seatData.map(([key,label,value]) => `<div class="seat"><span class="seat-icon" data-suit-icon="${key==='table'?'basto':key==='player1'?'espada':'copa'}"></span><span class="seat-name"><strong>${escapeHtml(value?.name || (key==='table'?'La mesa':'Esperando jugador…'))}</strong><small>${label}</small></span><span class="seat-state ${value?'ready':''}">${value?'LISTO':'ESPERANDO'}</span></div>`).join('');setupSuitIcons($('seats'));
   const ready = !!(state.room.table && players.player1 && players.player2);
   $('start-game').disabled = !(ready && isCoordinator());
   $('waiting-hint').textContent = isCoordinator() ? (ready ? 'Ya están todos. ¡A jugar!' : 'Esperando que se unan los dos jugadores') : 'Esperá a que quien creó la partida la inicie';
@@ -636,7 +660,7 @@ function renderGame() {
   $('deck-count').textContent=room.deckCount??40;
   $('game-room-code').textContent='MESA ABIERTA';
   $('my-name').textContent=isTable?tableName:(mine?.name||'Vos'); $('my-avatar').textContent=(isTable?tableName:(mine?.name||'V')).slice(0,1).toUpperCase();
-  $('opponent-name').textContent=isTable?'Los jugadores':(opponent?.name||'Esperando rival'); $('opponent-avatar').textContent=(isTable?'♠':(opponent?.name||'J').slice(0,1)).toUpperCase();
+  $('opponent-name').textContent=isTable?'Los jugadores':(opponent?.name||'Esperando rival'); $('opponent-avatar').textContent=(isTable?'T':(opponent?.name||'J').slice(0,1)).toUpperCase();
   const myTurn=!isTable&&room.turn===state.playerId&&room.status==='started'&&!room.resolvingTrick&&state.hand.length>0;
   $('turn-badge').textContent=isTable?'MESA':myTurn?'TU TURNO':'ESPERÁ'; $('turn-badge').classList.toggle('waiting-turn',!myTurn);
   $('hand').innerHTML=isTable?'':state.hand.map((card) => `<button class="hand-card sprite-card ${card.red?'card-red':''}" style="--sprite-position:${cardSpritePosition(card)}" aria-label="${cardAccessibleName(card)}" aria-disabled="${!myTurn}" data-card="${card.id}"><span class="sr-only">${cardAccessibleName(card)}</span></button>`).join('');
@@ -836,11 +860,10 @@ function demoFinishHand(winner,points){
   demoFeed(`${room.players[room.dealer].name} reparte. Empieza ${room.players[mano].name}.`);renderGame();
 }
 
-$('device-mode').addEventListener('change', () => {
-  const two = $('device-mode').value === 'two';
-  $('role-options').querySelector('[data-role=table]').classList.toggle('hidden', two);
-  if(two && state.role === 'table')pickRole('player1');
-});
+document.querySelectorAll('.mode-option').forEach(button=>button.addEventListener('click',()=>updateMode(button.dataset.mode)));
+$('points-picker-trigger').addEventListener('click',()=>{const menu=$('points-picker-menu'),opening=menu.classList.contains('hidden');menu.classList.toggle('hidden',!opening);$('points-picker-trigger').setAttribute('aria-expanded',String(opening));});
+document.addEventListener('click',event=>{if(!event.target.closest('.points-picker')){$('points-picker-menu').classList.add('hidden');$('points-picker-trigger').setAttribute('aria-expanded','false');}});
+document.addEventListener('keydown',event=>{if(event.key==='Escape'){$('points-picker-menu').classList.add('hidden');$('points-picker-trigger').setAttribute('aria-expanded','false');}});
 $('create-room').addEventListener('click',()=>configureSetup());
 $('open-room-list').addEventListener('click',(event)=>{const button=event.target.closest('[data-room][data-seat]');if(button)joinOpenRoom(button.dataset.room,button.dataset.seat);});
 $('role-options').querySelectorAll('.role-card').forEach((card)=>{
@@ -886,6 +909,7 @@ $('sound-toggle').addEventListener('click',()=>$('player-sound-toggle').click())
 $('close-config').addEventListener('click',()=>showView('setup-view'));
 $('save-config').addEventListener('click',()=>{try{const cfg=JSON.parse($('firebase-config').value);if(!firebaseConfigValid(cfg))throw new Error('missing');state.config=cfg;localStorage.setItem(storageKey,JSON.stringify(cfg));toast('Configuración guardada.',true);runPendingAction();}catch{toast('Pegá una configuración Firebase válida.',true);}});
 state.config=loadConfig();
+setupSuitIcons();renderPointsPicker();
 try {
   const bundled = await import('./firebase-config.js');
   if (firebaseConfigValid(bundled.firebaseConfig)) state.config = bundled.firebaseConfig;

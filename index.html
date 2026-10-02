@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="./style.css?v=20261002-51" />
+    <link rel="stylesheet" href="./style.css?v=20261002-52" />
   </head>
   <body>
     <div class="grain" aria-hidden="true"></div>
@@ -23,7 +23,7 @@
         <div class="home-content">
           <section class="home-intro">
             <div class="home-heading"><h1>¿Jugamos?</h1></div>
-            <div class="home-actions"><button class="button primary" id="create-room"><span>Crear mesa</span><span class="arrow" aria-hidden="true">+</span></button><button class="demo-link" id="demo-button">Probar demo</button></div>
+            <div class="home-actions"><button class="button primary" id="create-room"><span>Crear mesa</span><svg class="create-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button><button class="demo-link" id="demo-button">Probar demo</button></div>
           </section>
           <section class="home-lobby" aria-labelledby="home-lobby-title">
             <div class="home-lobby-heading"><div><div class="home-section-title"><h2 id="home-lobby-title">Mesas abiertas</h2></div></div><label class="home-name"><span class="field-label">Tu nombre</span><input id="lobby-name" class="name-input" maxlength="18" placeholder="Ej. Matias" autocomplete="nickname" /></label></div>
@@ -33,21 +33,23 @@
       </section>
 
       <section class="setup view" id="setup-view">
-        <header class="topbar"><button class="icon-button" id="back-home" aria-label="Volver">←</button><span class="mini-brand"><b>T</b> TRUCO</span><span aria-hidden="true" class="topbar-spacer"></span></header>
+        <header class="topbar"><button class="icon-button" id="back-home" aria-label="Volver"><svg class="back-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5m7 7-7-7 7-7"/></svg></button><span class="mini-brand"><b>T</b> TRUCO</span><span aria-hidden="true" class="topbar-spacer"></span></header>
         <div class="setup-content">
           <h2>Crear mesa</h2>
           <label class="field-label" for="player-name">Tu nombre</label>
           <input id="player-name" class="name-input" maxlength="18" placeholder="Ej. Matias" autocomplete="nickname" />
-          <label class="field-label" for="device-mode">Celulares</label><select id="device-mode" class="name-input"><option value="three">3 celulares</option><option value="two">2 celulares</option></select>
+          <label class="field-label">Dispositivos</label>
+          <div class="mode-options" role="group" aria-label="Cantidad de dispositivos"><button type="button" class="mode-option selected" data-mode="two" aria-pressed="true"><strong>2 celulares</strong><span>Un jugador crea la mesa</span></button><button type="button" class="mode-option" data-mode="three" aria-pressed="false"><strong>3 celulares</strong><span>Con una mesa aparte</span></button></div>
+          <select id="device-mode" class="visually-hidden" tabindex="-1" aria-hidden="true"><option value="two" selected>2 celulares</option><option value="three">3 celulares</option></select>
           <span class="field-label">Tu lugar</span>
           <div class="role-options" id="role-options">
-            <button class="role-card selected" data-role="table"><span class="role-glyph table-glyph">♣</span><span class="role-title">Mesa</span><span class="radio"></span></button>
-            <button class="role-card" data-role="player1"><span class="role-glyph">♠</span><span class="role-title">Jugador 1</span><span class="radio"></span></button>
-            <button class="role-card" data-role="player2"><span class="role-glyph red-suit">♥</span><span class="role-title">Jugador 2</span><span class="radio"></span></button>
+            <button class="role-card hidden" data-role="table" aria-pressed="false"><span class="role-glyph table-glyph" data-suit-icon="basto"></span><span class="role-title">Mesa</span><span class="radio"></span></button>
+            <button class="role-card selected" data-role="player1" aria-pressed="true"><span class="role-glyph" data-suit-icon="espada"></span><span class="role-title">Jugador 1</span><span class="radio"></span></button>
+            <button class="role-card" data-role="player2" aria-pressed="false"><span class="role-glyph red-suit" data-suit-icon="copa"></span><span class="role-title">Jugador 2</span><span class="radio"></span></button>
           </div>
-          <label class="field-label target-label" for="target-points">Puntos</label>
-          <select id="target-points" class="name-input target-select"><option value="10">10 puntos</option><option value="20">20 puntos</option><option value="30" selected>30 puntos</option><option value="40">40 puntos</option><option value="50">50 puntos</option><option value="60">60 puntos</option></select>
-          <button class="button primary full-button" id="enter-room">Crear mesa <span class="arrow">↗</span></button>
+          <span class="field-label target-label">Puntos</span>
+          <div class="points-picker"><select id="target-points" class="visually-hidden" tabindex="-1" aria-hidden="true"><option value="10">10 puntos</option><option value="20">20 puntos</option><option value="30" selected>30 puntos</option><option value="40">40 puntos</option><option value="50">50 puntos</option><option value="60">60 puntos</option></select><button id="points-picker-trigger" class="points-picker-trigger" type="button" aria-expanded="false" aria-controls="points-picker-menu"><span>30 puntos</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button><div id="points-picker-menu" class="points-picker-menu hidden" role="listbox" aria-label="Elegí el puntaje"></div></div>
+          <button class="button primary full-button" id="enter-room">Crear mesa</button>
         </div>
       </section>
 
@@ -58,7 +60,7 @@
           <h2>Que no falte<br /><em>nadie.</em></h2>
           <div class="code-card notice"><span class="field-label">MESA ABIERTA</span><strong>Los demás pueden sumarse desde “Mesas abiertas”.</strong></div>
           <div class="seats" id="seats"></div>
-          <div class="waiting-bottom"><button class="button primary full-button" id="start-game" disabled>Repartir las cartas <span class="arrow">↗</span></button><p id="waiting-hint">Esperando que se unan los dos jugadores</p></div>
+          <div class="waiting-bottom"><button class="button primary full-button" id="start-game" disabled>Repartir las cartas</button><p id="waiting-hint">Esperando que se unan los dos jugadores</p></div>
         </div>
       </section>
 
@@ -76,13 +78,13 @@
           <section class="felt-area" id="felt-area">
             <div class="felt-ring ring-a"></div><div class="felt-ring ring-b"></div>
             <div class="opponent-info"><span class="avatar avatar-opponent" id="opponent-avatar">J</span><span><strong id="opponent-name">Esperando…</strong><small>CONTRARIO</small></span><span class="card-back-stack"><i></i><i></i><i></i></span></div>
-            <div class="center-table"><div class="deck-stack" id="deck-stack"><span>♣</span></div><div class="table-hint" id="table-hint">LA MESA<br />ESTÁ LISTA</div><div class="trick-cards" id="trick-cards"></div><div class="muestra-card hidden" id="muestra-card"></div></div>
+            <div class="center-table"><div class="deck-stack" id="deck-stack"><span class="deck-mark" data-suit-icon="basto"></span></div><div class="table-hint" id="table-hint">LA MESA<br />ESTÁ LISTA</div><div class="trick-cards" id="trick-cards"></div><div class="muestra-card hidden" id="muestra-card"></div></div>
             <div class="table-divider"></div>
             <div class="my-player-info"><span class="avatar avatar-me" id="my-avatar">M</span><span><strong id="my-name">Vos</strong><small>JUGÁS VOS</small></span><span class="turn-badge" id="turn-badge">TU TURNO</span></div>
             <div class="hand" id="hand"></div>
             <div class="player-actions" id="player-actions"></div>
           </section>
-          <aside class="side-panel"><div class="side-title">PARTIDA <span>EN CURSO</span></div><div class="round-feed" id="round-feed"><div class="feed-item"><i></i><span>Esperando la primera jugada</span></div></div><div class="side-bottom"><span class="deck-count"><i>▧</i> <b id="deck-count">40</b> cartas en el mazo</span><button id="sound-toggle" class="sound-button">♫ Sonido <span>OFF</span></button></div></aside>
+          <aside class="side-panel"><div class="side-title">PARTIDA <span>EN CURSO</span></div><div class="round-feed" id="round-feed"><div class="feed-item"><i></i><span>Esperando la primera jugada</span></div></div><div class="side-bottom"><span class="deck-count"><svg class="deck-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="3" width="13" height="17" rx="2"/><path d="M9 7h5M9 11h5"/></svg> <b id="deck-count">40</b> cartas en el mazo</span><button id="sound-toggle" class="sound-button"><svg class="sound-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10v4h4l5 4V6l-5 4H4Z"/><path d="M16 9a5 5 0 0 1 0 6m2-9a9 9 0 0 1 0 12"/></svg> Sonido <span>OFF</span></button></div></aside>
         </div>
         <section class="mobile-score">
           <div class="mobile-score-head"><h2>NOSOTROS</h2><h2>ELLOS</h2></div>
@@ -96,11 +98,11 @@
 
       <section class="config-view view" id="config-view">
         <header class="topbar"><button class="icon-button" id="close-config" aria-label="Cerrar">×</button><span class="mini-brand"><b>T</b> TRUCO</span><span></span></header>
-        <div class="config-content"><p class="eyebrow">UN PASO MÁS</p><h2>Conectá<br />la partida.</h2><p class="muted">Para jugar desde tres dispositivos necesitamos una base compartida. Pegá aquí la configuración web de Firebase.</p><textarea id="firebase-config" placeholder='{"apiKey":"…","databaseURL":"https://…firebasedatabase.app","projectId":"…","appId":"…"}'></textarea><button class="button primary full-button" id="save-config">Guardar y continuar <span class="arrow">↗</span></button><p class="config-foot">La configuración web de Firebase identifica tu proyecto; no es una contraseña. Las reglas de seguridad deben limitar el acceso a las mesas.</p></div>
+        <div class="config-content"><p class="eyebrow">UN PASO MÁS</p><h2>Conectá<br />la partida.</h2><p class="muted">Para jugar desde tres dispositivos necesitamos una base compartida. Pegá aquí la configuración web de Firebase.</p><textarea id="firebase-config" placeholder='{"apiKey":"…","databaseURL":"https://…firebasedatabase.app","projectId":"…","appId":"…"}'></textarea><button class="button primary full-button" id="save-config">Guardar y continuar</button><p class="config-foot">La configuración web de Firebase identifica tu proyecto; no es una contraseña. Las reglas de seguridad deben limitar el acceso a las mesas.</p></div>
       </section>
 
       <section class="toast-global" id="global-toast" role="status"></section>
     </main>
-    <script type="module" src="./app.js?v=20261002-51"></script>
+    <script type="module" src="./app.js?v=20261002-52"></script>
   </body>
 </html>
