@@ -38,9 +38,11 @@ function makeCode() { return Array.from({length:5}, () => 'ABCDEFGHJKLMNPQRSTUVW
 const callSeen=new Map();
 let soundEnabled=localStorage.getItem('truco-call-sound')==='on';
 let voiceUnlocked=false;
+let callNoticeTimer=null;
+const CALL_NOTICE_DURATION=4000;
 function spokenCall(text=''){
-  const points=text.match(/\bcanta (\d+) tantos\b/i);
-  if(points)return `${points[1]} tantos`;
+  const points=text.match(/\bcanta (\d+) (tantos|son mejores|son iguales)\b/i);
+  if(points)return `${points[1]} ${points[2]}`;
   if(/: son buenas\./i.test(text))return 'Son buenas';
   if(!/\b(canta|responde|quiere)\b/i.test(text))return null;
   if(/no quiere/i.test(text))return 'No quiero';
@@ -50,7 +52,7 @@ function spokenCall(text=''){
 function makeCallNotice(text){
   const spoken=spokenCall(text);
   if(!spoken||!['player1','player2'].includes(state.playerId))return null;
-  return {id:crypto.randomUUID(),from:state.playerId,to:state.playerId==='player1'?'player2':'player1',text,spoken,time:Date.now()};
+  return {id:crypto.randomUUID(),from:state.playerId,to:state.playerId==='player1'?'player2':'player1',text:/\bcanta \d+ (tantos|son mejores|son iguales)\b/i.test(text)?spoken:text,spoken,time:Date.now()};
 }
 function speakCall(text){
   if(!soundEnabled||!voiceUnlocked||!('speechSynthesis' in window))return;
@@ -68,10 +70,13 @@ function renderCallNotice(){
   button.textContent=soundEnabled?'Voz activada':'Voz silenciada';
   button.setAttribute('aria-pressed',String(soundEnabled));
   const el=$('call-notice');
-  const visible=notice?.to===role;
+  clearTimeout(callNoticeTimer);callNoticeTimer=null;
+  const remaining=CALL_NOTICE_DURATION-(Date.now()-Number(notice?.time||0));
+  const visible=notice?.to===role&&remaining>0;
   el.classList.toggle('hidden',!visible);
   el.textContent=visible?notice.text:'';
   if(!visible)return;
+  callNoticeTimer=setTimeout(()=>{callNoticeTimer=null;renderCallNotice();},remaining);
   const key=`${state.roomCode}:${role}`;
   if(callSeen.get(key)!==notice.id){
     callSeen.set(key,notice.id);
@@ -488,13 +493,13 @@ async function revealEnvido(good=false) {
   if(bet?.type!=='envido'||!bet.revealMode||bet.revealTurn!==player)return;
   const first=room.mano,second=otherPlayer(first),number=Number($('envido-picker').dataset.value||0);
   if(good&&player!==second)return;
-  if(!good&&(!Number.isInteger(number)||number<0||number>50||(player===second&&number<=bet.reveals?.[first]))){toast('Elegí un número mayor que los tantos del rival.');return;}
+  if(!good&&(!Number.isInteger(number)||number<0||number>50||(player===second&&number<bet.reveals?.[first]))){toast('Elegí tantos iguales o mayores que los del rival.');return;}
   const reveals={...(bet.reveals||{})};if(!good)reveals[player]=number;
   let changes;
   if(player===first){changes={pendingBet:{...bet,reveals,revealTurn:second},feed:topFeed(room,`${room.players[player].name} canta ${number} tantos.`)};}
   else{
-    const winner=good?first:second;
-    changes={pendingBet:bet.suspendedBet||null,envidoClosed:true,envidoAudit:{reveals,winner,stake:bet.stake,handNumber:room.handNumber},feed:topFeed(room,good?`${room.players[player].name}: son buenas. Los ${bet.stake} puntos se verifican al terminar la mano.`:`${room.players[player].name} canta ${number} tantos. Los ${bet.stake} puntos se verifican al terminar la mano.`)};
+    const winner=good||number===Number(bet.reveals?.[first])?first:second;
+    changes={pendingBet:bet.suspendedBet||null,envidoClosed:true,envidoAudit:{reveals,winner,stake:bet.stake,handNumber:room.handNumber},feed:topFeed(room,good?`${room.players[player].name}: son buenas.`:`${room.players[player].name} canta ${number} ${winner===first?'son iguales':'son mejores'}.`)};
   }
   if(state.demo){const notice=makeCallNotice(changes.feed?.[0]?.text);if(notice)changes.callNotice=notice;Object.assign(room,changes);renderGame();}else await writeRoom(changes);
 }
@@ -506,7 +511,8 @@ function settleSingleFlor(room,scores) {
 function auditEnvidoScores(room,scores,truth){
   const audit=room.envidoAudit;if(!audit)return scores;
   const liars=Object.entries(audit.reveals||{}).filter(([player,value])=>Number(value)!==Number(truth[player])).map(([player])=>player);
-  const winner=liars.length===2?null:liars.length===1?otherPlayer(liars[0]):audit.winner;
+  const declaredWinner=Number.isFinite(audit.reveals?.player1)&&audit.reveals.player1===audit.reveals.player2?room.mano:audit.winner;
+  const winner=liars.length===2?null:liars.length===1?otherPlayer(liars[0]):declaredWinner;
   const result={...scores};if(winner)result[winner]=(result[winner]||0)+Number(audit.stake);
   return result;
 }
@@ -782,7 +788,7 @@ function renderEnvidoPicker(room){
   const el=$('envido-picker'),bet=room.pendingBet,active=bet?.revealMode&&bet.revealTurn===state.playerId;
   el.classList.toggle('hidden',!active);
   if(!active){el.dataset.key='';return;}
-  const first=room.mano,opponentPoints=bet.reveals?.[first],second=state.playerId!==first,min=second?Number(opponentPoints)+1:0;
+  const first=room.mano,opponentPoints=bet.reveals?.[first],second=state.playerId!==first,min=second?Number(opponentPoints):0;
   const key=`${room.handNumber}:${state.playerId}:${opponentPoints??'first'}`;
   if(el.dataset.key===key)return;el.dataset.key=key;el.dataset.value=String(Math.min(50,min));
   el.innerHTML=`<p>${second?`Tu rival declaró ${opponentPoints} tantos`:'Sos mano: declarás primero'}</p><div class="number-wheel" role="listbox" aria-label="Tantos del 0 al 50">${Array.from({length:51},(_,number)=>`<button role="option" aria-selected="${number===min}" ${number<min?'disabled':''} data-number="${number}">${number}</button>`).join('')}</div><div class="declaration-buttons">${min<=50?'<button id="declare-points" class="call-button">DECLARAR <span id="selected-points">'+min+'</span></button>':''}${second?'<button id="good-points" class="pass-button">SON BUENAS</button>':''}</div>`;
