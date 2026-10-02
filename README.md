@@ -29,3 +29,7 @@ Las reglas se contrastaron con las descripciones publicadas por [Ludoteka](https
 ## Privacidad y seguridad
 
 La configuración web de Firebase no es una contraseña y puede incluirse en el sitio. No subas credenciales de administrador ni claves privadas al repositorio. Para publicar el juego, endurecé las reglas de base de datos para limitar también quién puede modificar cada mesa.
+
+## Modo de 2 celulares
+
+Al crear la mesa, elegí **2 celulares · mesa en cada pantalla** y tu puesto de jugador. El otro teléfono se une al lugar libre. Quien creó la mesa inicia la partida y su teléfono coordina el reparto y el cierre de las manos automáticamente, por lo que debe permanecer conectado. Ambos ven el mazo, la muestra, las cartas jugadas y los puntos, además de su propia mano. El modo de tres dispositivos sigue disponible.

@@ -60,10 +60,12 @@ function pickRole(role) {
   const label = role === 'table' ? 'la mesa' : role === 'player1' ? 'Jugador 1' : 'Jugador 2';
   $('enter-room').innerHTML = `Crear mesa como ${label} <span class="arrow">↗</span>`;
 }
+function isCoordinator() { return state.playerId === 'table' || (state.room?.deviceMode === 'two' && state.room.table?.uid === state.uid); }
 function configureSetup() {
   state.joining = false;
   $('role-options').classList.remove('single');
   $('role-options').querySelectorAll('.role-card').forEach((card) => card.classList.remove('hidden'));
+  $('device-mode').value = 'three';
   pickRole('table');
   showView('setup-view');
 }
@@ -107,6 +109,7 @@ async function enterRoom() {
       const room = snap.val();
       if (room.status !== 'waiting') { toast('Esa mesa ya empezó. Elegí otra.'); openLobby(); return; }
       const seat = state.role;
+      if (room.deviceMode === 'two' && seat === 'table') { toast('Esta partida es para dos celulares. Elegí un jugador.'); return; }
       const seatPath = seat === 'table' ? `rooms/${code}/public/table` : `rooms/${code}/public/players/${seat}`;
       const seatRef = fb.ref(fb.db, seatPath);
       const claim = await fb.runTransaction(seatRef, (current) => current == null ? { uid: state.uid, name, online: true } : current);
@@ -116,7 +119,8 @@ async function enterRoom() {
       const code = makeCode(); state.roomCode = code; state.playerId = state.role;
       const person = { uid: state.uid, name, online: true };
       const targetPoints = normalizeTargetPoints($('target-points').value);
-      const initial = { status: 'waiting', createdAt: Date.now(), targetPoints, table: state.role === 'table' ? person : null, players: { player1: state.role === 'player1' ? person : null, player2: state.role === 'player2' ? person : null }, scores: { player1: 0, player2: 0 }, handNumber: 1, deckCount: 40, trickCards: [], feed: [{ text: `${name} abrió una mesa a ${targetPoints}. Faltan los demás.`, time: Date.now() }] };
+      const deviceMode = $('device-mode').value;
+      const initial = { deviceMode, status: 'waiting', createdAt: Date.now(), targetPoints, table: deviceMode === 'two' || state.role === 'table' ? person : null, players: { player1: state.role === 'player1' ? person : null, player2: state.role === 'player2' ? person : null }, scores: { player1: 0, player2: 0 }, handNumber: 1, deckCount: 40, trickCards: [], feed: [{ text: `${name} abrió una mesa a ${targetPoints}. Faltan los demás.`, time: Date.now() }] };
       await fb.set(fb.ref(fb.db, `rooms/${code}/public`), initial);
     }
     localStorage.setItem('truco-last-seat', JSON.stringify({ code: state.roomCode, role: state.playerId }));
@@ -146,10 +150,10 @@ function renderLobby(rooms) {
   const open = Object.entries(rooms).filter(([, value]) => value?.public?.status === 'waiting' && (!value.public.table || !value.public.players?.player1 || !value.public.players?.player2)).sort((a,b) => (b[1].public.createdAt || 0) - (a[1].public.createdAt || 0));
   if (!open.length) { $('open-room-list').innerHTML = '<div class="empty-lobby"><span>♣</span><strong>No hay mesas abiertas todavía</strong><p>Creá una mesa y elegí si vas a jugar o a llevar el tanteador.</p></div>'; return; }
   $('open-room-list').innerHTML = open.map(([code, value]) => {
-    const room = value.public, players = room.players || {}, seats = [['table','La mesa',room.table],['player1','Jugador 1',players.player1],['player2','Jugador 2',players.player2]];
+    const room = value.public, players = room.players || {}, seats = (room.deviceMode === 'two' ? [] : [['table','La mesa',room.table]]).concat([['player1','Jugador 1',players.player1],['player2','Jugador 2',players.player2]]);
     const title = room.table?.name || players.player1?.name || players.player2?.name || 'Mesa abierta';
     const available = seats.filter(([, , person]) => !person);
-    return `<article class="lobby-card"><div class="lobby-card-top"><div><p class="eyebrow">MESA ABIERTA · A ${targetPoints(room)} TANTOS</p><h3>${escapeHtml(title)}</h3></div><span class="lobby-count">${3-available.length}/3</span></div><div class="lobby-seats">${seats.map(([key,label,person]) => `<span class="lobby-seat ${person?'taken':''}">${person ? `${escapeHtml(label)}: ${escapeHtml(person.name || 'Ocupado')}` : `${escapeHtml(label)} · libre`}</span>`).join('')}</div><div class="lobby-join-options">${available.map(([key,label]) => `<button class="button ${key==='table'?'lobby-table-button':'lobby-player-button'}" data-room="${code}" data-seat="${key}">Unirme como ${label}<span>↗</span></button>`).join('')}</div></article>`;
+    return `<article class="lobby-card"><div class="lobby-card-top"><div><p class="eyebrow">${room.deviceMode === 'two' ? '2 CELULARES' : '3 DISPOSITIVOS'} · A ${targetPoints(room)} TANTOS</p><h3>${escapeHtml(title)}</h3></div><span class="lobby-count">${seats.length-available.length}/${seats.length}</span></div><div class="lobby-seats">${seats.map(([key,label,person]) => `<span class="lobby-seat ${person?'taken':''}">${person ? `${escapeHtml(label)}: ${escapeHtml(person.name || 'Ocupado')}` : `${escapeHtml(label)} · libre`}</span>`).join('')}</div><div class="lobby-join-options">${available.map(([key,label]) => `<button class="button ${key==='table'?'lobby-table-button':'lobby-player-button'}" data-room="${code}" data-seat="${key}">Unirme como ${label}<span>↗</span></button>`).join('')}</div></article>`;
   }).join('');
 }
 function joinOpenRoom(code, seat) {
@@ -170,11 +174,11 @@ function watchRoom() {
   state.unsubscribe = fb.onValue(fb.ref(fb.db, `rooms/${state.roomCode}/public`), (snapshot) => {
     if (!snapshot.exists()) { toast('La mesa ya no está disponible.'); showView('welcome-view'); openLobby(); return; }
     state.room = snapshot.val();
-    if(state.playerId==='table'&&state.room.status==='started'&&!state.room.resolvingTrick&&state.room.trickCards?.length===2&&(state.room.tricks||[]).length>0)recoverLegacyTrick(state.room);
-    if(state.playerId==='table')repairIncompleteHand(state.room);
-    if (state.playerId === 'table') scheduleTableResolution();
+    if(isCoordinator()&&state.room.status==='started'&&!state.room.resolvingTrick&&state.room.trickCards?.length===2&&(state.room.tricks||[]).length>0)recoverLegacyTrick(state.room);
+    if(isCoordinator())repairIncompleteHand(state.room);
+    if (isCoordinator()) scheduleTableResolution();
     if (['drawing','started','complete'].includes(state.room.status)) { showView('game-view'); if(state.room.status!=='drawing')watchPrivateHand(); renderGame(); }
-    if(state.playerId==='table'&&state.room.status==='drawing')finishOpeningDraw().catch(error=>toast(firebaseError(error)));
+    if(isCoordinator()&&state.room.status==='drawing')finishOpeningDraw().catch(error=>toast(firebaseError(error)));
     else if (state.room.status === 'waiting') { renderWaiting(); if (!$('waiting-view').classList.contains('active')) showView('waiting-view'); }
   });
 }
@@ -192,11 +196,11 @@ function renderWaiting() {
   if (!state.room) return;
   const players = state.room.players || {};
   $('room-status').textContent = state.room.table && players.player1 && players.player2 ? 'MESA COMPLETA' : 'ESPERANDO LUGARES';
-  const seatData = [['table','LA MESA',state.room.table],['player1','JUGADOR 1',players.player1],['player2','JUGADOR 2',players.player2]];
+  const seatData = (state.room.deviceMode === 'two' ? [] : [['table','LA MESA',state.room.table]]).concat([['player1','JUGADOR 1',players.player1],['player2','JUGADOR 2',players.player2]]);
   $('seats').innerHTML = seatData.map(([key,label,value]) => `<div class="seat"><span class="seat-icon">${key==='table'?'♣':key==='player1'?'♠':'♥'}</span><span class="seat-name"><strong>${escapeHtml(value?.name || (key==='table'?'La mesa':'Esperando jugador…'))}</strong><small>${label}</small></span><span class="seat-state ${value?'ready':''}">${value?'LISTO':'ESPERANDO'}</span></div>`).join('');
   const ready = !!(state.room.table && players.player1 && players.player2);
-  $('start-game').disabled = !(ready && state.playerId === 'table');
-  $('waiting-hint').textContent = state.playerId === 'table' ? (ready ? 'Ya están todos. ¡A jugar!' : 'Esperando que se unan los dos jugadores') : 'Esperá a que la mesa reparta';
+  $('start-game').disabled = !(ready && isCoordinator());
+  $('waiting-hint').textContent = isCoordinator() ? (ready ? 'Ya están todos. ¡A jugar!' : 'Esperando que se unan los dos jugadores') : 'Esperá a que quien creó la partida la inicie';
   $('game-room-code').textContent = 'MESA ABIERTA';
   $('start-game').textContent = `Repartir · a ${targetPoints(state.room)} tantos`;
 }
@@ -208,7 +212,7 @@ function shuffleDeck() {
   return deck;
 }
 async function startGame() {
-  if(state.room?.status!=='waiting'||state.playerId!=='table')return;
+  if(state.room?.status!=='waiting'||!isCoordinator()||!state.room.players?.player1||!state.room.players?.player2)return;
   await writeRoom({status:'drawing',openingDraw:{pool:shuffleDeck(),cards:{}},feed:topFeed(state.room,'Cada jugador toca el mazo para sortear quién reparte.')});
 }
 let finishingDraw=false;
@@ -485,7 +489,7 @@ function repairIncompleteHand(room){
 }
 function scheduleTableResolution() {
   const room=state.room;
-  if(!room||state.playerId!=='table')return;
+  if(!room||!isCoordinator())return;
   const isTrick=room.resolvingTrick&&room.trickCards?.length===2;
   const isRedeal=!!room.pendingNextHand;
   if(!isTrick&&!isRedeal){state.resolutionTimerKey=null;clearTimeout(state.resolutionTimer);state.resolutionTimer=null;return;}
@@ -600,6 +604,8 @@ function renderGame() {
   document.documentElement.style.setProperty('--tally-board-height',`${50+(targetPoints(room)/10*42+12)*2}px`);
   $('game-view').classList.toggle('table-mode', isTable);
   $('game-view').classList.toggle('player-mode', !isTable);
+  const sharedTable = isTable || room.deviceMode === 'two';
+  $('game-view').classList.toggle('two-device-mode', !isTable && room.deviceMode === 'two');
   $('demo-device-switcher').classList.toggle('hidden',!state.demo);
   $('demo-device-switcher').querySelectorAll('[data-demo-role]').forEach((button)=>button.setAttribute('aria-pressed',String(button.dataset.demoRole===state.playerId)));
   const drawing=room.status==='drawing';
@@ -625,10 +631,10 @@ function renderGame() {
   $('turn-badge').textContent=isTable?'MESA':myTurn?'TU TURNO':'ESPERÁ'; $('turn-badge').classList.toggle('waiting-turn',!myTurn);
   $('hand').innerHTML=isTable?'':state.hand.map((card) => `<button class="hand-card sprite-card ${card.red?'card-red':''}" style="--sprite-position:${cardSpritePosition(card)}" aria-label="${cardAccessibleName(card)}" aria-disabled="${!myTurn}" data-card="${card.id}"><span class="sr-only">${cardAccessibleName(card)}</span></button>`).join('');
   document.querySelectorAll('.hand-card').forEach((button) => button.addEventListener('click', () => {const card=state.hand.find((item)=>item.id===button.dataset.card); if(card) playCard(card);}));
-  $('trick-cards').innerHTML=isTable?(room.trickCards||[]).map(({card,playerId})=>`<div class="played-card played-card-${playerId||'player1'} sprite-card ${card.red?'card-red':''}" style="--sprite-position:${cardSpritePosition(card)}" role="img" aria-label="${cardAccessibleName(card)}"><span class="sr-only">${cardAccessibleName(card)}</span></div>`).join(''):'';
+  $('trick-cards').innerHTML=sharedTable?(room.trickCards||[]).map(({card,playerId})=>`<div class="played-card played-card-${playerId||'player1'} sprite-card ${card.red?'card-red':''}" style="--sprite-position:${cardSpritePosition(card)}" role="img" aria-label="${cardAccessibleName(card)}"><span class="sr-only">${cardAccessibleName(card)}</span></div>`).join(''):'';
   const sample=room.muestra;
-  $('muestra-card').classList.toggle('hidden',!isTable||!sample);
-  $('muestra-card').classList.toggle('sprite-card',!!(isTable&&sample));
+  $('muestra-card').classList.toggle('hidden',!sharedTable||!sample);
+  $('muestra-card').classList.toggle('sprite-card',!!(sharedTable&&sample));
   if (sample && $('muestra-card').dataset.cardId !== sample.id) {
     $('muestra-card').dataset.cardId = sample.id;
     $('muestra-card').style.setProperty('--muestra-dx','0px');
@@ -636,8 +642,8 @@ function renderGame() {
   }
   $('muestra-card').style.setProperty('--sprite-position',sample?cardSpritePosition(sample):'0% 0%');
   $('muestra-card').setAttribute('aria-label',sample?`${cardAccessibleName(sample)}, muestra`:'Muestra');
-  $('muestra-card').innerHTML=isTable&&sample?`<span class="sr-only">${cardAccessibleName(sample)}, muestra</span>`:'';
-  $('deck-stack').classList.toggle('hidden',!isTable);
+  $('muestra-card').innerHTML=sharedTable&&sample?`<span class="sr-only">${cardAccessibleName(sample)}, muestra</span>`:'';
+  $('deck-stack').classList.toggle('hidden',!sharedTable);
   $('table-hint').classList.toggle('hidden',!isTable||(room.trickCards||[]).length>0);
   const visibleFeed=(room.feed||[]).filter(({text=''})=>isTable||!/\bjug[oó]/i.test(text));
   $('round-feed').innerHTML=visibleFeed.slice(0,7).map(({text})=>`<div class="feed-item"><i></i><span>${escapeHtml(text)}</span></div>`).join('');
@@ -807,6 +813,11 @@ function demoFinishHand(winner,points){
   demoFeed(`${room.players[room.dealer].name} reparte. Empieza ${room.players[mano].name}.`);renderGame();
 }
 
+$('device-mode').addEventListener('change', () => {
+  const two = $('device-mode').value === 'two';
+  $('role-options').querySelector('[data-role=table]').classList.toggle('hidden', two);
+  if(two && state.role === 'table')pickRole('player1');
+});
 $('create-room').addEventListener('click',()=>configureSetup());
 $('open-room-list').addEventListener('click',(event)=>{const button=event.target.closest('[data-room][data-seat]');if(button)joinOpenRoom(button.dataset.room,button.dataset.seat);});
 $('role-options').querySelectorAll('.role-card').forEach((card)=>{
