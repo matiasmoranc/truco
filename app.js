@@ -36,7 +36,7 @@ function speakCall(text){
 function renderCallNotice(){
   const notice=state.room?.callNotice,role=state.playerId;
   const button=$('player-sound-toggle');
-  button.classList.toggle('hidden',role==='table');
+  button.classList.toggle('hidden',role==='table'||state.room?.status==='drawing');
   button.textContent=soundEnabled?'Voz activada':'Voz silenciada';
   button.setAttribute('aria-pressed',String(soundEnabled));
   const el=$('call-notice');
@@ -607,7 +607,7 @@ function renderGame() {
       ?(Number(cards.player1.rank)>Number(cards.player2.rank)?'player1':'player2'):null;
     const mano=dealer?otherPlayer(dealer):null;
     const prompt=isTable?'ESPERANDO QUE LOS JUGADORES TOQUEN SU MAZO':cards[state.playerId]?'CARTA ELEGIDA · ESPERÁ AL OTRO JUGADOR':'TOCÁ EL MAZO PARA SACAR UNA CARTA';
-    $('opening-draw').innerHTML=`<p>${prompt}</p><button class="draw-deck deck-stack" id="draw-deck" ${canDraw?'':'disabled'} aria-label="Sacar carta para sortear repartidor"></button><div class="draw-results">${['player1','player2'].map(player=>`<div class="draw-result ${dealer===player?'draw-winner':''}"><span>${escapeHtml(players[player]?.name||player)}${dealer===player?' · REPARTE':mano===player?' · EMPIEZA':''}</span>${cards[player]?`<div class="draw-card sprite-card" style="--sprite-position:${cardSpritePosition(cards[player])}" aria-label="${cardAccessibleName(cards[player])}"></div><b>${escapeHtml(cardAccessibleName(cards[player]))}</b>`:`<p>${isTable?'Esperando que toque el mazo':'Esperando carta'}</p>`}</div>`).join('')}</div><small>${escapeHtml(dealer?`${players[dealer]?.name} gana el saque y reparte. ${players[mano]?.name} empieza a jugar.`:room.feed?.[0]?.text||'')}</small>`;
+    $('opening-draw').innerHTML=`<p>${prompt}</p><button class="draw-deck" id="draw-deck" ${canDraw?'':'disabled'} aria-label="Sacar carta para sortear repartidor"></button><div class="draw-results">${['player1','player2'].map(player=>`<div class="draw-result ${dealer===player?'draw-winner':''}"><span>${escapeHtml(players[player]?.name||player)}${dealer===player?' · REPARTE':mano===player?' · EMPIEZA':''}</span>${cards[player]?`<div class="draw-card sprite-card" style="--sprite-position:${cardSpritePosition(cards[player])}" aria-label="${cardAccessibleName(cards[player])}"></div><b>${escapeHtml(cardAccessibleName(cards[player]))}</b>`:`<p>${isTable?'Esperando que toque el mazo':'Esperando carta'}</p>`}</div>`).join('')}</div><small>${escapeHtml(dealer?`${players[dealer]?.name} gana el saque y reparte. ${players[mano]?.name} empieza a jugar.`:room.feed?.[0]?.text||'')}</small>`;
     if(canDraw)$('draw-deck').addEventListener('click',()=>drawOpeningCard().catch(error=>{drawInFlight=false;toast(firebaseError(error));renderGame();}));
     $('hand').innerHTML='';$('player-actions').innerHTML='';$('trick-cards').innerHTML='';$('deck-stack').classList.add('hidden');$('muestra-card').classList.add('hidden');$('envido-picker').classList.add('hidden');return;
   }

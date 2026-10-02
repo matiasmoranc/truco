@@ -567,7 +567,7 @@ button,a,input,select,textarea{touch-action:manipulation}
 
 .opening-draw{position:absolute;inset:0 0 48px;z-index:70;background:#193b2b;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;padding:24px;text-align:center}
 .opening-draw>p{font-size:12px;letter-spacing:.12em;max-width:280px}
-.opening-draw .draw-deck{position:static!important;transform:none!important;display:block;width:110px!important;height:160px!important;color:transparent;touch-action:manipulation}
+.opening-draw .draw-deck{position:static!important;transform:none!important;display:block;width:110px!important;height:160px!important;flex:0 0 160px;background-image:url('./assets/tatu-dorso.webp');background-size:100% 100%;background-position:center;background-repeat:no-repeat;border:0;border-radius:9px;color:transparent;touch-action:manipulation}
 .draw-deck:disabled{cursor:default}
 .draw-results{display:flex;justify-content:center;gap:24px;min-height:180px}
 .draw-results>div{width:110px;display:flex;flex-direction:column;align-items:center;gap:8px;font-size:12px}
