@@ -623,3 +623,14 @@ button,a,input,select,textarea{touch-action:manipulation}
 }
 .player-mode.two-device-mode .deck-stack.hidden,
 .player-mode.two-device-mode .muestra-card.hidden{display:none!important}
+/* Compact score and individually movable sample in two-phone games. */
+.player-mode.two-device-mode .mobile-score{flex:0 0 96px;height:96px;min-height:0;max-height:96px;padding:5px 14px 7px;gap:3px;overflow:hidden}
+.player-mode.two-device-mode .mobile-score-head{flex:0 0 16px}
+.player-mode.two-device-mode .mobile-score-head h2{font-size:10px;letter-spacing:.1em}
+.player-mode.two-device-mode .mobile-score-grid{height:64px;min-height:0;gap:12px;align-items:center}
+.player-mode.two-device-mode .mobile-tally{height:64px;min-height:0;width:100%;max-width:none;overflow:hidden;margin:0;padding:0}
+.player-mode.two-device-mode .compact-score-sticks{display:block;width:100%;height:64px}
+.player-mode.two-device-mode .muestra-card.sprite-card{transform:translate(var(--muestra-dx,0px),calc(-50% + var(--muestra-dy,0px))) rotate(82deg);touch-action:none;cursor:grab}
+.player-mode.two-device-mode .muestra-card.sprite-card.dragging{z-index:10;cursor:grabbing}
+.player-mode.two-device-mode .center-table{z-index:6;overflow:visible}
+@media(max-height:650px){.player-mode.two-device-mode .mobile-score{flex-basis:80px;height:80px;max-height:80px}.player-mode.two-device-mode .mobile-score-grid,.player-mode.two-device-mode .mobile-tally,.player-mode.two-device-mode .compact-score-sticks{height:48px}}
