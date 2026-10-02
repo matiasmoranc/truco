@@ -130,21 +130,23 @@ async function enterRoom() {
       const code = state.selectedRoom;
       const roomRef = fb.ref(fb.db, `rooms/${code}/public`);
       const snap = await fb.get(roomRef);
-      if (!snap.exists()) { toast('No encontramos esa mesa. Revisá el código.'); return; }
+      if (!snap.exists()) { toast('La invitación ya no está disponible.',true);openLobby();return; }
       const room = snap.val();
-      if (room.status !== 'waiting') { toast('Esa mesa ya empezó. Elegí otra.'); openLobby(); return; }
+      if (room.status !== 'waiting' || roomExpired(room)) { toast('La mesa se cerró o la partida ya empezó.',true); openLobby(); return; }
       let seat;
       const person={uid:state.uid,name,online:true};
       const claim=await fb.runTransaction(roomRef,current=>{
         if(!current||current.status!=='waiting'||roomExpired(current))return;
         const players=current.players||{};
+        const ownSeat=['player1','player2'].find(key=>players[key]?.uid===state.uid)||(current.deviceMode!=='two'&&current.table?.uid===state.uid?'table':null);
+        if(ownSeat){seat=ownSeat;return current;}
         seat=state.role==='table'&&current.deviceMode!=='two'?'table':(!players.player1?'player1':!players.player2?'player2':null);
         if(!seat||(seat==='table'&&current.table))return;
         if(seat==='table')current.table=person;
         else {current.players={...players,[seat]:person};}
         return current;
       });
-      if(!claim.committed){toast('La mesa se cerró o ese lugar ya está ocupado.');openLobby();return;}
+      if(!claim.committed){toast('La mesa se cerró o ya no hay lugares disponibles.',true);openLobby();return;}
       state.roomCode = code; state.playerId = seat;
     } else {
       const code = makeCode(); state.roomCode = code; state.playerId = state.role;
@@ -154,12 +156,30 @@ async function enterRoom() {
       const initial = { deviceMode, status: 'waiting', createdAt: Date.now(), targetPoints, table: deviceMode === 'two' || state.role === 'table' ? person : null, players: { player1: state.role === 'player1' ? person : null, player2: state.role === 'player2' ? person : null }, scores: { player1: 0, player2: 0 }, handNumber: 1, deckCount: 40, trickCards: [], feed: [{ text: `${name} abrió una mesa a ${targetPoints}. Faltan los demás.`, time: Date.now() }] };
       await fb.set(fb.ref(fb.db, `rooms/${code}/public`), initial);
     }
+    localStorage.setItem('truco-player-name',name);
+    if(state.joining){const url=new URL(location.href);url.searchParams.delete('mesa');history.replaceState(null,'',url);}
     localStorage.setItem('truco-last-seat', JSON.stringify({ code: state.roomCode, role: state.playerId }));
     if (state.lobbyUnsubscribe) { state.lobbyUnsubscribe(); state.lobbyUnsubscribe = null; }
     watchRoom(); renderWaiting(); showView('waiting-view');
   } catch (error) {
-    console.error(error); toast(firebaseError(error));
+    console.error(error); toast(firebaseError(error),true);
   }
+}
+function invitationLink(code){
+  const url=new URL(location.href);url.search='';url.hash='';url.searchParams.set('mesa',code);return url.href;
+}
+function updateInvitation(){
+  const link=$('invite-whatsapp');
+  link.classList.toggle('hidden',!state.roomCode||state.demo||state.room?.status!=='waiting');
+  if(state.roomCode){const message=`¡Jugamos al truco! Entrá a mi mesa: ${invitationLink(state.roomCode)}`;link.href=`https://wa.me/?text=${encodeURIComponent(message)}`;}
+}
+async function openInvitation(code){
+  if(!/^[A-Z2-9]{5}$/.test(code)){toast('La invitación no es válida.',true);await openLobby();return;}
+  const name=localStorage.getItem('truco-player-name')||'';
+  $('player-name').value=name;$('lobby-name').value=name;
+  state.joining=true;state.selectedRoom=code;state.role='player';
+  toast('Entrando a la mesa…',true);
+  await enterRoom();
 }
 async function openLobby() {
   if (!firebaseConfigValid(state.config)) { state.nextAction = 'lobby'; showConfig(); return; }
@@ -247,6 +267,7 @@ function watchPrivateHand() {
 }
 function renderWaiting() {
   if (!state.room) return;
+  updateInvitation();
   const players = state.room.players || {};
   $('room-status').textContent = state.room.table && players.player1 && players.player2 ? 'MESA COMPLETA' : 'ESPERANDO LUGARES';
   const seatData = (state.room.deviceMode === 'two' ? [] : [['table','LA MESA',state.room.table]]).concat([['player1','JUGADOR 1',players.player1],['player2','JUGADOR 2',players.player2]]);
@@ -943,5 +964,7 @@ try {
   const bundled = await import('./firebase-config.js');
   if (firebaseConfigValid(bundled.firebaseConfig)) state.config = bundled.firebaseConfig;
 } catch { /* Optional during initial setup. */ }
-if(location.search.includes('demo=mesa'))demoStart('table');
+const invitedRoom=new URLSearchParams(location.search).get('mesa');
+if(invitedRoom)await openInvitation(invitedRoom);
+else if(location.search.includes('demo=mesa'))demoStart('table');
 else if (firebaseConfigValid(state.config)) openLobby();
