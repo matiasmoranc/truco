@@ -7,6 +7,7 @@ let state = { role: 'table', joining: false, config: null, firebase: null, roomC
 function showView(id) { views.forEach((name) => $(name).classList.toggle('active', name === id)); }
 function suitSvg(suit){
   const paths={
+    table:'<path d="M5 14h38v6H5zM9 20h5v23H9zM34 20h5v23h-5zM10 5h28l5 9H5z"/>',
     oro:'<path d="M24 3 42 24 24 45 6 24 24 3Z"/><path d="m24 11 11 13-11 13-11-13 11-13Z" class="suit-cutout"/>',
     copa:'<path d="M5 8h38v5c0 12-7 20-16 22v5h9v5H12v-5h9v-5C12 33 5 25 5 13V8Z"/><path d="M10 13c0 9 5 15 14 18 9-3 14-9 14-18H10Z" class="suit-cutout"/>',
     espada:'<path d="M24 3C19 12 6 20 6 31c0 8 6 12 13 10l-5 5h20l-5-5c7 2 13-2 13-10C42 20 29 12 24 3Z"/><path d="M24 12 12 29c-2 4 0 8 4 8 3 0 5-2 8-6 3 4 5 6 8 6 4 0 6-4 4-8L24 12Z" class="suit-cutout"/>',
@@ -18,8 +19,8 @@ function setupSuitIcons(root=document){root.querySelectorAll('[data-suit-icon]')
 function updateMode(mode){
   const two=mode==='two';$('device-mode').value=mode;
   document.querySelectorAll('.mode-option').forEach(button=>{const selected=button.dataset.mode===mode;button.classList.toggle('selected',selected);button.setAttribute('aria-pressed',String(selected));});
-  const table=document.querySelector('#role-options [data-role="table"]');table.classList.toggle('hidden',two);
-  if(two&&state.role==='table')pickRole('player1');
+  $('role-options').classList.toggle('hidden',two);$('role-label').classList.toggle('hidden',two);
+  if(two)pickRole('player1');
 }
 function renderPointsPicker(){
   const menu=$('points-picker-menu'),select=$('target-points');
@@ -132,12 +133,18 @@ async function enterRoom() {
       if (!snap.exists()) { toast('No encontramos esa mesa. Revisá el código.'); return; }
       const room = snap.val();
       if (room.status !== 'waiting') { toast('Esa mesa ya empezó. Elegí otra.'); openLobby(); return; }
-      const seat = state.role;
-      if (room.deviceMode === 'two' && seat === 'table') { toast('Esta partida es para dos celulares. Elegí un jugador.'); return; }
-      const seatPath = seat === 'table' ? `rooms/${code}/public/table` : `rooms/${code}/public/players/${seat}`;
-      const seatRef = fb.ref(fb.db, seatPath);
-      const claim = await fb.runTransaction(seatRef, (current) => current == null ? { uid: state.uid, name, online: true } : current);
-      if (!claim.committed || claim.snapshot.val()?.uid !== state.uid) { toast('Ese lugar ya está ocupado. Elegí otro puesto.'); openLobby(); return; }
+      let seat;
+      const person={uid:state.uid,name,online:true};
+      const claim=await fb.runTransaction(roomRef,current=>{
+        if(!current||current.status!=='waiting'||roomExpired(current))return;
+        const players=current.players||{};
+        seat=state.role==='table'&&current.deviceMode!=='two'?'table':(!players.player1?'player1':!players.player2?'player2':null);
+        if(!seat||(seat==='table'&&current.table))return;
+        if(seat==='table')current.table=person;
+        else {current.players={...players,[seat]:person};}
+        return current;
+      });
+      if(!claim.committed){toast('La mesa se cerró o ese lugar ya está ocupado.');openLobby();return;}
       state.roomCode = code; state.playerId = seat;
     } else {
       const code = makeCode(); state.roomCode = code; state.playerId = state.role;
@@ -161,7 +168,7 @@ async function openLobby() {
     showView('welcome-view');
     $('open-room-list').innerHTML = '<p class="muted">Buscando mesas abiertas…</p>';
     if (state.lobbyUnsubscribe) state.lobbyUnsubscribe();
-    state.lobbyUnsubscribe = fb.onValue(fb.ref(fb.db, 'rooms'), (snapshot) => renderLobby(snapshot.val() || {}), (error) => {
+    state.lobbyUnsubscribe = fb.onValue(fb.ref(fb.db, 'rooms'), (snapshot) => {state.lobbyRooms=snapshot.val()||{};renderLobby(state.lobbyRooms);}, (error) => {
       console.error(error); $('open-room-list').innerHTML = '<p class="muted">No pudimos cargar las mesas. Revisá las reglas de Firebase.</p>';
     });
   } catch (error) {
@@ -170,14 +177,35 @@ async function openLobby() {
     toast(firebaseError(error));
   }
 }
+const ROOM_WAIT_LIMIT=10*60*1000;
+function roomExpired(room,now=Date.now()){
+  return room?.status==='waiting' && !(room.players?.player1&&room.players?.player2) && Number.isFinite(room.createdAt) && now-room.createdAt>=ROOM_WAIT_LIMIT;
+}
+const closingRooms=new Set();
+async function closeExpiredRoom(code){
+  if(!state.firebase||closingRooms.has(code))return;
+  closingRooms.add(code);
+  try {const fb=state.firebase;await fb.runTransaction(fb.ref(fb.db,`rooms/${code}/public`),room=>roomExpired(room)?{...room,status:'closed',closedAt:Date.now()}:undefined);}
+  catch(error){console.error(error);}
+  finally{closingRooms.delete(code);}
+}
+setInterval(()=>{
+  if(state.lobbyUnsubscribe&&state.lobbyRooms)renderLobby(state.lobbyRooms);
+  if(!state.demo&&roomExpired(state.room))closeExpiredRoom(state.roomCode);
+},1000);
 function renderLobby(rooms) {
-  const open = Object.entries(rooms).filter(([, value]) => value?.public?.status === 'waiting' && (!value.public.table || !value.public.players?.player1 || !value.public.players?.player2)).sort((a,b) => (b[1].public.createdAt || 0) - (a[1].public.createdAt || 0));
+  Object.entries(rooms).forEach(([code,value])=>{if(roomExpired(value?.public))closeExpiredRoom(code);});
+  const open = Object.entries(rooms).filter(([, value]) => value?.public?.status === 'waiting' && !roomExpired(value.public) && (!value.public.table || !value.public.players?.player1 || !value.public.players?.player2)).sort((a,b) => (b[1].public.createdAt || 0) - (a[1].public.createdAt || 0));
   if (!open.length) { $('open-room-list').innerHTML = '<div class="empty-lobby"><span class="empty-lobby-icon" data-suit-icon="basto"></span><strong>No hay mesas abiertas todavía</strong></div>'; setupSuitIcons($('open-room-list')); return; }
   $('open-room-list').innerHTML = open.map(([code, value]) => {
     const room = value.public, players = room.players || {}, seats = (room.deviceMode === 'two' ? [] : [['table','La mesa',room.table]]).concat([['player1','Jugador 1',players.player1],['player2','Jugador 2',players.player2]]);
     const title = room.table?.name || players.player1?.name || players.player2?.name || 'Mesa abierta';
     const available = seats.filter(([, , person]) => !person);
-    return `<article class="lobby-card"><div class="lobby-card-top"><div><h3>${escapeHtml(title)}</h3><p class="lobby-meta">${targetPoints(room)} puntos · ${room.deviceMode==='two'?'2':'3'} celulares</p></div><span class="lobby-count" aria-label="${available.length} lugares disponibles">${seats.length-available.length}/${seats.length}</span></div><div class="lobby-join-options">${available.map(([key,label]) => `<button class="button lobby-player-button" data-room="${code}" data-seat="${key}" aria-label="Unirme a ${escapeHtml(title)} como ${escapeHtml(label)}">${key==='table'?'Mesa':escapeHtml(label)}<span aria-hidden="true">+</span></button>`).join('')}</div></article>`;
+    const actions=[];
+    if(!players.player1||!players.player2)actions.push(['player','Entrar']);
+    if(room.deviceMode!=='two'&&!room.table)actions.push(['table','Mesa']);
+    if(room.deviceMode!=='two'&&actions.some(([key])=>key==='player'))actions[0][1]='Jugador';
+    return `<article class="lobby-card"><div class="lobby-card-top"><div><h3>${escapeHtml(title)}</h3><p class="lobby-meta">${targetPoints(room)} puntos · ${room.deviceMode==='two'?'2':'3'} celulares</p></div><span class="lobby-count" aria-label="${available.length} lugares disponibles">${seats.length-available.length}/${seats.length}</span></div><div class="lobby-join-options">${actions.map(([key,label])=>`<button class="button lobby-player-button" data-room="${code}" data-seat="${key}">${key==='table'?suitSvg('table'):''}${label}<span aria-hidden="true">+</span></button>`).join('')}</div></article>`;
   }).join('');
 }
 function joinOpenRoom(code, seat) {
@@ -198,6 +226,7 @@ function watchRoom() {
   state.unsubscribe = fb.onValue(fb.ref(fb.db, `rooms/${state.roomCode}/public`), (snapshot) => {
     if (!snapshot.exists()) { toast('La mesa ya no está disponible.'); showView('welcome-view'); openLobby(); return; }
     state.room = snapshot.val();
+    if(state.room.status==='closed'||roomExpired(state.room)){if(roomExpired(state.room))closeExpiredRoom(state.roomCode);if(state.unsubscribe){state.unsubscribe();state.unsubscribe=null;}state.room=null;toast('La mesa se cerró: pasaron 10 minutos sin otro jugador.',true);showView('welcome-view');openLobby();return;}
     if(isCoordinator()&&state.room.status==='started'&&!state.room.resolvingTrick&&state.room.trickCards?.length===2&&(state.room.tricks||[]).length>0)recoverLegacyTrick(state.room);
     if(isCoordinator())repairIncompleteHand(state.room);
     if (isCoordinator()) scheduleTableResolution();
@@ -221,7 +250,7 @@ function renderWaiting() {
   const players = state.room.players || {};
   $('room-status').textContent = state.room.table && players.player1 && players.player2 ? 'MESA COMPLETA' : 'ESPERANDO LUGARES';
   const seatData = (state.room.deviceMode === 'two' ? [] : [['table','LA MESA',state.room.table]]).concat([['player1','JUGADOR 1',players.player1],['player2','JUGADOR 2',players.player2]]);
-  $('seats').innerHTML = seatData.map(([key,label,value]) => `<div class="seat"><span class="seat-icon" data-suit-icon="${key==='table'?'basto':key==='player1'?'espada':'copa'}"></span><span class="seat-name"><strong>${escapeHtml(value?.name || (key==='table'?'La mesa':'Esperando jugador…'))}</strong><small>${label}</small></span><span class="seat-state ${value?'ready':''}">${value?'LISTO':'ESPERANDO'}</span></div>`).join('');setupSuitIcons($('seats'));
+  $('seats').innerHTML = seatData.map(([key,label,value]) => `<div class="seat"><span class="seat-icon" data-suit-icon="${key==='table'?'table':key==='player1'?'espada':'copa'}"></span><span class="seat-name"><strong>${escapeHtml(value?.name || (key==='table'?'La mesa':'Esperando jugador…'))}</strong><small>${label}</small></span><span class="seat-state ${value?'ready':''}">${value?'LISTO':'ESPERANDO'}</span></div>`).join('');setupSuitIcons($('seats'));
   const ready = !!(state.room.table && players.player1 && players.player2);
   $('start-game').disabled = !(ready && isCoordinator());
   $('waiting-hint').textContent = isCoordinator() ? (ready ? 'Ya están todos. ¡A jugar!' : 'Esperando que se unan los dos jugadores') : 'Esperá a que quien creó la partida la inicie';

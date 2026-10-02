@@ -738,3 +738,7 @@ button,a,input,select,textarea{touch-action:manipulation}
  #setup-view .role-card{height:74px}
  #setup-view .full-button{margin-top:16px}
 }
+
+/* Only earned roles are offered; player seats are assigned automatically. */
+#setup-view #role-options { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.lobby-player-button > .suit-icon { width: 22px; height: 22px; flex: 0 0 22px; }

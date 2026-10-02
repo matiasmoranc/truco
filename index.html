@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="./style.css?v=20261002-52" />
+    <link rel="stylesheet" href="./style.css?v=20261002-53" />
   </head>
   <body>
     <div class="grain" aria-hidden="true"></div>
@@ -41,11 +41,11 @@
           <label class="field-label">Dispositivos</label>
           <div class="mode-options" role="group" aria-label="Cantidad de dispositivos"><button type="button" class="mode-option selected" data-mode="two" aria-pressed="true"><strong>2 celulares</strong><span>Un jugador crea la mesa</span></button><button type="button" class="mode-option" data-mode="three" aria-pressed="false"><strong>3 celulares</strong><span>Con una mesa aparte</span></button></div>
           <select id="device-mode" class="visually-hidden" tabindex="-1" aria-hidden="true"><option value="two" selected>2 celulares</option><option value="three">3 celulares</option></select>
-          <span class="field-label">Tu lugar</span>
-          <div class="role-options" id="role-options">
-            <button class="role-card hidden" data-role="table" aria-pressed="false"><span class="role-glyph table-glyph" data-suit-icon="basto"></span><span class="role-title">Mesa</span><span class="radio"></span></button>
-            <button class="role-card selected" data-role="player1" aria-pressed="true"><span class="role-glyph" data-suit-icon="espada"></span><span class="role-title">Jugador 1</span><span class="radio"></span></button>
-            <button class="role-card" data-role="player2" aria-pressed="false"><span class="role-glyph red-suit" data-suit-icon="copa"></span><span class="role-title">Jugador 2</span><span class="radio"></span></button>
+          <span class="field-label hidden" id="role-label">Tu lugar</span>
+          <div class="role-options hidden" id="role-options">
+            <button class="role-card" data-role="table" aria-pressed="false"><span class="role-glyph table-glyph" data-suit-icon="table"></span><span class="role-title">Mesa</span><span class="radio"></span></button>
+            <button class="role-card selected" data-role="player1" aria-pressed="true"><span class="role-glyph" data-suit-icon="espada"></span><span class="role-title">Jugador</span><span class="radio"></span></button>
+
           </div>
           <span class="field-label target-label">Puntos</span>
           <div class="points-picker"><select id="target-points" class="visually-hidden" tabindex="-1" aria-hidden="true"><option value="10">10 puntos</option><option value="20">20 puntos</option><option value="30" selected>30 puntos</option><option value="40">40 puntos</option><option value="50">50 puntos</option><option value="60">60 puntos</option></select><button id="points-picker-trigger" class="points-picker-trigger" type="button" aria-expanded="false" aria-controls="points-picker-menu"><span>30 puntos</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button><div id="points-picker-menu" class="points-picker-menu hidden" role="listbox" aria-label="Elegí el puntaje"></div></div>
@@ -103,6 +103,6 @@
 
       <section class="toast-global" id="global-toast" role="status"></section>
     </main>
-    <script type="module" src="./app.js?v=20261002-52"></script>
+    <script type="module" src="./app.js?v=20261002-53"></script>
   </body>
 </html>
