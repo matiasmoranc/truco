@@ -596,3 +596,30 @@ button,a,input,select,textarea{touch-action:manipulation}
 .opening-draw .draw-deck:not(:disabled):active{transform:scale(.96)!important}
 @keyframes draw-flip{from{opacity:.3;transform:rotateY(90deg)}to{opacity:1;transform:rotateY(0)}}
 @keyframes deck-pulse{50%{box-shadow:5px 6px 0 #142a1d,6px 7px 0 #b19e70,0 0 0 9px #d8b87522}}
+
+/* Shared table above each private hand in the two-phone mode. */
+.player-mode.two-device-mode .deck-stack,
+.player-mode.two-device-mode .trick-cards,
+.player-mode.two-device-mode .muestra-card{display:block!important}
+.player-mode.two-device-mode .center-table{position:relative;inset:auto;transform:none;width:100%;height:180px;margin:0 auto 12px}
+.player-mode.two-device-mode .deck-stack{position:absolute;top:50%;left:auto;right:12%;width:58px;height:84px;transform:translateY(-50%);z-index:4}
+.player-mode.two-device-mode .muestra-card{position:absolute;top:50%;left:auto;right:calc(12% + 44px);width:58px;height:84px;transform:translateY(-50%) rotate(82deg);z-index:3}
+.player-mode.two-device-mode .trick-cards{position:absolute;inset:0;pointer-events:none;z-index:5}
+.player-mode.two-device-mode .played-card{position:absolute;top:50%;left:20%;width:62px;height:90px;transform:translate(-50%,-50%) rotate(-6deg)}
+.player-mode.two-device-mode .played-card-player2{left:40%;transform:translate(-50%,-50%) rotate(6deg)}
+@media(max-width:700px){
+  .player-mode.two-device-mode .felt-area{padding-top:8px;overflow-y:auto}
+  .player-mode.two-device-mode .center-table{height:150px;flex-shrink:0}
+  .player-mode.two-device-mode .hand{margin-top:8px}
+}
+.player-mode.two-device-mode .center-table{display:block!important;position:absolute;top:42px;left:0;width:100%;height:clamp(130px,24dvh,190px);margin:0}
+.player-mode.two-device-mode .hand{top:64%;margin:0}
+.player-mode.two-device-mode .mobile-score{display:flex!important;flex-shrink:0}
+.player-mode.two-device-mode .my-player-info{top:8px}
+@media(max-height:650px){
+  .player-mode.two-device-mode .center-table{height:110px;top:35px}
+  .player-mode.two-device-mode .hand-card{width:78px;height:112px;flex-basis:78px}
+  .player-mode.two-device-mode .hand{top:62%}
+}
+.player-mode.two-device-mode .deck-stack.hidden,
+.player-mode.two-device-mode .muestra-card.hidden{display:none!important}

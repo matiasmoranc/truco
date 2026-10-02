@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="./style.css?v=20261002-46" />
+    <link rel="stylesheet" href="./style.css?v=20261002-48" />
   </head>
   <body>
     <div class="grain" aria-hidden="true"></div>
@@ -22,7 +22,7 @@
         </header>
         <div class="home-content">
           <section class="home-intro">
-            <div class="home-heading"><p class="eyebrow">UNA MESA, TRES DISPOSITIVOS</p><h1>Truco uruguayo</h1><p class="intro">Creá una mesa o sumate a una partida abierta.</p></div>
+            <div class="home-heading"><p class="eyebrow">JUGÁ CON 2 O 3 CELULARES</p><h1>Truco uruguayo</h1><p class="intro">Creá una mesa o sumate a una partida abierta.</p></div>
             <div class="home-actions"><button class="button primary" id="create-room"><span>Crear mesa</span><span class="arrow">↗</span></button><button class="demo-link" id="demo-button">Probar demo <span>↗</span></button></div>
           </section>
           <section class="home-lobby" aria-labelledby="home-lobby-title">
@@ -39,6 +39,7 @@
           <p class="eyebrow">ANTES DE REPARTIR</p>
           <h2>¿Quién sos<br />en esta mesa?</h2>
           <p class="muted">Elegí tu lugar y ponete un nombre.</p>
+          <label class="field-label" for="device-mode">MODO DE JUEGO</label><select id="device-mode" class="name-input"><option value="three">3 celulares · mesa separada</option><option value="two">2 celulares · mesa en cada pantalla</option></select>
           <div class="role-options" id="role-options">
             <button class="role-card selected" data-role="table"><span class="role-number">01</span><span class="role-glyph table-glyph">♣</span><span class="role-title">La mesa</span><span class="role-desc">Mazo, cartas jugadas y puntos</span><span class="radio"></span></button>
             <button class="role-card" data-role="player1"><span class="role-number">02</span><span class="role-glyph">♠</span><span class="role-title">Jugador 1</span><span class="role-desc">Tus cartas y tus jugadas</span><span class="radio"></span></button>
@@ -103,6 +104,6 @@
 
       <section class="toast-global" id="global-toast" role="status"></section>
     </main>
-    <script type="module" src="./app.js?v=20261002-47"></script>
+    <script type="module" src="./app.js?v=20261002-48"></script>
   </body>
 </html>
