@@ -57,8 +57,8 @@ function cleanName(value, fallback) { return value.trim().slice(0,18) || fallbac
 function pickRole(role) {
   state.role = role;
   document.querySelectorAll('.role-card').forEach((card) => card.classList.toggle('selected', card.dataset.role === role));
-  const label = role === 'table' ? 'la mesa' : role === 'player1' ? 'Jugador 1' : 'Jugador 2';
-  $('enter-room').innerHTML = `Crear mesa como ${label} <span class="arrow">↗</span>`;
+  $('enter-room').textContent = 'Crear mesa';
+  document.querySelectorAll('.role-card').forEach(card=>card.setAttribute('aria-pressed',String(card.dataset.role===role)));
 }
 function isCoordinator() { return state.playerId === 'table' || (state.room?.deviceMode === 'two' && state.room.table?.uid === state.uid); }
 function configureSetup() {
@@ -148,12 +148,12 @@ async function openLobby() {
 }
 function renderLobby(rooms) {
   const open = Object.entries(rooms).filter(([, value]) => value?.public?.status === 'waiting' && (!value.public.table || !value.public.players?.player1 || !value.public.players?.player2)).sort((a,b) => (b[1].public.createdAt || 0) - (a[1].public.createdAt || 0));
-  if (!open.length) { $('open-room-list').innerHTML = '<div class="empty-lobby"><span>♣</span><strong>No hay mesas abiertas todavía</strong><p>Creá una mesa y elegí si vas a jugar o a llevar el tanteador.</p></div>'; return; }
+  if (!open.length) { $('open-room-list').innerHTML = '<div class="empty-lobby"><span>♣</span><strong>No hay mesas abiertas todavía</strong></div>'; return; }
   $('open-room-list').innerHTML = open.map(([code, value]) => {
     const room = value.public, players = room.players || {}, seats = (room.deviceMode === 'two' ? [] : [['table','La mesa',room.table]]).concat([['player1','Jugador 1',players.player1],['player2','Jugador 2',players.player2]]);
     const title = room.table?.name || players.player1?.name || players.player2?.name || 'Mesa abierta';
     const available = seats.filter(([, , person]) => !person);
-    return `<article class="lobby-card"><div class="lobby-card-top"><div><p class="eyebrow">${room.deviceMode === 'two' ? '2 CELULARES' : '3 DISPOSITIVOS'} · A ${targetPoints(room)} TANTOS</p><h3>${escapeHtml(title)}</h3></div><span class="lobby-count">${seats.length-available.length}/${seats.length}</span></div><div class="lobby-seats">${seats.map(([key,label,person]) => `<span class="lobby-seat ${person?'taken':''}">${person ? `${escapeHtml(label)}: ${escapeHtml(person.name || 'Ocupado')}` : `${escapeHtml(label)} · libre`}</span>`).join('')}</div><div class="lobby-join-options">${available.map(([key,label]) => `<button class="button ${key==='table'?'lobby-table-button':'lobby-player-button'}" data-room="${code}" data-seat="${key}">Unirme como ${label}<span>↗</span></button>`).join('')}</div></article>`;
+    return `<article class="lobby-card"><div class="lobby-card-top"><div><h3>${escapeHtml(title)}</h3><p class="lobby-meta">${targetPoints(room)} puntos · ${room.deviceMode==='two'?'2':'3'} celulares</p></div><span class="lobby-count" aria-label="${available.length} lugares disponibles">${seats.length-available.length}/${seats.length}</span></div><div class="lobby-join-options">${available.map(([key,label]) => `<button class="button lobby-player-button" data-room="${code}" data-seat="${key}" aria-label="Unirme a ${escapeHtml(title)} como ${escapeHtml(label)}">${key==='table'?'Mesa':escapeHtml(label)}<span aria-hidden="true">+</span></button>`).join('')}</div></article>`;
   }).join('');
 }
 function joinOpenRoom(code, seat) {

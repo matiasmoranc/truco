@@ -634,3 +634,79 @@ button,a,input,select,textarea{touch-action:manipulation}
 .player-mode.two-device-mode .muestra-card.sprite-card.dragging{z-index:10;cursor:grabbing}
 .player-mode.two-device-mode .center-table{z-index:6;overflow:visible}
 @media(max-height:650px){.player-mode.two-device-mode .mobile-score{flex-basis:80px;height:80px;max-height:80px}.player-mode.two-device-mode .mobile-score-grid,.player-mode.two-device-mode .mobile-tally,.player-mode.two-device-mode .compact-score-sticks{height:48px}}
+
+
+/* Inicio y creación de mesa */
+#welcome-view{background:linear-gradient(145deg,#153e30,#0b241c);padding:24px;gap:24px;height:100dvh;min-height:0;max-width:none;overflow:hidden}
+#welcome-view .home-topbar{width:min(1040px,100%);margin:0 auto;height:44px}
+#welcome-view .brand-lockup{font-size:16px;letter-spacing:.12em;gap:10px}
+#welcome-view .brand-mark{border:0;background:#e8c983;color:#193429;border-radius:10px;width:38px;height:38px}
+#welcome-view .home-edition{font-size:14px;color:#b1c8be;letter-spacing:0}
+#welcome-view .home-content{width:min(1040px,100%);display:grid;grid-template-columns:300px minmax(0,1fr);gap:48px;align-items:start;margin:0 auto;flex:1;min-height:0}
+#welcome-view .home-intro{display:flex;flex-direction:column;align-items:stretch;gap:24px;padding-top:24px}
+#welcome-view .home-heading h1{font-family:'DM Sans',sans-serif;font-size:38px;line-height:1.15;letter-spacing:-.04em;margin:0;font-weight:700}
+#welcome-view .home-actions{width:100%;display:flex;flex-direction:column;gap:12px}
+#welcome-view .primary{border-radius:14px;height:56px;background:#e8c983;font-size:16px;padding:0 20px;box-shadow:0 5px 22px #0002}
+#welcome-view .arrow{font-size:25px}
+#welcome-view .demo-link{height:48px;border:1px solid #ffffff26;border-radius:14px;font-size:15px;font-weight:500;margin:0;background:#ffffff06;color:#dce9e1;text-align:center}
+#welcome-view .home-lobby{padding:0;border:0;background:none;align-self:stretch;max-height:none;overflow:hidden}
+#welcome-view .home-lobby-heading{flex-direction:column;align-items:stretch;gap:18px}
+#welcome-view .home-section-title h2{font-family:'DM Sans',sans-serif;font-size:22px;line-height:1.2;font-weight:700;letter-spacing:-.02em}
+#welcome-view .home-name{width:100%;max-width:none}
+#welcome-view .field-label{font-size:14px;font-weight:500;letter-spacing:0;color:#bfd1c7;margin-bottom:8px}
+#welcome-view .name-input{height:48px;font-size:16px;border-radius:12px;background:#08201866;border:1px solid #ffffff24;padding:0 14px}
+#welcome-view .open-room-list{display:flex;flex-direction:column;gap:10px;margin-top:18px;overflow:auto;min-height:0;flex:1;padding:0 3px 12px 0;scrollbar-width:thin}
+#welcome-view .lobby-card{border:1px solid #ffffff18;border-radius:16px;background:#ffffff06;padding:16px;flex-shrink:0}
+#welcome-view .lobby-card-top{display:flex;align-items:center;justify-content:space-between;gap:12px}
+#welcome-view .lobby-card h3{font-family:'DM Sans',sans-serif;font-size:18px;font-weight:600;line-height:1.2;margin:0;letter-spacing:-.02em}
+#welcome-view .lobby-meta{font-size:13px;margin:6px 0 0;color:#9fb8ab;line-height:1.3}
+#welcome-view .lobby-count{font-size:13px;border:0;border-radius:20px;padding:7px 10px;background:#85b39b20;color:#bdd6c8;white-space:nowrap}
+#welcome-view .lobby-join-options{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+#welcome-view .lobby-join-options .button{height:44px;min-height:44px;min-width:0;flex:1;border:1px solid #e8c98355;border-radius:10px;background:#e8c9830a;padding:0 12px;font-size:14px;font-weight:500;color:#efdaab;gap:12px;white-space:nowrap}
+#welcome-view .lobby-join-options .button span{font-size:20px;line-height:1}
+#welcome-view .lobby-join-options .button:hover{background:#e8c98322;border-color:#e8c983}
+#welcome-view .empty-lobby{padding:32px 12px;border:1px dashed #ffffff25;border-radius:16px;text-align:center;color:#b8cfc1}
+#welcome-view .empty-lobby strong{font-size:16px;line-height:1.4;font-weight:500}
+#welcome-view .empty-lobby>span{font-size:30px;color:#e8c983}
+#welcome-view :focus-visible,#setup-view :focus-visible{outline:3px solid #e8c983;outline-offset:3px}
+#setup-view{background:linear-gradient(145deg,#153e30,#0b241c);height:100dvh;min-height:0;overflow:auto}
+#setup-view .topbar{height:64px;min-height:64px;padding:0 24px;border:0;width:100%;max-width:650px;margin:0 auto}
+#setup-view .icon-button{border-radius:12px;width:44px;height:44px;font-size:22px;background:#ffffff08;border:1px solid #ffffff20}
+#setup-view .topbar-spacer{width:44px}
+#setup-view .setup-content{width:min(460px,100%);margin:0 auto;padding:12px 24px 24px}
+#setup-view h2{font-family:'DM Sans',sans-serif;font-size:30px;font-weight:700;line-height:1.2;letter-spacing:-.035em;margin:0 0 24px}
+#setup-view .field-label{font-size:14px;font-weight:500;letter-spacing:0;color:#bfd1c7;margin:18px 0 8px}
+#setup-view .name-input{height:48px;font-size:16px;border-radius:12px;padding:0 14px;border:1px solid #ffffff24;background:#08201866;color:#f3f4e8}
+#setup-view .name-input::placeholder,#welcome-view .name-input::placeholder{color:#89a89a}
+#setup-view .role-options{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:0}
+#setup-view .role-card{height:88px;min-width:0;padding:12px 6px;display:flex;align-items:center;justify-content:center;gap:7px;border:1px solid #ffffff24;border-radius:12px;background:#ffffff04;color:#b8ccc0}
+#setup-view .role-card.selected{background:#e8c98316;border-color:#e8c983;color:#efd69d}
+#setup-view .role-glyph{font-size:22px;margin:0;color:inherit;line-height:1}
+#setup-view .role-title{font-family:'DM Sans',sans-serif;font-size:14px;font-weight:500;margin:0;white-space:nowrap}
+#setup-view .radio{display:none}
+#setup-view .role-options:has([data-role=table].hidden){grid-template-columns:repeat(2,minmax(0,1fr))}
+#setup-view .full-button{height:54px;justify-content:center;border-radius:14px;font-size:16px;background:#e8c983;margin-top:24px}
+#setup-view .full-button .arrow{display:none}
+@media(max-width:700px){
+ #welcome-view{padding:18px 20px;gap:20px}
+ #welcome-view .home-content{display:flex;flex-direction:column;gap:26px}
+ #welcome-view .home-intro{width:100%;padding:0;gap:16px}
+ #welcome-view .home-heading h1{font-size:28px}
+ #welcome-view .home-actions{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:10px}
+ #welcome-view .home-actions .primary,#welcome-view .demo-link{height:52px;font-size:15px}
+ #welcome-view .home-lobby{flex:1;min-height:0;width:100%}
+ #welcome-view .home-lobby-heading{gap:14px}
+ #welcome-view .home-section-title h2{font-size:21px}
+ #welcome-view .open-room-list{margin-top:14px}
+ #welcome-view .lobby-card{padding:14px}
+}
+@media(max-height:650px){
+ #welcome-view{gap:12px;padding-top:12px;padding-bottom:12px}
+ #welcome-view .home-content{gap:16px}
+ #welcome-view .home-heading{display:none}
+ #setup-view .setup-content{padding-top:0}
+ #setup-view h2{font-size:26px;margin-bottom:16px}
+ #setup-view .field-label{margin-top:12px}
+ #setup-view .role-card{height:74px}
+ #setup-view .full-button{margin-top:16px}
+}

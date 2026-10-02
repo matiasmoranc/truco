@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="./style.css?v=20261002-49" />
+    <link rel="stylesheet" href="./style.css?v=20261002-51" />
   </head>
   <body>
     <div class="grain" aria-hidden="true"></div>
@@ -18,39 +18,36 @@
       <section class="welcome view active" id="welcome-view">
         <header class="home-topbar">
           <div class="brand-lockup"><span class="brand-mark">T</span><span>TRUCO<span class="brand-period">.</span></span></div>
-          <span class="connection"><span class="live-dot"></span>TRUCO URUGUAYO</span>
+          <span class="home-edition">Uruguayo</span>
         </header>
         <div class="home-content">
           <section class="home-intro">
-            <div class="home-heading"><p class="eyebrow">JUGÁ CON 2 O 3 CELULARES</p><h1>Truco uruguayo</h1><p class="intro">Creá una mesa o sumate a una partida abierta.</p></div>
-            <div class="home-actions"><button class="button primary" id="create-room"><span>Crear mesa</span><span class="arrow">↗</span></button><button class="demo-link" id="demo-button">Probar demo <span>↗</span></button></div>
+            <div class="home-heading"><h1>¿Jugamos?</h1></div>
+            <div class="home-actions"><button class="button primary" id="create-room"><span>Crear mesa</span><span class="arrow" aria-hidden="true">+</span></button><button class="demo-link" id="demo-button">Probar demo</button></div>
           </section>
           <section class="home-lobby" aria-labelledby="home-lobby-title">
-            <div class="home-lobby-heading"><div><div class="home-section-title"><h2 id="home-lobby-title">Mesas abiertas</h2><span class="live-pill"><i></i> EN VIVO</span></div><p>Elegí un lugar libre para entrar.</p></div><label class="home-name"><span class="field-label">TU NOMBRE</span><input id="lobby-name" class="name-input" maxlength="18" placeholder="Ej. Matias" autocomplete="nickname" /></label></div>
+            <div class="home-lobby-heading"><div><div class="home-section-title"><h2 id="home-lobby-title">Mesas abiertas</h2></div></div><label class="home-name"><span class="field-label">Tu nombre</span><input id="lobby-name" class="name-input" maxlength="18" placeholder="Ej. Matias" autocomplete="nickname" /></label></div>
             <div class="open-room-list" id="open-room-list"><p class="muted">Conectando con las mesas…</p></div>
           </section>
         </div>
-        <footer class="welcome-foot"><span>2 JUGADORES</span><span class="foot-dash"></span><span>1 MESA</span><span class="foot-dash"></span><span>CON MUESTRA</span></footer>
       </section>
 
       <section class="setup view" id="setup-view">
-        <header class="topbar"><button class="icon-button" id="back-home" aria-label="Volver">←</button><span class="mini-brand"><b>T</b> TRUCO</span><span class="step-count">01 <i>/ 02</i></span></header>
+        <header class="topbar"><button class="icon-button" id="back-home" aria-label="Volver">←</button><span class="mini-brand"><b>T</b> TRUCO</span><span aria-hidden="true" class="topbar-spacer"></span></header>
         <div class="setup-content">
-          <p class="eyebrow">ANTES DE REPARTIR</p>
-          <h2>¿Quién sos<br />en esta mesa?</h2>
-          <p class="muted">Elegí tu lugar y ponete un nombre.</p>
-          <label class="field-label" for="device-mode">MODO DE JUEGO</label><select id="device-mode" class="name-input"><option value="three">3 celulares · mesa separada</option><option value="two">2 celulares · mesa en cada pantalla</option></select>
-          <div class="role-options" id="role-options">
-            <button class="role-card selected" data-role="table"><span class="role-number">01</span><span class="role-glyph table-glyph">♣</span><span class="role-title">La mesa</span><span class="role-desc">Mazo, cartas jugadas y puntos</span><span class="radio"></span></button>
-            <button class="role-card" data-role="player1"><span class="role-number">02</span><span class="role-glyph">♠</span><span class="role-title">Jugador 1</span><span class="role-desc">Tus cartas y tus jugadas</span><span class="radio"></span></button>
-            <button class="role-card" data-role="player2"><span class="role-number">03</span><span class="role-glyph red-suit">♥</span><span class="role-title">Jugador 2</span><span class="role-desc">Tus cartas y tus jugadas</span><span class="radio"></span></button>
-          </div>
-          <label class="field-label" for="player-name">TU NOMBRE</label>
+          <h2>Crear mesa</h2>
+          <label class="field-label" for="player-name">Tu nombre</label>
           <input id="player-name" class="name-input" maxlength="18" placeholder="Ej. Matias" autocomplete="nickname" />
-          <label class="field-label target-label" for="target-points">SE JUEGA A</label>
+          <label class="field-label" for="device-mode">Celulares</label><select id="device-mode" class="name-input"><option value="three">3 celulares</option><option value="two">2 celulares</option></select>
+          <span class="field-label">Tu lugar</span>
+          <div class="role-options" id="role-options">
+            <button class="role-card selected" data-role="table"><span class="role-glyph table-glyph">♣</span><span class="role-title">Mesa</span><span class="radio"></span></button>
+            <button class="role-card" data-role="player1"><span class="role-glyph">♠</span><span class="role-title">Jugador 1</span><span class="radio"></span></button>
+            <button class="role-card" data-role="player2"><span class="role-glyph red-suit">♥</span><span class="role-title">Jugador 2</span><span class="radio"></span></button>
+          </div>
+          <label class="field-label target-label" for="target-points">Puntos</label>
           <select id="target-points" class="name-input target-select"><option value="10">10 puntos</option><option value="20">20 puntos</option><option value="30" selected>30 puntos</option><option value="40">40 puntos</option><option value="50">50 puntos</option><option value="60">60 puntos</option></select>
           <button class="button primary full-button" id="enter-room">Crear mesa <span class="arrow">↗</span></button>
-          <p class="setup-note"><span>✦</span> Los demás encontrarán esta mesa en “Mesas abiertas”.</p>
         </div>
       </section>
 
@@ -104,6 +101,6 @@
 
       <section class="toast-global" id="global-toast" role="status"></section>
     </main>
-    <script type="module" src="./app.js?v=20261002-49"></script>
+    <script type="module" src="./app.js?v=20261002-51"></script>
   </body>
 </html>
