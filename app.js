@@ -136,7 +136,10 @@ async function enterRoom() {
       let seat;
       const person={uid:state.uid,name,online:true};
       const claim=await fb.runTransaction(roomRef,current=>{
-        if(!current||current.status!=='waiting'||roomExpired(current))return;
+        seat=null;
+        // Firebase may call this first with uncached null; wait for the server value.
+        if(current===null)return null;
+        if(current.status!=='waiting'||roomExpired(current))return;
         const players=current.players||{};
         const ownSeat=['player1','player2'].find(key=>players[key]?.uid===state.uid)||(current.deviceMode!=='two'&&current.table?.uid===state.uid?'table':null);
         if(ownSeat){seat=ownSeat;return current;}
@@ -145,8 +148,10 @@ async function enterRoom() {
         if(seat==='table')current.table=person;
         else {current.players={...players,[seat]:person};}
         return current;
-      });
-      if(!claim.committed){toast('La mesa se cerró o ya no hay lugares disponibles.',true);openLobby();return;}
+      },{applyLocally:false});
+      const joined=claim.snapshot.val();
+      const occupant=seat==='table'?joined?.table:joined?.players?.[seat];
+      if(!claim.committed||!seat||occupant?.uid!==state.uid){toast('La mesa se cerró o ya no hay lugares disponibles.',true);openLobby();return;}
       state.roomCode = code; state.playerId = seat;
     } else {
       const code = makeCode(); state.roomCode = code; state.playerId = state.role;
@@ -171,7 +176,7 @@ function invitationLink(code){
 function updateInvitation(){
   const link=$('invite-whatsapp');
   link.classList.toggle('hidden',!state.roomCode||state.demo||state.room?.status!=='waiting');
-  if(state.roomCode){const message=`¡Jugamos al truco! Entrá a mi mesa: ${invitationLink(state.roomCode)}`;link.href=`https://wa.me/?text=${encodeURIComponent(message)}`;}
+  if(state.roomCode){const message=`Te da para un truquito? Entra a mi mesa: ${invitationLink(state.roomCode)}`;link.href=`https://wa.me/?text=${encodeURIComponent(message)}`;}
 }
 async function openInvitation(code){
   if(!/^[A-Z2-9]{5}$/.test(code)){toast('La invitación no es válida.',true);await openLobby();return;}
