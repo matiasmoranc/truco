@@ -18,7 +18,7 @@ function suitSvg(suit){
 function setupSuitIcons(root=document){root.querySelectorAll('[data-suit-icon]').forEach(el=>{el.innerHTML=suitSvg(el.dataset.suitIcon);});}
 function updateMode(mode){
   const two=mode==='two';$('device-mode').value=mode;
-  document.querySelectorAll('.mode-option').forEach(button=>{const selected=button.dataset.mode===mode;button.classList.toggle('selected',selected);button.setAttribute('aria-pressed',String(selected));});
+  $('use-table-device').checked=!two;
   $('role-options').classList.toggle('hidden',two);$('role-label').classList.toggle('hidden',two);
   if(two)pickRole('player1');
 }
@@ -196,7 +196,7 @@ setInterval(()=>{
 function renderLobby(rooms) {
   Object.entries(rooms).forEach(([code,value])=>{if(roomExpired(value?.public))closeExpiredRoom(code);});
   const open = Object.entries(rooms).filter(([, value]) => value?.public?.status === 'waiting' && !roomExpired(value.public) && (!value.public.table || !value.public.players?.player1 || !value.public.players?.player2)).sort((a,b) => (b[1].public.createdAt || 0) - (a[1].public.createdAt || 0));
-  if (!open.length) { $('open-room-list').innerHTML = '<div class="empty-lobby"><span class="empty-lobby-icon" data-suit-icon="basto"></span><strong>No hay mesas abiertas todavía</strong></div>'; setupSuitIcons($('open-room-list')); return; }
+  if (!open.length) { $('open-room-list').innerHTML = '<div class="empty-lobby"><strong>No hay mesas abiertas todavía</strong></div>'; setupSuitIcons($('open-room-list')); return; }
   $('open-room-list').innerHTML = open.map(([code, value]) => {
     const room = value.public, players = room.players || {}, seats = (room.deviceMode === 'two' ? [] : [['table','La mesa',room.table]]).concat([['player1','Jugador 1',players.player1],['player2','Jugador 2',players.player2]]);
     const title = room.table?.name || players.player1?.name || players.player2?.name || 'Mesa abierta';
@@ -889,7 +889,7 @@ function demoFinishHand(winner,points){
   demoFeed(`${room.players[room.dealer].name} reparte. Empieza ${room.players[mano].name}.`);renderGame();
 }
 
-document.querySelectorAll('.mode-option').forEach(button=>button.addEventListener('click',()=>updateMode(button.dataset.mode)));
+$('use-table-device').addEventListener('change',event=>updateMode(event.target.checked?'three':'two'));
 $('points-picker-trigger').addEventListener('click',()=>{const menu=$('points-picker-menu'),opening=menu.classList.contains('hidden');menu.classList.toggle('hidden',!opening);$('points-picker-trigger').setAttribute('aria-expanded',String(opening));});
 document.addEventListener('click',event=>{if(!event.target.closest('.points-picker')){$('points-picker-menu').classList.add('hidden');$('points-picker-trigger').setAttribute('aria-expanded','false');}});
 document.addEventListener('keydown',event=>{if(event.key==='Escape'){$('points-picker-menu').classList.add('hidden');$('points-picker-trigger').setAttribute('aria-expanded','false');}});

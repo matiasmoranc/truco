@@ -742,3 +742,18 @@ button,a,input,select,textarea{touch-action:manipulation}
 /* Only earned roles are offered; player seats are assigned automatically. */
 #setup-view #role-options { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .lobby-player-button > .suit-icon { width: 22px; height: 22px; flex: 0 0 22px; }
+
+/* Keep the page within Safari's visible viewport and use one continuous felt. */
+html,body { background:#12382b; }
+body { min-height:100dvh; }
+.app-shell { min-height:100dvh; background:#12382b; }
+#welcome-view,#setup-view { background:#12382b; }
+#setup-view .table-device-toggle { display:flex;align-items:center;justify-content:space-between;gap:16px;margin:22px 0 6px;padding:14px;border:1px solid #ffffff24;border-radius:12px;cursor:pointer;color:#dce9e1;font-size:14px;line-height:1.4;position:relative; }
+.table-device-toggle input { position:absolute;right:14px;width:44px;height:26px;margin:0;opacity:0;cursor:pointer; }
+.toggle-track { width:44px;height:26px;flex-shrink:0;border-radius:20px;background:#ffffff20;border:1px solid #ffffff25;position:relative;transition:background .2s;pointer-events:none; }
+.toggle-track::after { content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#b8ccc0;transition:transform .2s,background .2s; }
+.table-device-toggle input:checked + .toggle-track { background:#e8c983;border-color:#e8c983; }
+.table-device-toggle input:checked + .toggle-track::after { transform:translateX(18px);background:#193429; }
+.table-device-toggle input:focus-visible + .toggle-track { outline:3px solid #e8c983;outline-offset:3px; }
+#welcome-view .empty-lobby { padding:22px 12px; }
+#welcome-view .empty-lobby strong { font-family:'DM Sans',sans-serif; }

@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="./style.css?v=20261002-53" />
+    <link rel="stylesheet" href="./style.css?v=20261002-54" />
   </head>
   <body>
     <div class="grain" aria-hidden="true"></div>
@@ -38,8 +38,7 @@
           <h2>Crear mesa</h2>
           <label class="field-label" for="player-name">Tu nombre</label>
           <input id="player-name" class="name-input" maxlength="18" placeholder="Ej. Matias" autocomplete="nickname" />
-          <label class="field-label">Dispositivos</label>
-          <div class="mode-options" role="group" aria-label="Cantidad de dispositivos"><button type="button" class="mode-option selected" data-mode="two" aria-pressed="true"><strong>2 celulares</strong><span>Un jugador crea la mesa</span></button><button type="button" class="mode-option" data-mode="three" aria-pressed="false"><strong>3 celulares</strong><span>Con una mesa aparte</span></button></div>
+          <label class="table-device-toggle" for="use-table-device"><span>Usar otro dispositivo como mesa</span><input type="checkbox" id="use-table-device" role="switch" /><span class="toggle-track" aria-hidden="true"></span></label>
           <select id="device-mode" class="visually-hidden" tabindex="-1" aria-hidden="true"><option value="two" selected>2 celulares</option><option value="three">3 celulares</option></select>
           <span class="field-label hidden" id="role-label">Tu lugar</span>
           <div class="role-options hidden" id="role-options">
@@ -103,6 +102,6 @@
 
       <section class="toast-global" id="global-toast" role="status"></section>
     </main>
-    <script type="module" src="./app.js?v=20261002-53"></script>
+    <script type="module" src="./app.js?v=20261002-54"></script>
   </body>
 </html>
