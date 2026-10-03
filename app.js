@@ -1223,7 +1223,7 @@ function animatePlayedHandCard(card,origin=null){
     $('hand').querySelector('[data-card="'+CSS.escape(card.id)+'"]')?.classList.remove('launching-card');
   },480);
 }
-let handGesture=null,handLastTap=null,ignoreHandClickUntil=0;
+let handGesture=null,ignoreHandClickUntil=0;
 const handSurface=$('hand');
 function handCards(){return [...handSurface.querySelectorAll('.hand-card')];}
 function updateHandPreview(drag,dx){
@@ -1260,7 +1260,6 @@ function finishHandGesture(event,cancelled=false){
   const moved=drag.moved||Math.abs(dx)>9||Math.abs(dy)>9;
   if(cancelled){clearHandPreview();renderGame();return;}
   if(moved){
-    handLastTap=null;
     if(dy<=-40){
       state.cardLaunchOrigin=launchRect?{cardId:drag.cardId,rect:launchRect}:null;
       clearHandPreview();
@@ -1276,11 +1275,9 @@ function finishHandGesture(event,cancelled=false){
     return;
   }
   clearHandPreview();
-  if(handLastTap?.id===drag.cardId&&Date.now()-handLastTap.at<=450){
-    handLastTap=null;ignoreHandClickUntil=Date.now()+500;
-    const played=state.hand.find(item=>item.id===drag.cardId);
-    if(played)playCard(played);
-  }else handLastTap={id:drag.cardId,at:Date.now()};
+  ignoreHandClickUntil=Date.now()+500;
+  const played=state.hand.find(item=>item.id===drag.cardId);
+  if(played)playCard(played);
 }
 handSurface.addEventListener('pointerdown',event=>{
   const card=event.target.closest('.hand-card');
