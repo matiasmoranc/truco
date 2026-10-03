@@ -417,7 +417,52 @@ function normalizeTargetPoints(value) {
 }
 function targetPoints(room) { return normalizeTargetPoints(room?.targetPoints); }
 function faltanParaGanar(room) { return Math.max(1,targetPoints(room)-Math.max(Number(room.scores?.player1)||0,Number(room.scores?.player2)||0)); }
+
+function scoringEntries(room,scores,reason,truth=null){
+  const entries=[...(room.handScoreEntries||[])];
+  const remaining={player1:Number(scores.player1||0)-Number(room.scores?.player1||0),player2:Number(scores.player2||0)-Number(room.scores?.player2||0)};
+  const add=(player,points,detail)=>{if(points>0){entries.push({player,points,detail});remaining[player]-=points;}};
+  if(room.envidoAudit&&truth){
+    const audit=room.envidoAudit,award=auditEnvidoScores(room,{player1:0,player2:0},truth);
+    const names=p=>room.players?.[p]?.name||'Jugador';
+    const details=['player1','player2'].map(p=>audit.reveals?.[p]!=null?`${names(p)} declaró ${audit.reveals[p]} y tenía ${truth[p]}.`:`${names(p)} tenía ${truth[p]} tantos.`);
+    const liars=Object.keys(audit.reveals||{}).filter(p=>Number(audit.reveals[p])!==Number(truth[p]));
+    const result=liars.length===2?'Ambos declararon tantos incorrectos: nadie suma.':liars.length===1?`${names(liars[0])} declaró tantos incorrectos; los puntos pasan al rival.`:audit.reveals?.player1===audit.reveals?.player2&&audit.reveals?.player1!=null?'Empate: gana quien es mano.':'Gana el envido.';
+    const detail=`Envido · ${details.join(' ')} ${result}`;
+    for(const p of ['player1','player2'])if(award[p]>0&&remaining[p]>=award[p])add(p,award[p],detail);
+    if(!award.player1&&!award.player2)entries.push({player:room.mano||'player1',points:0,detail});
+  }
+  const flowers=Object.keys(room.flors||{});
+  if(flowers.length===1&&!room.florSettled&&remaining[flowers[0]]>=3)add(flowers[0],3,`Flor sin rival (${room.flors[flowers[0]]} tantos): suma 3 puntos.`);
+  for(const p of ['player1','player2'])if(remaining[p]>0)add(p,remaining[p],reason?.includes('gana la mano')?`Mano ganada${Number(room.trucoLevel)>1?' · '+({2:'Truco',3:'Retruco',4:'Vale cuatro'}[room.trucoLevel]||'Truco')+' aceptado':''}.`:(reason||'Puntos de la mano.'));
+  return entries;
+}
+function verifiedHandTruth(room){
+  const audit=state.verifiedEnvido;
+  return state.demo?state.demoTruth:(audit?.code===state.roomCode&&audit?.handNumber===room.handNumber?audit.truth:null);
+}
+function buildHandSummary(room,scores,reason,truth=verifiedHandTruth(room)){
+  const entries=scoringEntries(room,scores,reason,truth);
+  const totals={player1:0,player2:0};
+  entries.forEach(entry=>{totals[entry.player]+=Number(entry.points)||0;});
+  return {handNumber:room.handNumber||1,totals,entries,names:{player1:room.players?.player1?.name||'Jugador 1',player2:room.players?.player2?.name||'Jugador 2'},time:Date.now()};
+}
+function openScoreDetails(){
+  const dialog=$('score-details'),summary=state.room?.lastHandScore;
+  $('score-details-title').textContent=summary?`Última mano · ${summary.handNumber}`:'Última mano';
+  $('score-details-content').innerHTML=summary?['player1','player2'].map(player=>`<section class="score-detail-player"><header><strong>${escapeHtml(summary.names[player])}</strong><b>+${summary.totals[player]||0} puntos</b></header>${(summary.entries||[]).filter(entry=>entry.player===player).map(entry=>`<p><span>+${entry.points}</span>${escapeHtml(entry.detail)}</p>`).join('')||'<p>No sumó puntos en esta mano.</p>'}</section>`).join(''):'<p class="score-details-empty">Todavía no terminó ninguna mano.</p>';
+  dialog.showModal();
+}
+
 async function writeRoom(changes) {
+  if(changes.scores&&!changes.lastHandScore){
+    const bet=state.room.pendingBet;
+    const label=bet?({envido:bet.called==='real'?'Real envido':bet.called==='falta'?'Falta envido':'Envido',flor:'Flor',truco:Number(bet.stake)===3?'Retruco':Number(bet.stake)===4?'Vale cuatro':'Truco'}[bet.type]||''):'';
+    const detail=(label?label+' · ':'')+(changes.feed?.[0]?.text||'Puntos de la mano.');
+    const entries=scoringEntries(state.room,changes.scores,detail);
+    changes={...changes,handScoreEntries:entries};
+    if(changes.status==='complete')changes={...changes,lastHandScore:buildHandSummary(state.room,changes.scores,detail),handScoreEntries:[]};
+  }
   const fb=state.firebase; const updates={};
   const notice=makeCallNotice(changes.feed?.[0]?.text);
   if(notice)changes={...changes,callNotice:notice};
@@ -521,6 +566,7 @@ async function verifyEnvido(scores){
   const fb=state.firebase,snapshot=await fb.get(fb.ref(fb.db,`hands/${state.roomCode}/${state.room.table.uid}/envidoTruth`));
   if(!snapshot.exists())throw new Error('Faltan las cartas originales para verificar el envido.');
   const truth=snapshot.val(),result=auditEnvidoScores(state.room,scores,truth);
+  state.verifiedEnvido={code:state.roomCode,handNumber:state.room.handNumber,truth};
   return result;
 }
 async function callFlor() {
@@ -551,9 +597,13 @@ async function settleHand(tricks, room) {
 }
 async function nextHand(winner, scores, handNumber, message, envidoVerified=false) {
   if(!envidoVerified){scores=await verifyEnvido(scores);scores=settleSingleFlor(state.room,scores);}
+  const summary=buildHandSummary(state.room,scores,message);
   const deck=shuffleDeck(),p1=state.room.players.player1,p2=state.room.players.player2,muestra=deck[6];
   const mano=otherPlayer(state.room.mano||'player1'),dealer=otherPlayer(mano);
-  const patches={};patches[`hands/${state.roomCode}/${p1.uid}/hand`]=deck.slice(0,3);patches[`hands/${state.roomCode}/${p2.uid}/hand`]=deck.slice(3,6);
+  const patches={};
+  patches[`rooms/${state.roomCode}/public/lastHandScore`]=summary;
+  patches[`rooms/${state.roomCode}/public/handScoreEntries`]=[];
+  patches[`hands/${state.roomCode}/${p1.uid}/hand`]=deck.slice(0,3);patches[`hands/${state.roomCode}/${p2.uid}/hand`]=deck.slice(3,6);
   patches[`hands/${state.roomCode}/${state.room.table.uid}/envidoTruth`]={player1:handEnvido(deck.slice(0,3),muestra),player2:handEnvido(deck.slice(3,6),muestra)};
   patches[`rooms/${state.roomCode}/public/status`]=Math.max(...Object.values(scores))>=targetPoints(state.room)?'complete':'started';
   patches[`rooms/${state.roomCode}/public/scores`]=scores;patches[`rooms/${state.roomCode}/public/handNumber`]=handNumber+1;
@@ -601,7 +651,7 @@ function scheduleTableResolution() {
           scores=await verifyEnvido(scores);
           const msg=`${current.players[winner].name} gana la mano y suma ${points} ${points===1?'tanto':'tantos'}.${florists.length===1&&!current.florSettled?' Además cobra 3 por la flor.':''}`;
           if(Math.max(...Object.values(scores))>=targetPoints(current)){
-            await writeRoom({scores,envidoAudit:null,status:'complete',trickCards:[],resolvingTrick:false,resolutionId:null,resolvedWinner:null,resolvedTrickWinner:null,handComplete:false,feed:topFeed(current,msg)});
+            await writeRoom({scores,lastHandScore:buildHandSummary(current,scores,msg),handScoreEntries:[],envidoAudit:null,status:'complete',trickCards:[],resolvingTrick:false,resolutionId:null,resolvedWinner:null,resolvedTrickWinner:null,handComplete:false,feed:topFeed(current,msg)});
           }else await nextHand(winner,scores,current.handNumber||1,msg,true);
         }else{
           await writeRoom({trickCards:[],resolvingTrick:false,resolutionId:null,resolvedWinner:null,resolvedTrickWinner:null,handComplete:false,trickNo:(Number(current.trickNo)||1)+1,turn:trickWinner||current.mano||'player1',feed:topFeed(current,trickWinner?`${current.players[trickWinner].name} gana la baza.`:'Baza parda. Sigue la mano.')});
@@ -819,9 +869,11 @@ function demoHand(player){return state.demoHands?.[player]||[];}
 function demoFeed(text){state.room.feed=[{text,time:Date.now()},...(state.room.feed||[])].slice(0,8);const notice=makeCallNotice(text);if(notice)state.room.callNotice=notice;}
 function demoScore(player,points,description){
   const amount=Math.max(0,Number(points)||0);if(!amount)return;
+  const before={...state.room,scores:{...state.room.scores}};
   state.room.scores[player]=(state.room.scores[player]||0)+amount;
+  state.room.handScoreEntries=scoringEntries(before,state.room.scores,description);
   demoFeed(`${state.room.players[player].name} ${description} (+${amount}).`);
-  if(state.room.scores[player]>=targetPoints(state.room))state.room.status='complete';
+  if(state.room.scores[player]>=targetPoints(state.room)){state.room.status='complete';state.room.lastHandScore=buildHandSummary(before,state.room.scores,description,null);}
 }
 function demoResolveFlor(bet){
   const values=state.room.flors||{};if(values.player1==null||values.player2==null)return;
@@ -870,7 +922,7 @@ function demoAnswerAction(answer){
     const points=bet.type==='truco'?Math.max(1,(bet.stake||2)-1):bet.type==='flor'?(bet.accepted||3):(bet.accepted||1);
     if(bet.type==='truco'){demoFinishHand(bet.caller,points);return;}
     if(bet.type==='flor')room.florSettled=true;
-    demoScore(bet.caller,points,'suma por canto no querido');room.pendingBet=bet.suspendedBet||null;room.envidoClosed=true;renderGame();return;
+    demoScore(bet.caller,points,`${bet.type==='envido'?'Envido':bet.type==='flor'?'Flor':'Truco'} no querido por ${room.players[player].name}`);room.pendingBet=bet.suspendedBet||null;room.envidoClosed=true;renderGame();return;
   }
   if(bet.type==='envido'){
     room.pendingBet={...bet,reveals:{},revealMode:true,revealTurn:room.mano};demoFeed(`${room.players[player].name} quiere. Declara primero ${room.players[room.mano].name}.`);renderGame();return;
@@ -908,10 +960,11 @@ function demoPlay(card) {
   renderGame();toast('Jugada de demostración.');
 }
 function demoFinishHand(winner,points){
-  const room=state.room;
+  const room=state.room,before={...room,scores:{...room.scores}};
   room.scores=auditEnvidoScores(room,room.scores,state.demoTruth||{});room.envidoAudit=null;
   room.scores[winner]=(room.scores[winner]||0)+points;
   room.scores=settleSingleFlor(room,room.scores);
+  room.lastHandScore=buildHandSummary(before,room.scores,`${room.players[winner].name} gana la mano (${points} puntos).`,state.demoTruth||{});room.handScoreEntries=[];
   if(Math.max(...Object.values(room.scores))>=targetPoints(room)){room.status='complete';room.pendingBet=null;renderGame();return;}
   const deck=shuffleDeck(),mano=otherPlayer(room.mano);
   state.demoHands={player1:deck.slice(0,3),player2:deck.slice(3,6)};
@@ -921,6 +974,14 @@ function demoFinishHand(winner,points){
   demoFeed(`${room.players[room.dealer].name} reparte. Empieza ${room.players[mano].name}.`);renderGame();
 }
 
+document.querySelectorAll('.scoreboard,.mobile-score').forEach(marker=>{
+  marker.setAttribute('role','button');marker.setAttribute('tabindex','0');marker.setAttribute('aria-label','Ver puntos de la última mano');
+  marker.addEventListener('click',openScoreDetails);
+  marker.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();openScoreDetails();}});
+});
+$('close-score-details').addEventListener('click',()=>$('score-details').close());
+$('dismiss-score-details').addEventListener('click',()=>$('score-details').close());
+$('score-details').addEventListener('click',event=>{if(event.target===$('score-details'))$('score-details').close();});
 $('use-table-device').addEventListener('change',event=>updateMode(event.target.checked?'three':'two'));
 $('points-picker-trigger').addEventListener('click',()=>{const menu=$('points-picker-menu'),opening=menu.classList.contains('hidden');menu.classList.toggle('hidden',!opening);$('points-picker-trigger').setAttribute('aria-expanded',String(opening));});
 document.addEventListener('click',event=>{if(!event.target.closest('.points-picker')){$('points-picker-menu').classList.add('hidden');$('points-picker-trigger').setAttribute('aria-expanded','false');}});
