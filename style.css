@@ -797,3 +797,10 @@ body { min-height:100dvh; }
  .player-mode.two-device-mode .mobile-score{top:142px;height:110px;width:130px}
  .player-mode.two-device-mode .hand{top:77%}
 }
+
+/* A quiet demo entry stays at the bottom of the lobby. */
+#welcome-view .home-actions{display:flex;flex-direction:column;grid-template-columns:none}
+#welcome-view .home-actions .primary{width:100%}
+#welcome-view .home-footer{width:100%;flex:0 0 32px;display:flex;justify-content:center;align-items:center}
+#welcome-view .home-footer .demo-link{height:32px;min-height:32px;display:inline-flex;align-items:center;justify-content:center;margin:0;padding:0 12px;background:none;border:0;border-radius:8px;color:#a3bcb0;font-size:12px;font-weight:400;box-shadow:none}
+#welcome-view .home-footer .demo-link:hover{color:#e8c983}

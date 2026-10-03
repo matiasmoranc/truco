@@ -79,7 +79,7 @@ function renderCallNotice(){
     received={id:notice.id,at:Date.now()};
     receivedCallNotices.set(key,received);
   }
-  const remaining=received?.id===notice?.id?CALL_NOTICE_DURATION-(Date.now()-received.at):0;
+  const remaining=received&&notice&&received.id===notice.id?CALL_NOTICE_DURATION-(Date.now()-received.at):0;
   const visible=addressed&&remaining>0;
   el.classList.toggle('hidden',!visible);
   el.textContent=visible?notice.text:'';
@@ -353,7 +353,7 @@ async function finishOpeningDraw(){
     const dealer=Number(draw.player1.rank)>Number(draw.player2.rank)?'player1':'player2';
     if(state.demo){state.room.dealer=dealer;state.room.mano=otherPlayer(dealer);state.room.turn=state.room.mano;state.room.status='started';state.hand=state.playerId==='table'?[]:[...state.demoHands[state.playerId]];demoFeed(`${state.room.players[dealer].name} reparte. Empieza ${state.room.players[state.room.mano].name}.`);}
     else await dealOpeningHand(dealer);
-  }finally{finishingDraw=false;}
+  }finally{finishingDraw=false;if(state.demo)renderGame();}
 }
 async function dealOpeningHand(dealer) {
   const fb = state.firebase; const deck = shuffleDeck(); const players = state.room.players;
@@ -868,6 +868,11 @@ function renderEnvidoPicker(room){
 function escapeHtml(value='') { return String(value).replace(/[&<>"']/g,(ch)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch])); }
 
 function demoStart(role) {
+  if(state.unsubscribe)state.unsubscribe();
+  if(state.privateUnsubscribe)state.privateUnsubscribe();
+  state.unsubscribe=null;state.privateUnsubscribe=null;state.privateHandKey=null;
+  clearTimeout(state.resolutionTimer);state.resolutionTimer=null;state.resolutionTimerKey=null;
+  drawInFlight=false;finishingDraw=false;
   state.demo=true;state.roomCode='DEMO1';state.playerId=role;const deck=shuffleDeck();
   state.demoHands={player1:deck.slice(0,3),player2:deck.slice(3,6)};state.hand=role==='table'?[]:[...state.demoHands[role]];
   state.room={status:'started',targetPoints:30,muestra:deck[6],table:{name:'La mesa'},players:{player1:{name:'Matias'},player2:{name:'Nico'}},scores:{player1:0,player2:0},handNumber:1,deckCount:34,turn:'player1',mano:'player1',trickNo:1,trickCards:[],tricks:[],feed:[],playedCount:0,trucoLevel:1,lastTrucoCaller:null,pendingBet:null,flors:{},envidoClosed:false};
