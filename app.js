@@ -36,6 +36,7 @@ function toast(message, global = false) {
 }
 function makeCode() { return Array.from({length:5}, () => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random()*32)]).join(''); }
 const callSeen=new Map();
+const receivedCallNotices=new Map();
 let soundEnabled=localStorage.getItem('truco-call-sound')==='on';
 let voiceUnlocked=false;
 let callNoticeTimer=null;
@@ -52,7 +53,7 @@ function spokenCall(text=''){
 function makeCallNotice(text){
   const spoken=spokenCall(text);
   if(!spoken||!['player1','player2'].includes(state.playerId))return null;
-  return {id:crypto.randomUUID(),from:state.playerId,to:state.playerId==='player1'?'player2':'player1',text:/\bcanta \d+ (tantos|son mejores|son iguales)\b/i.test(text)?spoken:text,spoken,time:Date.now()};
+  return {id:crypto.randomUUID(),from:state.playerId,to:state.playerId==='player1'?'player2':'player1',text:/\bcanta \d+ (tantos|son mejores|son iguales)\b/i.test(text)?spoken:text,spoken,time:Date.now(),handNumber:state.room?.handNumber||1};
 }
 function speakCall(text){
   if(!soundEnabled||!voiceUnlocked||!('speechSynthesis' in window))return;
@@ -71,16 +72,22 @@ function renderCallNotice(){
   button.setAttribute('aria-pressed',String(soundEnabled));
   const el=$('call-notice');
   clearTimeout(callNoticeTimer);callNoticeTimer=null;
-  const remaining=CALL_NOTICE_DURATION-(Date.now()-Number(notice?.time||0));
-  const visible=notice?.to===role&&remaining>0;
+  const key=`${state.roomCode}:${role}`;
+  const addressed=notice?.to===role&&(!notice.handNumber||notice.handNumber===state.room?.handNumber);
+  let received=receivedCallNotices.get(key);
+  if(addressed&&received?.id!==notice.id){
+    received={id:notice.id,at:Date.now()};
+    receivedCallNotices.set(key,received);
+  }
+  const remaining=received?.id===notice?.id?CALL_NOTICE_DURATION-(Date.now()-received.at):0;
+  const visible=addressed&&remaining>0;
   el.classList.toggle('hidden',!visible);
   el.textContent=visible?notice.text:'';
   if(!visible)return;
   callNoticeTimer=setTimeout(()=>{callNoticeTimer=null;renderCallNotice();},remaining);
-  const key=`${state.roomCode}:${role}`;
   if(callSeen.get(key)!==notice.id){
     callSeen.set(key,notice.id);
-    if(Date.now()-notice.time<60000)speakCall(notice.spoken);
+    speakCall(notice.spoken);
   }
 }
 function cleanName(value, fallback) { return value.trim().slice(0,18) || fallback; }
@@ -258,7 +265,6 @@ function watchRoom() {
     state.room = snapshot.val();
     if(state.room.status==='closed'||roomExpired(state.room)){if(roomExpired(state.room))closeExpiredRoom(state.roomCode);if(state.unsubscribe){state.unsubscribe();state.unsubscribe=null;}state.room=null;toast('La mesa se cerró: pasaron 10 minutos sin otro jugador.',true);showView('welcome-view');openLobby();return;}
     if(isCoordinator()&&state.room.status==='started'&&!state.room.resolvingTrick&&state.room.trickCards?.length===2&&(state.room.tricks||[]).length>0)recoverLegacyTrick(state.room);
-    if(isCoordinator())repairIncompleteHand(state.room);
     if (isCoordinator()) scheduleTableResolution();
     if (['drawing','started','complete'].includes(state.room.status)) { showView('game-view'); if(state.room.status!=='drawing')watchPrivateHand(); renderGame(); }
     if(isCoordinator()&&state.room.status==='drawing')finishOpeningDraw().catch(error=>toast(firebaseError(error)));
@@ -267,11 +273,13 @@ function watchRoom() {
 }
 function watchPrivateHand() {
   if (state.playerId === 'table') return;
-  if (state.privateUnsubscribe) state.privateUnsubscribe();
+  const subscriptionKey=`${state.roomCode}:${state.uid}`;
+  if(state.privateUnsubscribe&&state.privateHandKey===subscriptionKey)return;
+  if(state.privateUnsubscribe)state.privateUnsubscribe();
+  state.privateHandKey=subscriptionKey;
   const fb = state.firebase;
   state.privateUnsubscribe = fb.onValue(fb.ref(fb.db, `hands/${state.roomCode}/${state.uid}/hand`), (snapshot) => {
     state.hand = snapshot.val() || [];
-    if(state.room?.status==='started')fb.update(fb.ref(fb.db),{[`rooms/${state.roomCode}/public/handClaims/${state.playerId}`]:state.hand.length}).catch(()=>{});
     renderGame();
   });
 }
@@ -472,7 +480,10 @@ async function writeRoom(changes) {
     if(changes.status==='complete')changes={...changes,lastHandScore:buildHandSummary(state.room,changes.scores,detail),handScoreEntries:[]};
   }
   const fb=state.firebase; const updates={};
-  const notice=makeCallNotice(changes.feed?.[0]?.text);
+  const newBet=changes.pendingBet;
+  const callLabel=newBet?.caller===state.playerId&&!newBet.revealMode
+    ?(newBet.type==='envido'?({envido:'envido',real:'real envido',falta:'falta envido'}[newBet.called]||'envido'):newBet.type==='truco'?({2:'truco',3:'retruco',4:'vale cuatro'}[newBet.stake]||'truco'):null):null;
+  const notice=makeCallNotice(callLabel?`${state.room.players[state.playerId].name} canta ${callLabel}.`:changes.feed?.[0]?.text);
   if(notice)changes={...changes,callNotice:notice};
   for(const [key,value] of Object.entries(changes)) updates[`rooms/${state.roomCode}/public/${key}`]=value;
   await fb.update(fb.ref(fb.db),updates);
@@ -628,15 +639,6 @@ async function nextHand(winner, scores, handNumber, message, envidoVerified=fals
   patches[`rooms/${state.roomCode}/public/feed`]=[{text:`${message} Se reparte la siguiente mano.`,time:Date.now()},...(state.room.feed||[]).slice(0,6)];
   await state.firebase.update(state.firebase.ref(state.firebase.db),patches);
 }
-function repairIncompleteHand(room){
-  if(!room||room.status!=='started'||room.resolvingTrick||room.pendingNextHand||(room.trickCards||[]).length) return;
-  const claims=room.handClaims||{},p1=Number(claims.player1),p2=Number(claims.player2);
-  if(!Number.isFinite(p1)||!Number.isFinite(p2)||p1===p2||!((p1===0&&p2>0)||(p2===0&&p1>0))) return;
-  const key=`${room.handNumber||1}:${p1}:${p2}`;
-  if(state.emptyHandRepairKey===key)return;
-  state.emptyHandRepairKey=key;
-  writeRoom({pendingNextHand:{id:`empty-hand:${key}`,winner:room.mano||'player1',message:'Se detectó una mano incompleta. Se reparten nuevas cartas.'}}).catch(()=>{state.emptyHandRepairKey=null;});
-}
 function scheduleTableResolution() {
   const room=state.room;
   if(!room||!isCoordinator())return;
@@ -784,7 +786,7 @@ function renderGame() {
   $('game-room-code').textContent='MESA ABIERTA';
   $('my-name').textContent=isTable?tableName:(mine?.name||'Vos'); $('my-avatar').textContent=(isTable?tableName:(mine?.name||'V')).slice(0,1).toUpperCase();
   $('opponent-name').textContent=isTable?'Los jugadores':(opponent?.name||'Esperando rival'); $('opponent-avatar').textContent=(isTable?'T':(opponent?.name||'J').slice(0,1)).toUpperCase();
-  const myTurn=!isTable&&room.turn===state.playerId&&room.status==='started'&&!room.resolvingTrick&&state.hand.length>0;
+  const myTurn=!isTable&&room.turn===state.playerId&&room.status==='started'&&!room.resolvingTrick&&state.hand.length>0&&!room.pendingBet&&!room.pendingNextHand;
   $('turn-badge').textContent=isTable?'MESA':myTurn?'TU TURNO':'ESPERÁ'; $('turn-badge').classList.toggle('waiting-turn',!myTurn);
   $('hand').innerHTML=isTable?'':state.hand.map((card) => `<button class="hand-card sprite-card ${card.red?'card-red':''}" style="--sprite-position:${cardSpritePosition(card)}" aria-label="${cardAccessibleName(card)}" aria-disabled="${!myTurn}" data-card="${card.id}"><span class="sr-only">${cardAccessibleName(card)}</span></button>`).join('');
   document.querySelectorAll('.hand-card').forEach((button) => button.addEventListener('click', () => {const card=state.hand.find((item)=>item.id===button.dataset.card); if(card) playCard(card);}));
@@ -817,7 +819,8 @@ function renderGame() {
     const level=Number(room.trucoLevel)||1;if(level<4&&(level===1||room.lastTrucoCaller!==state.playerId))buttons.push(`<button class="call-button" data-action="${level===1?'truco':level===2?'retruco':'vale4'}">${level===1?'TRUCO':level===2?'RETRUCO':'VALE 4'}</button>`);
     }else if(!buttons.length)buttons.push('<span class="action-wait">ESPERÁ TU TURNO</span>');
   }
-  actions.innerHTML=state.hand.length?buttons.join(''):'<span class="action-wait">ESPERANDO EL REPARTO…</span>';
+  const waitingForRival=!state.hand.length&&!room.resolvingTrick&&!room.pendingNextHand&&room.turn===other;
+  actions.innerHTML=pending||state.hand.length?buttons.join(''):`<span class="action-wait">${waitingForRival?'ESPERANDO LA ÚLTIMA CARTA DEL RIVAL…':'ESPERANDO EL REPARTO…'}</span>`;
   renderEnvidoPicker(room);
   actions.querySelectorAll('[data-action]').forEach((button)=>button.addEventListener('click',()=>{const act=button.dataset.action;if(state.demo){demoAction(act);return;}if(['yes','no','raise'].includes(act)||act.startsWith('raise-'))answerBet(act);else if(act==='reveal')revealEnvido();else if(act==='flor')callFlor();else callBet(act);}));
   $('turn-badge').textContent=isTable?'MESA':pending?(pending.responder===state.playerId?'RESPONDÉ':'ESPERANDO'):myTurn?'TU TURNO':'ESPERÁ';$('turn-badge').classList.toggle('waiting-turn',!myTurn||!!pending);
@@ -1008,7 +1011,7 @@ $('role-options').querySelectorAll('.role-card').forEach((card)=>{
 $('back-home').addEventListener('click',()=>{showView('welcome-view');openLobby();});
 $('enter-room').addEventListener('click',enterRoom);
 $('demo-button').addEventListener('click',()=>demoStart('player1'));
-$('leave-room').addEventListener('click',()=>{if(state.unsubscribe)state.unsubscribe();if(state.privateUnsubscribe)state.privateUnsubscribe();state.room=null;state.demo=false;showView('welcome-view');openLobby();});
+$('leave-room').addEventListener('click',()=>{if(state.unsubscribe)state.unsubscribe();if(state.privateUnsubscribe)state.privateUnsubscribe();state.privateUnsubscribe=null;state.privateHandKey=null;state.room=null;state.demo=false;showView('welcome-view');openLobby();});
 $('game-home').addEventListener('click',()=>{if(state.demo){state.demo=false;showView('welcome-view');openLobby();return;}showView('waiting-view');});
 $('demo-device-switcher').addEventListener('click',(event)=>{const button=event.target.closest('[data-demo-role]');if(button)switchDemoRole(button.dataset.demoRole);});
 $('muestra-card').addEventListener('pointerdown',(event)=>{
