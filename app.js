@@ -259,23 +259,6 @@ async function enterRoom() {
     state.enteringRoom=false;$('enter-room').disabled=false;
   }
 }
-async function restoreLastRoom(){
-  let saved;
-  try{saved=JSON.parse(localStorage.getItem('truco-last-seat')||'null');}catch{return false;}
-  if(!saved||!/^[A-Z2-9]{5}$/.test(saved.code))return false;
-  try{
-    const fb=await firebaseServices();
-    const snapshot=await fb.get(fb.ref(fb.db,`rooms/${saved.code}/public`));
-    const room=snapshot.val(),seat=roomSeatForUid(room,state.uid);
-    if(!seat||room?.status==='closed'||roomExpired(room)){
-      localStorage.removeItem('truco-last-seat');return false;
-    }
-    state.joining=true;state.selectedRoom=saved.code;state.role=seat;
-    $('player-name').value=localStorage.getItem('truco-player-name')||'Jugador';
-    await enterRoom();
-    return !!state.room&&state.roomCode===saved.code;
-  }catch(error){console.error('[truco:resume] failed',error);return false;}
-}
 function invitationLink(code){
   const url=new URL(location.href);url.search='';url.hash='';url.searchParams.set('mesa',code);return url.href;
 }
@@ -1393,4 +1376,4 @@ try {
 const invitedRoom=new URLSearchParams(location.search).get('mesa');
 if(invitedRoom)await openInvitation(invitedRoom);
 else if(location.search.includes('demo=mesa'))demoStart('table');
-else if (firebaseConfigValid(state.config)&&!(await restoreLastRoom())) openLobby();
+else if (firebaseConfigValid(state.config)) openLobby();
