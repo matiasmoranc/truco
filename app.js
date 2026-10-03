@@ -148,20 +148,27 @@ function firebaseConfigValid(config) { return !!(config && config.apiKey && conf
 function loadConfig() {
   try { return JSON.parse(localStorage.getItem(storageKey) || 'null'); } catch { return null; }
 }
+let firebaseReadyPromise=null;
 async function firebaseServices() {
-  if (state.firebase) return state.firebase;
-  const [appSdk, dbSdk, authSdk] = await Promise.all([
-    import(`https://www.gstatic.com/firebasejs/${FIREBASE_VERSION}/firebase-app.js`),
-    import(`https://www.gstatic.com/firebasejs/${FIREBASE_VERSION}/firebase-database.js`),
-    import(`https://www.gstatic.com/firebasejs/${FIREBASE_VERSION}/firebase-auth.js`)
-  ]);
-  const app = appSdk.initializeApp(state.config);
-  const auth = authSdk.getAuth(app);
-  if (!auth.currentUser) await authSdk.signInAnonymously(auth);
-  state.uid = auth.currentUser.uid;
-  state.firebase = { db: dbSdk.getDatabase(app, state.config.databaseURL), ...dbSdk };
-  dbSdk.onValue(dbSdk.ref(state.firebase.db,'.info/serverTimeOffset'),snapshot=>{state.serverTimeOffset=Number(snapshot.val())||0;});
-  return state.firebase;
+  if(state.firebase)return state.firebase;
+  if(firebaseReadyPromise)return firebaseReadyPromise;
+  firebaseReadyPromise=(async()=>{
+    const [appSdk,dbSdk,authSdk]=await Promise.all([
+      import(`https://www.gstatic.com/firebasejs/${FIREBASE_VERSION}/firebase-app.js`),
+      import(`https://www.gstatic.com/firebasejs/${FIREBASE_VERSION}/firebase-database.js`),
+      import(`https://www.gstatic.com/firebasejs/${FIREBASE_VERSION}/firebase-auth.js`)
+    ]);
+    const app=appSdk.getApps().length?appSdk.getApp():appSdk.initializeApp(state.config);
+    const auth=authSdk.getAuth(app);
+    await auth.authStateReady();
+    if(!auth.currentUser)await authSdk.signInAnonymously(auth);
+    state.uid=auth.currentUser.uid;
+    state.firebase={db:dbSdk.getDatabase(app,state.config.databaseURL),...dbSdk};
+    dbSdk.onValue(dbSdk.ref(state.firebase.db,'.info/serverTimeOffset'),snapshot=>{state.serverTimeOffset=Number(snapshot.val())||0;},error=>console.error('[truco:clock]',error));
+    console.info('[truco:connection] authentication ready');
+    return state.firebase;
+  })().catch(error=>{firebaseReadyPromise=null;throw error;});
+  return firebaseReadyPromise;
 }
 async function runPendingAction() {
   const action = state.nextAction; state.nextAction = null;
@@ -172,54 +179,102 @@ function showConfig() {
   $('firebase-config').value = state.config ? JSON.stringify(state.config, null, 2) : '';
   showView('config-view');
 }
-async function enterRoom() {
-  const name = cleanName($('player-name').value, state.role === 'table' ? 'La mesa' : 'Jugador');
-  if (!firebaseConfigValid(state.config)) { state.nextAction = 'enter'; showConfig(); return; }
-  try {
-    const fb = await firebaseServices();
-    if (state.joining) {
-      const code = state.selectedRoom;
-      const roomRef = fb.ref(fb.db, `rooms/${code}/public`);
-      const snap = await fb.get(roomRef);
-      if (!snap.exists()) { toast('La invitación ya no está disponible.',true);openLobby();return; }
-      const room = snap.val();
-      if (room.status !== 'waiting' || roomExpired(room)) { toast('La mesa se cerró o la partida ya empezó.',true); openLobby(); return; }
-      let seat;
-      const person={uid:state.uid,name,online:true};
-      const claim=await fb.runTransaction(roomRef,current=>{
-        seat=null;
-        // Firebase may call this first with uncached null; wait for the server value.
-        if(current===null)return null;
-        if(current.status!=='waiting'||roomExpired(current))return;
-        const players=current.players||{};
-        const ownSeat=['player1','player2'].find(key=>players[key]?.uid===state.uid)||(current.deviceMode!=='two'&&current.table?.uid===state.uid?'table':null);
-        if(ownSeat){seat=ownSeat;return current;}
-        seat=state.role==='table'&&current.deviceMode!=='two'?'table':(!players.player1?'player1':!players.player2?'player2':null);
-        if(!seat||(seat==='table'&&current.table))return;
-        if(seat==='table')current.table=person;
-        else {current.players={...players,[seat]:person};}
-        return current;
-      },{applyLocally:false});
-      const joined=claim.snapshot.val();
-      const occupant=seat==='table'?joined?.table:joined?.players?.[seat];
-      if(!claim.committed||!seat||occupant?.uid!==state.uid){toast('La mesa se cerró o ya no hay lugares disponibles.',true);openLobby();return;}
-      state.roomCode = code; state.playerId = seat;
-    } else {
-      const code = makeCode(); state.roomCode = code; state.playerId = state.role;
-      const person = { uid: state.uid, name, online: true };
-      const targetPoints = normalizeTargetPoints($('target-points').value);
-      const deviceMode = $('device-mode').value;
-      const initial = { deviceMode, status: 'waiting', createdAt: Date.now(), targetPoints, table: deviceMode === 'two' || state.role === 'table' ? person : null, players: { player1: state.role === 'player1' ? person : null, player2: state.role === 'player2' ? person : null }, scores: { player1: 0, player2: 0 }, handNumber: 1, deckCount: 40, trickCards: [], feed: [{ text: `${name} abrió una mesa a ${targetPoints}. Faltan los demás.`, time: Date.now() }] };
-      await fb.set(fb.ref(fb.db, `rooms/${code}/public`), initial);
-    }
-    localStorage.setItem('truco-player-name',name);
-    if(state.joining){const url=new URL(location.href);url.searchParams.delete('mesa');history.replaceState(null,'',url);}
-    localStorage.setItem('truco-last-seat', JSON.stringify({ code: state.roomCode, role: state.playerId }));
-    if (state.lobbyUnsubscribe) { state.lobbyUnsubscribe(); state.lobbyUnsubscribe = null; }
-    showView('waiting-view');watchRoom();renderWaiting();
-  } catch (error) {
-    console.error(error); toast(firebaseError(error),true);
+function roomSeatForUid(room,uid){
+  if(!room||!uid)return null;
+  return ['player1','player2'].find(key=>room.players?.[key]?.uid===uid)
+    ||(room.deviceMode!=='two'&&room.table?.uid===uid?'table':null);
+}
+function claimRoomSeat(current,person,role){
+  // An uncached null must be retried against the server, not treated as a full table.
+  if(current===null)return null;
+  if(current.status==='closed'||roomExpired(current))return;
+  if(roomSeatForUid(current,person.uid))return current;
+  if(current.status!=='waiting')return;
+  const players=current.players||{};
+  if(role==='table'&&current.deviceMode!=='two'){
+    if(current.table)return;
+    return {...current,table:person};
   }
+  const seat=!players.player1?'player1':!players.player2?'player2':null;
+  if(!seat)return;
+  return {...current,players:{...players,[seat]:person}};
+}
+async function enterRoom() {
+  if(state.enteringRoom)return;
+  const name=cleanName($('player-name').value,state.role==='table'?'La mesa':'Jugador');
+  if(!firebaseConfigValid(state.config)){state.nextAction='enter';showConfig();return;}
+  state.enteringRoom=true;
+  state.navigationEpoch=(state.navigationEpoch||0)+1;
+  const request={joining:state.joining,code:state.selectedRoom,role:state.role};
+  $('enter-room').disabled=true;
+  console.info('[truco:join] begin',{joining:request.joining,code:request.code||null});
+  try{
+    const fb=await firebaseServices();
+    let joinedRoom;
+    if(request.joining){
+      const code=request.code,roomRef=fb.ref(fb.db,`rooms/${code}/public`);
+      const snap=await fb.get(roomRef);
+      if(!snap.exists()){toast('La invitación ya no está disponible.',true);await openLobby();return;}
+      let room=snap.val(),seat=roomSeatForUid(room,state.uid);
+      if(room.status==='closed'||roomExpired(room)){toast('La mesa ya está cerrada.',true);await openLobby();return;}
+      // Existing players may reconnect even after the automatic start.
+      if(!seat){
+        if(room.status!=='waiting'){toast('La partida ya empezó y no tenés un lugar en esta mesa.',true);await openLobby();return;}
+        const person={uid:state.uid,name,online:true};
+        const claim=await fb.runTransaction(roomRef,current=>claimRoomSeat(current,person,request.role),{applyLocally:false});
+        room=claim.snapshot.val();
+        seat=roomSeatForUid(room,state.uid);
+        if(!seat||room?.status==='closed'||roomExpired(room)){
+          toast('La mesa se cerró o ya no hay lugares disponibles.',true);await openLobby();return;
+        }
+      }
+      state.roomCode=code;state.playerId=seat;joinedRoom=room;
+    }else{
+      const code=makeCode(),deviceMode=$('device-mode').value;
+      const role=deviceMode==='two'?'player1':request.role;
+      const person={uid:state.uid,name,online:true};
+      const targetPoints=normalizeTargetPoints($('target-points').value);
+      joinedRoom={deviceMode,status:'waiting',createdAt:Date.now(),targetPoints,
+        table:deviceMode==='two'||role==='table'?person:null,
+        players:{player1:role==='player1'?person:null,player2:role==='player2'?person:null},
+        scores:{player1:0,player2:0},handNumber:1,deckCount:40,trickCards:[],
+        feed:[{text:`${name} abrió una mesa a ${targetPoints}. Faltan los demás.`,time:Date.now()}]};
+      await fb.set(fb.ref(fb.db,`rooms/${code}/public`),joinedRoom);
+      state.roomCode=code;state.playerId=role;
+    }
+    if(state.privateUnsubscribe)state.privateUnsubscribe();
+    state.privateUnsubscribe=null;state.privateHandKey=null;
+    state.demo=false;state.hand=[];state.room=joinedRoom;
+    localStorage.setItem('truco-player-name',name);
+    if(request.joining){const url=new URL(location.href);url.searchParams.delete('mesa');history.replaceState(null,'',url);}
+    localStorage.setItem('truco-last-seat',JSON.stringify({code:state.roomCode,role:state.playerId}));
+    if(state.lobbyUnsubscribe){state.lobbyUnsubscribe();state.lobbyUnsubscribe=null;}
+    console.info('[truco:join] seated',{code:state.roomCode,role:state.playerId,status:joinedRoom.status});
+    showView(['drawing','started','revealing','complete'].includes(joinedRoom.status)?'game-view':'waiting-view');
+    watchRoom();
+    if(joinedRoom.status==='waiting')renderWaiting();
+  }catch(error){
+    console.error('[truco:join] failed',error);toast(firebaseError(error),true);
+  }finally{
+    state.enteringRoom=false;$('enter-room').disabled=false;
+  }
+}
+async function restoreLastRoom(){
+  let saved;
+  try{saved=JSON.parse(localStorage.getItem('truco-last-seat')||'null');}catch{return false;}
+  if(!saved||!/^[A-Z2-9]{5}$/.test(saved.code))return false;
+  try{
+    const fb=await firebaseServices();
+    const snapshot=await fb.get(fb.ref(fb.db,`rooms/${saved.code}/public`));
+    const room=snapshot.val(),seat=roomSeatForUid(room,state.uid);
+    if(!seat||room?.status==='closed'||roomExpired(room)){
+      localStorage.removeItem('truco-last-seat');return false;
+    }
+    state.joining=true;state.selectedRoom=saved.code;state.role=seat;
+    $('player-name').value=localStorage.getItem('truco-player-name')||'Jugador';
+    await enterRoom();
+    return !!state.room&&state.roomCode===saved.code;
+  }catch(error){console.error('[truco:resume] failed',error);return false;}
 }
 function invitationLink(code){
   const url=new URL(location.href);url.search='';url.hash='';url.searchParams.set('mesa',code);return url.href;
@@ -240,7 +295,9 @@ async function openInvitation(code){
 async function openLobby() {
   if (!firebaseConfigValid(state.config)) { state.nextAction = 'lobby'; showConfig(); return; }
   try {
+    const navigationEpoch=state.navigationEpoch||0;
     const fb = await firebaseServices();
+    if(navigationEpoch!==(state.navigationEpoch||0))return;
     showView('welcome-view');
     $('open-room-list').innerHTML = '<p class="muted">Buscando mesas abiertas…</p>';
     if (state.lobbyUnsubscribe) state.lobbyUnsubscribe();
@@ -297,10 +354,12 @@ function firebaseError(error) {
   return 'No pudimos conectar la mesa. Revisá la configuración de Firebase.';
 }
 function watchRoom() {
-  const fb = state.firebase;
+  const fb = state.firebase,code=state.roomCode;
+  const version=(state.roomWatchVersion||0)+1;state.roomWatchVersion=version;
   if (state.unsubscribe) state.unsubscribe();
-  state.unsubscribe = fb.onValue(fb.ref(fb.db, `rooms/${state.roomCode}/public`), (snapshot) => {
-    if (!snapshot.exists()) { toast('La mesa ya no está disponible.'); showView('welcome-view'); openLobby(); return; }
+  state.unsubscribe = fb.onValue(fb.ref(fb.db, `rooms/${code}/public`), (snapshot) => {
+    if(code!==state.roomCode||version!==state.roomWatchVersion)return;
+    if (!snapshot.exists()) { if(state.unsubscribe){state.unsubscribe();state.unsubscribe=null;}state.room=null;console.warn('[truco:room] unavailable',{code});toast('La mesa ya no está disponible.',true);showView('welcome-view');openLobby();return; }
     state.room = snapshot.val();
     if(state.room.status==='closed'||roomExpired(state.room)){if(roomExpired(state.room))closeExpiredRoom(state.roomCode);if(state.unsubscribe){state.unsubscribe();state.unsubscribe=null;}state.room=null;toast('La mesa se cerró: pasaron 10 minutos sin otro jugador.',true);showView('welcome-view');openLobby();return;}
     if(isCoordinator()&&state.room.status==='started'&&!state.room.resolvingTrick&&state.room.trickCards?.length===2&&(state.room.tricks||[]).length>0)recoverLegacyTrick(state.room);
@@ -315,7 +374,7 @@ function watchRoom() {
     if (['drawing','started','revealing','complete'].includes(state.room.status)) { showView('game-view'); if(state.room.status!=='drawing')watchPrivateHand(); renderGame(); }
     if(isCoordinator()&&state.room.status==='drawing')finishOpeningDraw().catch(error=>toast(firebaseError(error)));
     else if (state.room.status === 'waiting') { renderWaiting(); if (!$('waiting-view').classList.contains('active')) showView('waiting-view'); }
-  });
+  },error=>{if(code!==state.roomCode||version!==state.roomWatchVersion)return;console.error('[truco:room] subscription failed',{code,error});toast(firebaseError(error),true);});
 }
 function watchPrivateHand() {
   if (state.playerId === 'table') return;
@@ -325,9 +384,10 @@ function watchPrivateHand() {
   state.privateHandKey=subscriptionKey;
   const fb = state.firebase;
   state.privateUnsubscribe = fb.onValue(fb.ref(fb.db, `hands/${state.roomCode}/${state.uid}/hand`), (snapshot) => {
+    if(state.privateHandKey!==subscriptionKey)return;
     state.hand = snapshot.val() || [];
     renderGame();
-  });
+  },error=>{if(state.privateHandKey!==subscriptionKey)return;console.error('[truco:hand] subscription failed',error);toast(firebaseError(error),true);});
 }
 function renderWaiting() {
   if (!state.room) return;
@@ -1291,7 +1351,7 @@ $('role-options').querySelectorAll('.role-card').forEach((card)=>{
 $('back-home').addEventListener('click',()=>{showView('welcome-view');openLobby();});
 $('enter-room').addEventListener('click',enterRoom);
 $('demo-button').addEventListener('click',()=>demoStart('player1'));
-$('leave-room').addEventListener('click',()=>{if(state.unsubscribe)state.unsubscribe();if(state.privateUnsubscribe)state.privateUnsubscribe();state.privateUnsubscribe=null;state.privateHandKey=null;state.room=null;state.demo=false;showView('welcome-view');openLobby();});
+$('leave-room').addEventListener('click',()=>{state.roomWatchVersion=(state.roomWatchVersion||0)+1;state.navigationEpoch=(state.navigationEpoch||0)+1;localStorage.removeItem('truco-last-seat');if(state.unsubscribe)state.unsubscribe();if(state.privateUnsubscribe)state.privateUnsubscribe();state.privateUnsubscribe=null;state.privateHandKey=null;state.room=null;state.demo=false;showView('welcome-view');openLobby();});
 $('game-home').addEventListener('click',()=>{if(state.demo){state.demo=false;showView('welcome-view');openLobby();return;}showView('waiting-view');});
 $('demo-device-switcher').addEventListener('click',(event)=>{const button=event.target.closest('[data-demo-role]');if(button)switchDemoRole(button.dataset.demoRole);});
 $('muestra-card').addEventListener('pointerdown',(event)=>{
@@ -1333,4 +1393,4 @@ try {
 const invitedRoom=new URLSearchParams(location.search).get('mesa');
 if(invitedRoom)await openInvitation(invitedRoom);
 else if(location.search.includes('demo=mesa'))demoStart('table');
-else if (firebaseConfigValid(state.config)) openLobby();
+else if (firebaseConfigValid(state.config)&&!(await restoreLastRoom())) openLobby();
