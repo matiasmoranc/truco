@@ -170,7 +170,7 @@ async function enterRoom() {
     if(state.joining){const url=new URL(location.href);url.searchParams.delete('mesa');history.replaceState(null,'',url);}
     localStorage.setItem('truco-last-seat', JSON.stringify({ code: state.roomCode, role: state.playerId }));
     if (state.lobbyUnsubscribe) { state.lobbyUnsubscribe(); state.lobbyUnsubscribe = null; }
-    watchRoom(); renderWaiting(); showView('waiting-view');
+    showView('waiting-view');watchRoom();renderWaiting();
   } catch (error) {
     console.error(error); toast(firebaseError(error),true);
   }
@@ -283,10 +283,9 @@ function renderWaiting() {
   const seatData = (state.room.deviceMode === 'two' ? [] : [['table','LA MESA',state.room.table]]).concat([['player1','JUGADOR 1',players.player1],['player2','JUGADOR 2',players.player2]]);
   $('seats').innerHTML = seatData.map(([key,label,value]) => `<div class="seat"><span class="seat-icon" data-suit-icon="${key==='table'?'table':key==='player1'?'espada':'copa'}"></span><span class="seat-name"><strong>${escapeHtml(value?.name || (key==='table'?'La mesa':'Esperando jugador…'))}</strong><small>${label}</small></span><span class="seat-state ${value?'ready':''}">${value?'LISTO':'ESPERANDO'}</span></div>`).join('');setupSuitIcons($('seats'));
   const ready = !!(state.room.table && players.player1 && players.player2);
-  $('start-game').disabled = !(ready && isCoordinator());
-  $('waiting-hint').textContent = isCoordinator() ? (ready ? 'Ya están todos. ¡A jugar!' : 'Esperando que se unan los dos jugadores') : 'Esperá a que quien creó la partida la inicie';
+  if(ready&&isCoordinator())startGame().catch(error=>toast(firebaseError(error),true));
+  $('waiting-hint').textContent = ready?'Comenzando la partida…':'Esperando los dispositivos restantes';
   $('game-room-code').textContent = 'MESA ABIERTA';
-  $('start-game').textContent = `Repartir · a ${targetPoints(state.room)} tantos`;
 }
 function shuffleDeck() {
   const suits = [{name:'oro',symbol:'♦',red:true},{name:'copa',symbol:'♥',red:true},{name:'espada',symbol:'♠',red:false},{name:'basto',symbol:'♣',red:false}];
@@ -295,9 +294,18 @@ function shuffleDeck() {
   for (let i=deck.length-1;i>0;i--) { const j=Math.floor(Math.random()*(i+1)); [deck[i],deck[j]]=[deck[j],deck[i]]; }
   return deck;
 }
+let startingGame=false;
 async function startGame() {
-  if(state.room?.status!=='waiting'||!isCoordinator()||!state.room.players?.player1||!state.room.players?.player2)return;
-  await writeRoom({status:'drawing',openingDraw:{pool:shuffleDeck(),cards:{}},feed:topFeed(state.room,'Cada jugador toca el mazo para sortear quién reparte.')});
+  if(startingGame||state.room?.status!=='waiting'||!isCoordinator()||!state.room.table||!state.room.players?.player1||!state.room.players?.player2)return;
+  startingGame=true;
+  try{
+    const fb=state.firebase,pool=shuffleDeck();
+    await fb.runTransaction(fb.ref(fb.db,`rooms/${state.roomCode}/public`),room=>{
+      if(room===null)return null;
+      if(room.status!=='waiting'||!room.table||!room.players?.player1||!room.players?.player2)return;
+      return {...room,status:'drawing',openingDraw:{pool,cards:{}},feed:topFeed(room,'Cada jugador toca el mazo para sortear quién reparte.')};
+    },{applyLocally:false});
+  }finally{startingGame=false;}
 }
 let finishingDraw=false;
 let drawInFlight=false;
@@ -750,7 +758,11 @@ function renderGame() {
   $('game-view').classList.toggle('two-device-mode', !isTable && room.deviceMode === 'two');
   $('demo-device-switcher').classList.toggle('hidden',!state.demo);
   $('demo-device-switcher').querySelectorAll('[data-demo-role]').forEach((button)=>button.setAttribute('aria-pressed',String(button.dataset.demoRole===state.playerId)));
+  const mobileMarker=document.querySelector('.mobile-score'),felt=$('felt-area');
+  if(room.deviceMode==='two'&&!isTable){if(mobileMarker.parentElement!==felt)felt.append(mobileMarker);}
+  else if(mobileMarker.parentElement===felt)$('game-view').querySelector('.game-layout').after(mobileMarker);
   const drawing=room.status==='drawing';
+  mobileMarker.classList.toggle('hidden',drawing);
   $('opening-draw').classList.toggle('hidden',!drawing);
   if(drawing){
     const cards=room.openingDraw?.cards||{},canDraw=!isTable&&!cards[state.playerId];
@@ -812,14 +824,14 @@ function renderGame() {
   if(room.status==='complete') toast('¡Partida terminada!');
 }
 function renderCompactTally(points,target){
-  const limit=normalizeTargetPoints(target),n=Math.min(Math.max(0,Math.floor(Number(points)||0)),limit),columns=limit/10;
-  const width=Math.max(96,columns*28+8),lines=[];
+  const limit=normalizeTargetPoints(target),n=Math.min(Math.max(0,Math.floor(Number(points)||0)),limit),slots=limit/10;
+  const halfHeight=slots*28+8,height=halfHeight*2,lines=[];
   for(let group=0;group<Math.ceil(n/5);group++){
-    const x=5+(group%columns)*28,y=5+Math.floor(group/columns)*32,size=Math.min(5,n-group*5),d=20;
+    const x=5,y=5+(group%slots)*28+(group>=slots?halfHeight:0),size=Math.min(5,n-group*5),d=20;
     const sides=[[x,y,x,y+d],[x,y+d,x+d,y+d],[x+d,y+d,x+d,y],[x+d,y,x,y],[x,y+d,x+d,y]];
     lines.push(...sides.slice(0,size).map(([a,b,c,d])=>`<line x1="${a}" y1="${b}" x2="${c}" y2="${d}"/>`));
   }
-  return `<svg class="compact-score-sticks" viewBox="0 0 ${width} 64" role="img" aria-label="${n} puntos de ${limit}"><line x1="0" y1="31" x2="${width}" y2="31" stroke="#efebd7" stroke-opacity=".3"/><g fill="none" stroke="#f0eee2" stroke-width="2.5" stroke-linecap="round">${lines.join('')}</g></svg>`;
+  return `<svg class="compact-score-sticks" viewBox="0 0 56 ${height}" preserveAspectRatio="xMinYMin meet" role="img" aria-label="${n} puntos de ${limit}"><line x1="0" y1="${halfHeight}" x2="56" y2="${halfHeight}" stroke="#efebd7" stroke-opacity=".4"/><g fill="none" stroke="#f0eee2" stroke-width="2.5" stroke-linecap="round">${lines.join('')}</g></svg>`;
 }
 function renderTally(points,target){
   const limit=normalizeTargetPoints(target),n=Math.min(Math.max(0,Math.floor(Number(points)||0)),limit);
@@ -996,7 +1008,6 @@ $('role-options').querySelectorAll('.role-card').forEach((card)=>{
 $('back-home').addEventListener('click',()=>{showView('welcome-view');openLobby();});
 $('enter-room').addEventListener('click',enterRoom);
 $('demo-button').addEventListener('click',()=>demoStart('player1'));
-$('start-game').addEventListener('click',async()=>{try{await startGame();}catch(error){console.error(error);toast(firebaseError(error));}});
 $('leave-room').addEventListener('click',()=>{if(state.unsubscribe)state.unsubscribe();if(state.privateUnsubscribe)state.privateUnsubscribe();state.room=null;state.demo=false;showView('welcome-view');openLobby();});
 $('game-home').addEventListener('click',()=>{if(state.demo){state.demo=false;showView('welcome-view');openLobby();return;}showView('waiting-view');});
 $('demo-device-switcher').addEventListener('click',(event)=>{const button=event.target.closest('[data-demo-role]');if(button)switchDemoRole(button.dataset.demoRole);});
