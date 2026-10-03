@@ -55,6 +55,44 @@ function makeCallNotice(text){
   if(!spoken||!['player1','player2'].includes(state.playerId))return null;
   return {id:crypto.randomUUID(),from:state.playerId,to:state.playerId==='player1'?'player2':'player1',text:/\bcanta \d+ (tantos|son mejores|son iguales)\b/i.test(text)?spoken:text,spoken,time:Date.now(),handNumber:state.room?.handNumber||1};
 }
+
+let roundPauseTimer=null;
+const roundPauseArrivals=new Map();
+function gameTime(){return Date.now()+(state.demo?0:Number(state.serverTimeOffset)||0);}
+function roundPauseInfo(room=state.room){
+  if(!room)return null;
+  let key,endsAt,duration,label;
+  if(room.resolvingTrick){
+    key='trick:'+room.resolutionId;endsAt=room.resolutionEndsAt;duration=3000;
+    const next=room.resolvedTrickWinner||room.mano;
+    label=room.handComplete?'Siguiente mano':next===state.playerId?'Jugás en':'Pausa';
+  }else if(room.status==='revealing'&&room.endReveal){
+    key='reveal:'+room.endReveal.id;endsAt=room.endReveal.endsAt;duration=5000;label='Siguiente mano';
+  }else if(room.pendingNextHand){
+    key='redeal:'+room.pendingNextHand.id;endsAt=room.pendingNextHand.endsAt;duration=3000;label='Siguiente mano';
+  }else return null;
+  const arrivalKey=`${state.roomCode}:${room.handNumber}:${key}`;
+  if(!Number.isFinite(Number(endsAt))||endsAt==null){
+    if(!roundPauseArrivals.has(arrivalKey))roundPauseArrivals.set(arrivalKey,gameTime()+duration);
+    endsAt=roundPauseArrivals.get(arrivalKey);
+  }
+  return {key,label,endsAt:Number(endsAt),seconds:Math.max(0,Math.ceil((Number(endsAt)-gameTime())/1000))};
+}
+function pauseMessage(){
+  const pause=roundPauseInfo();
+  if(!pause)return null;
+  return pause.seconds>0?`Pausa entre jugadas: faltan ${pause.seconds} ${pause.seconds===1?'segundo':'segundos'}.`:'La pausa terminó. Esperá un instante mientras continúa la partida.';
+}
+function renderRoundPauseTimer(){
+  clearTimeout(roundPauseTimer);roundPauseTimer=null;
+  const el=$('round-pause-timer'),pause=roundPauseInfo();
+  const visible=!!pause&&state.playerId!=='table'&&$('game-view').classList.contains('active');
+  el.classList.toggle('hidden',!visible);
+  if(!visible){el.textContent='';return;}
+  el.textContent=pause.seconds>0?`${pause.label} · ${pause.seconds} s`:'Continuando…';
+  roundPauseTimer=setTimeout(()=>renderRoundPauseTimer(),200);
+}
+
 function speakCall(text){
   if(!soundEnabled||!voiceUnlocked||!('speechSynthesis' in window))return;
   window.speechSynthesis.cancel();
@@ -122,6 +160,7 @@ async function firebaseServices() {
   if (!auth.currentUser) await authSdk.signInAnonymously(auth);
   state.uid = auth.currentUser.uid;
   state.firebase = { db: dbSdk.getDatabase(app, state.config.databaseURL), ...dbSdk };
+  dbSdk.onValue(dbSdk.ref(state.firebase.db,'.info/serverTimeOffset'),snapshot=>{state.serverTimeOffset=Number(snapshot.val())||0;});
   return state.firebase;
 }
 async function runPendingAction() {
@@ -646,6 +685,7 @@ async function nextHand(winner, scores, handNumber, message, envidoVerified=fals
   patches[`rooms/${state.roomCode}/public/trucoLevel`]=1;patches[`rooms/${state.roomCode}/public/pendingBet`]=null;
   patches[`rooms/${state.roomCode}/public/lastTrucoCaller`]=null;
   patches[`rooms/${state.roomCode}/public/florSettled`]=false;patches[`rooms/${state.roomCode}/public/flors`]={};patches[`rooms/${state.roomCode}/public/envidoClosed`]=false;patches[`rooms/${state.roomCode}/public/playedCount`]=0;
+  patches[`rooms/${state.roomCode}/public/resolutionEndsAt`]=null;
   patches[`rooms/${state.roomCode}/public/resolvingTrick`]=false;patches[`rooms/${state.roomCode}/public/resolutionId`]=null;patches[`rooms/${state.roomCode}/public/resolvedWinner`]=null;patches[`rooms/${state.roomCode}/public/resolvedTrickWinner`]=null;patches[`rooms/${state.roomCode}/public/handComplete`]=false;patches[`rooms/${state.roomCode}/public/pendingNextHand`]=null;
   patches[`rooms/${state.roomCode}/public/feed`]=[{text:`${message} Se reparte la siguiente mano.`,time:Date.now()},...(state.room.feed||[]).slice(0,6)];
   await state.firebase.update(state.firebase.ref(state.firebase.db),patches);
@@ -689,7 +729,7 @@ async function finishLiveHand(winner,scores,message){
   const terminal=Math.max(...Object.values(scores))>=targetPoints(current);
   if(groups.length){
     await writeRoom({status:'revealing',scores,lastHandScore:summary,handScoreEntries:[],turn:null,pendingBet:null,pendingNextHand:null,trickCards:[],resolvingTrick:false,resolutionId:null,handComplete:false,
-      endReveal:{id:crypto.randomUUID(),handNumber:current.handNumber,winner:winner||current.mano,scores,message,summary,terminal,groups},feed:topFeed(current,message)});
+      endReveal:{id:crypto.randomUUID(),endsAt:gameTime()+5000,handNumber:current.handNumber,winner:winner||current.mano,scores,message,summary,terminal,groups},feed:topFeed(current,message)});
   }else if(terminal){
     await writeRoom({scores,lastHandScore:summary,handScoreEntries:[],envidoAudit:null,status:'complete',trickCards:[],resolvingTrick:false,resolutionId:null,resolvedWinner:null,resolvedTrickWinner:null,handComplete:false,pendingNextHand:null,endReveal:{done:true},feed:topFeed(current,message)});
   }else await nextHand(winner,scores,current.handNumber||1,message,true);
@@ -709,6 +749,7 @@ function scheduleTableResolution() {
   const isRedeal=!!room.pendingNextHand;
   if(!isTrick&&!isRedeal&&!isReveal){state.resolutionTimerKey=null;clearTimeout(state.resolutionTimer);state.resolutionTimer=null;return;}
   const key=isReveal?`reveal:${room.endReveal.id}`:isTrick?`trick:${room.resolutionId}`:`redeal:${room.pendingNextHand.id}`;
+  const pause=roundPauseInfo(room),delay=Math.max(0,(pause?.endsAt||gameTime()+(isReveal?5000:3000))-gameTime());
   if(state.resolutionTimerKey===key)return;
   clearTimeout(state.resolutionTimer);state.resolutionTimerKey=key;
   state.resolutionTimer=setTimeout(async()=>{
@@ -729,7 +770,7 @@ function scheduleTableResolution() {
           const msg=`${current.players[winner].name} gana la mano y suma ${points} ${points===1?'tanto':'tantos'}.${florists.length===1&&!current.florSettled?' Además cobra 3 por la flor.':''}`;
           await finishLiveHand(winner,scores,msg);
         }else{
-          await writeRoom({trickCards:[],resolvingTrick:false,resolutionId:null,resolvedWinner:null,resolvedTrickWinner:null,handComplete:false,trickNo:(Number(current.trickNo)||1)+1,turn:trickWinner||current.mano||'player1',feed:topFeed(current,trickWinner?`${current.players[trickWinner].name} gana la baza.`:'Baza parda. Sigue la mano.')});
+          await writeRoom({trickCards:[],resolvingTrick:false,resolutionId:null,resolutionEndsAt:null,resolvedWinner:null,resolvedTrickWinner:null,handComplete:false,trickNo:(Number(current.trickNo)||1)+1,turn:trickWinner||current.mano||'player1',feed:topFeed(current,trickWinner?`${current.players[trickWinner].name} gana la baza.`:'Baza parda. Sigue la mano.')});
         }
       }else if(isRedeal&&state.room?.pendingNextHand?.id===room.pendingNextHand.id){
         const pending=state.room.pendingNextHand;
@@ -742,7 +783,7 @@ function scheduleTableResolution() {
       }
     }catch(error){console.error(error);toast(firebaseError(error));}
     finally{if(state.resolutionTimerKey===key){state.resolutionTimer=null;state.resolutionTimerKey=null;}}
-  },isReveal?5000:3000);
+  },delay);
 }
 async function recoverLegacyTrick(room) {
   const key=`${state.roomCode}:${room.handNumber||1}:${room.trickNo||1}`;
@@ -767,7 +808,10 @@ async function playCard(card) {
   const players=state.room.players||{};
   const other=state.playerId==='player1'?'player2':'player1';
   if (!players[state.playerId] || !players[other]) { toast('La mesa necesita a los dos jugadores para continuar.'); return; }
-  if (state.room.turn !== state.playerId || state.room.pendingBet || state.room.resolvingTrick) {
+  const pause=pauseMessage();
+  if(pause){toast(pause);return;}
+  if(state.room.pendingBet){toast('Primero respondé el canto pendiente.');return;}
+  if (state.room.turn !== state.playerId) {
     toast('Todavía no es tu turno. Esperá la jugada del otro jugador.');
     return;
   }
@@ -798,6 +842,7 @@ async function playCard(card) {
     patches[`rooms/${state.roomCode}/public/tricks`] = tricks;
     patches[`rooms/${state.roomCode}/public/turn`] = null;
     patches[`rooms/${state.roomCode}/public/resolvingTrick`] = true;
+    patches[`rooms/${state.roomCode}/public/resolutionEndsAt`] = gameTime()+3000;
     patches[`rooms/${state.roomCode}/public/resolutionId`] = resolutionId;
     patches[`rooms/${state.roomCode}/public/resolvedTrickWinner`] = winner;
     patches[`rooms/${state.roomCode}/public/resolvedWinner`] = handWinner;
@@ -832,6 +877,7 @@ function renderGame() {
   $('game-view').classList.toggle('player-mode', !isTable);
   const sharedTable = isTable || room.deviceMode === 'two';
   renderEndEvidence(room,sharedTable);
+  renderRoundPauseTimer();
   $('game-view').classList.toggle('two-device-mode', !isTable && room.deviceMode === 'two');
   $('demo-device-switcher').classList.toggle('hidden',!state.demo);
   $('demo-device-switcher').querySelectorAll('[data-demo-role]').forEach((button)=>button.setAttribute('aria-pressed',String(button.dataset.demoRole===state.playerId)));
@@ -898,7 +944,7 @@ function renderGame() {
   actions.innerHTML=room.status==='revealing'?'<span class="action-wait">FIN DE LA MANO</span>':pending||state.hand.length?buttons.join(''):`<span class="action-wait">${waitingForRival?'ESPERANDO LA ÚLTIMA CARTA DEL RIVAL…':'ESPERANDO EL REPARTO…'}</span>`;
   renderEnvidoPicker(room);
   actions.querySelectorAll('[data-action]').forEach((button)=>button.addEventListener('click',()=>{const act=button.dataset.action;if(state.demo){demoAction(act);return;}if(['yes','no','raise'].includes(act)||act.startsWith('raise-'))answerBet(act);else if(act==='reveal')revealEnvido();else if(act==='flor')callFlor();else callBet(act);}));
-  $('turn-badge').textContent=isTable?'MESA':pending?(pending.responder===state.playerId?'RESPONDÉ':'ESPERANDO'):myTurn?'TU TURNO':'ESPERÁ';$('turn-badge').classList.toggle('waiting-turn',!myTurn||!!pending);
+  $('turn-badge').textContent=isTable?'MESA':roundPauseInfo(room)?'PAUSA':pending?(pending.responder===state.playerId?'RESPONDÉ':'ESPERANDO'):myTurn?'TU TURNO':'ESPERÁ';$('turn-badge').classList.toggle('waiting-turn',!myTurn||!!pending);
   if(room.status==='complete') toast('¡Partida terminada!');
 }
 function renderCompactTally(points,target){
@@ -1038,7 +1084,8 @@ function demoAction(action){
 }
 function demoPlay(card) {
   const player=state.playerId;if(player==='table')return;
-  if(state.room.status!=='started'||state.room.resolvingTrick)return;
+  const pause=pauseMessage();if(pause){toast(pause);return;}
+  if(state.room.status!=='started')return;
   if(state.room.pendingBet){toast('Primero respondé el canto pendiente.');return;}
   if(state.room.turn!==player){toast('Todavía no es tu turno. Esperá la jugada del otro jugador.');return;}
   state.demoHands[player]=(state.demoHands[player]||[]).filter((item)=>item.id!==card.id);state.hand=[...state.demoHands[player]];state.room.playedCount=(state.room.playedCount||0)+1;
@@ -1049,8 +1096,8 @@ function demoPlay(card) {
     const wins={player1:state.room.tricks.filter((trick)=>trick.winner==='player1').length,player2:state.room.tricks.filter((trick)=>trick.winner==='player2').length};
     const handWinner=wins.player1>=2?'player1':wins.player2>=2?'player2':state.room.tricks.length>=3?(wins.player1===wins.player2?(state.room.tricks.find((trick)=>trick.winner)?.winner||state.room.mano):wins.player1>wins.player2?'player1':'player2'):null;
     if(winner)state.room.feed.unshift({text:`${state.room.players[winner].name} se lleva la baza.`,time:Date.now()});
-    state.room.resolvingTrick=true;
-    setTimeout(()=>{state.room.resolvingTrick=false;state.room.trickCards=[];if(handWinner){demoFinishHand(handWinner,state.room.trucoLevel||1);return;}else{state.room.turn=winner||state.room.mano;state.room.trickNo++;}state.hand=state.playerId==='table'?[]:[...(state.demoHands[state.playerId]||[])];renderGame();},3000);
+    state.room.resolvingTrick=true;state.room.resolutionId=crypto.randomUUID();state.room.resolutionEndsAt=gameTime()+3000;state.room.resolvedTrickWinner=winner;state.room.handComplete=!!handWinner;
+    setTimeout(()=>{state.room.resolvingTrick=false;state.room.resolutionEndsAt=null;state.room.handComplete=false;state.room.trickCards=[];if(handWinner){demoFinishHand(handWinner,state.room.trucoLevel||1);return;}else{state.room.turn=winner||state.room.mano;state.room.trickNo++;}state.hand=state.playerId==='table'?[]:[...(state.demoHands[state.playerId]||[])];renderGame();},3000);
   }else state.room.turn=player==='player1'?'player2':'player1';
   renderGame();toast('Jugada de demostración.');
 }
@@ -1065,7 +1112,7 @@ function demoFinishHand(winner,points){
 }
 function demoShowEvidence(groups){
   const room=state.room;
-  room.status='revealing';room.pendingBet=null;room.trickCards=[];room.turn=null;room.endReveal={groups};
+  room.status='revealing';room.pendingBet=null;room.trickCards=[];room.turn=null;room.endReveal={id:crypto.randomUUID(),endsAt:gameTime()+5000,groups};
   setTimeout(()=>{if(!state.demo||state.room!==room||room.status!=='revealing')return;demoDealAfterHand();},5000);
 }
 function demoDealAfterHand(){
@@ -1075,7 +1122,7 @@ function demoDealAfterHand(){
   state.demoHands={player1:deck.slice(0,3),player2:deck.slice(3,6)};
   state.demoOriginalHands=structuredClone(state.demoHands);
   state.demoTruth={player1:handEnvido(state.demoHands.player1,deck[6]),player2:handEnvido(state.demoHands.player2,deck[6])};
-  Object.assign(room,{status:'started',endReveal:null,mano,dealer:otherPlayer(mano),turn:mano,handNumber:room.handNumber+1,tricks:[],trickCards:[],trickNo:1,muestra:deck[6],deckCount:33,playedCount:0,trucoLevel:1,pendingBet:null,lastTrucoCaller:null,flors:{},florSettled:false,envidoClosed:false,callNotice:null});
+  Object.assign(room,{status:'started',resolutionEndsAt:null,resolvingTrick:false,endReveal:null,mano,dealer:otherPlayer(mano),turn:mano,handNumber:room.handNumber+1,tricks:[],trickCards:[],trickNo:1,muestra:deck[6],deckCount:33,playedCount:0,trucoLevel:1,pendingBet:null,lastTrucoCaller:null,flors:{},florSettled:false,envidoClosed:false,callNotice:null});
   state.hand=state.playerId==='table'?[]:[...state.demoHands[state.playerId]];
   demoFeed(`${room.players[room.dealer].name} reparte. Empieza ${room.players[mano].name}.`);renderGame();
 }

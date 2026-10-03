@@ -816,3 +816,6 @@ body { min-height:100dvh; }
 .reveal-mode .hand,.reveal-mode .trick-cards{visibility:hidden}
 .reveal-mode.table-mode .end-hand-reveal{inset:2% 3% 3%}
 @media(max-height:650px){.end-hand-reveal{gap:12px;padding:8px}.end-reveal-card{width:clamp(60px,17vw,94px)}.end-reveal-group{gap:7px}}
+
+.round-pause-timer{position:absolute;top:54px;left:50%;transform:translateX(-50%);z-index:120;padding:5px 9px;border-radius:20px;border:1px solid #e8c98345;background:#12382b;color:#e8c983;font:500 11px 'DM Sans',sans-serif;letter-spacing:.02em;white-space:nowrap;pointer-events:none;font-variant-numeric:tabular-nums}
+.round-pause-timer.hidden,.table-mode .round-pause-timer{display:none!important}
