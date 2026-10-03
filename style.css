@@ -845,13 +845,11 @@ body { min-height:100dvh; }
 .player-mode .action-buttons .call-button,.player-mode .action-buttons .pass-button{
  min-width:82px;min-height:48px;height:auto;padding:7px 11px;border-radius:10px;
  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
- font:600 10px 'DM Sans',sans-serif;letter-spacing:.06em;line-height:1.15;
+ font:700 13px 'DM Sans',sans-serif;letter-spacing:.04em;line-height:1.2;
 }
 .player-mode .action-buttons .call-button{background:#e8c983;color:#193429;border-color:#e8c983;box-shadow:0 2px 8px #071b1140}
 .player-mode .action-buttons .pass-button{background:#163a2c;border-color:#93aa9a;color:#e9eee5}
-.player-mode .action-buttons .call-button small,.player-mode .action-buttons .pass-button small{
- font:400 9px 'DM Sans',sans-serif;letter-spacing:.02em;opacity:.78;text-transform:none
-}
+.player-mode .action-buttons strong{font-weight:inherit}
 @media(max-width:640px){
  .player-mode .hand{top:48%;width:calc(100% - 12px);max-width:440px;padding:0 6px;z-index:3}
  .player-mode .hand-card{width:clamp(110px,34vw,136px);height:clamp(158px,48vw,184px);flex-basis:clamp(110px,34vw,136px);margin-left:-31px;margin-right:-31px}
@@ -859,7 +857,7 @@ body { min-height:100dvh; }
  .player-mode .hand-card:last-child{margin-right:0}
  .player-mode .player-actions{bottom:9px;width:calc(100% - 16px)}
  .player-mode .action-buttons{gap:6px}
- .player-mode .action-buttons .call-button,.player-mode .action-buttons .pass-button{min-width:88px;min-height:46px;padding:6px 8px;font-size:9px}
+ .player-mode .action-buttons .call-button,.player-mode .action-buttons .pass-button{min-width:88px;min-height:46px;padding:8px 9px;font-size:12px}
 }
 @media(max-width:370px){
  .player-mode .hand-card{width:clamp(106px,33vw,124px);height:clamp(152px,47vw,170px);flex-basis:clamp(106px,33vw,124px);margin-left:-28px;margin-right:-28px}
