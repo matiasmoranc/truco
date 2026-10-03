@@ -804,3 +804,15 @@ body { min-height:100dvh; }
 #welcome-view .home-footer{width:100%;flex:0 0 32px;display:flex;justify-content:center;align-items:center}
 #welcome-view .home-footer .demo-link{height:32px;min-height:32px;display:inline-flex;align-items:center;justify-content:center;margin:0;padding:0 12px;background:none;border:0;border-radius:8px;color:#a3bcb0;font-size:12px;font-weight:400;box-shadow:none}
 #welcome-view .home-footer .demo-link:hover{color:#e8c983}
+
+/* Show the original scoring cards before the following deal. */
+.end-hand-reveal{position:absolute;inset:5% 3% 9%;z-index:110;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;background:#12382b;overflow:auto;padding:14px 8px}
+.end-hand-reveal.hidden{display:none!important}
+.end-reveal-group{width:100%;display:flex;flex-direction:column;align-items:center;gap:12px}
+.end-reveal-group h3{margin:0;text-align:center;color:#f0eee2;font-size:18px;font-family:'DM Sans',sans-serif;font-weight:600;line-height:1.3}
+.end-reveal-group h3 span{display:block;margin-top:4px;color:#e8c983;font-size:13px;font-weight:400}
+.end-reveal-cards{display:flex;justify-content:center;gap:10px;width:100%}
+.end-reveal-card{width:clamp(66px,20vw,130px);aspect-ratio:2/3;flex:0 0 auto;border-radius:9px;background-color:#f2eddf;box-shadow:0 4px 12px #0003}
+.reveal-mode .hand,.reveal-mode .trick-cards{visibility:hidden}
+.reveal-mode.table-mode .end-hand-reveal{inset:2% 3% 3%}
+@media(max-height:650px){.end-hand-reveal{gap:12px;padding:8px}.end-reveal-card{width:clamp(60px,17vw,94px)}.end-reveal-group{gap:7px}}
