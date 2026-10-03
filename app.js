@@ -939,6 +939,8 @@ function renderGame() {
   renderCallNotice();
   const room = state.room, players=room.players||{}, isTable=state.playerId==='table', mine=players[state.playerId], opponent=players[state.playerId==='player1'?'player2':'player1'];
   document.documentElement.style.setProperty('--tally-board-height',`${50+(targetPoints(room)/10*42+12)*2}px`);
+  const compactTallyHeight=Math.max(76,20+(targetPoints(room)/10)*56);
+  document.documentElement.style.setProperty('--compact-tally-height',compactTallyHeight+'px');
   $('game-view').classList.toggle('reveal-mode',room.status==='revealing');
   $('game-view').classList.toggle('table-mode', isTable);
   $('game-view').classList.toggle('player-mode', !isTable);
@@ -1207,6 +1209,7 @@ function animatePlayedHandCard(card,origin=null){
   const flight=source.cloneNode(true);
   flight.classList.remove('dragging','launching-card');
   flight.classList.add('card-flight');
+  if($('game-view').classList.contains('two-device-mode'))flight.classList.add('two-device-flight');
   flight.removeAttribute('data-card');flight.removeAttribute('aria-disabled');
   flight.setAttribute('aria-hidden','true');flight.tabIndex=-1;
   flight.style.left=rect.left+'px';flight.style.top=rect.top+'px';

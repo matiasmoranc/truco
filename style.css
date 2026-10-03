@@ -892,3 +892,54 @@ body { min-height:100dvh; }
  .player-mode .hand-card{transition:none}
  .card-flight.hand-card{animation-duration:.1s!important}
 }
+
+/* Two phones keep the compact hand and leave a fixed clear lane for calls. */
+.player-mode.two-device-mode .hand{
+  top:calc(100% - 156px);
+  width:calc(100% - 20px);
+  max-width:360px;
+  z-index:5;
+}
+.player-mode.two-device-mode .hand-card{
+  width:clamp(110px,34vw,136px);
+  height:clamp(158px,48vw,184px);
+  flex-basis:clamp(110px,34vw,136px);
+  margin-left:-31px;margin-right:-31px;
+}
+.player-mode.two-device-mode .hand-card:first-child{margin-left:0}
+.player-mode.two-device-mode .hand-card:last-child{margin-right:0}
+.player-mode.two-device-mode .player-actions{z-index:20}
+.player-mode.two-device-mode .mobile-score{
+  width:126px;
+  height:var(--compact-tally-height);
+  min-height:0;max-height:var(--compact-tally-height);
+  overflow:visible;
+}
+.player-mode.two-device-mode .mobile-score-grid{
+  height:calc(var(--compact-tally-height) - 18px);
+  min-height:0;
+  gap:7px;
+  align-items:stretch;
+}
+.player-mode.two-device-mode .mobile-tally,
+.player-mode.two-device-mode .compact-score-sticks{
+  height:100%;
+  min-height:0;
+}
+.player-mode.two-device-mode .mobile-score-divider{
+  height:100%;
+  max-height:calc(var(--compact-tally-height) - 18px);
+  align-self:stretch;
+}
+.card-flight.two-device-flight{
+  animation-name:hand-card-slide-away!important;
+  transform-origin:center center!important;
+}
+@keyframes hand-card-slide-away{
+  from{transform:translate3d(0,0,0) rotate(0deg) scale(1);opacity:1}
+  to{transform:translate3d(0,var(--flight-y),0) rotate(-4deg) scale(.42);opacity:.25}
+}
+@media(max-height:650px){
+  .player-mode.two-device-mode .hand{top:calc(100% - 138px)}
+  .player-mode.two-device-mode .hand-card{width:clamp(96px,31vw,112px);height:clamp(140px,42vw,160px);flex-basis:clamp(96px,31vw,112px);margin-left:-26px;margin-right:-26px}
+}
