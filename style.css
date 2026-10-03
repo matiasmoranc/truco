@@ -874,3 +874,23 @@ body { min-height:100dvh; }
 @media(max-width:370px){
  .player-mode .hand-card{width:clamp(127px,39.6vw,149px);height:clamp(182px,56.4vw,204px);flex-basis:clamp(127px,39.6vw,149px);margin-left:-34px;margin-right:-34px}
 }
+
+/* Live reorder preview: translate is independent of each card's fan rotation. */
+.player-mode .hand-card{translate:var(--preview-x,0px) 0;transition:translate .16s ease,transform .18s ease,box-shadow .18s ease}
+.player-mode .hand-card.dragging{translate:0 0;transition:none}
+.player-mode .hand-card.launching-card{visibility:hidden}
+.card-flight.hand-card{
+ position:fixed!important;z-index:10000!important;margin:0!important;pointer-events:none!important;
+ translate:none!important;rotate:none!important;transform-origin:center!important;
+ visibility:visible!important;opacity:1!important;transition:none!important;
+ animation:hand-card-slide-out .42s cubic-bezier(.32,.02,.62,1) forwards!important;
+ box-shadow:0 12px 28px #041b1155!important;
+}
+@keyframes hand-card-slide-out{
+ from{transform:translate3d(0,0,0) rotate(0deg)}
+ to{transform:translate3d(0,var(--flight-y),0) rotate(-4deg)}
+}
+@media(prefers-reduced-motion:reduce){
+ .player-mode .hand-card{transition:none}
+ .card-flight.hand-card{animation-duration:.1s!important}
+}
