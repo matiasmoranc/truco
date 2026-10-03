@@ -2,7 +2,7 @@ const FIREBASE_VERSION = '12.4.0';
 const $ = (id) => document.getElementById(id);
 const views = ['welcome-view', 'setup-view', 'waiting-view', 'game-view', 'config-view'];
 const storageKey = 'truco-firebase-config';
-let state = { role: 'table', joining: false, config: null, firebase: null, roomCode: null, selectedRoom: null, uid: null, playerId: null, unsubscribe: null, privateUnsubscribe: null, lobbyUnsubscribe: null, room: null, hand: [], demo: false, demoHands: {}, nextAction: null, resolutionTimer: null, resolutionTimerKey: null, playActionInFlight: false, legacyRepairKey: null, emptyHandRepairKey: null };
+let state = { role: 'table', joining: false, config: null, firebase: null, roomCode: null, selectedRoom: null, uid: null, playerId: null, unsubscribe: null, privateUnsubscribe: null, lobbyUnsubscribe: null, room: null, hand: [], handOrder: [], handOrderKey: null, demo: false, demoHands: {}, nextAction: null, resolutionTimer: null, resolutionTimerKey: null, playActionInFlight: false, legacyRepairKey: null, emptyHandRepairKey: null };
 
 function showView(id) { views.forEach((name) => $(name).classList.toggle('active', name === id)); }
 function suitSvg(suit){
@@ -863,6 +863,27 @@ function cardAccessibleName(card) {
   return `${card.label} de ${suits[card.suit]||card.suit}`;
 }
 
+function handOrderKey(){return `truco-hand-order:${state.roomCode||'local'}:${state.playerId||'player1'}`;}
+function orderedHand(){
+  const key=handOrderKey();
+  if(state.handOrderKey!==key){
+    state.handOrderKey=key;
+    try{state.handOrder=JSON.parse(localStorage.getItem(key)||'[]');}catch{state.handOrder=[];}
+    if(!Array.isArray(state.handOrder))state.handOrder=[];
+  }
+  const cards=state.hand||[],valid=new Set(cards.map(card=>card.id));
+  let order=(state.handOrder||[]).filter(id=>valid.has(id));
+  for(const card of cards)if(!order.includes(card.id))order.push(card.id);
+  if(order.length!==(state.handOrder||[]).length||order.some((id,index)=>id!==state.handOrder[index])){
+    state.handOrder=order;
+    try{localStorage.setItem(handOrderKey(),JSON.stringify(order));}catch{}
+  }
+  return order.map(id=>cards.find(card=>card.id===id)).filter(Boolean);
+}
+function saveHandOrder(order){
+  state.handOrder=order;state.handOrderKey=handOrderKey();
+  try{localStorage.setItem(state.handOrderKey,JSON.stringify(order));}catch{}
+}
 function renderGame() {
   if (!state.room) return;
   if(state.demo&&state.room.status==='complete'&&!state.room.endReveal){
@@ -909,8 +930,9 @@ function renderGame() {
   $('opponent-name').textContent=isTable?'Los jugadores':(opponent?.name||'Esperando rival'); $('opponent-avatar').textContent=(isTable?'T':(opponent?.name||'J').slice(0,1)).toUpperCase();
   const myTurn=!isTable&&room.turn===state.playerId&&room.status==='started'&&!room.resolvingTrick&&state.hand.length>0&&!room.pendingBet&&!room.pendingNextHand;
   $('turn-badge').textContent=isTable?'MESA':myTurn?'TU TURNO':'ESPERÁ'; $('turn-badge').classList.toggle('waiting-turn',!myTurn);
-  $('hand').innerHTML=isTable?'':state.hand.map((card) => `<button class="hand-card sprite-card ${card.red?'card-red':''}" style="--sprite-position:${cardSpritePosition(card)}" aria-label="${cardAccessibleName(card)}" aria-disabled="${!myTurn}" data-card="${card.id}"><span class="sr-only">${cardAccessibleName(card)}</span></button>`).join('');
-  document.querySelectorAll('.hand-card').forEach((button) => button.addEventListener('click', () => {const card=state.hand.find((item)=>item.id===button.dataset.card); if(card) playCard(card);}));
+  const visibleHand=isTable?[]:orderedHand();
+  $('hand').innerHTML=visibleHand.map((card) => `<button class="hand-card sprite-card ${card.red?'card-red':''}" style="--sprite-position:${cardSpritePosition(card)}" aria-label="${cardAccessibleName(card)}" aria-disabled="${!myTurn}" data-card="${card.id}"><span class="sr-only">${cardAccessibleName(card)}</span></button>`).join('');
+
   $('trick-cards').innerHTML=sharedTable?(room.trickCards||[]).map(({card,playerId})=>`<div class="played-card played-card-${playerId||'player1'} sprite-card ${card.red?'card-red':''}" style="--sprite-position:${cardSpritePosition(card)}" role="img" aria-label="${cardAccessibleName(card)}"><span class="sr-only">${cardAccessibleName(card)}</span></div>`).join(''):'';
   const sample=room.muestra;
   $('muestra-card').classList.toggle('hidden',!sharedTable||!sample);
@@ -932,16 +954,19 @@ function renderGame() {
   const canEnvido=!room.envidoClosed&&(room.playedCount||0)===0&&!room.flors?.[state.playerId]&&!room.flors?.[other]&&!hasFlor(state.hand,room.muestra);
   let buttons=[];
   if(pending?.revealMode){buttons.push('<span class="action-wait">'+(pending.revealTurn===state.playerId?'Deslizá para elegir tus tantos':'Esperando los tantos del rival…')+'</span>');}
-  else if(pending){if(pending.responder===state.playerId){if(['envido','truco'].includes(pending.type)&&(room.playedCount||0)===0&&hasFlor(state.hand,room.muestra)&&!room.flors?.[state.playerId])buttons.push('<button class="call-button" data-action="flor">FLOR</button>');if(pending.type==='truco'&&canEnvido)buttons.push('<button class="pass-button" data-action="envido">ENVIDO</button><button class="pass-button" data-action="real">REAL</button><button class="pass-button" data-action="falta">FALTA</button>');buttons.push(`${pending.type==='flor'&&pending.single&&!hasFlor(state.hand,room.muestra)?'':`<button class="call-button" data-action="yes">${pending.type==='flor'?(pending.single?'FLOR':'LA MÍA'):'QUIERO'}</button>`}<button class="pass-button" data-action="no">${pending.type==='flor'&&pending.single?'NO TENGO FLOR':'NO QUIERO'}</button>`);if(pending.type==='truco'&&pending.stake<4)buttons.push(`<button class="pass-button" data-action="raise">${pending.stake===2?'RETRUCO':'VALE 4'}</button>`);if(pending.type==='envido'){buttons.push('<button class="pass-button" data-action="raise-envido">ENVIDO</button><button class="pass-button" data-action="raise-real">REAL</button><button class="pass-button" data-action="raise-falta">FALTA</button>');}if(pending.type==='flor'&&!pending.single){buttons.push('<button class="pass-button" data-action="raise-conflor">CON FLOR ENVIDO</button><button class="pass-button" data-action="raise-faltaflor">CONTRA FLOR AL RESTO</button>');}}else buttons.push('<span class="action-wait">ESPERANDO RESPUESTA…</span>');}
+  else if(pending){if(pending.responder===state.playerId){if(['envido','truco'].includes(pending.type)&&(room.playedCount||0)===0&&hasFlor(state.hand,room.muestra)&&!room.flors?.[state.playerId])buttons.push('<button class="call-button" data-action="flor"><strong>FLOR</strong><small>3 puntos</small></button>');if(pending.type==='truco'&&canEnvido)buttons.push('<button class="pass-button" data-action="envido"><strong>ENVIDO</strong><small>2 puntos</small></button><button class="pass-button" data-action="real"><strong>REAL ENVIDO</strong><small>3 puntos</small></button><button class="pass-button" data-action="falta"><strong>FALTA ENVIDO</strong><small>hasta el final</small></button>');buttons.push(`${pending.type==='flor'&&pending.single&&!hasFlor(state.hand,room.muestra)?'':`<button class="call-button" data-action="yes">${pending.type==='flor'?(pending.single?'FLOR':'LA MÍA'):'QUIERO'}</button>`}<button class="pass-button" data-action="no">${pending.type==='flor'&&pending.single?'NO TENGO FLOR':'NO QUIERO'}</button>`);if(pending.type==='truco'&&pending.stake<4)buttons.push(`<button class="pass-button" data-action="raise">${pending.stake===2?'RETRUCO':'VALE 4'}</button>`);if(pending.type==='envido'){buttons.push('<button class="pass-button" data-action="raise-envido">ENVIDO</button><button class="pass-button" data-action="raise-real">REAL</button><button class="pass-button" data-action="raise-falta">FALTA</button>');}if(pending.type==='flor'&&!pending.single){buttons.push('<button class="pass-button" data-action="raise-conflor">CON FLOR ENVIDO</button><button class="pass-button" data-action="raise-faltaflor">CONTRA FLOR AL RESTO</button>');}}else buttons.push('<span class="action-wait">ESPERANDO RESPUESTA…</span>');}
   else {
-    if((room.playedCount||0)===0&&state.hand.length&&hasFlor(state.hand,room.muestra)&&!room.flors?.[state.playerId])buttons.push('<button class="call-button" data-action="flor">FLOR</button>');
+    if((room.playedCount||0)===0&&state.hand.length&&hasFlor(state.hand,room.muestra)&&!room.flors?.[state.playerId])buttons.push('<button class="call-button" data-action="flor"><strong>FLOR</strong><small>3 puntos</small></button>');
     if(myTurn){
     if(canEnvido)buttons.push('<button class="pass-button" data-action="envido">ENVIDO</button><button class="pass-button" data-action="real">REAL</button><button class="pass-button" data-action="falta">FALTA</button>');
-    const level=Number(room.trucoLevel)||1;if(level<4&&(level===1||room.lastTrucoCaller!==state.playerId))buttons.push(`<button class="call-button" data-action="${level===1?'truco':level===2?'retruco':'vale4'}">${level===1?'TRUCO':level===2?'RETRUCO':'VALE 4'}</button>`);
+    const level=Number(room.trucoLevel)||1;if(level<4&&(level===1||room.lastTrucoCaller!==state.playerId))buttons.push(`<button class="call-button" data-action="${level===1?'truco':level===2?'retruco':'vale4'}"><strong>${level===1?'TRUCO':level===2?'RETRUCO':'VALE 4'}</strong><small>${level===1?'sube a 2':level===2?'sube a 3':'sube a 4'} puntos</small></button>`);
     }else if(!buttons.length)buttons.push('<span class="action-wait">ESPERÁ TU TURNO</span>');
   }
   const waitingForRival=!state.hand.length&&!room.resolvingTrick&&!room.pendingNextHand&&room.turn===other;
-  actions.innerHTML=room.status==='revealing'?'<span class="action-wait">FIN DE LA MANO</span>':pending||state.hand.length?buttons.join(''):`<span class="action-wait">${waitingForRival?'ESPERANDO LA ÚLTIMA CARTA DEL RIVAL…':'ESPERANDO EL REPARTO…'}</span>`;
+  const hasChoices=buttons.length>0&&!buttons.every(button=>button.includes('action-wait'));
+  const category=pending?(pending.revealMode?'PUNTOS DEL ENVIDO':'RESPONDER CANTO'):'CANTAR';
+  const choices=hasChoices?`<div class="action-group"><span class="action-caption">${category}</span><div class="action-buttons">${buttons.join('')}</div></div>`:buttons.join('');
+  actions.innerHTML=room.status==='revealing'?'<span class="action-wait">FIN DE LA MANO</span>':pending||state.hand.length?choices:`<span class="action-wait">${waitingForRival?'ESPERANDO LA ÚLTIMA CARTA DEL RIVAL…':'ESPERANDO EL REPARTO…'}</span>`;
   renderEnvidoPicker(room);
   actions.querySelectorAll('[data-action]').forEach((button)=>button.addEventListener('click',()=>{const act=button.dataset.action;if(state.demo){demoAction(act);return;}if(['yes','no','raise'].includes(act)||act.startsWith('raise-'))answerBet(act);else if(act==='reveal')revealEnvido();else if(act==='flor')callFlor();else callBet(act);}));
   $('turn-badge').textContent=isTable?'MESA':roundPauseInfo(room)?'PAUSA':pending?(pending.responder===state.playerId?'RESPONDÉ':'ESPERANDO'):myTurn?'TU TURNO':'ESPERÁ';$('turn-badge').classList.toggle('waiting-turn',!myTurn||!!pending);
@@ -1126,6 +1151,71 @@ function demoDealAfterHand(){
   state.hand=state.playerId==='table'?[]:[...state.demoHands[state.playerId]];
   demoFeed(`${room.players[room.dealer].name} reparte. Empieza ${room.players[mano].name}.`);renderGame();
 }
+
+
+let handGesture=null,handLastTap=null,ignoreHandClickUntil=0;
+const handSurface=$('hand');
+function handCards(){return [...handSurface.querySelectorAll('.hand-card')];}
+function finishHandGesture(event,cancelled=false){
+  const drag=handGesture;if(!drag||drag.pointerId!==event.pointerId)return;
+  handGesture=null;
+  try{handSurface.releasePointerCapture(event.pointerId);}catch{}
+  const card=handSurface.querySelector(`[data-card="${CSS.escape(drag.cardId)}"]`);
+  if(card){card.classList.remove('dragging');card.style.removeProperty('--drag-x');card.style.removeProperty('--drag-y');}
+  if(cancelled)return;
+  const dx=event.clientX-drag.startX,dy=event.clientY-drag.startY;
+  const moved=drag.moved||Math.abs(dx)>9||Math.abs(dy)>9;
+  if(moved){
+    handLastTap=null;
+    if(dy<=-40){
+      ignoreHandClickUntil=Date.now()+500;
+      const played=state.hand.find(item=>item.id===drag.cardId);
+      if(played)playCard(played);
+      return;
+    }
+    const current=orderedHand().map(item=>item.id);
+    const from=current.indexOf(drag.cardId);
+    if(from>=0&&current.length>1){
+      const cards=handCards();
+      const centers=cards.map(el=>{const r=el.getBoundingClientRect();return {id:el.dataset.card,x:r.left+r.width/2};});
+      const target=centers.reduce((best,item)=>Math.abs(event.clientX-item.x)<Math.abs(event.clientX-best.x)?item:best,centers[0]);
+      const to=current.indexOf(target?.id);
+      if(to>=0&&to!==from){current.splice(from,1);current.splice(to,0,drag.cardId);saveHandOrder(current);renderGame();}
+    }
+    ignoreHandClickUntil=Date.now()+400;
+    return;
+  }
+  if(handLastTap?.id===drag.cardId&&Date.now()-handLastTap.at<=450){
+    handLastTap=null;ignoreHandClickUntil=Date.now()+500;
+    const played=state.hand.find(item=>item.id===drag.cardId);
+    if(played)playCard(played);
+  }else handLastTap={id:drag.cardId,at:Date.now()};
+}
+handSurface.addEventListener('pointerdown',event=>{
+  const card=event.target.closest('.hand-card');
+  if(!card||state.playerId==='table'||!state.hand.some(item=>item.id===card.dataset.card))return;
+  if(event.button!=null&&event.button!==0)return;
+  handGesture={pointerId:event.pointerId,cardId:card.dataset.card,startX:event.clientX,startY:event.clientY,moved:false};
+  try{handSurface.setPointerCapture(event.pointerId);}catch{}
+});
+handSurface.addEventListener('pointermove',event=>{
+  const drag=handGesture;if(!drag||drag.pointerId!==event.pointerId)return;
+  const dx=event.clientX-drag.startX,dy=event.clientY-drag.startY;
+  if(!drag.moved&&Math.hypot(dx,dy)<7)return;
+  drag.moved=true;
+  const card=handSurface.querySelector(`[data-card="${CSS.escape(drag.cardId)}"]`);
+  if(card){card.classList.add('dragging');card.style.setProperty('--drag-x',`${dx}px`);card.style.setProperty('--drag-y',`${dy}px`);}
+});
+handSurface.addEventListener('pointerup',event=>finishHandGesture(event));
+handSurface.addEventListener('pointercancel',event=>finishHandGesture(event,true));
+handSurface.addEventListener('click',event=>{
+  if(Date.now()<ignoreHandClickUntil)event.preventDefault();
+});
+handSurface.addEventListener('keydown',event=>{
+  const card=event.target.closest('.hand-card');
+  if(!card||!['Enter',' '].includes(event.key))return;
+  event.preventDefault();const played=state.hand.find(item=>item.id===card.dataset.card);if(played)playCard(played);
+});
 
 document.querySelectorAll('.scoreboard,.mobile-score').forEach(marker=>{
   marker.setAttribute('role','button');marker.setAttribute('tabindex','0');marker.setAttribute('aria-label','Ver puntos de la última mano');

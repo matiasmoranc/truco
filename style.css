@@ -819,3 +819,58 @@ body { min-height:100dvh; }
 
 .round-pause-timer{position:absolute;top:54px;left:50%;transform:translateX(-50%);z-index:120;padding:5px 9px;border-radius:20px;border:1px solid #e8c98345;background:#12382b;color:#e8c983;font:500 11px 'DM Sans',sans-serif;letter-spacing:.02em;white-space:nowrap;pointer-events:none;font-variant-numeric:tabular-nums}
 .round-pause-timer.hidden,.table-mode .round-pause-timer{display:none!important}
+
+/* Larger cards and touch controls for playing from the hand. */
+.player-mode .hand{perspective:900px;overflow:visible}
+.player-mode .hand-card{
+ width:clamp(110px,34vw,140px);
+ height:clamp(158px,48vw,190px);
+ flex-basis:clamp(110px,34vw,140px);
+ margin-left:-32px;margin-right:-32px;
+ touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;
+ cursor:grab;will-change:transform;
+}
+.player-mode .hand-card:first-child{margin-left:0}
+.player-mode .hand-card:last-child{margin-right:0}
+.player-mode .hand-card.dragging{
+ z-index:40;cursor:grabbing;
+ transform:translate3d(var(--drag-x,0px),var(--drag-y,0px),0) scale(1.045)!important;
+ transition:none;box-shadow:0 16px 32px #06160dc4;
+}
+.player-mode .hand-card:focus-visible{outline:2px solid #e8c983;outline-offset:3px}
+.player-mode .player-actions{width:calc(100% - 24px);max-width:500px;bottom:12px;gap:0}
+.player-mode .action-group{width:100%;display:flex;flex-direction:column;align-items:center;gap:6px}
+.player-mode .action-caption{font:600 9px 'DM Sans',sans-serif;letter-spacing:.16em;color:#b5c7bb}
+.player-mode .action-buttons{width:100%;display:flex;justify-content:center;align-items:stretch;flex-wrap:wrap;gap:7px}
+.player-mode .action-buttons .call-button,.player-mode .action-buttons .pass-button{
+ min-width:82px;min-height:48px;height:auto;padding:7px 11px;border-radius:10px;
+ display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+ font:600 10px 'DM Sans',sans-serif;letter-spacing:.06em;line-height:1.15;
+}
+.player-mode .action-buttons .call-button{background:#e8c983;color:#193429;border-color:#e8c983;box-shadow:0 2px 8px #071b1140}
+.player-mode .action-buttons .pass-button{background:#163a2c;border-color:#93aa9a;color:#e9eee5}
+.player-mode .action-buttons .call-button small,.player-mode .action-buttons .pass-button small{
+ font:400 9px 'DM Sans',sans-serif;letter-spacing:.02em;opacity:.78;text-transform:none
+}
+@media(max-width:640px){
+ .player-mode .hand{top:48%;width:calc(100% - 12px);max-width:440px;padding:0 6px;z-index:3}
+ .player-mode .hand-card{width:clamp(110px,34vw,136px);height:clamp(158px,48vw,184px);flex-basis:clamp(110px,34vw,136px);margin-left:-31px;margin-right:-31px}
+ .player-mode .hand-card:first-child{margin-left:0}
+ .player-mode .hand-card:last-child{margin-right:0}
+ .player-mode .player-actions{bottom:9px;width:calc(100% - 16px)}
+ .player-mode .action-buttons{gap:6px}
+ .player-mode .action-buttons .call-button,.player-mode .action-buttons .pass-button{min-width:88px;min-height:46px;padding:6px 8px;font-size:9px}
+}
+@media(max-width:370px){
+ .player-mode .hand-card{width:clamp(106px,33vw,124px);height:clamp(152px,47vw,170px);flex-basis:clamp(106px,33vw,124px);margin-left:-28px;margin-right:-28px}
+}
+
+/* El aumento del 20% también prevalece sobre los tamaños móviles anteriores. */
+@media(max-width:640px){
+ .player-mode .hand-card{width:clamp(132px,40.8vw,163px);height:clamp(190px,57.6vw,221px);flex-basis:clamp(132px,40.8vw,163px);margin-left:-38px;margin-right:-38px}
+ .player-mode .hand-card:first-child{margin-left:0}
+ .player-mode .hand-card:last-child{margin-right:0}
+}
+@media(max-width:370px){
+ .player-mode .hand-card{width:clamp(127px,39.6vw,149px);height:clamp(182px,56.4vw,204px);flex-basis:clamp(127px,39.6vw,149px);margin-left:-34px;margin-right:-34px}
+}
