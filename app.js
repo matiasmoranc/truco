@@ -89,7 +89,7 @@ function renderRoundPauseTimer(){
   const visible=!!pause&&state.playerId!=='table'&&$('game-view').classList.contains('active');
   el.classList.toggle('hidden',!visible);
   if(!visible){el.textContent='';return;}
-  if(el.parentElement!==$('game-view'))$('game-view').append(el);
+  if(el.parentElement!==$('game-view'))$('turn-badge').append(el);
   el.textContent=pause.seconds+' s';
   roundPauseTimer=setTimeout(()=>renderRoundPauseTimer(),200);
 }
@@ -997,6 +997,15 @@ async function expireTurnClock(clock){
   }catch(error){console.error('[truco:turn-clock]',error);}
   finally{turnClockWritePending=false;}
 }
+function setTurnBadge(text){
+  const badge=$('turn-badge');
+  let label=badge.querySelector('.turn-badge-label');
+  if(!label){
+    Array.from(badge.childNodes).filter(node=>node.nodeType===3).forEach(node=>node.remove());
+    label=document.createElement('span');label.className='turn-badge-label';badge.prepend(label);
+  }
+  label.textContent=text;
+}
 function renderTurnTimer(){
   clearTimeout(turnTimerHandle);turnTimerHandle=null;
   let el=$('turn-timer');
@@ -1084,7 +1093,7 @@ function renderGame() {
   $('my-name').textContent=isTable?tableName:(mine?.name||'Vos'); $('my-avatar').textContent=(isTable?tableName:(mine?.name||'V')).slice(0,1).toUpperCase();
   $('opponent-name').textContent=isTable?'Los jugadores':(opponent?.name||'Esperando rival'); $('opponent-avatar').textContent=(isTable?'T':(opponent?.name||'J').slice(0,1)).toUpperCase();
   const myTurn=!isTable&&room.turn===state.playerId&&room.status==='started'&&!room.resolvingTrick&&state.hand.length>0&&!room.pendingBet&&!room.pendingNextHand;
-  $('turn-badge').textContent=isTable?'MESA':myTurn?'TU TURNO':'ESPERÁ'; $('turn-badge').classList.toggle('waiting-turn',!myTurn);
+  setTurnBadge(isTable?'MESA':myTurn?'TU TURNO':'ESPERÁ'); $('turn-badge').classList.toggle('waiting-turn',!myTurn);
   const visibleHand=isTable?[]:orderedHand();
   if(!state.handGestureActive)$('hand').innerHTML=visibleHand.map((card) => `<button class="hand-card sprite-card ${card.red?'card-red':''} ${state.launchingCardId===card.id?'launching-card':''}" style="--sprite-position:${cardSpritePosition(card)}" aria-label="${cardAccessibleName(card)}" aria-disabled="${!myTurn}" data-card="${card.id}"><span class="sr-only">${cardAccessibleName(card)}</span></button>`).join('');
 
@@ -1123,7 +1132,7 @@ function renderGame() {
   actions.innerHTML=room.status==='revealing'?'<span class="action-wait">FIN DE LA MANO</span>':pending||state.hand.length?choices:`<span class="action-wait">${waitingForRival?'ESPERANDO LA ÚLTIMA CARTA DEL RIVAL…':'ESPERANDO EL REPARTO…'}</span>`;
   renderEnvidoPicker(room);
   actions.querySelectorAll('[data-action]').forEach((button)=>button.addEventListener('click',()=>{const act=button.dataset.action;if(state.demo){demoAction(act);return;}if(['yes','no','raise'].includes(act)||act.startsWith('raise-'))answerBet(act);else if(act==='reveal')revealEnvido();else if(act==='flor')callFlor();else callBet(act);}));
-  $('turn-badge').textContent=isTable?'MESA':roundPauseInfo(room)?'ESPERÁ':pending?(pending.responder===state.playerId?'RESPONDÉ':'ESPERANDO'):myTurn?'TU TURNO':'ESPERÁ';$('turn-badge').classList.toggle('waiting-turn',!myTurn||!!pending);
+  setTurnBadge(isTable?'MESA':roundPauseInfo(room)?'ESPERÁ':pending?(pending.responder===state.playerId?'RESPONDÉ':'ESPERANDO'):myTurn?'TU TURNO':'ESPERÁ');$('turn-badge').classList.toggle('waiting-turn',!myTurn||!!pending);
   if(room.status==='complete') toast(room.matchResult?.reason==='inactivity'?room.matchResult.message:'¡Partida terminada!');
 }
 function renderCompactTally(points,target){

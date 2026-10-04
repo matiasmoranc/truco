@@ -984,3 +984,16 @@ body { min-height:100dvh; }
 .declaring-envido .hand-card-muted{opacity:1!important}
 .game-topbar .player-sound-toggle{position:static;flex:0 0 38px;margin-left:auto;z-index:80}
 .turn-timer,.round-pause-timer{top:72px;right:12px;left:auto;transform:none;min-width:44px;max-width:80px;padding:9px 8px;text-align:center;font-size:14px;border-radius:20px}
+
+/* Keep the countdown in the turn badge and clear the two-phone tally. */
+.player-mode .turn-badge{display:inline-flex;align-items:center;justify-content:center;gap:8px}
+.turn-badge .turn-timer{position:static;inset:auto;transform:none;min-width:0;max-width:none;padding:0 0 0 8px;border:0;border-left:1px solid currentColor;border-radius:0;background:transparent;font-size:12px;line-height:1.2;letter-spacing:0;color:var(--gold)}
+.turn-badge .turn-timer-warning{color:#ffe0ca}
+.player-mode.two-device-mode .center-table{top:22px}
+.player-mode.two-device-mode .mobile-score{top:calc(42px + clamp(130px,24dvh,190px)/2 + 10px);right:4%}
+.player-mode.two-device-mode .hand-card{width:clamp(104.5px,32.3vw,129.2px);height:clamp(150.1px,45.6vw,174.8px);flex-basis:clamp(104.5px,32.3vw,129.2px)}
+@media(max-height:650px){
+  .player-mode.two-device-mode .center-table{top:15px}
+  .player-mode.two-device-mode .mobile-score{top:100px}
+  .player-mode.two-device-mode .hand-card{width:clamp(91.2px,29.45vw,106.4px);height:clamp(133px,39.9vw,152px);flex-basis:clamp(91.2px,29.45vw,106.4px)}
+}
