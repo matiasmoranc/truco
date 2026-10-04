@@ -321,7 +321,7 @@ function renderLobby(rooms) {
     if(!players.player1||!players.player2)actions.push(['player','Entrar']);
     if(room.deviceMode!=='two'&&!room.table)actions.push(['table','Mesa']);
     if(room.deviceMode!=='two'&&actions.some(([key])=>key==='player'))actions[0][1]='Jugador';
-    return `<article class="lobby-card"><div class="lobby-card-top"><div><h3>${escapeHtml(title)}</h3><p class="lobby-meta">${targetPoints(room)} puntos · ${room.deviceMode==='two'?'2':'3'} celulares</p></div><span class="lobby-count" aria-label="${available.length} lugares disponibles">${seats.length-available.length}/${seats.length}</span></div><div class="lobby-join-options">${actions.map(([key,label])=>`<button class="button lobby-player-button" data-room="${code}" data-seat="${key}">${key==='table'?suitSvg('table'):''}${label}<span aria-hidden="true">+</span></button>`).join('')}</div></article>`;
+    return `<article class="lobby-card"><div class="lobby-card-top"><div><h3>${escapeHtml(title)}</h3><p class="lobby-meta">${targetPoints(room)} puntos${room.deviceMode==='two'?'':' · 2 jugadores + mesa'}</p></div><span class="lobby-count" aria-label="${available.length} lugares disponibles">${seats.length-available.length}/${seats.length}</span></div><div class="lobby-join-options">${actions.map(([key,label])=>`<button class="button lobby-player-button" data-room="${code}" data-seat="${key}">${key==='table'?suitSvg('table'):''}${label}<span aria-hidden="true">+</span></button>`).join('')}</div></article>`;
   }).join('');
 }
 function joinOpenRoom(code, seat) {
@@ -1209,12 +1209,20 @@ function animatePlayedHandCard(card,origin=null){
   const flight=source.cloneNode(true);
   flight.classList.remove('dragging','launching-card');
   flight.classList.add('card-flight');
-  if($('game-view').classList.contains('two-device-mode'))flight.classList.add('two-device-flight');
+  const twoDevice=$('game-view').classList.contains('two-device-mode');
+  if(twoDevice){
+    flight.classList.add('two-device-flight');
+    const tableRect=$('trick-cards').getBoundingClientRect();
+    const targetX=tableRect.left+tableRect.width*(state.playerId==='player1'?.2:.4);
+    const targetY=tableRect.top+tableRect.height*.5;
+    flight.style.setProperty('--flight-x',(targetX-(rect.left+rect.width/2))+'px');
+    flight.style.setProperty('--flight-y',(targetY-(rect.top+rect.height/2))+'px');
+    flight.style.setProperty('--flight-scale',String(Math.min(62/rect.width,90/rect.height)));
+  }else flight.style.setProperty('--flight-y',-(rect.bottom+80)+'px');
   flight.removeAttribute('data-card');flight.removeAttribute('aria-disabled');
   flight.setAttribute('aria-hidden','true');flight.tabIndex=-1;
   flight.style.left=rect.left+'px';flight.style.top=rect.top+'px';
   flight.style.width=rect.width+'px';flight.style.height=rect.height+'px';
-  flight.style.setProperty('--flight-y',-(rect.bottom+80)+'px');
   state.launchingCardId=card.id;source.classList.add('launching-card');
   document.body.appendChild(flight);
   setTimeout(()=>{

@@ -100,7 +100,7 @@
 .game-layout{flex:1;min-height:0}
 .scoreboard{display:flex;flex-direction:column;gap:12px;min-width:0;min-height:0;padding:24px 14px;background:transparent}
 .scoreboard-head{display:grid;grid-template-columns:1fr 1fr;align-items:center;gap:8px;text-align:center;flex:0 0 auto}
-.scoreboard-head h2,.mobile-score-head h2{margin:0;color:#e6e5d8;font-size:clamp(8px,1vw,12px);font-weight:500;letter-spacing:.13em;white-space:nowrap}
+.scoreboard-head h2,.mobile-score-head h2{margin:0;color:#e6e5d8;font-size:clamp(16px,2vw,20px);font-weight:700;letter-spacing:.04em;white-space:nowrap}
 .scoreboard-grid{display:grid;grid-template-columns:minmax(0,1fr) 1px minmax(0,1fr);gap:8px;flex:1;min-height:0}
 .scoreboard-divider,.mobile-score-divider{align-self:stretch;background:rgba(239,235,215,.35)}
 .scoreboard .tally-table,.mobile-score .mobile-tally{display:flex;flex-direction:column;width:100%;max-width:none;height:100%;min-height:0;flex:1;margin:0;gap:0}
@@ -937,7 +937,7 @@ body { min-height:100dvh; }
 }
 @keyframes hand-card-slide-away{
   from{transform:translate3d(0,0,0) rotate(0deg) scale(1);opacity:1}
-  to{transform:translate3d(0,var(--flight-y),0) rotate(-4deg) scale(.42);opacity:.25}
+  to{transform:translate3d(var(--flight-x),var(--flight-y),0) rotate(-6deg) scale(var(--flight-scale));opacity:.96}
 }
 @media(max-height:650px){
   .player-mode.two-device-mode .hand{top:calc(100% - 138px)}

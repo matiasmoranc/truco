@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="./style.css?v=20261003-71" />
+    <link rel="stylesheet" href="./style.css?v=20261003-72" />
   </head>
   <body>
     <div class="grain" aria-hidden="true"></div>
@@ -72,7 +72,7 @@
         <header class="game-topbar"><button class="mini-brand" id="game-home"><b>T</b> TRUCO</button><span class="room-pill" id="game-room-code">MESA · —</span><span class="connection"><span class="live-dot"></span> EN VIVO</span></header>
         <div class="game-layout">
           <aside class="scoreboard">
-            <div class="scoreboard-head"><h2>NOSOTROS</h2><h2>ELLOS</h2></div>
+            <div class="scoreboard-head"><h2 aria-label="Nosotros">N</h2><h2 aria-label="Ellos">E</h2></div>
             <div class="scoreboard-grid"><div class="tally tally-table" id="tally-1" aria-label="Palitos de Nosotros"></div><div class="scoreboard-divider" aria-hidden="true"></div><div class="tally tally-table" id="tally-2" aria-label="Palitos de Ellos"></div></div>
           </aside>
           <section class="felt-area" id="felt-area">
@@ -89,7 +89,7 @@
           <aside class="side-panel"><div class="side-title">PARTIDA <span>EN CURSO</span></div><div class="round-feed" id="round-feed"><div class="feed-item"><i></i><span>Esperando la primera jugada</span></div></div><div class="side-bottom"><span class="deck-count"><svg class="deck-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="3" width="13" height="17" rx="2"/><path d="M9 7h5M9 11h5"/></svg> <b id="deck-count">40</b> cartas en el mazo</span><button id="sound-toggle" class="sound-button"><svg class="sound-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10v4h4l5 4V6l-5 4H4Z"/><path d="M16 9a5 5 0 0 1 0 6m2-9a9 9 0 0 1 0 12"/></svg> Sonido <span>OFF</span></button></div></aside>
         </div>
         <section class="mobile-score">
-          <div class="mobile-score-head"><h2>NOSOTROS</h2><h2>ELLOS</h2></div>
+          <div class="mobile-score-head"><h2 aria-label="Nosotros">N</h2><h2 aria-label="Ellos">E</h2></div>
           <div class="mobile-score-grid"><div class="tally mobile-tally" id="mobile-tally-1" aria-label="Palitos de Nosotros"></div><div class="mobile-score-divider" aria-hidden="true"></div><div class="tally mobile-tally" id="mobile-tally-2" aria-label="Palitos de Ellos"></div></div>
         </section>
         <div class="demo-device-switcher hidden" id="demo-device-switcher" role="group" aria-label="Cambiar dispositivo de prueba">
@@ -106,6 +106,6 @@
       <section class="toast-global" id="global-toast" role="status"></section>
     </main>
     <dialog id="score-details" class="score-details" aria-labelledby="score-details-title"><div class="score-details-panel"><header class="score-details-header"><h2 id="score-details-title">Última mano</h2><button id="close-score-details" type="button" aria-label="Cerrar detalle"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button></header><div id="score-details-content"></div><button id="dismiss-score-details" class="score-details-dismiss" type="button">Cerrar</button></div></dialog>
-    <script type="module" src="./app.js?v=20261003-71"></script>
+    <script type="module" src="./app.js?v=20261003-72"></script>
   </body>
 </html>
