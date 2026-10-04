@@ -1043,3 +1043,9 @@ body { min-height:100dvh; }
 .player-mode .player-actions .compact-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:5px}
 .player-mode .compact-actions .call-button,.player-mode .compact-actions .pass-button{flex:1 1 68px;min-width:0;min-height:34px;height:34px;padding:4px 6px;font-size:10px;line-height:1.1;border-radius:7px;letter-spacing:.02em}
 .player-mode .player-controls>.fold-hand{flex:0 0 78px;align-self:flex-end;width:78px;min-width:0;height:34px;padding:4px;font-size:9px;white-space:normal;line-height:1.1;border-radius:7px}
+
+/* Notices stay in the open center of the table, away from the deck and hand. */
+.player-mode .call-notice{position:absolute;top:44%;left:50%;right:auto;bottom:auto;transform:translate(-50%,-50%);width:max-content;max-width:50%;box-sizing:border-box;padding:10px 12px;border-radius:12px;font-size:13px;line-height:1.35;overflow-wrap:anywhere;z-index:90}
+.toast,.toast-global{top:50%;bottom:auto;left:50%;width:max-content;max-width:80vw;box-sizing:border-box;text-align:center;border-radius:12px;transform:translate(-50%,calc(-50% + 12px));z-index:200}
+.toast.show,.toast-global.show{transform:translate(-50%,-50%)}
+.player-mode .turn-badge-label{max-width:60vw;overflow-wrap:anywhere;letter-spacing:.04em}
