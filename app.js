@@ -952,7 +952,7 @@ function turnClockRemaining(clock,now=gameTime()){
   return {extra:elapsed>=30000,seconds:Math.max(0,Math.ceil(((elapsed<30000?30000:45000)-elapsed)/1000)),expired:elapsed>=45000};
 }
 async function settleTurnTimeout(room){
-  if(turnTimeoutSettling||!room.turnTimeout||(!state.demo&&!isCoordinator()))return;
+  if(turnTimeoutSettling||room.status!=='timed-out'||!room.turnTimeout||(!state.demo&&!isCoordinator()))return;
   turnTimeoutSettling=true;
   try{
     const winner=room.turnTimeout.winner,points=Number(room.trucoLevel)||1;
@@ -963,21 +963,35 @@ async function settleTurnTimeout(room){
   }catch(error){console.error('[truco:turn-timeout]',error);toast(firebaseError(error));}
   finally{turnTimeoutSettling=false;}
 }
+function turnTimeoutChanges(room){
+  const loser=room.turn,winner=otherPlayer(loser);
+  const timeoutCounts={...(room.timeoutCounts||{})};
+  timeoutCounts[loser]=(Number(timeoutCounts[loser])||0)+1;
+  const name=room.players?.[loser]?.name||'El jugador';
+  if(timeoutCounts[loser]<2){
+    return {timeoutCounts,status:'timed-out',turn:null,turnTimeout:{winner,message:name+' agotó su tiempo y pierde la mano (1 de 2 faltas por inactividad).'}};
+  }
+  const message=name+' agotó los 45 segundos por segunda vez y pierde la partida. '+(room.players?.[winner]?.name||'El rival')+' gana por inactividad.';
+  return {timeoutCounts,status:'complete',turn:null,turnClock:null,turnTimeout:null,
+    scores:{...room.scores,[winner]:Math.max(Number(room.scores?.[winner])||0,targetPoints(room))},
+    matchResult:{winner,loser,reason:'inactivity',message},
+    pendingBet:null,pendingNextHand:null,resolvingTrick:false,resolutionId:null,resolutionEndsAt:null,
+    resolvedWinner:null,resolvedTrickWinner:null,handComplete:false,trickCards:[],envidoAudit:null,
+    endReveal:{done:true},feed:topFeed(room,message)};
+}
 async function expireTurnClock(clock){
   if(turnClockWritePending)return;
   turnClockWritePending=true;
   try{
-    const loser=state.room.turn,winner=otherPlayer(loser);
-    const message=(state.room.players?.[loser]?.name||'El jugador')+' agotó su tiempo y pierde la mano.';
     if(state.demo){
       if(turnClockKey()!==clock.key||!turnClockRemaining(clock).expired)return;
-      Object.assign(state.room,{status:'timed-out',turn:null,turnTimeout:{winner,message}});
+      Object.assign(state.room,turnTimeoutChanges(state.room));
       await settleTurnTimeout(state.room);renderGame();return;
     }
     const fb=state.firebase,code=state.roomCode;
     const result=await fb.runTransaction(fb.ref(fb.db,'rooms/'+code+'/public'),current=>{
       if(!current||turnClockKey(current)!==clock.key||current.turnClock?.key!==clock.key||!turnClockRemaining(current.turnClock).expired)return;
-      return {...current,status:'timed-out',turn:null,turnTimeout:{winner:otherPlayer(current.turn),message:(current.players?.[current.turn]?.name||'El jugador')+' agotó su tiempo y pierde la mano.'}};
+      return {...current,...turnTimeoutChanges(current)};
     });
     if(result.committed&&state.roomCode===code){state.room=result.snapshot.val();await settleTurnTimeout(state.room);}
   }catch(error){console.error('[truco:turn-clock]',error);}
@@ -1107,7 +1121,7 @@ function renderGame() {
   renderEnvidoPicker(room);
   actions.querySelectorAll('[data-action]').forEach((button)=>button.addEventListener('click',()=>{const act=button.dataset.action;if(state.demo){demoAction(act);return;}if(['yes','no','raise'].includes(act)||act.startsWith('raise-'))answerBet(act);else if(act==='reveal')revealEnvido();else if(act==='flor')callFlor();else callBet(act);}));
   $('turn-badge').textContent=isTable?'MESA':roundPauseInfo(room)?'ESPERÁ':pending?(pending.responder===state.playerId?'RESPONDÉ':'ESPERANDO'):myTurn?'TU TURNO':'ESPERÁ';$('turn-badge').classList.toggle('waiting-turn',!myTurn||!!pending);
-  if(room.status==='complete') toast('¡Partida terminada!');
+  if(room.status==='complete') toast(room.matchResult?.reason==='inactivity'?room.matchResult.message:'¡Partida terminada!');
 }
 function renderCompactTally(points,target){
   const limit=normalizeTargetPoints(target),n=Math.min(Math.max(0,Math.floor(Number(points)||0)),limit),slots=limit/10;
