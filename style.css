@@ -962,3 +962,12 @@ body { min-height:100dvh; }
 /* Action labels explain which verb belongs to each call. */
 .player-mode .action-verb{font:700 8px 'DM Sans',sans-serif;letter-spacing:.13em;line-height:1;color:currentColor;opacity:.78}
 .player-mode .action-buttons .call-button,.player-mode .action-buttons .pass-button{gap:3px}
+
+/* Icon voice toggle and a tally column just wide enough for each square. */
+.player-sound-toggle{width:38px;height:38px;padding:8px;display:grid;place-items:center;border-radius:50%}
+.player-sound-toggle svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.player-mode.two-device-mode .mobile-score{width:69px}
+.player-mode.two-device-mode .mobile-score-head{grid-template-columns:30px 30px;gap:9px;height:24px;flex-basis:24px}
+.player-mode.two-device-mode .mobile-score-head h2{font-size:18px;letter-spacing:0;text-align:center}
+.player-mode.two-device-mode .mobile-score-grid{grid-template-columns:30px 1px 30px;gap:4px;height:calc(var(--compact-tally-height) - 29px)}
+.player-mode.two-device-mode .mobile-score-divider{max-height:calc(var(--compact-tally-height) - 29px)}
