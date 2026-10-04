@@ -1014,3 +1014,10 @@ body { min-height:100dvh; }
 .invitation-spinner{width:36px;height:36px;border:3px solid #d8b87530;border-top-color:var(--gold);border-radius:50%;margin:0 auto 20px;animation:invitation-spin .8s linear infinite}
 @keyframes invitation-spin{to{transform:rotate(360deg)}}
 @media(prefers-reduced-motion:reduce){.invitation-spinner{animation:none}}
+
+/* Keep folding in a fixed slot, separate from the changing calls. */
+.player-mode .fold-hand{position:absolute;right:14px;top:48px;z-index:25;height:32px;padding:0 10px;border:1px solid #a1b4a366;border-radius:6px;background:#12382b;color:#dce5dc;font-size:10px;font-weight:600;letter-spacing:.04em}
+.player-mode .fold-hand:disabled{opacity:.4;cursor:default}
+.player-mode.two-device-mode .deck-stack{left:calc(12% + 44px);right:auto}
+.player-mode.two-device-mode .muestra-card{left:12%;right:auto}
+.turn-badge .turn-timer.turn-timer-warning{color:#ffab8e;border-color:#ffab8e;background:#59271e;padding:3px 6px;border-radius:4px}

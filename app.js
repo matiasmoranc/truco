@@ -247,7 +247,7 @@ async function enterRoom() {
       state.roomCode=code;state.playerId=role;
     }
     if(state.privateUnsubscribe)state.privateUnsubscribe();
-    state.privateUnsubscribe=null;state.privateHandKey=null;
+    state.privateUnsubscribe=null;state.privateHandKey=null;state.privateDeal=null;
     state.invitationEntry=false;
     state.demo=false;state.hand=[];state.room=joinedRoom;
     localStorage.setItem('truco-player-name',name);
@@ -386,6 +386,20 @@ function watchRoom() {
     else if (state.room.status === 'waiting') { renderWaiting(); if (!$('waiting-view').classList.contains('active')) showView('waiting-view'); }
   },error=>{if(code!==state.roomCode||version!==state.roomWatchVersion)return;console.error('[truco:room] subscription failed',{code,error});toast(firebaseError(error),true);});
 }
+function privateHandMatchesRoom(deal,room){
+  if(!deal||!room||(deal.handNumber!=null&&Number(deal.handNumber)!==Number(room.handNumber||1)))return false;
+  const expected=room.handCounts?.[state.playerId];
+  return expected==null||(deal.hand||[]).length===Number(expected);
+}
+function syncPrivateHand(){
+  if(state.demo||state.playerId==='table')return;
+  const handNumber=state.room?.handNumber||1;
+  if(state.renderedHandNumber!==handNumber){
+    state.renderedHandNumber=handNumber;state.handGestureActive=false;handGesture=null;
+    state.cardLaunchOrigin=null;state.launchingCardId=null;
+  }
+  state.hand=privateHandMatchesRoom(state.privateDeal,state.room)?(state.privateDeal.hand||[]):[];
+}
 function watchPrivateHand() {
   if (state.playerId === 'table') return;
   const subscriptionKey=`${state.roomCode}:${state.uid}`;
@@ -393,10 +407,10 @@ function watchPrivateHand() {
   if(state.privateUnsubscribe)state.privateUnsubscribe();
   state.privateHandKey=subscriptionKey;
   const fb = state.firebase;
-  state.privateUnsubscribe = fb.onValue(fb.ref(fb.db, `hands/${state.roomCode}/${state.uid}/hand`), (snapshot) => {
+  state.privateUnsubscribe = fb.onValue(fb.ref(fb.db, `hands/${state.roomCode}/${state.uid}`), (snapshot) => {
     if(state.privateHandKey!==subscriptionKey)return;
-    state.hand = snapshot.val() || [];
-    renderGame();
+    state.privateDeal=snapshot.val();
+    syncPrivateHand();renderGame();
   },error=>{if(state.privateHandKey!==subscriptionKey)return;console.error('[truco:hand] subscription failed',error);toast(firebaseError(error),true);});
 }
 function renderWaiting() {
@@ -478,6 +492,8 @@ async function dealOpeningHand(dealer) {
   const patches = {};
   patches[`hands/${state.roomCode}/${players.player1.uid}/hand`] = hand1;
   patches[`hands/${state.roomCode}/${players.player2.uid}/hand`] = hand2;
+  patches[`hands/${state.roomCode}/${players.player1.uid}/handNumber`] = state.room.handNumber||1;
+  patches[`hands/${state.roomCode}/${players.player2.uid}/handNumber`] = state.room.handNumber||1;
   patches[`hands/${state.roomCode}/${state.room.table.uid}/envidoTruth`] = {player1:handEnvido(hand1,muestra),player2:handEnvido(hand2,muestra)};
   patches[`hands/${state.roomCode}/${state.room.table.uid}/originalHands`] = {player1:hand1,player2:hand2};
   patches[`rooms/${state.roomCode}/public/endReveal`] = null;
@@ -748,6 +764,8 @@ async function nextHand(winner, scores, handNumber, message, envidoVerified=fals
   patches[`rooms/${state.roomCode}/public/lastHandScore`]=summary;
   patches[`rooms/${state.roomCode}/public/handScoreEntries`]=[];
   patches[`hands/${state.roomCode}/${p1.uid}/hand`]=deck.slice(0,3);patches[`hands/${state.roomCode}/${p2.uid}/hand`]=deck.slice(3,6);
+  patches[`hands/${state.roomCode}/${p1.uid}/handNumber`]=handNumber+1;
+  patches[`hands/${state.roomCode}/${p2.uid}/handNumber`]=handNumber+1;
   patches[`hands/${state.roomCode}/${state.room.table.uid}/envidoTruth`]={player1:handEnvido(deck.slice(0,3),muestra),player2:handEnvido(deck.slice(3,6),muestra)};
   patches[`hands/${state.roomCode}/${state.room.table.uid}/originalHands`]={player1:deck.slice(0,3),player2:deck.slice(3,6)};
   patches[`rooms/${state.roomCode}/public/endReveal`]=null;
@@ -854,6 +872,7 @@ function scheduleTableResolution() {
         if(state.room.status!=='complete'){
           let scores=await verifyEnvido(state.room.scores||{});
           scores=settleSingleFlor(state.room,scores);
+          if(pending.foldPoints)scores[pending.winner]=(Number(scores[pending.winner])||0)+pending.foldPoints;
           await finishLiveHand(pending.winner,scores,pending.message||'La mano terminó.');
         }
         else await writeRoom({pendingNextHand:null});
@@ -879,7 +898,33 @@ async function recoverLegacyTrick(room) {
     }
   }catch(error){console.error(error);state.legacyRepairKey=null;toast(firebaseError(error));}
 }
+function canFoldHand(room,player){
+  return !!room&&['player1','player2'].includes(player)&&room.status==='started'&&!room.resolvingTrick&&!room.pendingNextHand&&(!room.pendingBet||room.pendingBet.type==='truco');
+}
+function foldHandChanges(room,loser){
+  const winner=otherPlayer(loser),points=Number(room.trucoLevel)||1;
+  const message=(room.players?.[loser]?.name||'El jugador')+' se fue al mazo. '+(room.players?.[winner]?.name||'El rival')+' gana la mano y suma '+points+' '+(points===1?'tanto.':'tantos.');
+  return {turn:null,turnClock:null,pendingBet:null,pendingNextHand:{id:'fold:'+crypto.randomUUID(),winner,foldPoints:points,message},feed:topFeed(room,message)};
+}
+async function foldHand(){
+  if(state.foldInFlight||state.playActionInFlight||!canFoldHand(state.room,state.playerId))return;
+  state.foldInFlight=true;
+  try{
+    if(state.demo){
+      const changes=foldHandChanges(state.room,state.playerId);
+      demoFeed(changes.pendingNextHand.message);state.room.turn=null;state.room.pendingBet=null;
+      demoFinishHand(changes.pendingNextHand.winner,changes.pendingNextHand.foldPoints);return;
+    }
+    const fb=state.firebase,code=state.roomCode,player=state.playerId,handNumber=state.room.handNumber;
+    await fb.runTransaction(fb.ref(fb.db,'rooms/'+code+'/public'),current=>{
+      if(!canFoldHand(current,player)||current.handNumber!==handNumber||current.players?.[player]?.uid!==state.uid)return;
+      return {...current,...foldHandChanges(current,player)};
+    },{applyLocally:false});
+  }catch(error){console.error('[truco:fold]',error);toast(firebaseError(error));}
+  finally{state.foldInFlight=false;renderGame();}
+}
 async function playCard(card) {
+  syncPrivateHand();
   if(state.room?.turnClock?.key===turnClockKey()&&turnClockRemaining(state.room.turnClock).expired){renderTurnTimer();return;}
   const launchOrigin=state.cardLaunchOrigin;
   state.cardLaunchOrigin=null;
@@ -903,6 +948,7 @@ async function playCard(card) {
   const played = [...previousTrick.slice(-1), { playerId:state.playerId, name:players[state.playerId].name, card }];
   const patches = {};
   patches[`hands/${state.roomCode}/${state.uid}/hand`] = newHand;
+  patches[`hands/${state.roomCode}/${state.uid}/handNumber`] = state.room.handNumber||1;
   const handCounts={...(state.room.handCounts||{}),[state.playerId]:newHand.length};
   patches[`rooms/${state.roomCode}/public/handCounts`]=handCounts;
   patches[`rooms/${state.roomCode}/public/handClaims/${state.playerId}`]=newHand.length;
@@ -1060,6 +1106,12 @@ function renderTurnTimer(){
   if(clock?.key===key){
     const remaining=turnClockRemaining(clock),name=room.players?.[room.turn]?.name||'Jugador';
     el.classList.toggle('turn-timer-warning',remaining.extra);
+    const tick=clock.key+':'+remaining.seconds;
+    if(remaining.extra&&el.dataset.warningTick!==tick){
+      el.dataset.warningTick=tick;
+      el.animate?.([{transform:'translateX(0)'},{transform:'translateX(-3px)'},{transform:'translateX(3px)'},{transform:'translateX(-2px)'},{transform:'translateX(0)'}],{duration:280});
+    }
+    if(!remaining.extra)delete el.dataset.warningTick;
     el.textContent=remaining.seconds+' s';
     el.setAttribute('aria-label',name+(remaining.extra?' perderá su turno en ':' tiene ')+remaining.seconds+' segundos');
     if(remaining.expired&&(state.demo||isCoordinator()))expireTurnClock(clock);
@@ -1069,6 +1121,7 @@ function renderTurnTimer(){
 
 function renderGame() {
   if (!state.room) return;
+  syncPrivateHand();
   if(state.demo&&state.room.status==='complete'&&!state.room.endReveal){
     const groups=buildEndEvidence(state.room,state.demoOriginalHands||{});
     if(groups.length)demoShowEvidence(groups);
@@ -1138,6 +1191,8 @@ function renderGame() {
   $('table-hint').classList.toggle('hidden',!isTable||(room.trickCards||[]).length>0);
   const visibleFeed=(room.feed||[]).filter(({text=''})=>isTable||!/\bjug[oó]/i.test(text));
   $('round-feed').innerHTML=visibleFeed.slice(0,7).map(({text})=>`<div class="feed-item"><i></i><span>${escapeHtml(text)}</span></div>`).join('');
+  $('fold-hand').classList.toggle('hidden',isTable);
+  $('fold-hand').disabled=state.foldInFlight||state.playActionInFlight||!canFoldHand(room,state.playerId);
   const actions=$('player-actions');actions.classList.toggle('hidden',isTable||room.status==='complete');
   const pending=room.pendingBet, other=state.playerId==='player1'?'player2':'player1';
   const canEnvido=canCallFirstRoundEnvido(room,state.playerId,state.hand);
@@ -1483,6 +1538,7 @@ $('role-options').querySelectorAll('.role-card').forEach((card)=>{
   });
 });
 $('back-home').addEventListener('click',()=>{showView('welcome-view');openLobby();});
+$('fold-hand').addEventListener('click',foldHand);
 $('enter-room').addEventListener('click',enterRoom);
 $('demo-button').addEventListener('click',()=>demoStart('player1'));
 $('demo-two-button').addEventListener('click',()=>demoStart('player1','two'));
