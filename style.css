@@ -971,3 +971,8 @@ body { min-height:100dvh; }
 .player-mode.two-device-mode .mobile-score-head h2{font-size:18px;letter-spacing:0;text-align:center}
 .player-mode.two-device-mode .mobile-score-grid{grid-template-columns:30px 1px 30px;gap:4px;height:calc(var(--compact-tally-height) - 29px)}
 .player-mode.two-device-mode .mobile-score-divider{max-height:calc(var(--compact-tally-height) - 29px)}
+
+.turn-timer{position:absolute;top:96px;left:50%;transform:translateX(-50%);z-index:85;max-width:calc(100% - 24px);padding:6px 12px;border:1px solid #e8c98355;border-radius:20px;background:#12382bef;color:#e8c983;font:600 12px 'DM Sans',sans-serif;white-space:nowrap;pointer-events:none;font-variant-numeric:tabular-nums}
+.turn-timer-warning{background:#59271ef2;border-color:#edaa80;color:#ffe0ca}
+.turn-timer.hidden{display:none!important}
+.table-mode .turn-timer{display:none!important}
