@@ -1053,7 +1053,10 @@ function renderGame() {
   renderRoundPauseTimer();
   $('game-view').classList.toggle('two-device-mode', !isTable && room.deviceMode === 'two');
   $('demo-device-switcher').classList.toggle('hidden',!state.demo);
-  $('demo-device-switcher').querySelectorAll('[data-demo-role]').forEach((button)=>button.setAttribute('aria-pressed',String(button.dataset.demoRole===state.playerId)));
+  $('demo-device-switcher').querySelectorAll('[data-demo-role]').forEach((button)=>{
+    button.classList.toggle('hidden',room.deviceMode==='two'&&button.dataset.demoRole==='table');
+    button.setAttribute('aria-pressed',String(button.dataset.demoRole===state.playerId));
+  });
   const mobileMarker=document.querySelector('.mobile-score'),felt=$('felt-area');
   if(room.deviceMode==='two'&&!isTable){if(mobileMarker.parentElement!==felt)felt.append(mobileMarker);}
   else if(mobileMarker.parentElement===felt)$('game-view').querySelector('.game-layout').after(mobileMarker);
@@ -1165,7 +1168,8 @@ function renderEnvidoPicker(room){
 }
 function escapeHtml(value='') { return String(value).replace(/[&<>"']/g,(ch)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch])); }
 
-function demoStart(role) {
+function demoStart(role,deviceMode='table') {
+  if(deviceMode==='two'&&role==='table')role='player1';
   if(state.unsubscribe)state.unsubscribe();
   if(state.privateUnsubscribe)state.privateUnsubscribe();
   state.unsubscribe=null;state.privateUnsubscribe=null;state.privateHandKey=null;
@@ -1173,13 +1177,13 @@ function demoStart(role) {
   drawInFlight=false;finishingDraw=false;
   state.demo=true;state.roomCode='DEMO1';state.playerId=role;const deck=shuffleDeck();
   state.demoHands={player1:deck.slice(0,3),player2:deck.slice(3,6)};state.demoOriginalHands=structuredClone(state.demoHands);state.hand=role==='table'?[]:[...state.demoHands[role]];
-  state.room={status:'started',targetPoints:30,muestra:deck[6],table:{name:'La mesa'},players:{player1:{name:'Jugador 1'},player2:{name:'Nico'}},scores:{player1:0,player2:0},handNumber:1,deckCount:34,turn:'player1',mano:'player1',trickNo:1,trickCards:[],tricks:[],feed:[],playedCount:0,trucoLevel:1,lastTrucoCaller:null,pendingBet:null,flors:{},envidoClosed:false};
+  state.room={deviceMode,status:'started',targetPoints:30,muestra:deck[6],table:{name:'La mesa'},players:{player1:{name:'Jugador 1'},player2:{name:'Nico'}},scores:{player1:0,player2:0},handNumber:1,deckCount:34,turn:'player1',mano:'player1',trickNo:1,trickCards:[],tricks:[],feed:[],playedCount:0,trucoLevel:1,lastTrucoCaller:null,pendingBet:null,flors:{},envidoClosed:false};
   state.room.status='drawing';state.hand=[];
   state.demoTruth={player1:handEnvido(state.demoHands.player1,deck[6]),player2:handEnvido(state.demoHands.player2,deck[6])};
   $('game-room-code').textContent='MESA · DEMO1';renderGame();showView('game-view');
 }
 function switchDemoRole(role) {
-  if(!state.demo||!['table','player1','player2'].includes(role))return;
+  if(!state.demo||!['table','player1','player2'].includes(role)||(state.room?.deviceMode==='two'&&role==='table'))return;
   state.playerId=role;state.hand=role==='table'?[]:[...(state.demoHands[role]||[])];renderGame();
 }
 function demoOther(player){return player==='player1'?'player2':'player1';}
@@ -1447,6 +1451,7 @@ $('role-options').querySelectorAll('.role-card').forEach((card)=>{
 $('back-home').addEventListener('click',()=>{showView('welcome-view');openLobby();});
 $('enter-room').addEventListener('click',enterRoom);
 $('demo-button').addEventListener('click',()=>demoStart('player1'));
+$('demo-two-button').addEventListener('click',()=>demoStart('player1','two'));
 $('leave-room').addEventListener('click',()=>{state.roomWatchVersion=(state.roomWatchVersion||0)+1;state.navigationEpoch=(state.navigationEpoch||0)+1;localStorage.removeItem('truco-last-seat');if(state.unsubscribe)state.unsubscribe();if(state.privateUnsubscribe)state.privateUnsubscribe();state.privateUnsubscribe=null;state.privateHandKey=null;state.room=null;state.demo=false;showView('welcome-view');openLobby();});
 $('game-home').addEventListener('click',()=>{if(state.demo){state.demo=false;showView('welcome-view');openLobby();return;}showView('waiting-view');});
 $('demo-device-switcher').addEventListener('click',(event)=>{const button=event.target.closest('[data-demo-role]');if(button)switchDemoRole(button.dataset.demoRole);});
@@ -1488,5 +1493,6 @@ try {
 } catch { /* Optional during initial setup. */ }
 const invitedRoom=new URLSearchParams(location.search).get('mesa');
 if(invitedRoom)await openInvitation(invitedRoom);
+else if(new URLSearchParams(location.search).get('demo')==='two')demoStart('player1','two');
 else if(location.search.includes('demo=mesa'))demoStart('table');
 else if (firebaseConfigValid(state.config)) openLobby();
