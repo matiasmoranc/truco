@@ -323,7 +323,7 @@ function renderLobby(rooms) {
     if(!players.player1||!players.player2)actions.push(['player','Entrar']);
     if(room.deviceMode!=='two'&&!room.table)actions.push(['table','Mesa']);
     if(room.deviceMode!=='two'&&actions.some(([key])=>key==='player'))actions[0][1]='Jugador';
-    return `<article class="lobby-card"><div class="lobby-card-top"><div><h3>${escapeHtml(title)}</h3><p class="lobby-meta">${targetPoints(room)} puntos${room.deviceMode==='two'?'':' · 2 jugadores + mesa'}</p></div><span class="lobby-count" aria-label="${available.length} lugares disponibles">${seats.length-available.length}/${seats.length}</span></div><div class="lobby-join-options">${actions.map(([key,label])=>`<button class="button lobby-player-button" data-room="${code}" data-seat="${key}">${key==='table'?suitSvg('table'):''}${label}<span aria-hidden="true">+</span></button>`).join('')}</div></article>`;
+    return `<article class="lobby-card"><div class="lobby-card-top"><div><h3>${escapeHtml(title)}</h3><p class="lobby-meta">${targetPoints(room)} puntos${room.deviceMode==='two'?'':' · 2 jugadores + mesa'}</p></div><span class="lobby-count" aria-label="${available.length} lugares disponibles">${seats.length-available.length}/${seats.length}</span></div><div class="lobby-join-options">${actions.map(([key,label])=>`<button class="button lobby-player-button" data-room="${code}" data-seat="${key}">${key==='table'?suitSvg('table'):''}${label}</button>`).join('')}</div></article>`;
   }).join('');
 }
 function joinOpenRoom(code, seat) {
@@ -356,7 +356,7 @@ function watchRoom() {
       }
     }
     if (isCoordinator()) scheduleTableResolution();
-    if (['drawing','started','revealing','complete'].includes(state.room.status)) { showView('game-view'); if(state.room.status!=='drawing')watchPrivateHand(); renderGame(); }
+    if (['drawing','started','revealing','complete','timed-out'].includes(state.room.status)) { showView('game-view'); if(state.room.status!=='drawing')watchPrivateHand(); renderGame(); }
     if(isCoordinator()&&state.room.status==='drawing')finishOpeningDraw().catch(error=>toast(firebaseError(error)));
     else if (state.room.status === 'waiting') { renderWaiting(); if (!$('waiting-view').classList.contains('active')) showView('waiting-view'); }
   },error=>{if(code!==state.roomCode||version!==state.roomWatchVersion)return;console.error('[truco:room] subscription failed',{code,error});toast(firebaseError(error),true);});
@@ -848,6 +848,7 @@ async function recoverLegacyTrick(room) {
   }catch(error){console.error(error);state.legacyRepairKey=null;toast(firebaseError(error));}
 }
 async function playCard(card) {
+  if(state.room?.turnClock?.key===turnClockKey()&&turnClockRemaining(state.room.turnClock).expired){renderTurnTimer();return;}
   const launchOrigin=state.cardLaunchOrigin;
   state.cardLaunchOrigin=null;
   if (state.demo) { demoPlay(card,launchOrigin); return; }
@@ -932,6 +933,83 @@ function saveHandOrder(order){
   state.handOrder=order;state.handOrderKey=handOrderKey();
   try{localStorage.setItem(state.handOrderKey,JSON.stringify(order));}catch{}
 }
+
+let turnTimerHandle=null,turnClockWritePending=false,turnTimeoutSettling=false;
+function turnClockKey(room=state.room){
+  if(!room||room.status!=='started'||room.resolvingTrick||room.pendingNextHand||room.pendingBet||room.endReveal&&!room.endReveal.done||!['player1','player2'].includes(room.turn))return null;
+  return [room.handNumber||1,room.trickNo||1,room.playedCount||0,room.turn].join(':');
+}
+function turnClockRemaining(clock,now=gameTime()){
+  const elapsed=Math.max(0,now-Number(clock.startedAt));
+  return {extra:elapsed>=30000,seconds:Math.max(0,Math.ceil(((elapsed<30000?30000:45000)-elapsed)/1000)),expired:elapsed>=45000};
+}
+async function settleTurnTimeout(room){
+  if(turnTimeoutSettling||!room.turnTimeout||(!state.demo&&!isCoordinator()))return;
+  turnTimeoutSettling=true;
+  try{
+    const winner=room.turnTimeout.winner,points=Number(room.trucoLevel)||1;
+    if(state.demo){demoFeed(room.turnTimeout.message);demoFinishHand(winner,points);return;}
+    let scores=await verifyEnvido({...room.scores});
+    scores=settleSingleFlor(room,scores);scores[winner]=(Number(scores[winner])||0)+points;
+    await finishLiveHand(winner,scores,room.turnTimeout.message);
+  }catch(error){console.error('[truco:turn-timeout]',error);toast(firebaseError(error));}
+  finally{turnTimeoutSettling=false;}
+}
+async function expireTurnClock(clock){
+  if(turnClockWritePending)return;
+  turnClockWritePending=true;
+  try{
+    const loser=state.room.turn,winner=otherPlayer(loser);
+    const message=(state.room.players?.[loser]?.name||'El jugador')+' agotó su tiempo y pierde la mano.';
+    if(state.demo){
+      if(turnClockKey()!==clock.key||!turnClockRemaining(clock).expired)return;
+      Object.assign(state.room,{status:'timed-out',turn:null,turnTimeout:{winner,message}});
+      await settleTurnTimeout(state.room);renderGame();return;
+    }
+    const fb=state.firebase,code=state.roomCode;
+    const result=await fb.runTransaction(fb.ref(fb.db,'rooms/'+code+'/public'),current=>{
+      if(!current||turnClockKey(current)!==clock.key||current.turnClock?.key!==clock.key||!turnClockRemaining(current.turnClock).expired)return;
+      return {...current,status:'timed-out',turn:null,turnTimeout:{winner:otherPlayer(current.turn),message:(current.players?.[current.turn]?.name||'El jugador')+' agotó su tiempo y pierde la mano.'}};
+    });
+    if(result.committed&&state.roomCode===code){state.room=result.snapshot.val();await settleTurnTimeout(state.room);}
+  }catch(error){console.error('[truco:turn-clock]',error);}
+  finally{turnClockWritePending=false;}
+}
+function renderTurnTimer(){
+  clearTimeout(turnTimerHandle);turnTimerHandle=null;
+  let el=$('turn-timer');
+  if(!el){el=document.createElement('div');el.id='turn-timer';el.className='turn-timer hidden';el.setAttribute('role','timer');$('felt-area').append(el);}
+  const room=state.room,key=turnClockKey(room),visible=$('game-view').classList.contains('active');
+  el.classList.toggle('hidden',!visible||!key||state.playerId==='table');
+  if(!visible||!room)return;
+  if(room.status==='timed-out'){
+    settleTurnTimeout(room);turnTimerHandle=setTimeout(renderTurnTimer,250);return;
+  }
+  if(!key){
+    if(room.turnClock&&!turnClockWritePending&&(state.demo||isCoordinator())){
+      if(state.demo)room.turnClock=null;
+      else{turnClockWritePending=true;writeRoom({turnClock:null}).catch(console.error).finally(()=>turnClockWritePending=false);}
+    }
+    turnTimerHandle=setTimeout(renderTurnTimer,250);return;
+  }
+  let clock=room.turnClock;
+  if(clock?.key!==key){
+    el.textContent='';el.classList.add('hidden');
+    if(state.demo){clock=room.turnClock={key,startedAt:gameTime()};}
+    else if(isCoordinator()&&!turnClockWritePending){
+      turnClockWritePending=true;
+      writeRoom({turnClock:{key,startedAt:gameTime()}}).catch(console.error).finally(()=>turnClockWritePending=false);
+    }
+  }
+  if(clock?.key===key){
+    const remaining=turnClockRemaining(clock),name=room.players?.[room.turn]?.name||'Jugador';
+    el.classList.toggle('turn-timer-warning',remaining.extra);
+    el.textContent=remaining.extra?name+' perderá su turno en '+remaining.seconds+' s':'Turno de '+name+' · '+remaining.seconds+' s';
+    if(remaining.expired&&(state.demo||isCoordinator()))expireTurnClock(clock);
+  }
+  turnTimerHandle=setTimeout(renderTurnTimer,200);
+}
+
 function renderGame() {
   if (!state.room) return;
   if(state.demo&&state.room.status==='complete'&&!state.room.endReveal){
@@ -939,6 +1017,7 @@ function renderGame() {
     if(groups.length)demoShowEvidence(groups);
   }
   renderCallNotice();
+  renderTurnTimer();
   const room = state.room, players=room.players||{}, isTable=state.playerId==='table', mine=players[state.playerId], opponent=players[state.playerId==='player1'?'player2':'player1'];
   document.documentElement.style.setProperty('--tally-board-height',`${50+(targetPoints(room)/10*42+12)*2}px`);
   const compactTallyHeight=Math.max(76,20+(targetPoints(room)/10)*56);
@@ -1070,7 +1149,7 @@ function demoStart(role) {
   drawInFlight=false;finishingDraw=false;
   state.demo=true;state.roomCode='DEMO1';state.playerId=role;const deck=shuffleDeck();
   state.demoHands={player1:deck.slice(0,3),player2:deck.slice(3,6)};state.demoOriginalHands=structuredClone(state.demoHands);state.hand=role==='table'?[]:[...state.demoHands[role]];
-  state.room={status:'started',targetPoints:30,muestra:deck[6],table:{name:'La mesa'},players:{player1:{name:'Matias'},player2:{name:'Nico'}},scores:{player1:0,player2:0},handNumber:1,deckCount:34,turn:'player1',mano:'player1',trickNo:1,trickCards:[],tricks:[],feed:[],playedCount:0,trucoLevel:1,lastTrucoCaller:null,pendingBet:null,flors:{},envidoClosed:false};
+  state.room={status:'started',targetPoints:30,muestra:deck[6],table:{name:'La mesa'},players:{player1:{name:'Jugador 1'},player2:{name:'Nico'}},scores:{player1:0,player2:0},handNumber:1,deckCount:34,turn:'player1',mano:'player1',trickNo:1,trickCards:[],tricks:[],feed:[],playedCount:0,trucoLevel:1,lastTrucoCaller:null,pendingBet:null,flors:{},envidoClosed:false};
   state.room.status='drawing';state.hand=[];
   state.demoTruth={player1:handEnvido(state.demoHands.player1,deck[6]),player2:handEnvido(state.demoHands.player2,deck[6])};
   $('game-room-code').textContent='MESA · DEMO1';renderGame();showView('game-view');
@@ -1157,6 +1236,7 @@ function demoAction(action){
   else demoCallAction(action);
 }
 function demoPlay(card,launchOrigin=null) {
+  if(state.room?.turnClock?.key===turnClockKey()&&turnClockRemaining(state.room.turnClock).expired){renderTurnTimer();return;}
   const player=state.playerId;if(player==='table')return;
   const pause=pauseMessage();if(pause){renderRoundPauseTimer();return;}
   if(state.room.status!=='started')return;
