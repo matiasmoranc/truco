@@ -981,7 +981,7 @@ function renderGame() {
   const visibleHand=isTable?[]:orderedHand();
   if(!state.handGestureActive)$('hand').innerHTML=visibleHand.map((card) => `<button class="hand-card sprite-card ${card.red?'card-red':''} ${state.launchingCardId===card.id?'launching-card':''}" style="--sprite-position:${cardSpritePosition(card)}" aria-label="${cardAccessibleName(card)}" aria-disabled="${!myTurn}" data-card="${card.id}"><span class="sr-only">${cardAccessibleName(card)}</span></button>`).join('');
 
-  $('trick-cards').innerHTML=sharedTable?(room.trickCards||[]).map(({card,playerId})=>`<div class="played-card played-card-${playerId||'player1'} sprite-card ${card.red?'card-red':''}" style="--sprite-position:${cardSpritePosition(card)}" role="img" aria-label="${cardAccessibleName(card)}"><span class="sr-only">${cardAccessibleName(card)}</span></div>`).join(''):'';
+  $('trick-cards').innerHTML=sharedTable?(room.trickCards||[]).filter(({card,playerId})=>!(state.launchingCardId===card.id&&playerId===state.playerId)).map(({card,playerId})=>`<div class="played-card played-card-${playerId||'player1'} sprite-card ${card.red?'card-red':''}" style="--sprite-position:${cardSpritePosition(card)}" role="img" aria-label="${cardAccessibleName(card)}"><span class="sr-only">${cardAccessibleName(card)}</span></div>`).join(''):'';
   const sample=room.muestra;
   $('muestra-card').classList.toggle('hidden',!sharedTable||!sample);
   $('muestra-card').classList.toggle('sprite-card',!!(sharedTable&&sample));
@@ -1227,9 +1227,9 @@ function animatePlayedHandCard(card,origin=null){
   document.body.appendChild(flight);
   setTimeout(()=>{
     flight.remove();
-    if(state.launchingCardId===card.id)state.launchingCardId=null;
+    if(state.launchingCardId===card.id){state.launchingCardId=null;renderGame();}
     $('hand').querySelector('[data-card="'+CSS.escape(card.id)+'"]')?.classList.remove('launching-card');
-  },480);
+  },430);
 }
 let handGesture=null,ignoreHandClickUntil=0;
 const handSurface=$('hand');
