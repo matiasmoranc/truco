@@ -23,10 +23,10 @@
         <div class="home-content">
           <section class="home-intro">
             <div class="home-heading"><h1>¿Jugamos?</h1></div>
-            <div class="home-actions"><button class="button primary" id="create-room"><span>Crear mesa</span><svg class="create-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button></div>
+            <div class="home-actions"><button class="button primary" id="create-room"><span>Crear mesa</span></button></div>
           </section>
           <section class="home-lobby" aria-labelledby="home-lobby-title">
-            <div class="home-lobby-heading"><div><div class="home-section-title"><h2 id="home-lobby-title">Mesas abiertas</h2></div></div><label class="home-name"><span class="field-label">Tu nombre</span><input id="lobby-name" class="name-input" maxlength="18" placeholder="Ej. Matias" autocomplete="nickname" /></label></div>
+            <div class="home-lobby-heading"><div><div class="home-section-title"><h2 id="home-lobby-title">Mesas abiertas</h2></div></div><label class="home-name"><span class="field-label">Tu nombre</span><input id="lobby-name" class="name-input" maxlength="18" placeholder="Tu nombre" autocomplete="nickname" /></label></div>
             <div class="open-room-list" id="open-room-list"><p class="muted">Conectando con las mesas…</p></div>
           </section>
         </div>
@@ -38,7 +38,7 @@
         <div class="setup-content">
           <h2>Crear mesa</h2>
           <label class="field-label" for="player-name">Tu nombre</label>
-          <input id="player-name" class="name-input" maxlength="18" placeholder="Ej. Matias" autocomplete="nickname" />
+          <input id="player-name" class="name-input" maxlength="18" placeholder="Tu nombre" autocomplete="nickname" />
           <label class="table-device-toggle" for="use-table-device"><span>Usar otro dispositivo como mesa</span><input type="checkbox" id="use-table-device" role="switch" /><span class="toggle-track" aria-hidden="true"></span></label>
           <select id="device-mode" class="visually-hidden" tabindex="-1" aria-hidden="true"><option value="two" selected>2 celulares</option><option value="three">3 celulares</option></select>
           <span class="field-label hidden" id="role-label">Tu lugar</span>
