@@ -1021,3 +1021,12 @@ body { min-height:100dvh; }
 .player-mode.two-device-mode .deck-stack{left:calc(12% + 44px);right:auto}
 .player-mode.two-device-mode .muestra-card{left:12%;right:auto}
 .turn-badge .turn-timer.turn-timer-warning{color:#ffab8e;border-color:#ffab8e;background:#59271e;padding:3px 6px;border-radius:4px}
+
+/* Deck back on the right; calls and folding share a fixed bottom dock. */
+.player-mode.two-device-mode .deck-stack{left:auto;right:12%}
+.player-mode.two-device-mode .muestra-card{left:auto;right:calc(12% + 44px)}
+.player-mode .player-controls{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);width:min(680px,calc(100% - 28px));display:flex;flex-direction:column;align-items:center;gap:7px;z-index:25}
+.player-mode .player-controls .player-actions{position:static;inset:auto;transform:none;width:100%;margin:0}
+.player-mode .player-controls .fold-hand{position:static;inset:auto;transform:none;align-self:center;width:150px;height:30px;flex-shrink:0}
+.player-mode.two-device-mode .hand{top:calc(100% - 210px)}
+@media(max-height:650px){.player-mode.two-device-mode .hand{top:calc(100% - 192px)}}
