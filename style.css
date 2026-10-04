@@ -1036,3 +1036,10 @@ body { min-height:100dvh; }
 .player-mode .player-actions .fixed-actions{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;width:100%}
 .player-mode .fixed-actions button,.player-mode .player-controls .fixed-actions .fold-hand{position:static;inset:auto;transform:none;width:100%;min-width:0;height:34px;min-height:34px;margin:0;padding:4px 3px;border-radius:7px;font-size:10px;line-height:1.1;letter-spacing:.015em;white-space:normal}
 .player-mode .fixed-actions button:disabled{opacity:.32;cursor:default;pointer-events:none}
+
+/* Only available calls share the bottom dock; folding stays on the right. */
+.player-mode .player-controls{flex-direction:row;align-items:flex-end;gap:6px}
+.player-mode .player-controls .player-actions{flex:1;min-width:0;display:block}
+.player-mode .player-actions .compact-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:5px}
+.player-mode .compact-actions .call-button,.player-mode .compact-actions .pass-button{flex:1 1 68px;min-width:0;min-height:34px;height:34px;padding:4px 6px;font-size:10px;line-height:1.1;border-radius:7px;letter-spacing:.02em}
+.player-mode .player-controls>.fold-hand{flex:0 0 78px;align-self:flex-end;width:78px;min-width:0;height:34px;padding:4px;font-size:9px;white-space:normal;line-height:1.1;border-radius:7px}
