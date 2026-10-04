@@ -1030,3 +1030,9 @@ body { min-height:100dvh; }
 .player-mode .player-controls .fold-hand{position:static;inset:auto;transform:none;align-self:center;width:150px;height:30px;flex-shrink:0}
 .player-mode.two-device-mode .hand{top:calc(100% - 210px)}
 @media(max-height:650px){.player-mode.two-device-mode .hand{top:calc(100% - 192px)}}
+
+/* Every call keeps its seat, with folding at the right of the second row. */
+.player-mode .player-controls{gap:0}
+.player-mode .player-actions .fixed-actions{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;width:100%}
+.player-mode .fixed-actions button,.player-mode .player-controls .fixed-actions .fold-hand{position:static;inset:auto;transform:none;width:100%;min-width:0;height:34px;min-height:34px;margin:0;padding:4px 3px;border-radius:7px;font-size:10px;line-height:1.1;letter-spacing:.015em;white-space:normal}
+.player-mode .fixed-actions button:disabled{opacity:.32;cursor:default;pointer-events:none}

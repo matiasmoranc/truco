@@ -121,11 +121,15 @@ function renderCallNotice(){
     receivedCallNotices.set(key,received);
   }
   const remaining=received&&notice&&received.id===notice.id?CALL_NOTICE_DURATION-(Date.now()-received.at):0;
-  const visible=addressed&&remaining>0;
+  const pending=state.room?.pendingBet;
+  const awaitingResponse=addressed&&pending&&notice.from===pending.caller&&
+    (pending.revealMode?pending.revealTurn===role:pending.responder===role);
+  if(awaitingResponse&&received)received.pinned=true;
+  const visible=addressed&&(awaitingResponse||(!received?.pinned&&remaining>0));
   el.classList.toggle('hidden',!visible);
   el.textContent=visible?notice.text:'';
   if(!visible)return;
-  callNoticeTimer=setTimeout(()=>{callNoticeTimer=null;renderCallNotice();},remaining);
+  if(!awaitingResponse)callNoticeTimer=setTimeout(()=>{callNoticeTimer=null;renderCallNotice();},remaining);
   if(callSeen.get(key)!==notice.id){
     callSeen.set(key,notice.id);
     speakCall(notice.spoken);
@@ -1216,10 +1220,26 @@ function renderGame() {
     const level=Number(room.trucoLevel)||1;if(level<4&&(level===1||room.lastTrucoCaller!==state.playerId))buttons.push(`<button class="call-button" data-action="${level===1?'truco':level===2?'retruco':'vale4'}"><strong>${level===1?'TRUCO':level===2?'RETRUCO':'VALE 4'}</strong></button>`);
     }else if(!buttons.length)buttons.push('<span class="action-wait">ESPERÁ TU TURNO</span>');
   }
-  const waitingForRival=!state.hand.length&&!room.resolvingTrick&&!room.pendingNextHand&&room.turn===other;
-  const hasChoices=buttons.length>0&&!buttons.every(button=>button.includes('action-wait'));
-  const choices=hasChoices?`<div class="action-group"><div class="action-buttons">${buttons.join('')}</div></div>`:buttons.join('');
-  actions.innerHTML=room.status==='revealing'?'<span class="action-wait">FIN DE LA MANO</span>':pending||state.hand.length?choices:`<span class="action-wait">${waitingForRival?'ESPERANDO LA ÚLTIMA CARTA DEL RIVAL…':'ESPERANDO EL REPARTO…'}</span>`;
+  const available=new Map();
+  const actionPattern=/data-action="([^"]+)"/g;
+  for(const match of buttons.join('').matchAll(actionPattern))available.set(match[1],match[1]);
+  const slots=[
+    ['ENVIDO',['envido','raise-envido']],['REAL',['real','raise-real']],
+    ['FALTA',['falta','raise-falta']],['FLOR',['flor']],
+    ['TRUCO',['truco']],['RETRUCO',['retruco',...(pending?.type==='truco'&&pending.stake===2?['raise']:[])]],
+    ['VALE 4',['vale4',...(pending?.type==='truco'&&pending.stake===3?['raise']:[])]],
+    ['IRSE AL MAZO',null],['QUIERO',['yes']],['NO QUIERO',['no']],
+    ['CON FLOR',['raise-conflor']],['AL RESTO',['raise-faltaflor']]
+  ];
+  const foldButton=$('fold-hand');
+  foldButton.remove();
+  const canAct=room.status==='started'&&!room.resolvingTrick&&!room.pendingNextHand;
+  actions.innerHTML='<div class="action-buttons fixed-actions">'+slots.map(([label,candidates])=>{
+    if(!candidates)return '<span class="fold-slot"></span>';
+    const action=candidates.find(candidate=>available.has(candidate));
+    return `<button type="button" class="${label==='QUIERO'?'call-button':'pass-button'}" ${action&&canAct?'data-action="'+action+'"':'disabled'}>${label}</button>`;
+  }).join('')+'</div>';
+  actions.querySelector('.fold-slot').replaceWith(foldButton);
   renderEnvidoPicker(room);
   actions.querySelectorAll('[data-action]').forEach((button)=>button.addEventListener('click',()=>{const act=button.dataset.action;if(state.demo){demoAction(act);return;}if(['yes','no','raise'].includes(act)||act.startsWith('raise-'))answerBet(act);else if(act==='reveal')revealEnvido();else if(act==='flor')callFlor();else callBet(act);}));
   setTurnBadge(isTable?'MESA':roundPauseInfo(room)?'ESPERÁ':pending?(pending.responder===state.playerId?'RESPONDÉ':'ESPERANDO'):myTurn?'TU TURNO':'ESPERÁ');$('turn-badge').classList.toggle('waiting-turn',!myTurn||!!pending);
