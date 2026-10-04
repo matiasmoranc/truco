@@ -89,7 +89,7 @@ function renderRoundPauseTimer(){
   const visible=!!pause&&state.playerId!=='table'&&$('game-view').classList.contains('active');
   el.classList.toggle('hidden',!visible);
   if(!visible){el.textContent='';return;}
-  if(el.parentElement!==$('game-view'))$('turn-badge').append(el);
+  if(el.parentElement!==$('turn-badge'))$('turn-badge').append(el);
   el.textContent=pause.seconds+' s';
   roundPauseTimer=setTimeout(()=>renderRoundPauseTimer(),200);
 }
@@ -1009,7 +1009,8 @@ function setTurnBadge(text){
 function renderTurnTimer(){
   clearTimeout(turnTimerHandle);turnTimerHandle=null;
   let el=$('turn-timer');
-  if(!el){el=document.createElement('div');el.id='turn-timer';el.className='turn-timer hidden';el.setAttribute('role','timer');$('game-view').append(el);}
+  if(!el){el=document.createElement('div');el.id='turn-timer';el.className='turn-timer hidden';el.setAttribute('role','timer');$('turn-badge').append(el);}
+  if(el.parentElement!==$('turn-badge'))$('turn-badge').append(el);
   const room=state.room,key=turnClockKey(room),visible=$('game-view').classList.contains('active');
   el.classList.toggle('hidden',!visible||!key||state.playerId==='table');
   if(!visible||!room)return;
@@ -1464,6 +1465,10 @@ $('demo-two-button').addEventListener('click',()=>demoStart('player1','two'));
 $('leave-room').addEventListener('click',()=>{state.roomWatchVersion=(state.roomWatchVersion||0)+1;state.navigationEpoch=(state.navigationEpoch||0)+1;localStorage.removeItem('truco-last-seat');if(state.unsubscribe)state.unsubscribe();if(state.privateUnsubscribe)state.privateUnsubscribe();state.privateUnsubscribe=null;state.privateHandKey=null;state.room=null;state.demo=false;showView('welcome-view');openLobby();});
 $('game-home').addEventListener('click',()=>{if(state.demo){state.demo=false;showView('welcome-view');openLobby();return;}showView('waiting-view');});
 $('demo-device-switcher').addEventListener('click',(event)=>{const button=event.target.closest('[data-demo-role]');if(button)switchDemoRole(button.dataset.demoRole);});
+function limitMuestraOffset(x,y){
+  const distance=Math.hypot(x,y),scale=distance>15?15/distance:1;
+  return {x:x*scale,y:y*scale};
+}
 $('muestra-card').addEventListener('pointerdown',(event)=>{
   if (!state.demo && state.playerId !== 'table' && state.room?.deviceMode !== 'two') return;
   const card=$('muestra-card'); if(card.classList.contains('hidden')) return;
@@ -1472,8 +1477,9 @@ $('muestra-card').addEventListener('pointerdown',(event)=>{
 });
 $('muestra-card').addEventListener('pointermove',(event)=>{
   const card=$('muestra-card'),drag=card._drag; if(!drag||drag.pointerId!==event.pointerId)return;
-  card.style.setProperty('--muestra-dx',`${drag.baseX+event.clientX-drag.startX}px`);
-  card.style.setProperty('--muestra-dy',`${drag.baseY+event.clientY-drag.startY}px`);
+  const offset=limitMuestraOffset(drag.baseX+event.clientX-drag.startX,drag.baseY+event.clientY-drag.startY);
+  card.style.setProperty('--muestra-dx',`${offset.x}px`);
+  card.style.setProperty('--muestra-dy',`${offset.y}px`);
 });
 const endMuestraDrag=(event)=>{const card=$('muestra-card');if(card._drag?.pointerId===event.pointerId){card.releasePointerCapture?.(event.pointerId);card._drag=null;card.classList.remove('dragging');}};
 $('muestra-card').addEventListener('pointerup',endMuestraDrag);

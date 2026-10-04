@@ -997,3 +997,7 @@ body { min-height:100dvh; }
   .player-mode.two-device-mode .mobile-score{top:100px}
   .player-mode.two-device-mode .hand-card{width:clamp(91.2px,29.45vw,106.4px);height:clamp(133px,39.9vw,152px);flex-basis:clamp(91.2px,29.45vw,106.4px)}
 }
+
+/* Both countdowns belong to the turn badge, including the pause between plays. */
+.turn-badge .turn-timer,.turn-badge .round-pause-timer{position:static;inset:auto;transform:none;min-width:0;max-width:none;padding:0 0 0 8px;border:0;border-left:1px solid currentColor;border-radius:0;background:transparent;font-size:12px;line-height:1.2;letter-spacing:0;color:var(--gold)}
+.player-mode.two-device-mode .deck-stack,.player-mode.two-device-mode .muestra-card{top:calc(50% - 18px)}
