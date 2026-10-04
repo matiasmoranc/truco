@@ -1,10 +1,10 @@
 const FIREBASE_VERSION = '12.4.0';
 const $ = (id) => document.getElementById(id);
-const views = ['welcome-view', 'setup-view', 'waiting-view', 'game-view', 'config-view'];
+const views = ['welcome-view', 'invite-view', 'setup-view', 'waiting-view', 'game-view', 'config-view'];
 const storageKey = 'truco-firebase-config';
 let state = { role: 'table', joining: false, config: null, firebase: null, roomCode: null, selectedRoom: null, uid: null, playerId: null, unsubscribe: null, privateUnsubscribe: null, lobbyUnsubscribe: null, room: null, hand: [], handOrder: [], handOrderKey: null, demo: false, demoHands: {}, nextAction: null, resolutionTimer: null, resolutionTimerKey: null, playActionInFlight: false, legacyRepairKey: null, emptyHandRepairKey: null };
 
-function showView(id) { views.forEach((name) => $(name).classList.toggle('active', name === id)); }
+function showView(id) { document.documentElement.classList.remove('opening-invitation'); views.forEach((name) => $(name).classList.toggle('active', name === id)); }
 function suitSvg(suit){
   const paths={
     table:'<path d="M5 14h38v6H5zM9 20h5v23H9zM34 20h5v23h-5zM10 5h28l5 9H5z"/>',
@@ -204,6 +204,7 @@ function claimRoomSeat(current,person,role){
 }
 async function enterRoom() {
   if(state.enteringRoom)return;
+  if(state.invitationEntry&&!$('player-name').value.trim()){showInvitationForm();$('invite-name').focus();return;}
   const name=cleanName($('player-name').value,state.role==='table'?'La mesa':'Jugador');
   if(!firebaseConfigValid(state.config)){state.nextAction='enter';showConfig();return;}
   state.enteringRoom=true;
@@ -247,6 +248,7 @@ async function enterRoom() {
     }
     if(state.privateUnsubscribe)state.privateUnsubscribe();
     state.privateUnsubscribe=null;state.privateHandKey=null;
+    state.invitationEntry=false;
     state.demo=false;state.hand=[];state.room=joinedRoom;
     localStorage.setItem('truco-player-name',name);
     if(request.joining){const url=new URL(location.href);url.searchParams.delete('mesa');history.replaceState(null,'',url);}
@@ -258,6 +260,7 @@ async function enterRoom() {
     if(joinedRoom.status==='waiting')renderWaiting();
   }catch(error){
     console.error('[truco:join] failed',error);toast(firebaseError(error),true);
+    if(state.invitationEntry)showInvitationForm();
   }finally{
     state.enteringRoom=false;$('enter-room').disabled=false;
   }
@@ -270,14 +273,35 @@ function updateInvitation(){
   link.classList.toggle('hidden',!state.roomCode||state.demo||state.room?.status!=='waiting');
   if(state.roomCode){const message=`Te da para un truquito? Entra a mi mesa: ${invitationLink(state.roomCode)}`;link.href=`https://wa.me/?text=${encodeURIComponent(message)}`;}
 }
-async function openInvitation(code){
-  if(!/^[A-Z2-9]{5}$/.test(code)){toast('La invitación no es válida.',true);await openLobby();return;}
-  const name=localStorage.getItem('truco-player-name')||'';
-  $('player-name').value=name;$('lobby-name').value=name;
-  state.joining=true;state.selectedRoom=code;state.role='player';
-  toast('Entrando a la mesa…',true);
-  await enterRoom();
+function showInvitationForm(){
+  showView('invite-view');
+  $('invite-loading').classList.add('hidden');
+  $('invite-form').classList.remove('hidden');
+  $('invite-name').focus();
 }
+async function openInvitation(code){
+  showView('invite-view');
+  if(!/^[A-Z2-9]{5}$/.test(code)){toast('La invitación no es válida.',true);await openLobby();return;}
+  state.joining=true;state.invitationEntry=true;state.selectedRoom=code;state.role='player';
+  $('invite-name').value=localStorage.getItem('truco-player-name')||'';
+  showInvitationForm();
+}
+$('invite-form').addEventListener('submit',async event=>{
+  event.preventDefault();
+  const name=$('invite-name').value.trim();
+  if(!name){$('invite-name').focus();return;}
+  $('player-name').value=name;
+  $('invite-form').classList.add('hidden');
+  $('invite-loading').classList.remove('hidden');
+  showView('invite-view');
+  await enterRoom();
+});
+$('invite-cancel').addEventListener('click',()=>{
+  if(state.enteringRoom)return;
+  state.invitationEntry=false;state.joining=false;
+  const url=new URL(location.href);url.searchParams.delete('mesa');history.replaceState(null,'',url);
+  openLobby();
+});
 async function openLobby() {
   if (!firebaseConfigValid(state.config)) { state.nextAction = 'lobby'; showConfig(); return; }
   try {
@@ -1500,6 +1524,7 @@ document.addEventListener('click',()=>{if(soundEnabled&&!voiceUnlocked){voiceUnl
 $('sound-toggle').addEventListener('click',()=>$('player-sound-toggle').click());
 $('close-config').addEventListener('click',()=>showView('setup-view'));
 $('save-config').addEventListener('click',()=>{try{const cfg=JSON.parse($('firebase-config').value);if(!firebaseConfigValid(cfg))throw new Error('missing');state.config=cfg;localStorage.setItem(storageKey,JSON.stringify(cfg));toast('Configuración guardada.',true);runPendingAction();}catch{toast('Pegá una configuración Firebase válida.',true);}});
+if(new URLSearchParams(location.search).has('mesa'))showView('invite-view');
 state.config=loadConfig();
 setupSuitIcons();renderPointsPicker();
 try {

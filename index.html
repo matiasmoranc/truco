@@ -5,12 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
     <meta name="theme-color" content="#10291f" />
     <meta name="description" content="Una mesa de truco para jugar entre amigos, cada uno desde su celular." />
+    <script>if(new URLSearchParams(location.search).has('mesa'))document.documentElement.classList.add('opening-invitation');</script>
     <title>Truco — La mesa está servida</title>
     <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="./style.css?v=20261004-76" />
+    <link rel="stylesheet" href="./style.css?v=20261004-77" />
   </head>
   <body>
     <div class="grain" aria-hidden="true"></div>
@@ -31,6 +32,21 @@
           </section>
         </div>
         <footer class="home-footer"><button class="demo-link" id="demo-button">Demo con mesa</button><button class="demo-link" id="demo-two-button">Demo 2 dispositivos</button></footer>
+      </section>
+
+      <section class="view invitation-view" id="invite-view" aria-label="Unirse a la mesa">
+        <div class="invitation-content">
+          <div class="brand-lockup"><span class="brand-mark">T</span><span>TRUCO</span></div>
+          <div id="invite-loading" role="status" aria-live="polite"><div class="invitation-spinner" aria-hidden="true"></div><p>Entrando a la mesa…</p></div>
+          <form id="invite-form" class="hidden">
+            <h2>Te esperan<br />en la mesa.</h2>
+            <p>Ingresá tu nombre para unirte y jugar.</p>
+            <label class="field-label" for="invite-name">Tu nombre</label>
+            <input id="invite-name" class="name-input" maxlength="18" placeholder="Tu nombre" autocomplete="nickname" required />
+            <button type="submit" class="button primary full-button">Entrar a la mesa</button>
+            <button type="button" id="invite-cancel" class="text-button">Volver al inicio</button>
+          </form>
+        </div>
       </section>
 
       <section class="setup view" id="setup-view">
@@ -106,6 +122,6 @@
       <section class="toast-global" id="global-toast" role="status"></section>
     </main>
     <dialog id="score-details" class="score-details" aria-labelledby="score-details-title"><div class="score-details-panel"><header class="score-details-header"><h2 id="score-details-title">Última mano</h2><button id="close-score-details" type="button" aria-label="Cerrar detalle"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button></header><div id="score-details-content"></div><button id="dismiss-score-details" class="score-details-dismiss" type="button">Cerrar</button></div></dialog>
-    <script type="module" src="./app.js?v=20261004-76"></script>
+    <script type="module" src="./app.js?v=20261004-77"></script>
   </body>
 </html>

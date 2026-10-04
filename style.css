@@ -1001,3 +1001,16 @@ body { min-height:100dvh; }
 /* Both countdowns belong to the turn badge, including the pause between plays. */
 .turn-badge .turn-timer,.turn-badge .round-pause-timer{position:static;inset:auto;transform:none;min-width:0;max-width:none;padding:0 0 0 8px;border:0;border-left:1px solid currentColor;border-radius:0;background:transparent;font-size:12px;line-height:1.2;letter-spacing:0;color:var(--gold)}
 .player-mode.two-device-mode .deck-stack,.player-mode.two-device-mode .muestra-card{top:calc(50% - 18px)}
+
+/* Invitation links show this surface before the module or Firebase loads. */
+.opening-invitation #welcome-view{display:none!important}
+.opening-invitation #invite-view{display:flex}
+.invitation-view{height:100dvh;min-height:0;align-items:center;justify-content:center;padding:24px;background:linear-gradient(145deg,#153e30,#0b241c)}
+.invitation-content{width:min(360px,100%)}
+.invitation-content .brand-lockup{margin-bottom:36px}
+.invitation-content h2{font-family:'Playfair Display',serif;font-size:42px;line-height:1.1;margin:0 0 18px}
+.invitation-content p{color:#b8c8bd;font-size:15px;line-height:1.6;margin:0 0 24px}
+#invite-loading{text-align:center;padding:30px 0}
+.invitation-spinner{width:36px;height:36px;border:3px solid #d8b87530;border-top-color:var(--gold);border-radius:50%;margin:0 auto 20px;animation:invitation-spin .8s linear infinite}
+@keyframes invitation-spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.invitation-spinner{animation:none}}
