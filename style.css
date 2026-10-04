@@ -943,3 +943,14 @@ body { min-height:100dvh; }
   .player-mode.two-device-mode .hand{top:calc(100% - 138px)}
   .player-mode.two-device-mode .hand-card{width:clamp(96px,31vw,112px);height:clamp(140px,42vw,160px);flex-basis:clamp(96px,31vw,112px);margin-left:-26px;margin-right:-26px}
 }
+
+
+/* Leave a little more room between the hand and call buttons on two phones. */
+.player-mode.two-device-mode .hand{top:calc(100% - 180px)}
+@media(max-height:650px){
+  .player-mode.two-device-mode .hand{top:calc(100% - 162px)}
+}
+
+/* Fit the compact tally to the two stick squares and make N/E easier to read. */
+.player-mode.two-device-mode .mobile-score{width:118px}
+.player-mode.two-device-mode .mobile-score-head h2{font-size:16px;letter-spacing:.04em}
