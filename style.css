@@ -954,3 +954,11 @@ body { min-height:100dvh; }
 /* Fit the compact tally to the two stick squares and make N/E easier to read. */
 .player-mode.two-device-mode .mobile-score{width:118px}
 .player-mode.two-device-mode .mobile-score-head h2{font-size:16px;letter-spacing:.04em}
+
+
+/* The card stays still after its flight lands on a two-phone game. */
+.player-mode.two-device-mode .played-card{animation:none}
+
+/* Action labels explain which verb belongs to each call. */
+.player-mode .action-verb{font:700 8px 'DM Sans',sans-serif;letter-spacing:.13em;line-height:1;color:currentColor;opacity:.78}
+.player-mode .action-buttons .call-button,.player-mode .action-buttons .pass-button{gap:3px}
