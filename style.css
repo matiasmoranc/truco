@@ -976,3 +976,11 @@ body { min-height:100dvh; }
 .turn-timer-warning{background:#59271ef2;border-color:#edaa80;color:#ffe0ca}
 .turn-timer.hidden{display:none!important}
 .table-mode .turn-timer{display:none!important}
+
+/* Keep declaration controls above the hand and both clocks at the right edge. */
+.envido-picker{top:72px;bottom:auto;padding:12px}
+.envido-picker p{margin-bottom:6px;font-size:12px}
+.declaration-buttons{margin-top:6px}
+.declaring-envido .hand-card-muted{opacity:1!important}
+.game-topbar .player-sound-toggle{position:static;flex:0 0 38px;margin-left:auto;z-index:80}
+.turn-timer,.round-pause-timer{top:72px;right:12px;left:auto;transform:none;min-width:44px;max-width:80px;padding:9px 8px;text-align:center;font-size:14px;border-radius:20px}
