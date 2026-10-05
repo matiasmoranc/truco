@@ -937,9 +937,19 @@ async function foldHand(){
   state.foldInFlight=true;
   try{
     if(state.demo){
-      const changes=foldHandChanges(state.room,state.playerId);
-      Object.assign(state.room,changes);demoFeed(changes.pendingNextHand.message);state.room.pendingNextHand=null;state.room.turn=null;state.room.pendingBet=null;
-      demoFinishHand(changes.pendingNextHand.winner,changes.pendingNextHand.foldPoints);return;
+      const room=state.room,changes=foldHandChanges(room,state.playerId),pending=changes.pendingNextHand;
+      Object.assign(room,changes);
+      // Keep the fold notice and the pending hand alive for the full 3-second pause.
+      renderGame();
+      clearTimeout(state.resolutionTimer);
+      state.resolutionTimerKey=pending.id;
+      state.resolutionTimer=setTimeout(()=>{
+        if(!state.demo||state.room!==room||room.pendingNextHand?.id!==pending.id)return;
+        room.pendingNextHand=null;
+        state.resolutionTimer=null;state.resolutionTimerKey=null;
+        demoFinishHand(pending.winner,pending.foldPoints);
+      },Math.max(0,pending.endsAt-gameTime()));
+      return;
     }
     const fb=state.firebase,code=state.roomCode,player=state.playerId,handNumber=state.room.handNumber;
     await fb.runTransaction(fb.ref(fb.db,'rooms/'+code+'/public'),current=>{
