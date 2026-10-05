@@ -763,9 +763,14 @@ body { min-height:100dvh; }
 .invite-whatsapp:focus-visible{outline:3px solid #e8c983;outline-offset:3px}
 
 .scoreboard,.mobile-score{cursor:pointer;touch-action:manipulation}
-.score-details{padding:0;border:1px solid #d8b87566;border-radius:20px;width:min(460px,calc(100vw - 32px));max-height:80dvh;overflow:auto;color:#f7f3e9;background:#12382b;box-shadow:0 20px 80px #0008}
+.score-details{padding:0;border:1px solid #d8b87566;border-radius:20px;width:min(460px,calc(100vw - 32px));max-height:80dvh;overflow:hidden;color:#f7f3e9;background:#12382b;box-shadow:0 20px 80px #0008}
 .score-details::backdrop{background:#03150ec4}
-.score-details-panel{padding:20px}
+.score-details-panel{padding:20px;display:flex;flex-direction:column;max-height:80dvh;box-sizing:border-box}
+#score-details-content{overflow-y:auto;min-height:0;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;touch-action:pan-y;padding-right:4px}
+.score-details-header,.score-details-dismiss{flex-shrink:0}
+.score-detail-hand+ .score-detail-hand{border-top:1px solid #ffffff26;padding-top:18px}
+.score-detail-hand h3{margin:0 0 12px;color:#e8c983;font-size:16px}
+.score-details-dismiss{margin-top:12px}
 .score-details-header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px}
 .score-details-header h2{font:600 21px 'DM Sans',sans-serif;margin:0}
 .score-details-header button{display:grid;place-items:center;width:44px;height:44px;border:1px solid #ffffff26;border-radius:12px;background:#ffffff08}

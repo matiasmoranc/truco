@@ -629,10 +629,19 @@ function buildHandSummary(room,scores,reason,truth=verifiedHandTruth(room)){
   entries.forEach(entry=>{totals[entry.player]+=Number(entry.points)||0;});
   return {handNumber:room.handNumber||1,totals,entries,names:{player1:room.players?.player1?.name||'Jugador 1',player2:room.players?.player2?.name||'Jugador 2'},time:Date.now()};
 }
+function handScoreHistory(room, summary=null){
+  const history={...(room?.handScoreHistory||{})};
+  for(const hand of [room?.lastHandScore,summary]){
+    if(hand)history[hand.handNumber]=hand;
+  }
+  return history;
+}
 function openScoreDetails(){
-  const dialog=$('score-details'),summary=state.room?.lastHandScore;
-  $('score-details-title').textContent=summary?`Última mano · ${summary.handNumber}`:'Última mano';
-  $('score-details-content').innerHTML=summary?['player1','player2'].map(player=>`<section class="score-detail-player"><header><strong>${escapeHtml(summary.names[player])}</strong><b>+${summary.totals[player]||0} puntos</b></header>${(summary.entries||[]).filter(entry=>entry.player===player).map(entry=>`<p><span>+${entry.points}</span>${escapeHtml(entry.detail)}</p>`).join('')||'<p>No sumó puntos en esta mano.</p>'}</section>`).join(''):'<p class="score-details-empty">Todavía no terminó ninguna mano.</p>';
+  const dialog=$('score-details');
+  const history=Object.values(handScoreHistory(state.room)).sort((a,b)=>b.handNumber-a.handNumber);
+  $('score-details-title').textContent='Historial de manos';
+  $('score-details-content').innerHTML=history.length?history.map(summary=>`<section class="score-detail-hand"><h3>Mano ${summary.handNumber}</h3>${['player1','player2'].map(player=>`<section class="score-detail-player"><header><strong>${escapeHtml(summary.names[player])}</strong><b>+${summary.totals[player]||0} puntos</b></header>${(summary.entries||[]).filter(entry=>entry.player===player).map(entry=>`<p><span>+${entry.points}</span>${escapeHtml(entry.detail)}</p>`).join('')||'<p>No sumó puntos en esta mano.</p>'}</section>`).join('')}</section>`).join(''):'<p class="score-details-empty">Todavía no terminó ninguna mano.</p>';
+  $('score-details-content').scrollTop=0;
   dialog.showModal();
 }
 
@@ -645,6 +654,7 @@ async function writeRoom(changes) {
     changes={...changes,handScoreEntries:entries};
     if(changes.status==='complete')changes={...changes,lastHandScore:buildHandSummary(state.room,changes.scores,detail),handScoreEntries:[]};
   }
+  if(changes.lastHandScore)changes={...changes,handScoreHistory:handScoreHistory(state.room,changes.lastHandScore)};
   const fb=state.firebase; const updates={};
   const newBet=changes.pendingBet;
   const callLabel=newBet?.caller===state.playerId&&!newBet.revealMode
@@ -797,6 +807,7 @@ async function nextHand(winner, scores, handNumber, message, envidoVerified=fals
   const mano=otherPlayer(state.room.mano||'player1'),dealer=otherPlayer(mano);
   const patches={};
   patches[`rooms/${state.roomCode}/public/lastHandScore`]=summary;
+  patches[`rooms/${state.roomCode}/public/handScoreHistory`]=handScoreHistory(state.room,summary);
   patches[`rooms/${state.roomCode}/public/handScoreEntries`]=[];
   patches[`hands/${state.roomCode}/${p1.uid}/hand`]=deck.slice(0,3);patches[`hands/${state.roomCode}/${p2.uid}/hand`]=deck.slice(3,6);
   patches[`hands/${state.roomCode}/${p1.uid}/handNumber`]=handNumber+1;
@@ -1376,7 +1387,7 @@ function demoScore(player,points,description){
   state.room.scores[player]=(state.room.scores[player]||0)+amount;
   state.room.handScoreEntries=scoringEntries(before,state.room.scores,description);
   demoFeed(`${state.room.players[player].name} ${description} (+${amount}).`);
-  if(state.room.scores[player]>=targetPoints(state.room)){state.room.status='complete';state.room.lastHandScore=buildHandSummary(before,state.room.scores,description,null);}
+  if(state.room.scores[player]>=targetPoints(state.room)){state.room.status='complete';state.room.lastHandScore=buildHandSummary(before,state.room.scores,description,null);state.room.handScoreHistory=handScoreHistory(state.room,state.room.lastHandScore);}
 }
 function demoResolveFlor(bet){
   const values=state.room.flors||{};if(values.player1==null||values.player2==null)return;
@@ -1473,6 +1484,7 @@ function demoFinishHand(winner,points){
   room.scores[winner]=(room.scores[winner]||0)+points;
   room.scores=settleSingleFlor(room,room.scores);
   room.lastHandScore=buildHandSummary(before,room.scores,`${room.players[winner].name} gana la mano (${points} puntos).`,state.demoTruth||{});room.handScoreEntries=[];
+  room.handScoreHistory=handScoreHistory(room,room.lastHandScore);
   if(groups.length){demoShowEvidence(groups);renderGame();return;}
   demoDealAfterHand();
 }
@@ -1613,7 +1625,7 @@ handSurface.addEventListener('keydown',event=>{
 });
 
 document.querySelectorAll('.scoreboard,.mobile-score').forEach(marker=>{
-  marker.setAttribute('role','button');marker.setAttribute('tabindex','0');marker.setAttribute('aria-label','Ver puntos de la última mano');
+  marker.setAttribute('role','button');marker.setAttribute('tabindex','0');marker.setAttribute('aria-label','Ver historial de puntos de todas las manos');
   marker.addEventListener('click',openScoreDetails);
   marker.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();openScoreDetails();}});
 });
