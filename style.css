@@ -1128,3 +1128,31 @@ body { min-height:100dvh; }
   border-color:#e7c675;
   font-weight:700;
 }
+
+/* Fixed center marker: only the envido numbers move underneath it. */
+.player-mode.declaring-envido .number-wheel{position:relative}
+.player-mode.declaring-envido .number-wheel button[aria-selected="true"]{
+  background:transparent!important;
+  color:#f3efdf!important;
+  border-color:transparent!important;
+  box-shadow:none!important;
+}
+.player-mode.declaring-envido .envido-picker::after{
+  content:"";
+  position:absolute;
+  left:50%;
+  top:25px;
+  transform:translateX(-50%);
+  width:48px;
+  height:48px;
+  border-radius:9px;
+  background:#e7c675;
+  pointer-events:none;
+  z-index:-1;
+}
+.player-mode.declaring-envido .number-wheel button{transition:opacity .12s ease}
+.player-mode.declaring-envido .number-wheel button[data-distance="0"]{opacity:1}
+.player-mode.declaring-envido .number-wheel button[data-distance="1"]{opacity:.78}
+.player-mode.declaring-envido .number-wheel button[data-distance="2"]{opacity:.48}
+.player-mode.declaring-envido .number-wheel button[data-distance="3"]{opacity:.25}
+.player-mode.declaring-envido .number-wheel button[data-distance="4"]{opacity:.1}
