@@ -467,12 +467,12 @@ function renderWaiting() {
   if (!state.room) return;
   updateInvitation();
   const players = state.room.players || {};
-  $('room-status').textContent = state.room.table && players.player1 && players.player2 ? 'MESA COMPLETA' : 'ESPERANDO LUGARES';
-  const seatData = (state.room.deviceMode === 'two' ? [] : [['table','LA MESA',state.room.table]]).concat([['player1','JUGADOR 1',players.player1],['player2','JUGADOR 2',players.player2]]);
-  $('seats').innerHTML = seatData.map(([key,label,value]) => `<div class="seat"><span class="seat-icon" data-suit-icon="${key==='table'?'table':key==='player1'?'espada':'copa'}"></span><span class="seat-name"><strong>${escapeHtml(value?.name || (key==='table'?'La mesa':'Esperando jugador…'))}</strong><small>${label}</small></span><span class="seat-state ${value?'ready':''}">${value?'LISTO':'ESPERANDO'}</span></div>`).join('');setupSuitIcons($('seats'));
   const ready = !!(state.room.table && players.player1 && players.player2);
+  $('room-status').textContent = ready?'Todo listo':state.room.deviceMode==='two'?'Esperando rival':'Esperando jugadores';
+  const seatData = (state.room.deviceMode === 'two' ? [] : [['table','LA MESA',state.room.table]]).concat([['player1','JUGADOR 1',players.player1],['player2','JUGADOR 2',players.player2]]);
+  $('seats').innerHTML = seatData.map(([key,label,value]) => `<div class="seat"><span class="seat-icon" data-suit-icon="${key==='table'?'table':key==='player1'?'espada':'copa'}"></span><span class="seat-name"><strong>${escapeHtml(value?.name || (key==='table'?'Dispositivo de mesa':'Lugar disponible'))}</strong>${state.room.deviceMode==='two'?'':`<small>${label}</small>`}</span><span class="seat-state ${value?'ready':''}">${value?'Conectado':'Libre'}</span></div>`).join('');setupSuitIcons($('seats'));
   if(ready&&isCoordinator())startGame().catch(error=>toast(firebaseError(error),true));
-  $('waiting-hint').textContent = ready?'Comenzando la partida…':'Esperando los dispositivos restantes';
+  $('waiting-hint').textContent = ready?'La partida está por comenzar.':players.player1&&players.player2&&!state.room.table?'Falta conectar el dispositivo de mesa.':'Invitá a un amigo para empezar a jugar.';
   $('game-room-code').textContent = 'MESA ABIERTA';
 }
 function shuffleDeck() {

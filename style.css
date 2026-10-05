@@ -278,10 +278,10 @@
 
 /* La muestra tiene el tamaño del mazo y sale hacia el centro, cruzada. */
 .table-mode .deck-stack{width:clamp(106px,10.8vw,151px);height:clamp(151px,15.6vw,214px)}
-.table-mode .muestra-card{width:clamp(106px,10.8vw,151px);height:clamp(151px,15.6vw,214px);top:50%;right:calc(5% + clamp(95px,10.2vw,142px));left:auto;z-index:1;transform:translateY(-50%) rotate(82deg)}
+.table-mode .muestra-card{width:clamp(106px,10.8vw,151px);height:clamp(151px,15.6vw,214px);top:50%;right:calc(5% + clamp(95px,10.2vw,142px));left:auto;z-index:1;transform:translateY(-50%) rotate(-98deg)}
 @media(max-width:640px){
   .table-mode .deck-stack{width:clamp(110px,36vw,149px);height:clamp(160px,52vw,216px)}
-  .table-mode .muestra-card{width:clamp(110px,36vw,149px);height:clamp(160px,52vw,216px);top:50%;right:calc(4% + clamp(100px,34vw,140px));left:auto;transform:translateY(-50%) rotate(82deg)}
+  .table-mode .muestra-card{width:clamp(110px,36vw,149px);height:clamp(160px,52vw,216px);top:50%;right:calc(4% + clamp(100px,34vw,140px));left:auto;transform:translateY(-50%) rotate(-98deg)}
 }
 
 /* El tanteador de la mesa crece hacia abajo sin recortar los palitos. */
@@ -333,7 +333,7 @@
   top:50%;
   right:calc(5% + clamp(55px,4vw,70px));
   left:auto;
-  transform:translate(calc(0px + var(--muestra-dx,0px)),calc(-50% + var(--muestra-dy,0px))) rotate(82deg);
+  transform:translate(calc(0px + var(--muestra-dx,0px)),calc(-50% + var(--muestra-dy,0px))) rotate(-98deg);
   z-index:1;
 }
 .table-mode .muestra-card.sprite-card.dragging{cursor:grabbing}
@@ -603,7 +603,7 @@ button,a,input,select,textarea{touch-action:manipulation}
 .player-mode.two-device-mode .muestra-card{display:block!important}
 .player-mode.two-device-mode .center-table{position:relative;inset:auto;transform:none;width:100%;height:180px;margin:0 auto 12px}
 .player-mode.two-device-mode .deck-stack{position:absolute;top:50%;left:auto;right:12%;width:58px;height:84px;transform:translateY(-50%);z-index:4}
-.player-mode.two-device-mode .muestra-card{position:absolute;top:50%;left:auto;right:calc(12% + 44px);width:58px;height:84px;transform:translateY(-50%) rotate(82deg);z-index:3}
+.player-mode.two-device-mode .muestra-card{position:absolute;top:50%;left:auto;right:calc(12% + 44px);width:58px;height:84px;transform:translateY(-50%) rotate(-98deg);z-index:3}
 .player-mode.two-device-mode .trick-cards{position:absolute;inset:0;pointer-events:none;z-index:5}
 .player-mode.two-device-mode .played-card{position:absolute;top:50%;left:20%;width:62px;height:90px;transform:translate(-50%,-50%) rotate(-6deg)}
 .player-mode.two-device-mode .played-card-player2{left:40%;transform:translate(-50%,-50%) rotate(6deg)}
@@ -630,7 +630,7 @@ button,a,input,select,textarea{touch-action:manipulation}
 .player-mode.two-device-mode .mobile-score-grid{height:64px;min-height:0;gap:12px;align-items:center}
 .player-mode.two-device-mode .mobile-tally{height:64px;min-height:0;width:100%;max-width:none;overflow:hidden;margin:0;padding:0}
 .player-mode.two-device-mode .compact-score-sticks{display:block;width:100%;height:64px}
-.player-mode.two-device-mode .muestra-card.sprite-card{transform:translate(var(--muestra-dx,0px),calc(-50% + var(--muestra-dy,0px))) rotate(82deg);touch-action:none;cursor:grab}
+.player-mode.two-device-mode .muestra-card.sprite-card{transform:translate(var(--muestra-dx,0px),calc(-50% + var(--muestra-dy,0px))) rotate(-98deg);touch-action:none;cursor:grab}
 .player-mode.two-device-mode .muestra-card.sprite-card.dragging{z-index:10;cursor:grabbing}
 .player-mode.two-device-mode .center-table{z-index:6;overflow:visible}
 @media(max-height:650px){.player-mode.two-device-mode .mobile-score{flex-basis:80px;height:80px;max-height:80px}.player-mode.two-device-mode .mobile-score-grid,.player-mode.two-device-mode .mobile-tally,.player-mode.two-device-mode .compact-score-sticks{height:48px}}
@@ -1198,3 +1198,11 @@ body { min-height:100dvh; }
   .draw-results{min-height:140px}
   .draw-results .draw-card{width:84px;height:122px}
 }
+
+/* Direct waiting screen and the upper end of the muestra exposed to the left. */
+.waiting h2{font-family:'DM Sans',sans-serif;font-size:clamp(28px,7vw,38px);line-height:1.15;letter-spacing:-.025em;margin:0 0 24px}
+.waiting-content{padding-top:32px}
+.waiting .seats{margin:24px 0 16px}
+.waiting .seat-name strong{font-size:15px}
+.waiting .seat-state{font-size:11px;letter-spacing:0;text-transform:none}
+.waiting-bottom p{font-size:14px;line-height:1.5;letter-spacing:0;color:#b9cabe}
