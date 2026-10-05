@@ -145,6 +145,25 @@ function renderCallNotice(){
   }
 }
 function cleanName(value, fallback) { return value.trim().slice(0,18) || fallback; }
+function savedPlayerName() {
+  try { return localStorage.getItem('truco-player-name') || ''; } catch { return ''; }
+}
+function rememberPlayerName(name) {
+  try {
+    if(name) localStorage.setItem('truco-player-name', name);
+    else localStorage.removeItem('truco-player-name');
+  } catch { /* The game can still be used when browser storage is unavailable. */ }
+}
+for (const id of ['player-name', 'lobby-name']) {
+  $(id).value = savedPlayerName();
+  $(id).addEventListener('input', event => {
+    const name = cleanName(event.target.value, '');
+    rememberPlayerName(name);
+    for (const otherId of ['player-name', 'lobby-name']) {
+      if(otherId !== id) $(otherId).value = name;
+    }
+  });
+}
 function pickRole(role) {
   state.role = role;
   document.querySelectorAll('.role-card').forEach((card) => card.classList.toggle('selected', card.dataset.role === role));
@@ -263,7 +282,7 @@ async function enterRoom() {
     state.privateUnsubscribe=null;state.privateHandKey=null;state.privateDeal=null;
     state.invitationEntry=false;
     state.demo=false;state.hand=[];state.room=joinedRoom;
-    localStorage.setItem('truco-player-name',name);
+    rememberPlayerName(name);
     if(request.joining){const url=new URL(location.href);url.searchParams.delete('mesa');history.replaceState(null,'',url);}
     localStorage.setItem('truco-last-seat',JSON.stringify({code:state.roomCode,role:state.playerId}));
     if(state.lobbyUnsubscribe){state.lobbyUnsubscribe();state.lobbyUnsubscribe=null;}
@@ -296,7 +315,7 @@ async function openInvitation(code){
   showView('invite-view');
   if(!/^[A-Z2-9]{5}$/.test(code)){toast('La invitación no es válida.',true);await openLobby();return;}
   state.joining=true;state.invitationEntry=true;state.selectedRoom=code;state.role='player';
-  $('invite-name').value=localStorage.getItem('truco-player-name')||'';
+  $('invite-name').value=savedPlayerName();
   showInvitationForm();
 }
 $('invite-form').addEventListener('submit',async event=>{
