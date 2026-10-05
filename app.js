@@ -717,7 +717,7 @@ async function revealEnvido(good=false) {
   if(player===first){changes={pendingBet:{...bet,reveals,revealTurn:second},feed:topFeed(room,`${room.players[player].name} canta ${number} tantos.`)};}
   else{
     const winner=good||number===Number(bet.reveals?.[first])?first:second;
-    changes={pendingBet:bet.suspendedBet||null,envidoClosed:true,envidoAudit:{reveals,winner,stake:bet.stake,handNumber:room.handNumber},feed:topFeed(room,good?`${room.players[player].name}: son buenas.`:`${room.players[player].name} canta ${number} ${winner===first?'son iguales':'son mejores'}.`)};
+    changes={pendingBet:bet.suspendedBet||null,envidoClosed:true,envidoAudit:{reveals,winner,stake:bet.stake,handNumber:room.handNumber},feed:topFeed(room,good?`${room.players[player].name}: son buenas.`:`${room.players[player].name} canta ${number} son mejores.`)};
   }
   if(state.demo){const notice=makeCallNotice(changes.feed?.[0]?.text);if(notice)changes.callNotice=notice;Object.assign(room,changes);renderGame();}else await writeRoom(changes);
 }
