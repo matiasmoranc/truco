@@ -1176,3 +1176,25 @@ body { min-height:100dvh; }
   line-height:14px;
   box-shadow:0 2px 8px #0005;
 }
+
+/* Opening draw: readable instructions and a shared deadline on small screens. */
+.drawing-mode .game-topbar{position:relative;z-index:90}
+.drawing-mode #game-home{font-size:0;gap:6px}
+.drawing-mode #game-home b{display:none}
+.drawing-mode #game-home::before{content:"←";font-size:24px}
+.drawing-mode #game-home::after{content:"Lobby";font:600 14px 'DM Sans',sans-serif}
+.drawing-mode .fold-hand{display:none!important}
+.opening-draw{gap:14px;padding-top:78px;overscroll-behavior:contain}
+.draw-prompt{width:min(100%,320px);flex-shrink:0}
+.draw-prompt h2{margin:0 0 7px;font:700 clamp(18px,5vw,23px)/1.25 'DM Sans',sans-serif;color:#fff4d6}
+.draw-prompt p{margin:0;font-size:14px;line-height:1.45;letter-spacing:normal;text-transform:none;color:#d1e0d6;overflow-wrap:break-word;text-wrap:pretty}
+.opening-timer{flex-shrink:0;border:1px solid #e8c98355;border-radius:10px;padding:7px 14px;background:#10291f;color:#f2d99f;font-size:15px;font-weight:700;font-variant-numeric:tabular-nums}
+.opening-timer.draw-timer-warning{color:#ffd3b0;border-color:#ed9166;background:#4b281d}
+.draw-results .draw-result>span{overflow-wrap:anywhere;max-width:100%;text-wrap:balance}
+.draw-results .draw-result>p{margin:0;font-size:13px;line-height:1.4;overflow-wrap:break-word}
+@media(max-height:680px){
+  .opening-draw{gap:10px;padding-top:70px;padding-bottom:16px}
+  .opening-draw .draw-deck{width:84px!important;height:122px!important;flex-basis:122px}
+  .draw-results{min-height:140px}
+  .draw-results .draw-card{width:84px;height:122px}
+}
