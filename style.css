@@ -1112,3 +1112,19 @@ body { min-height:100dvh; }
   pointer-events:auto;
   z-index:90;
 }
+
+/* Refine compact envido picker: selected value centered, declare is primary. */
+.player-mode.declaring-envido .number-wheel{
+  width:100%;
+  box-sizing:border-box;
+  scroll-padding-inline:calc(50% - 24px);
+}
+.player-mode.declaring-envido .number-wheel button{
+  scroll-snap-align:center;
+}
+.player-mode.declaring-envido #declare-points{
+  background:#e7c675;
+  color:#102f25;
+  border-color:#e7c675;
+  font-weight:700;
+}
