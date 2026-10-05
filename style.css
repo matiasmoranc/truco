@@ -1206,3 +1206,8 @@ body { min-height:100dvh; }
 .waiting .seat-name strong{font-size:15px}
 .waiting .seat-state{font-size:11px;letter-spacing:0;text-transform:none}
 .waiting-bottom p{font-size:14px;line-height:1.5;letter-spacing:0;color:#b9cabe}
+
+/* The waiting label and both clocks stay above the revealed-card backdrop. */
+.reveal-mode.player-mode .my-player-info{z-index:130}
+.reveal-mode.player-mode .turn-badge{position:relative;background:#10291f;border-color:#d8b875;color:#f2d99f}
+.reveal-mode .round-pause-timer{z-index:131}
