@@ -1059,3 +1059,27 @@ body { min-height:100dvh; }
 .player-mode .envido-raises{grid-template-columns:repeat(3,minmax(0,1fr))}
 .player-mode .envido-answer{grid-template-columns:repeat(2,minmax(0,1fr))}
 .player-mode .envido-action-row .call-button,.player-mode .envido-action-row .pass-button{width:100%;min-width:0}
+
+/* Envido declaration lives in the normal action area below the player's cards. */
+.player-mode.declaring-envido .envido-picker{
+  position:absolute;
+  top:auto;
+  bottom:12px;
+  left:50%;
+  transform:translateX(-50%);
+  z-index:85;
+  width:min(500px,calc(100% - 24px));
+  padding:0 8px;
+  border:0;
+  border-radius:0;
+  background:transparent;
+  box-shadow:none;
+}
+.player-mode.declaring-envido .envido-picker p{margin:0 0 5px;font-size:11px}
+.player-mode.declaring-envido .number-wheel{padding:4px calc(50% - 28px)}
+.player-mode.declaring-envido .number-wheel button{height:50px}
+.player-mode.declaring-envido .declaration-buttons{margin-top:5px;flex-direction:column;align-items:center;gap:6px}
+.player-mode.declaring-envido #declare-points{min-width:150px}
+.player-mode.declaring-envido #good-points{min-width:150px}
+.player-mode.declaring-envido .player-actions{visibility:hidden;pointer-events:none}
+.player-mode.declaring-envido .fold-hand{visibility:hidden;pointer-events:none}
