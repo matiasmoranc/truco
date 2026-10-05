@@ -975,7 +975,7 @@ function renderEndEvidence(room,sharedTable){
   const el=$('end-hand-reveal'),active=room.status==='revealing'&&!!room.endReveal;
   el.classList.toggle('hidden',!active||!sharedTable);
   if(!active||!sharedTable){el.innerHTML='';return;}
-  el.innerHTML=room.endReveal.groups.map(group=>`<section class="end-reveal-group"><h3>${escapeHtml(room.players[group.player]?.name||'Jugador')}<span>${escapeHtml(group.label)}</span></h3><div class="end-reveal-cards">${group.cards.map(card=>`<div class="end-reveal-card sprite-card" style="--sprite-position:${cardSpritePosition(card)}" role="img" aria-label="${cardAccessibleName(card)}"></div>`).join('')}</div></section>`).join('');
+  el.innerHTML=room.endReveal.groups.map(group=>`<section class="end-reveal-group"><h3>${escapeHtml(room.players[group.player]?.name||'Jugador')}<span>${escapeHtml(group.label)}</span></h3><div class="end-reveal-cards">${group.cards.map(card=>`<div class="end-reveal-card sprite-card" style="${cardImageStyle(card)}" role="img" aria-label="${cardAccessibleName(card)}"></div>`).join('')}</div></section>`).join('');
 }
 
 function scheduleTableResolution() {
@@ -1141,11 +1141,16 @@ async function playCard(card) {
   }
   try{await fb.update(fb.ref(fb.db), patches);}catch(error){console.error(error);toast(firebaseError(error));}finally{state.playActionInFlight=false;}
 }
-function cardSpritePosition(card) {
-  const rank=Number(card.rank), column=rank<=7?rank-1:rank-3;
-  const rows={'♠':0,'♥':1,'♦':2,'♣':3};
-  const row=rows[card.suit]??0;
-  return `${(column/9*100).toFixed(4)}% ${(row/3*100).toFixed(4)}%`;
+function cardImage(card){
+  const rank=Number(card.rank);
+  const suitGroups={'♦':0,'♥':3,'♠':6,'♣':9};
+  const index=rank-1,group=Math.floor(index/4),column=index%4;
+  const file=(suitGroups[card.suit]??6)+group+1;
+  return {image:`url('./assets/cards/${file}.jpg')`,position:`${column/3*100}% 0%`};
+}
+function cardImageStyle(card){
+  const {image,position}=cardImage(card);
+  return `--sprite-image:${image};--sprite-position:${position}`;
 }
 function cardAccessibleName(card) {
   const suits={'♠':'espadas','♥':'copas','♦':'oros','♣':'bastos'};
@@ -1342,7 +1347,7 @@ function renderGame() {
     const bothChosen=!!(cards.player1&&cards.player2);
     const prompt=bothChosen?'Los dos eligieron su carta':isTable?'Sorteo de quién reparte':cards[state.playerId]?'Ya elegiste tu carta':'Elegí tu carta';
     const hint=bothChosen?(dealer?'La carta más alta reparte. La partida comienza enseguida.':'Empataron. Van a sacar otra carta.') :isTable?'Cada jugador debe tocar el mazo en su celular.':cards[state.playerId]?'Esperando que el otro jugador toque el mazo.':'Tocá el mazo para sortear quién reparte.';
-    $('opening-draw').innerHTML=`<div class="draw-prompt"><h2>${prompt}</h2><p>${hint}</p></div><div id="opening-timer" class="opening-timer" role="timer" aria-label="Tiempo para elegir carta"></div><button class="draw-deck" id="draw-deck" ${canDraw?'':'disabled'} aria-label="Sacar carta para sortear repartidor"></button><div class="draw-results">${['player1','player2'].map(player=>`<div class="draw-result ${dealer===player?'draw-winner':''}"><span>${escapeHtml(players[player]?.name||player)}${dealer===player?' · REPARTE':mano===player?' · EMPIEZA':''}</span>${cards[player]?`<div class="draw-card sprite-card ${cards[player].justDrawn?'draw-card-new':''}" style="--sprite-position:${cardSpritePosition(cards[player])}" aria-label="${cardAccessibleName(cards[player])}"></div>`:`<p>${isTable?'Esperando que toque el mazo':'Esperando carta'}</p>`}</div>`).join('')}</div>`;
+    $('opening-draw').innerHTML=`<div class="draw-prompt"><h2>${prompt}</h2><p>${hint}</p></div><div id="opening-timer" class="opening-timer" role="timer" aria-label="Tiempo para elegir carta"></div><button class="draw-deck" id="draw-deck" ${canDraw?'':'disabled'} aria-label="Sacar carta para sortear repartidor"></button><div class="draw-results">${['player1','player2'].map(player=>`<div class="draw-result ${dealer===player?'draw-winner':''}"><span>${escapeHtml(players[player]?.name||player)}${dealer===player?' · REPARTE':mano===player?' · EMPIEZA':''}</span>${cards[player]?`<div class="draw-card sprite-card ${cards[player].justDrawn?'draw-card-new':''}" style="${cardImageStyle(cards[player])}" aria-label="${cardAccessibleName(cards[player])}"></div>`:`<p>${isTable?'Esperando que toque el mazo':'Esperando carta'}</p>`}</div>`).join('')}</div>`;
     if(canDraw)$('draw-deck').addEventListener('click',()=>drawOpeningCard().catch(error=>{drawInFlight=false;toast(firebaseError(error));renderGame();}));
     $('hand').innerHTML='';$('player-actions').classList.add('hidden');$('fold-hand').classList.add('hidden');$('fold-hand').disabled=true;$('trick-cards').innerHTML='';$('deck-stack').classList.add('hidden');$('muestra-card').classList.add('hidden');$('envido-picker').classList.add('hidden');renderOpeningTimer();return;
   }
@@ -1360,9 +1365,9 @@ function renderGame() {
   const myTurn=!isTable&&room.turn===state.playerId&&room.status==='started'&&!room.resolvingTrick&&state.hand.length>0&&!room.pendingBet&&!room.pendingNextHand;
   setTurnBadge(isTable?'MESA':myTurn?'TU TURNO':'ESPERÁ'); $('turn-badge').classList.toggle('waiting-turn',!myTurn);
   const visibleHand=isTable?[]:orderedHand();
-  if(!state.handGestureActive)$('hand').innerHTML=visibleHand.map((card) => `<button class="hand-card sprite-card ${card.red?'card-red':''} ${state.launchingCardId===card.id?'launching-card':''}" style="--sprite-position:${cardSpritePosition(card)}" aria-label="${cardAccessibleName(card)}" aria-disabled="${!myTurn}" data-card="${card.id}"><span class="sr-only">${cardAccessibleName(card)}</span></button>`).join('');
+  if(!state.handGestureActive)$('hand').innerHTML=visibleHand.map((card) => `<button class="hand-card sprite-card ${card.red?'card-red':''} ${state.launchingCardId===card.id?'launching-card':''}" style="${cardImageStyle(card)}" aria-label="${cardAccessibleName(card)}" aria-disabled="${!myTurn}" data-card="${card.id}"><span class="sr-only">${cardAccessibleName(card)}</span></button>`).join('');
 
-  $('trick-cards').innerHTML=sharedTable?(room.trickCards||[]).filter(({card,playerId})=>!(state.launchingCardId===card.id&&playerId===state.playerId)).map(({card,playerId})=>`<div class="played-card played-card-${playerId||'player1'} sprite-card ${card.red?'card-red':''}" style="--sprite-position:${cardSpritePosition(card)}" role="img" aria-label="${cardAccessibleName(card)}"><span class="sr-only">${cardAccessibleName(card)}</span></div>`).join(''):'';
+  $('trick-cards').innerHTML=sharedTable?(room.trickCards||[]).filter(({card,playerId})=>!(state.launchingCardId===card.id&&playerId===state.playerId)).map(({card,playerId})=>`<div class="played-card played-card-${playerId||'player1'} sprite-card ${card.red?'card-red':''}" style="${cardImageStyle(card)}" role="img" aria-label="${cardAccessibleName(card)}"><span class="sr-only">${cardAccessibleName(card)}</span></div>`).join(''):'';
   const sample=room.muestra;
   $('muestra-card').classList.toggle('hidden',!sharedTable||!sample);
   $('muestra-card').classList.toggle('sprite-card',!!(sharedTable&&sample));
@@ -1371,7 +1376,9 @@ function renderGame() {
     $('muestra-card').style.setProperty('--muestra-dx','0px');
     $('muestra-card').style.setProperty('--muestra-dy','0px');
   }
-  $('muestra-card').style.setProperty('--sprite-position',sample?cardSpritePosition(sample):'0% 0%');
+  const sampleImage=sample?cardImage(sample):null;
+  $('muestra-card').style.setProperty('--sprite-image',sampleImage?.image||'none');
+  $('muestra-card').style.setProperty('--sprite-position',sampleImage?.position||'0% 0%');
   $('muestra-card').setAttribute('aria-label',sample?`${cardAccessibleName(sample)}, muestra`:'Muestra');
   $('muestra-card').innerHTML=sharedTable&&sample?`<span class="sr-only">${cardAccessibleName(sample)}, muestra</span>`:'';
   $('deck-stack').classList.toggle('hidden',!sharedTable);

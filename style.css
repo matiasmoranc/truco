@@ -291,13 +291,13 @@
   .table-mode .scoreboard .tally-half{overflow:visible;min-height:0;padding-top:7px;gap:6px}
 }
 
-/* Caras y dorso reales de la baraja Tatú, en una hoja de sprites 10 × 4. */
-.sprite-card{background-image:url('./assets/tatu-sprite-user.webp');background-size:1000% 400%;background-position:var(--sprite-position);background-repeat:no-repeat}
+/* Original JPEG sheets: four faces per image, three cards in the back sheet. */
+.sprite-card{background-image:var(--sprite-image);background-size:400% 100%;background-position:var(--sprite-position);background-repeat:no-repeat}
 .hand-card.sprite-card{padding:0;background-color:#f2eddf}
 .played-card.sprite-card{background-color:#f5f0df}
 .muestra-card.sprite-card{color:transparent;background-color:#f5f0df;opacity:1}
 .muestra-card.sprite-card .sr-only{display:block}
-.deck-stack{background-image:url('./assets/tatu-dorso-user.webp');background-size:100% 100%;background-position:center;background-repeat:no-repeat;color:transparent}
+.deck-stack{background-image:url('./assets/cards/13.jpg');background-size:300% 100%;background-position:100% 0%;background-repeat:no-repeat;color:transparent}
 .deck-stack span{display:none}
 .sr-only{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
 
@@ -567,7 +567,7 @@ button,a,input,select,textarea{touch-action:manipulation}
 
 .opening-draw{position:absolute;inset:0 0 48px;z-index:70;background:#193b2b;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;padding:24px;text-align:center}
 .opening-draw>p{font-size:12px;letter-spacing:.12em;max-width:280px}
-.opening-draw .draw-deck{position:static!important;transform:none!important;display:block;width:110px!important;height:160px!important;flex:0 0 160px;background-image:url('./assets/tatu-dorso-user.webp');background-size:100% 100%;background-position:center;background-repeat:no-repeat;border:0;border-radius:9px;color:transparent;touch-action:manipulation}
+.opening-draw .draw-deck{position:static!important;transform:none!important;display:block;width:110px!important;height:160px!important;flex:0 0 160px;background-image:url('./assets/cards/13.jpg');background-size:300% 100%;background-position:100% 0%;background-repeat:no-repeat;border:0;border-radius:9px;color:transparent;touch-action:manipulation}
 .draw-deck:disabled{cursor:default}
 .draw-results{display:flex;justify-content:center;gap:24px;min-height:180px}
 .draw-results>div{width:110px;display:flex;flex-direction:column;align-items:center;gap:8px;font-size:12px}
