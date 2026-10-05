@@ -59,7 +59,7 @@ function makeCallNotice(text){
   text=callNoticeText(text);
   const spoken=spokenCall(text);
   if(!spoken||!['player1','player2'].includes(state.playerId))return null;
-  return {id:crypto.randomUUID(),from:state.playerId,to:state.playerId==='player1'?'player2':'player1',text:spoken==='Tiene'||spoken==='Me voy al mazo'?text.split('.')[0]+'.':/\bcanta \d+ (tantos|son mejores|son iguales)\b/i.test(text)?spoken:text,spoken,time:Date.now(),handNumber:state.room?.handNumber||1};
+  return {...(spoken==='Me voy al mazo'?{kind:'fold'}:{}),id:crypto.randomUUID(),from:state.playerId,to:state.playerId==='player1'?'player2':'player1',text:spoken==='Tiene'||spoken==='Me voy al mazo'?text.split('.')[0]+'.':/\bcanta \d+ (tantos|son mejores|son iguales)\b/i.test(text)?spoken:text,spoken,time:Date.now(),handNumber:state.room?.handNumber||1};
 }
 
 let roundPauseTimer=null;
@@ -110,7 +110,8 @@ function speakCall(text){
   window.speechSynthesis.speak(utterance);
 }
 function renderCallNotice(){
-  const notice=state.room?.callNotice,role=state.playerId;
+  const role=state.playerId,key=`${state.roomCode}:${role}`;
+  const notice=state.room?.callNotice||receivedCallNotices.get(key)?.foldNotice;
   const button=$('player-sound-toggle');
   button.classList.toggle('hidden',role==='table'||state.room?.status==='drawing');
   button.innerHTML=`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4Z"/>${soundEnabled?'<path d="M16 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14"/>':'<path d="m3 3 18 18"/>'}</svg>`;
@@ -119,11 +120,10 @@ function renderCallNotice(){
   button.setAttribute('aria-pressed',String(soundEnabled));
   const el=$('call-notice');
   clearTimeout(callNoticeTimer);callNoticeTimer=null;
-  const key=`${state.roomCode}:${role}`;
-  const addressed=notice?.to===role&&(!notice.handNumber||notice.handNumber===state.room?.handNumber);
+  const addressed=notice?.to===role&&(notice.kind==='fold'||!notice.handNumber||notice.handNumber===state.room?.handNumber);
   let received=receivedCallNotices.get(key);
   if(addressed&&received?.id!==notice.id){
-    received={id:notice.id,at:Date.now()};
+    received={id:notice.id,at:Date.now(),...(notice.kind==='fold'?{foldNotice:notice}:{})};
     receivedCallNotices.set(key,received);
   }
   const remaining=received&&notice&&received.id===notice.id?CALL_NOTICE_DURATION-(Date.now()-received.at):0;
@@ -912,13 +912,22 @@ async function recoverLegacyTrick(room) {
   }catch(error){console.error(error);state.legacyRepairKey=null;toast(firebaseError(error));}
 }
 function canFoldHand(room,player){
-  return !!room&&['player1','player2'].includes(player)&&room.status==='started'&&!room.resolvingTrick&&!room.pendingNextHand&&(!room.pendingBet||room.pendingBet.type==='truco');
+  return !!room&&['player1','player2'].includes(player)&&room.status==='started'&&!room.resolvingTrick&&!room.pendingNextHand;
 }
 function foldHandChanges(room,loser){
   const winner=otherPlayer(loser),points=Number(room.trucoLevel)||1;
   const message=(room.players?.[loser]?.name||'El jugador')+' se fue al mazo. '+(room.players?.[winner]?.name||'El rival')+' gana la mano y suma '+points+' '+(points===1?'tanto.':'tantos.');
-  const notice={id:crypto.randomUUID(),from:loser,to:winner,text:(room.players?.[loser]?.name||'El rival')+' se fue al mazo.',spoken:'Me voy al mazo',time:Date.now(),handNumber:room.handNumber||1};
-  return {callNotice:notice,turn:null,turnClock:null,pendingBet:null,pendingNextHand:{id:'fold:'+crypto.randomUUID(),winner,foldPoints:points,message},feed:topFeed(room,message)};
+  const bet=room.pendingBet,sideChanges={};
+  if(bet&&['envido','flor'].includes(bet.type)){
+    const sidePoints=bet.revealMode?Number(bet.stake)||0:bet.type==='flor'?Number(bet.accepted)||3:Number(bet.accepted)||1;
+    const scores={...room.scores};
+    scores[winner]=(Number(scores[winner])||0)+sidePoints;
+    sideChanges.scores=scores;
+    sideChanges.envidoClosed=true;
+    if(bet.type==='flor')sideChanges.florSettled=true;
+  }
+  const notice={kind:'fold',id:crypto.randomUUID(),from:loser,to:winner,text:(room.players?.[loser]?.name||'El rival')+' se fue al mazo.',spoken:'Me voy al mazo',time:Date.now(),handNumber:room.handNumber||1};
+  return {...sideChanges,callNotice:notice,turn:null,turnClock:null,pendingBet:null,pendingNextHand:{id:'fold:'+crypto.randomUUID(),winner,foldPoints:points,message},feed:topFeed(room,message)};
 }
 async function foldHand(){
   if(state.foldInFlight||state.playActionInFlight||!canFoldHand(state.room,state.playerId))return;
@@ -926,7 +935,7 @@ async function foldHand(){
   try{
     if(state.demo){
       const changes=foldHandChanges(state.room,state.playerId);
-      demoFeed(changes.pendingNextHand.message);state.room.turn=null;state.room.pendingBet=null;
+      Object.assign(state.room,changes);demoFeed(changes.pendingNextHand.message);state.room.pendingNextHand=null;state.room.turn=null;state.room.pendingBet=null;
       demoFinishHand(changes.pendingNextHand.winner,changes.pendingNextHand.foldPoints);return;
     }
     const fb=state.firebase,code=state.roomCode,player=state.playerId,handNumber=state.room.handNumber;
@@ -1192,7 +1201,7 @@ function renderGame() {
     const prompt=isTable?'ESPERANDO QUE LOS JUGADORES TOQUEN SU MAZO':cards[state.playerId]?'CARTA ELEGIDA · ESPERÁ AL OTRO JUGADOR':'TOCÁ EL MAZO PARA SACAR UNA CARTA';
     $('opening-draw').innerHTML=`<p>${prompt}</p><button class="draw-deck" id="draw-deck" ${canDraw?'':'disabled'} aria-label="Sacar carta para sortear repartidor"></button><div class="draw-results">${['player1','player2'].map(player=>`<div class="draw-result ${dealer===player?'draw-winner':''}"><span>${escapeHtml(players[player]?.name||player)}${dealer===player?' · REPARTE':mano===player?' · EMPIEZA':''}</span>${cards[player]?`<div class="draw-card sprite-card" style="--sprite-position:${cardSpritePosition(cards[player])}" aria-label="${cardAccessibleName(cards[player])}"></div>`:`<p>${isTable?'Esperando que toque el mazo':'Esperando carta'}</p>`}</div>`).join('')}</div>`;
     if(canDraw)$('draw-deck').addEventListener('click',()=>drawOpeningCard().catch(error=>{drawInFlight=false;toast(firebaseError(error));renderGame();}));
-    $('hand').innerHTML='';$('player-actions').classList.add('hidden');$('fold-hand')?.classList.add('hidden');$('trick-cards').innerHTML='';$('deck-stack').classList.add('hidden');$('muestra-card').classList.add('hidden');$('envido-picker').classList.add('hidden');return;
+    $('hand').innerHTML='';$('player-actions').classList.add('hidden');$('fold-hand')?.classList.toggle('hidden',isTable);$('fold-hand').disabled=true;$('trick-cards').innerHTML='';$('deck-stack').classList.add('hidden');$('muestra-card').classList.add('hidden');$('envido-picker').classList.add('hidden');return;
   }
   const tableName=room.table?.name||'La mesa';
   $('tally-1').innerHTML=renderTally(room.scores?.player1||0,targetPoints(room));$('tally-2').innerHTML=renderTally(room.scores?.player2||0,targetPoints(room));
@@ -1247,11 +1256,23 @@ function renderGame() {
   const canAct=room.status==='started'&&!room.resolvingTrick&&!room.pendingNextHand;
   const availableButtons=canAct?buttons.filter(button=>button.includes('data-action=')):[];
   actions.innerHTML=availableButtons.length?'<div class="action-buttons compact-actions">'+availableButtons.join('')+'</div>':'';
-  foldButton.classList.toggle('hidden',isTable||!canFoldHand(room,state.playerId));
+  foldButton.classList.toggle('hidden',isTable);
   renderEnvidoPicker(room);
+  alignHandWithControls();
   actions.querySelectorAll('[data-action]').forEach((button)=>button.addEventListener('click',()=>{const act=button.dataset.action;if(state.demo){demoAction(act);return;}if(['yes','no','raise'].includes(act)||act.startsWith('raise-'))answerBet(act);else if(act==='reveal')revealEnvido();else if(act==='flor')callFlor();else callBet(act);}));
   setTurnBadge(isTable?'MESA':roundPauseInfo(room)?'ESPERÁ':pending?(pending.responder===state.playerId?'RESPONDÉ':'ESPERANDO'):myTurn?'TU TURNO':'ESPERÁ');$('turn-badge').classList.toggle('waiting-turn',!myTurn||!!pending);
   if(room.status==='complete') toast(room.matchResult?.reason==='inactivity'?room.matchResult.message:'¡Partida terminada!');
+}
+function alignHandWithControls(){
+  requestAnimationFrame(()=>{
+    if(state.handGestureActive)return;
+    const hand=$('hand'),controls=document.querySelector('.player-controls');
+    const cards=hand?.querySelectorAll('.hand-card:not(.launching-card)');
+    if(!controls||!cards?.length||!$('game-view').classList.contains('player-mode'))return;
+    const left=Math.min(...Array.from(cards,card=>card.getBoundingClientRect().left));
+    const offset=Number.parseFloat(hand.style.getPropertyValue('--hand-edge-offset'))||0;
+    hand.style.setProperty('--hand-edge-offset',(offset+controls.getBoundingClientRect().left-left)+'px');
+  });
 }
 function renderCompactTally(points,target){
   const limit=normalizeTargetPoints(target),n=Math.min(Math.max(0,Math.floor(Number(points)||0)),limit),slots=limit/10;

@@ -1049,3 +1049,6 @@ body { min-height:100dvh; }
 .toast,.toast-global{top:50%;bottom:auto;left:50%;width:max-content;max-width:80vw;box-sizing:border-box;text-align:center;border-radius:12px;transform:translate(-50%,calc(-50% + 12px));z-index:200}
 .toast.show,.toast-global.show{transform:translate(-50%,-50%)}
 .player-mode .turn-badge-label{max-width:60vw;overflow-wrap:anywhere;letter-spacing:.04em}
+
+/* The card fan shares the controls' left margin and frees the tally column. */
+.player-mode .hand,.player-mode.two-device-mode .hand{left:calc(max(14px,(100% - 680px)/2) + var(--hand-edge-offset,0px));transform:translateY(-50%);justify-content:flex-start;padding-left:0;padding-right:0}
