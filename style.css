@@ -1161,3 +1161,18 @@ body { min-height:100dvh; }
 .player-mode.declaring-envido .number-wheel button[data-distance="2"]{opacity:.48}
 .player-mode.declaring-envido .number-wheel button[data-distance="3"]{opacity:.25}
 .player-mode.declaring-envido .number-wheel button[data-distance="4"]{opacity:.1}
+
+/* Keep the declaration label readable over the player's cards. */
+.player-mode.declaring-envido .envido-picker > p{
+  width:fit-content;
+  max-width:100%;
+  margin:0 auto 3px;
+  padding:0 8px;
+  border-radius:6px;
+  background:#10291f;
+  color:#fff4d6;
+  font-size:12px;
+  font-weight:700;
+  line-height:14px;
+  box-shadow:0 2px 8px #0005;
+}
