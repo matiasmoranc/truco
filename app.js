@@ -1307,12 +1307,12 @@ function renderEnvidoPicker(room){
   const first=room.mano,opponentPoints=bet.reveals?.[first],second=state.playerId!==first,min=second?Number(opponentPoints):0;
   const key=`${room.handNumber}:${state.playerId}:${opponentPoints??'first'}`;
   if(el.dataset.key===key)return;el.dataset.key=key;el.dataset.value=String(Math.min(50,min));
-  el.innerHTML=`<p>${second?`Tu rival declaró ${opponentPoints} tantos`:'Sos mano: declarás primero'}</p><div class="number-wheel" role="listbox" aria-label="Tantos del 0 al 50">${Array.from({length:51},(_,number)=>`<button role="option" aria-selected="${number===min}" ${number<min?'disabled':''} data-number="${number}">${number}</button>`).join('')}</div><div class="declaration-buttons">${min<=50?'<button id="declare-points" class="call-button">DECLARAR <span id="selected-points">'+min+'</span></button>':''}${second?'<button id="good-points" class="pass-button">SON BUENAS</button>':''}</div>`;
+  el.innerHTML=`<p>Declarar puntos de envido:</p><div class="number-wheel" role="listbox" aria-label="Tantos del 0 al 50">${Array.from({length:51},(_,number)=>`<button role="option" aria-selected="${number===min}" ${number<min?'disabled':''} data-number="${number}">${number}</button>`).join('')}</div><div class="declaration-buttons">${min<=50?'<button id="declare-points" class="call-button">DECLARAR <span id="selected-points">'+min+'</span></button>':''}${second?'<button id="good-points" class="pass-button">SON BUENAS</button>':''}</div>`;
   const wheel=el.querySelector('.number-wheel');
-  const select=number=>{el.dataset.value=String(number);el.querySelectorAll('[data-number]').forEach(button=>button.setAttribute('aria-selected',String(Number(button.dataset.number)===number)));const label=$('selected-points');if(label)label.textContent=number;};
+  const select=number=>{el.dataset.value=String(number);el.querySelectorAll('[data-number]').forEach(button=>{const distance=Math.abs(Number(button.dataset.number)-number);button.setAttribute('aria-selected',String(distance===0));button.dataset.distance=String(Math.min(distance,4));});const label=$('selected-points');if(label)label.textContent=number;};
   wheel.addEventListener('scroll',()=>{const number=Math.max(Math.min(50,min),Math.min(50,Math.round(wheel.scrollLeft/56)));select(number);},{passive:true});
   wheel.querySelectorAll('[data-number]').forEach(button=>button.addEventListener('click',()=>{select(Number(button.dataset.number));wheel.scrollTo({left:Number(button.dataset.number)*56,behavior:'smooth'});}));
-  wheel.scrollLeft=Math.min(50,min)*56;
+  wheel.scrollLeft=Math.min(50,min)*56;select(Math.min(50,min));
   $('declare-points')?.addEventListener('click',()=>revealEnvido().catch(error=>toast(firebaseError(error))));
   $('good-points')?.addEventListener('click',()=>revealEnvido(true).catch(error=>toast(firebaseError(error))));
 }
