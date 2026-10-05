@@ -111,9 +111,7 @@ function speakCall(text){
 }
 function renderCallNotice(){
   const role=state.playerId,key=`${state.roomCode}:${role}`;
-  const liveNotice=state.room?.callNotice;
-  const cachedFold=receivedCallNotices.get(key)?.foldNotice;
-  const notice=liveNotice?.kind==='fold'&&cachedFold?.id!==liveNotice.id?liveNotice:(liveNotice||cachedFold);
+  const notice=state.room?.callNotice;
   const button=$('player-sound-toggle');
   button.classList.toggle('hidden',role==='table'||state.room?.status==='drawing');
   button.innerHTML=`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4Z"/>${soundEnabled?'<path d="M16 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14"/>':'<path d="m3 3 18 18"/>'}</svg>`;
@@ -125,19 +123,19 @@ function renderCallNotice(){
   const addressed=notice?.to===role&&(notice.kind==='fold'||!notice.handNumber||notice.handNumber===state.room?.handNumber);
   let received=receivedCallNotices.get(key);
   if(addressed&&received?.id!==notice.id){
-    received={id:notice.id,at:Date.now(),pinned:false,...(notice.kind==='fold'?{foldNotice:notice}:{})};
+    received={id:notice.id,at:Date.now(),pinned:false};
     receivedCallNotices.set(key,received);
   }
   const remaining=received&&notice&&received.id===notice.id?CALL_NOTICE_DURATION-(Date.now()-received.at):0;
   const pending=state.room?.pendingBet;
-  const awaitingResponse=addressed&&pending&&notice.from===pending.caller&&
+  const awaitingResponse=addressed&&notice?.kind!=='fold'&&pending&&notice.from===pending.caller&&
     (pending.revealMode?pending.revealTurn===role:pending.responder===role);
   if(awaitingResponse&&received)received.pinned=true;
-  const visible=addressed&&(awaitingResponse||(!received?.pinned&&remaining>0));
+  const visible=addressed&&(notice?.kind==='fold'?remaining>0:(awaitingResponse||(!received?.pinned&&remaining>0)));
   el.classList.toggle('hidden',!visible);
   el.textContent=visible?callNoticeText(notice.text):'';
   if(!visible)return;
-  if(!awaitingResponse)callNoticeTimer=setTimeout(()=>{callNoticeTimer=null;renderCallNotice();},remaining);
+  if(!awaitingResponse)callNoticeTimer=setTimeout(()=>{callNoticeTimer=null;renderCallNotice();},Math.max(0,remaining));
   if(callSeen.get(key)!==notice.id){
     callSeen.set(key,notice.id);
     speakCall(notice.spoken);
