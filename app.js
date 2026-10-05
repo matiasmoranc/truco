@@ -111,7 +111,9 @@ function speakCall(text){
 }
 function renderCallNotice(){
   const role=state.playerId,key=`${state.roomCode}:${role}`;
-  const notice=state.room?.callNotice;
+  const liveNotice=state.room?.callNotice;
+  const cached=receivedCallNotices.get(key)?.notice;
+  const notice=liveNotice||cached;
   const button=$('player-sound-toggle');
   button.classList.toggle('hidden',role==='table'||state.room?.status==='drawing');
   button.innerHTML=`<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4Z"/>${soundEnabled?'<path d="M16 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14"/>':'<path d="m3 3 18 18"/>'}</svg>`;
@@ -123,7 +125,7 @@ function renderCallNotice(){
   const addressed=notice?.to===role&&(notice.kind==='fold'||!notice.handNumber||notice.handNumber===state.room?.handNumber);
   let received=receivedCallNotices.get(key);
   if(addressed&&received?.id!==notice.id){
-    received={id:notice.id,at:Date.now(),pinned:false};
+    received={id:notice.id,at:Date.now(),pinned:false,notice};
     receivedCallNotices.set(key,received);
   }
   const remaining=received&&notice&&received.id===notice.id?CALL_NOTICE_DURATION-(Date.now()-received.at):0;
@@ -131,7 +133,8 @@ function renderCallNotice(){
   const awaitingResponse=addressed&&notice?.kind!=='fold'&&pending&&notice.from===pending.caller&&
     (pending.revealMode?pending.revealTurn===role:pending.responder===role);
   if(awaitingResponse&&received)received.pinned=true;
-  const visible=addressed&&(notice?.kind==='fold'?remaining>0:(awaitingResponse||(!received?.pinned&&remaining>0)));
+  const foldVisible=notice?.kind==='fold'&&remaining>0;
+  const visible=addressed&&(foldVisible||(notice?.kind!=='fold'&&(awaitingResponse||(!received?.pinned&&remaining>0))));
   el.classList.toggle('hidden',!visible);
   el.textContent=visible?callNoticeText(notice.text):'';
   if(!visible)return;
@@ -927,7 +930,7 @@ function foldHandChanges(room,loser){
     if(bet.type==='flor')sideChanges.florSettled=true;
   }
   const notice={kind:'fold',id:crypto.randomUUID(),from:loser,to:winner,text:(room.players?.[loser]?.name||'El rival')+' se fue al mazo.',spoken:'Me voy al mazo',time:Date.now(),handNumber:room.handNumber||1};
-  return {...sideChanges,callNotice:notice,turn:null,turnClock:null,pendingBet:null,pendingNextHand:{id:'fold:'+crypto.randomUUID(),winner,foldPoints:points,message},feed:topFeed(room,message)};
+  return {...sideChanges,callNotice:notice,turn:null,turnClock:null,pendingBet:null,pendingNextHand:{id:'fold:'+crypto.randomUUID(),winner,foldPoints:points,message,endsAt:gameTime()+3000},feed:topFeed(room,message)};
 }
 async function foldHand(){
   if(state.foldInFlight||state.playActionInFlight||!canFoldHand(state.room,state.playerId))return;
@@ -1635,10 +1638,10 @@ document.addEventListener('touchend',(event)=>{
 $('player-sound-toggle').addEventListener('click',()=>{
   soundEnabled=!soundEnabled;voiceUnlocked=true;
   localStorage.setItem('truco-call-sound',soundEnabled?'on':'off');
-  if(soundEnabled)speakCall('Sonido activado');else window.speechSynthesis?.cancel();
+  if(!soundEnabled)window.speechSynthesis?.cancel();
   renderCallNotice();
 });
-document.addEventListener('click',()=>{if(soundEnabled&&!voiceUnlocked){voiceUnlocked=true;speakCall('Sonido activado');}},{capture:true});
+document.addEventListener('click',()=>{if(soundEnabled&&!voiceUnlocked)voiceUnlocked=true;},{capture:true});
 $('sound-toggle').addEventListener('click',()=>$('player-sound-toggle').click());
 $('close-config').addEventListener('click',()=>showView('setup-view'));
 $('save-config').addEventListener('click',()=>{try{const cfg=JSON.parse($('firebase-config').value);if(!firebaseConfigValid(cfg))throw new Error('missing');state.config=cfg;localStorage.setItem(storageKey,JSON.stringify(cfg));toast('Configuración guardada.',true);runPendingAction();}catch{toast('Pegá una configuración Firebase válida.',true);}});
