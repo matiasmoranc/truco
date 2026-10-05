@@ -1083,3 +1083,32 @@ body { min-height:100dvh; }
 .player-mode.declaring-envido #good-points{min-width:150px}
 .player-mode.declaring-envido .player-actions{visibility:hidden;pointer-events:none}
 .player-mode.declaring-envido .fold-hand{visibility:hidden;pointer-events:none}
+
+/* Compact envido declaration: keep fold visible and actions beside the wheel. */
+.player-mode.declaring-envido .envido-picker{
+  width:min(420px,calc(100% - 120px));
+  left:12px;
+  transform:none;
+  padding:5px 0;
+}
+.player-mode.declaring-envido .envido-picker p{margin:0 0 3px;font-size:10px}
+.player-mode.declaring-envido .number-wheel{padding:2px calc(50% - 24px)}
+.player-mode.declaring-envido .number-wheel button{flex-basis:48px;width:48px;height:48px;font-size:22px}
+.player-mode.declaring-envido .declaration-buttons{
+  margin-top:5px;
+  flex-direction:row;
+  align-items:center;
+  gap:6px;
+}
+.player-mode.declaring-envido #declare-points,
+.player-mode.declaring-envido #good-points{
+  min-width:0;
+  flex:1;
+  height:40px;
+  padding:0 8px;
+}
+.player-mode.declaring-envido .fold-hand{
+  visibility:visible;
+  pointer-events:auto;
+  z-index:90;
+}
