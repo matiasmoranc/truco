@@ -1249,10 +1249,10 @@ function turnTimeoutChanges(room){
   const timeoutCounts={...(room.timeoutCounts||{})};
   timeoutCounts[loser]=(Number(timeoutCounts[loser])||0)+1;
   const name=room.players?.[loser]?.name||'El jugador';
-  if(timeoutCounts[loser]<2){
-    return {timeoutCounts,status:'timed-out',turn:null,pendingBet:null,turnTimeout:{winner,message:name+' agotó su tiempo y pierde la mano (1 de 2 faltas por inactividad).'}};
+  if(timeoutCounts[loser]<3){
+    return {timeoutCounts,status:'timed-out',turn:null,pendingBet:null,turnTimeout:{winner,message:name+' agotó su tiempo y pierde la mano ('+timeoutCounts[loser]+' de 3 faltas por inactividad).'}};
   }
-  const message=name+' agotó los 45 segundos por segunda vez y pierde la partida. '+(room.players?.[winner]?.name||'El rival')+' gana por inactividad.';
+  const message=name+' agotó los 45 segundos por tercera vez y pierde la partida. '+(room.players?.[winner]?.name||'El rival')+' gana por inactividad.';
   return {timeoutCounts,status:'complete',turn:null,turnClock:null,turnTimeout:null,
     scores:{...room.scores,[winner]:Math.max(Number(room.scores?.[winner])||0,targetPoints(room))},
     matchResult:{winner,loser,reason:'inactivity',message},
@@ -1291,20 +1291,23 @@ function waitingTurnLabel(room=state.room){
 }
 function inactivityWarningLabel(room=state.room,viewer=state.playerId){
   const player=turnClockPlayer(room);
-  if(!turnClockKey(room)||room.turnClock?.key!==turnClockKey(room)||Number(room.timeoutCounts?.[player]||0)<1||!turnClockRemaining(room.turnClock).extra)return '';
+  if(!turnClockKey(room)||room.turnClock?.key!==turnClockKey(room)||Number(room.timeoutCounts?.[player]||0)<2||!turnClockRemaining(room.turnClock).extra)return '';
   return player===viewer?'Perderás el partido en:':(room.players?.[player]?.name||'Tu rival')+' perderá el partido en:';
 }
-function inactivityLifeText(room=state.room,viewer=state.playerId){
-  if(!['player1','player2'].includes(viewer)||!['started','revealing','timed-out'].includes(room?.status))return '';
-  return [viewer,otherPlayer(viewer)].filter(player=>Number(room.timeoutCounts?.[player]||0)>=1).map(player=>
-    player===viewer?'Te queda 1 vida · Ya agotaste 45 s':(room.players?.[player]?.name||'Tu rival')+': 1 vida · Ya agotó 45 s'
-  ).join('\n');
+function inactivityLifeStatus(room=state.room){
+  const player=turnClockPlayer(room);
+  if(!turnClockKey(room)||!['player1','player2'].includes(player))return null;
+  const lost=Math.min(2,Math.max(0,Number(room.timeoutCounts?.[player])||0));
+  return {player,lost,name:room.players?.[player]?.name||'Jugador'};
 }
 function renderInactivityLife(){
   let el=$('inactivity-life');
-  if(!el){el=document.createElement('span');el.id='inactivity-life';el.className='inactivity-life';$('turn-badge').append(el);}
-  const text=inactivityLifeText();
-  el.textContent=text;el.classList.toggle('hidden',!text);
+  if(!el){el=document.createElement('span');el.id='inactivity-life';el.className='inactivity-life';el.setAttribute('role','img');$('turn-badge').append(el);}
+  const status=inactivityLifeStatus();
+  el.classList.toggle('hidden',!status);
+  if(!status){el.replaceChildren();return;}
+  el.setAttribute('aria-label',status.name+': '+(3-status.lost)+' vidas restantes');
+  el.innerHTML=[0,1].map(index=>'<i class="inactivity-circle'+(index<status.lost?' life-lost':'')+'" aria-hidden="true"></i>').join('');
 }
 function setTurnBadge(text){
   text=inactivityWarningLabel()||text;
@@ -1356,7 +1359,7 @@ function renderTurnTimer(){
     if(!remaining.extra)delete el.dataset.warningTick;
     const warning=inactivityWarningLabel(room);if(warning)setTurnBadge(warning);
     el.textContent=remaining.seconds+' s';
-    el.setAttribute('aria-label',name+(remaining.extra?(Number(room.timeoutCounts?.[turnClockPlayer(room)]||0)>=1?' perderá el partido en ':' perderá la mano en '):' tiene ')+remaining.seconds+' segundos');
+    el.setAttribute('aria-label',name+(remaining.extra?(Number(room.timeoutCounts?.[turnClockPlayer(room)]||0)>=2?' perderá el partido en ':' perderá la mano en '):' tiene ')+remaining.seconds+' segundos');
     if(remaining.expired&&(state.demo||isCoordinator()))expireTurnClock(clock);
   }
   turnTimerHandle=setTimeout(renderTurnTimer,200);

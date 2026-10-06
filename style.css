@@ -995,11 +995,11 @@ body { min-height:100dvh; }
 .turn-badge .turn-timer{position:static;inset:auto;transform:none;min-width:0;max-width:none;padding:0 0 0 8px;border:0;border-left:1px solid currentColor;border-radius:0;background:transparent;font-size:12px;line-height:1.2;letter-spacing:0;color:var(--gold)}
 .turn-badge .turn-timer-warning{color:#ffe0ca}
 .player-mode.two-device-mode .center-table{top:22px}
-.player-mode.two-device-mode .mobile-score{top:calc(42px + clamp(130px,24dvh,190px)/2 + 15px);right:4%}
+.player-mode.two-device-mode .mobile-score{top:calc(42px + clamp(130px,24dvh,190px)/2 + 20px);right:4%}
 .player-mode.two-device-mode .hand-card{width:clamp(104.5px,32.3vw,129.2px);height:clamp(150.1px,45.6vw,174.8px);flex-basis:clamp(104.5px,32.3vw,129.2px)}
 @media(max-height:650px){
   .player-mode.two-device-mode .center-table{top:15px}
-  .player-mode.two-device-mode .mobile-score{top:105px}
+  .player-mode.two-device-mode .mobile-score{top:110px}
   .player-mode.two-device-mode .hand-card{width:clamp(91.2px,29.45vw,106.4px);height:clamp(133px,39.9vw,152px);flex-basis:clamp(91.2px,29.45vw,106.4px)}
 }
 
@@ -1250,5 +1250,7 @@ body { min-height:100dvh; }
 
 .call-notice { text-align:center; }
 .call-notice strong { display:block; margin-top:4px; font-size:calc(1em + 4px); font-weight:700; }
-.player-mode .turn-badge { flex-wrap:wrap; }
-.turn-badge .inactivity-life { flex:0 0 100%; font-size:9px; font-weight:400; line-height:1.35; letter-spacing:0; color:#abb9af; white-space:pre-line; text-align:center; }
+.player-mode .turn-badge { position:relative; flex-wrap:nowrap; max-width:calc(100% - 22px); }
+.turn-badge .inactivity-life { position:absolute; left:calc(100% + 6px); top:50%; transform:translateY(-50%); display:flex; flex-direction:column; justify-content:center; gap:3px; width:8px; height:19px; max-height:100%; pointer-events:none; }
+.inactivity-circle { display:block; width:8px; height:8px; flex:0 0 8px; border:1.5px solid #e8c983; border-radius:50%; background:transparent; }
+.inactivity-circle.life-lost { border-color:#d67869; background:#d67869; }
