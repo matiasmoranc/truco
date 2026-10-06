@@ -1241,3 +1241,9 @@ body { min-height:100dvh; }
 .match-end-actions{display:flex;flex-direction:column;gap:10px}
 .match-end-actions .button{justify-content:center;border-radius:12px}
 .match-end-actions .button:not(.primary){background:#ffffff08;border:1px solid #ffffff30}
+
+
+.bot-levels { margin: 0 0 20px; padding: 16px; border: 1px solid rgba(199,174,107,.4); border-radius: 12px; background: rgba(0,0,0,.15); }
+.bot-levels label { display: block; margin-bottom: 10px; }
+.bot-levels select { width: 100%; min-height: 46px; padding: 10px 12px; border: 1px solid #718b76; border-radius: 8px; background: #163d30; color: #faf5e7; font: inherit; }
+.bot-levels p { margin: 12px 0 0; font-size: 14px; line-height: 1.45; color: #c3d1c4; }

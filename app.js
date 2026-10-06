@@ -190,6 +190,8 @@ function pickRole(role) {
 }
 function isCoordinator() { return state.playerId === 'table' || (state.room?.deviceMode === 'two' && state.room.table?.uid === state.uid); }
 function configureSetup() {
+  state.invitationEntry=false;
+  $('play-bot').checked=false;updateBotSetup();
   state.joining = false;
   $('role-options').classList.remove('single');
   $('role-options').querySelectorAll('.role-card').forEach((card) => card.classList.remove('hidden'));
@@ -256,6 +258,7 @@ async function enterRoom() {
   if(state.enteringRoom)return;
   if(state.invitationEntry&&!$('player-name').value.trim()){showInvitationForm();$('invite-name').focus();return;}
   const name=cleanName($('player-name').value,state.role==='table'?'La mesa':'Jugador');
+  if(!state.joining&&$('play-bot').checked){startBotGame(name);return;}
   if(!firebaseConfigValid(state.config)){state.nextAction='enter';showConfig();return;}
   state.enteringRoom=true;
   state.navigationEpoch=(state.navigationEpoch||0)+1;
@@ -510,6 +513,7 @@ function openingDrawExpired(room,now=gameTime()){
   return room?.status==='drawing'&&Number.isFinite(draw?.endsAt)&&now>=draw.endsAt&&!(draw.cards?.player1&&draw.cards?.player2);
 }
 function returnToLobby(message=''){
+  stopBot();
   clearTimeout(openingTimerHandle);openingTimerHandle=null;
   state.roomWatchVersion=(state.roomWatchVersion||0)+1;
   state.navigationEpoch=(state.navigationEpoch||0)+1;
@@ -864,11 +868,11 @@ async function answerBet(answer) {
   }
   await writeRoom({trucoLevel:bet.stake,pendingBet:null,feed:topFeed(state.room,`${state.room.players[state.playerId].name} quiere. El truco queda en ${bet.stake}.`) });
 }
-async function revealEnvido(good=false) {
+async function revealEnvido(good=false,declaredNumber=null) {
   if(state.room?.turnClock?.key===turnClockKey()&&turnClockRemaining(state.room.turnClock).expired){renderTurnTimer();return;}
   const room=state.room,bet=room?.pendingBet,player=state.playerId;
   if(bet?.type!=='envido'||!bet.revealMode||bet.revealTurn!==player)return;
-  const first=room.mano,second=otherPlayer(first),number=Number($('envido-picker').dataset.value||0);
+  const first=room.mano,second=otherPlayer(first),number=Number(declaredNumber??($('envido-picker').dataset.value||0));
   if(good&&player!==second)return;
   if(!good&&(!Number.isInteger(number)||number<0||number>50||(player===second&&number<bet.reveals?.[first]))){toast('Igualá o superá los tantos.');return;}
   const reveals={...(bet.reveals||{})};if(!good)reveals[player]=number;
@@ -1331,7 +1335,8 @@ function renderTurnTimer(){
 }
 
 function renderGame() {
-  if (!state.room) return;
+  if (!state.room||state.botActing) return;
+  scheduleBot();
   renderMatchEnd();
   syncPrivateHand();
   if(state.demo&&state.room.status==='complete'&&!state.room.endReveal){
@@ -1351,7 +1356,7 @@ function renderGame() {
   renderEndEvidence(room,sharedTable);
   renderRoundPauseTimer();
   $('game-view').classList.toggle('two-device-mode', !isTable && room.deviceMode === 'two');
-  $('demo-device-switcher').classList.toggle('hidden',!state.demo);
+  $('demo-device-switcher').classList.toggle('hidden',!state.demo||state.bot);
   $('demo-device-switcher').querySelectorAll('[data-demo-role]').forEach((button)=>{
     button.classList.toggle('hidden',room.deviceMode==='two'&&button.dataset.demoRole==='table');
     button.setAttribute('aria-pressed',String(button.dataset.demoRole===state.playerId));
@@ -1384,7 +1389,7 @@ function renderGame() {
   const leftPlayer=twoPhones?state.playerId:'player1',rightPlayer=otherPlayer(leftPlayer);
   $('mobile-tally-1').innerHTML=tallyRenderer(room.scores?.[leftPlayer]||0,targetPoints(room));$('mobile-tally-2').innerHTML=tallyRenderer(room.scores?.[rightPlayer]||0,targetPoints(room));
   $('deck-count').textContent=room.deckCount??40;
-  $('game-room-code').textContent='MESA ABIERTA';
+  $('game-room-code').textContent=state.bot?'CONTRA BOT · '+botLevelLabel(state.botDifficulty).toUpperCase():'MESA ABIERTA';
   $('my-name').textContent=isTable?tableName:(mine?.name||'Vos'); $('my-avatar').textContent=(isTable?tableName:(mine?.name||'V')).slice(0,1).toUpperCase();
   $('opponent-name').textContent=isTable?'Los jugadores':(opponent?.name||'Esperando rival'); $('opponent-avatar').textContent=(isTable?'T':(opponent?.name||'J').slice(0,1)).toUpperCase();
   const myTurn=!isTable&&room.turn===state.playerId&&room.status==='started'&&!room.resolvingTrick&&state.hand.length>0&&!room.pendingBet&&!room.pendingNextHand;
@@ -1586,7 +1591,124 @@ function renderEnvidoPicker(room){
 }
 function escapeHtml(value='') { return String(value).replace(/[&<>"']/g,(ch)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch])); }
 
+
+function botLevelLabel(level){return {easy:'Fácil',normal:'Normal',hard:'Difícil'}[level]||'Normal';}
+function updateBotSetup(){
+  const enabled=$('play-bot').checked;
+  $('bot-levels').classList.toggle('hidden',!enabled);
+  $('use-table-device').closest('label').classList.toggle('hidden',enabled);
+  if(enabled)updateMode('two');
+  $('enter-room').textContent=enabled?'Jugar contra Bot':'Crear mesa';
+}
+function stopBot(){clearTimeout(state.botTimer);state.botTimer=null;state.bot=false;state.botMemory=null;}
+function startBotGame(name){
+  demoStart('player1','two');
+  state.bot=true;state.botDifficulty=$('bot-level').value;
+  state.roomCode='BOT1';state.room.targetPoints=Number($('target-points').value);
+  state.room.players={player1:{name},player2:{name:'Bot · '+botLevelLabel(state.botDifficulty)}};
+  try{localStorage.setItem('truco-player-name',name);}catch{}
+  state.dismissedMatchEnd=null;renderGame();
+}
+// The policy never receives the rival's hand or the original deal.
+function chooseBotDecision(room,hand,level,memory,random=Math.random){
+  const me='player2',bet=room.pendingBet,flower=hasFlor(hand,room.muestra);
+  const tantos=handEnvido(hand,room.muestra);
+  const strengths=hand.map(card=>cardStrength(card,room.muestra)).sort((a,b)=>b-a);
+  const power=(strengths[0]||0)+(strengths[1]||0)*0.65;
+  const easy=level==='easy',hard=level==='hard';
+  if(bet?.revealMode){
+    if(bet.revealTurn!==me)return null;
+    return {kind:'reveal',value:tantos,good:room.mano!==me&&tantos<Number(bet.reveals?.[room.mano])};
+  }
+  if(bet&&bet.responder!==me)return null;
+  if(!room.playedCount&&flower&&room.flors?.[me]==null)return {kind:'action',value:'flor'};
+  if(bet){
+    if(bet.type==='flor'){
+      if(bet.single)return {kind:'action',value:flower?'yes':'no'};
+      const value=room.flors?.[me]||0;
+      if(hard&&value>=38&&!memory.florRaised&&bet.called!=='falta'){
+        memory.florRaised=true;return {kind:'action',value:'raise-conflor'};
+      }
+      return {kind:'action',value:bet.called==='falta'&&value<32?'no':'yes'};
+    }
+    if(bet.type==='envido'){
+      if(hard&&tantos>=32&&!memory.envidoRaised&&bet.called!=='falta'){
+        memory.envidoRaised=true;return {kind:'action',value:'raise-real'};
+      }
+      const threshold=bet.called==='falta'?30:bet.called==='real'?26:23;
+      return {kind:'action',value:(easy?random()<0.65:tantos>=threshold)?'yes':'no'};
+    }
+    if(bet.type==='truco'){
+      if(!memory.envidoCalled&&tantos>=27&&canCallFirstRoundEnvido(room,me,hand)){
+        memory.envidoCalled=true;return {kind:'action',value:'envido'};
+      }
+      const won=(room.tricks||[]).some(trick=>trick.winner===me);
+      if(hard&&bet.stake<4&&power>=145)return {kind:'action',value:'raise'};
+      return {kind:'action',value:(easy?random()<0.7:won||power>=(bet.stake>=3?105:75))?'yes':'no'};
+    }
+    return null;
+  }
+  if(room.turn!==me||!hand.length)return null;
+  if(!memory.envidoCalled&&canCallFirstRoundEnvido(room,me,hand)){
+    memory.envidoCalled=true;
+    if(easy?random()<0.4:tantos>=25)return {kind:'action',value:hard&&tantos>=33?'real':'envido'};
+  }
+  const trucoLevel=Number(room.trucoLevel)||1;
+  if(trucoLevel<4&&(trucoLevel===1||room.lastTrucoCaller!==me)&&!memory.trucoCalled){
+    memory.trucoCalled=true;
+    if(easy?random()<0.25:power>=(hard?115:130))return {kind:'action',value:trucoLevel===1?'truco':trucoLevel===2?'retruco':'vale4'};
+  }
+  const sorted=[...hand].sort((a,b)=>cardStrength(a,room.muestra)-cardStrength(b,room.muestra));
+  let card;
+  if(easy)card=hand[Math.floor(random()*hand.length)];
+  else if(room.trickCards?.length){
+    const rival=cardStrength(room.trickCards[0].card,room.muestra);
+    // A tie suffices after winning the first trick.
+    const canTie=room.tricks?.[0]?.winner===me;
+    card=sorted.find(c=>canTie?cardStrength(c,room.muestra)>=rival:cardStrength(c,room.muestra)>rival)||sorted[0];
+  }else{
+    card=sorted[sorted.length-1];
+    if(hard&&sorted.length>1){
+      const known=new Set([...hand,...(memory.played||[]),room.muestra].filter(Boolean).map(c=>c.id));
+      const unseen=shuffleDeck().filter(c=>!known.has(c.id));
+      const economical=sorted.find(c=>unseen.filter(other=>cardStrength(other,room.muestra)<cardStrength(c,room.muestra)).length/Math.max(1,unseen.length)>=0.8);
+      if(economical)card=economical;
+    }
+  }
+  return {kind:'play',card};
+}
+function scheduleBot(){
+  clearTimeout(state.botTimer);state.botTimer=null;
+  const room=state.room;
+  if(!state.bot||!room||state.botActing)return;
+  const key=(room.matchNumber||1)+':'+room.handNumber;
+  if(state.botMemory?.key!==key)state.botMemory={key,played:[]};
+  for(const item of room.trickCards||[])if(!state.botMemory.played.some(c=>c.id===item.card.id))state.botMemory.played.push({...item.card});
+  if(room.resolvingTrick||room.pendingNextHand||room.status==='revealing')return;
+  const ready=room.status==='drawing'?!room.openingDraw?.cards?.player2:
+    room.status==='complete'?room.rematch?.status==='pending'&&room.rematch.requester==='player1':
+    room.status==='started'&&(room.pendingBet?(room.pendingBet.revealMode?room.pendingBet.revealTurn==='player2':room.pendingBet.responder==='player2'):room.turn==='player2'||(!room.playedCount&&hasFlor(demoHand('player2'),room.muestra)&&room.flors?.player2==null));
+  if(!ready)return;
+  state.botTimer=setTimeout(()=>{
+    state.botTimer=null;if(!state.bot||state.room!==room)return;
+    const action=room.status==='drawing'?{kind:'draw'}:room.status==='complete'?{kind:'rematch'}:
+      chooseBotDecision(room,[...demoHand('player2')],state.botDifficulty,state.botMemory);
+    if(!action)return;
+    const human=state.playerId;state.botActing=true;state.playerId='player2';state.hand=[...demoHand('player2')];
+    try{
+      if(action.kind==='draw')drawOpeningCard();
+      else if(action.kind==='rematch')respondRematch('accept');
+      else if(action.kind==='reveal')revealEnvido(action.good,action.value);
+      else if(action.kind==='play')demoPlay(action.card);
+      else demoAction(action.value);
+    }finally{
+      state.playerId=human;state.hand=state.room?.status==='drawing'?[]:[...demoHand(human)];state.botActing=false;renderGame();
+    }
+  },state.botDifficulty==='easy'?1200:850);
+}
+
 function demoStart(role,deviceMode='table') {
+  stopBot();state.lobbyUnsubscribe?.();state.lobbyUnsubscribe=null;
   if(deviceMode==='two'&&role==='table')role='player1';
   if(state.unsubscribe)state.unsubscribe();
   if(state.privateUnsubscribe)state.privateUnsubscribe();
@@ -1601,7 +1723,7 @@ function demoStart(role,deviceMode='table') {
   $('game-room-code').textContent='MESA · DEMO1';renderGame();showView('game-view');
 }
 function switchDemoRole(role) {
-  if(!state.demo||!['table','player1','player2'].includes(role)||(state.room?.deviceMode==='two'&&role==='table'))return;
+  if(state.bot||!state.demo||!['table','player1','player2'].includes(role)||(state.room?.deviceMode==='two'&&role==='table'))return;
   state.playerId=role;state.hand=role==='table'?[]:[...(state.demoHands[role]||[])];renderGame();
 }
 function demoOther(player){return player==='player1'?'player2':'player1';}
@@ -1699,9 +1821,10 @@ function demoPlay(card,launchOrigin=null) {
     const handWinner=settleHand(state.room.tricks,state.room);
     if(winner)state.room.feed.unshift({text:`${state.room.players[winner].name} se lleva la baza.`,time:Date.now()});
     state.room.resolvingTrick=true;state.room.resolutionId=crypto.randomUUID();state.room.resolutionEndsAt=gameTime()+3000;state.room.resolvedTrickWinner=winner;state.room.handComplete=!!handWinner;
-    setTimeout(()=>{state.room.resolvingTrick=false;state.room.resolutionEndsAt=null;state.room.handComplete=false;state.room.trickCards=[];if(handWinner){demoFinishHand(handWinner,state.room.trucoLevel||1);return;}else{state.room.turn=winner||state.room.mano;state.room.trickNo++;}state.hand=state.playerId==='table'?[]:[...(state.demoHands[state.playerId]||[])];renderGame();},3000);
+    const resolvingRoom=state.room;
+    setTimeout(()=>{if(!state.demo||state.room!==resolvingRoom)return;state.room.resolvingTrick=false;state.room.resolutionEndsAt=null;state.room.handComplete=false;state.room.trickCards=[];if(handWinner){demoFinishHand(handWinner,state.room.trucoLevel||1);return;}else{state.room.turn=winner||state.room.mano;state.room.trickNo++;}state.hand=state.playerId==='table'?[]:[...(state.demoHands[state.playerId]||[])];renderGame();},3000);
   }else state.room.turn=player==='player1'?'player2':'player1';
-  renderGame();toast('Jugada de demostración.');
+  renderGame();if(!state.bot)toast('Jugada de demostración.');
 }
 function demoFinishHand(winner,points){
   const room=state.room,before={...room,scores:{...room.scores}},groups=buildEndEvidence(room,state.demoOriginalHands||{});
@@ -1857,6 +1980,7 @@ document.querySelectorAll('.scoreboard,.mobile-score').forEach(marker=>{
 $('close-score-details').addEventListener('click',()=>$('score-details').close());
 $('dismiss-score-details').addEventListener('click',()=>$('score-details').close());
 $('score-details').addEventListener('click',event=>{if(event.target===$('score-details'))$('score-details').close();});
+$('play-bot').addEventListener('change',updateBotSetup);
 $('use-table-device').addEventListener('change',event=>updateMode(event.target.checked?'three':'two'));
 $('points-picker-trigger').addEventListener('click',()=>{const menu=$('points-picker-menu'),opening=menu.classList.contains('hidden');menu.classList.toggle('hidden',!opening);$('points-picker-trigger').setAttribute('aria-expanded',String(opening));});
 document.addEventListener('click',event=>{if(!event.target.closest('.points-picker')){$('points-picker-menu').classList.add('hidden');$('points-picker-trigger').setAttribute('aria-expanded','false');}});
@@ -1873,8 +1997,8 @@ $('fold-hand').addEventListener('click',foldHand);
 $('enter-room').addEventListener('click',enterRoom);
 $('demo-button').addEventListener('click',()=>demoStart('player1'));
 $('demo-two-button').addEventListener('click',()=>demoStart('player1','two'));
-$('leave-room').addEventListener('click',()=>{state.roomWatchVersion=(state.roomWatchVersion||0)+1;state.navigationEpoch=(state.navigationEpoch||0)+1;localStorage.removeItem('truco-last-seat');if(state.unsubscribe)state.unsubscribe();if(state.privateUnsubscribe)state.privateUnsubscribe();state.privateUnsubscribe=null;state.privateHandKey=null;state.room=null;state.demo=false;showView('welcome-view');openLobby();});
-$('game-home').addEventListener('click',()=>{if(state.room?.status==='drawing'){closeOpeningDraw('draw-left');return;}if(state.demo){state.demo=false;showView('welcome-view');openLobby();return;}showView('waiting-view');});
+$('leave-room').addEventListener('click',()=>{stopBot();state.roomWatchVersion=(state.roomWatchVersion||0)+1;state.navigationEpoch=(state.navigationEpoch||0)+1;localStorage.removeItem('truco-last-seat');if(state.unsubscribe)state.unsubscribe();if(state.privateUnsubscribe)state.privateUnsubscribe();state.privateUnsubscribe=null;state.privateHandKey=null;state.room=null;state.demo=false;showView('welcome-view');openLobby();});
+$('game-home').addEventListener('click',()=>{if(state.room?.status==='drawing'){closeOpeningDraw('draw-left');return;}if(state.demo){stopBot();state.demo=false;showView('welcome-view');openLobby();return;}showView('waiting-view');});
 $('demo-device-switcher').addEventListener('click',(event)=>{const button=event.target.closest('[data-demo-role]');if(button)switchDemoRole(button.dataset.demoRole);});
 function limitMuestraOffset(x,y){
   const distance=Math.hypot(x,y),scale=distance>15?15/distance:1;
@@ -1925,3 +2049,4 @@ if(invitedRoom)await openInvitation(invitedRoom);
 else if(new URLSearchParams(location.search).get('demo')==='two')demoStart('player1','two');
 else if(location.search.includes('demo=mesa'))demoStart('table');
 else if (firebaseConfigValid(state.config)) openLobby();
+
