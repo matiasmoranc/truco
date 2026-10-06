@@ -11,7 +11,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="./style.css?v=20261006-cards5" />
+    <link rel="stylesheet" href="./style.css?v=20261006-pause7" />
   </head>
   <body>
     <div class="grain" aria-hidden="true"></div>
@@ -31,7 +31,6 @@
             <div class="open-room-list" id="open-room-list"><p class="muted">Conectando con las mesas…</p></div>
           </section>
         </div>
-        <footer class="home-footer"><button class="demo-link" id="demo-button">Demo con mesa</button><button class="demo-link" id="demo-two-button">Demo 2 dispositivos</button></footer>
       </section>
 
       <section class="view invitation-view" id="invite-view" aria-label="Unirse a la mesa">
@@ -109,9 +108,6 @@
           <div class="mobile-score-head"><h2 aria-label="Nosotros">N</h2><h2 aria-label="Ellos">E</h2></div>
           <div class="mobile-score-grid"><div class="tally mobile-tally" id="mobile-tally-1" aria-label="Palitos de Nosotros"></div><div class="mobile-score-divider" aria-hidden="true"></div><div class="tally mobile-tally" id="mobile-tally-2" aria-label="Palitos de Ellos"></div></div>
         </section>
-        <div class="demo-device-switcher hidden" id="demo-device-switcher" role="group" aria-label="Cambiar dispositivo de prueba">
-          <span>PROBAR VISTA</span><button type="button" data-demo-role="table" aria-pressed="false">Mesa</button><button type="button" data-demo-role="player1" aria-pressed="false">Jugador 1</button><button type="button" data-demo-role="player2" aria-pressed="false">Jugador 2</button>
-        </div>
         <section id="match-end" class="match-end hidden" role="dialog" aria-modal="true" aria-labelledby="match-end-title">
           <div class="match-end-panel">
             <button id="close-match-end" class="match-end-close" type="button" aria-label="Cerrar resultado">×</button>
@@ -136,7 +132,7 @@
       <section class="toast-global" id="global-toast" role="status"></section>
     </main>
     <dialog id="score-details" class="score-details" aria-labelledby="score-details-title"><div class="score-details-panel"><header class="score-details-header"><h2 id="score-details-title">Historial de manos</h2><button id="close-score-details" type="button" aria-label="Cerrar detalle"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button></header><div id="score-details-content"></div><button id="dismiss-score-details" class="score-details-dismiss" type="button">Cerrar</button></div></dialog>
-    <script type="module" src="./app.js?v=20261006-cards5"></script>
+    <script type="module" src="./app.js?v=20261006-pause7"></script>
   </body>
 </html>
 
