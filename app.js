@@ -1289,7 +1289,25 @@ function waitingTurnLabel(room=state.room){
   const player=pending?(pending.revealMode?pending.revealTurn:pending.responder):(room?.turn||otherPlayer(state.playerId));
   return 'Turno de '+(room?.players?.[player]?.name||'tu rival');
 }
+function inactivityWarningLabel(room=state.room,viewer=state.playerId){
+  const player=turnClockPlayer(room);
+  if(!turnClockKey(room)||room.turnClock?.key!==turnClockKey(room)||Number(room.timeoutCounts?.[player]||0)<1||!turnClockRemaining(room.turnClock).extra)return '';
+  return player===viewer?'Perderás el partido en:':(room.players?.[player]?.name||'Tu rival')+' perderá el partido en:';
+}
+function inactivityLifeText(room=state.room,viewer=state.playerId){
+  if(!['player1','player2'].includes(viewer)||!['started','revealing','timed-out'].includes(room?.status))return '';
+  return [viewer,otherPlayer(viewer)].filter(player=>Number(room.timeoutCounts?.[player]||0)>=1).map(player=>
+    player===viewer?'Te queda 1 vida · Ya agotaste 45 s':(room.players?.[player]?.name||'Tu rival')+': 1 vida · Ya agotó 45 s'
+  ).join('\n');
+}
+function renderInactivityLife(){
+  let el=$('inactivity-life');
+  if(!el){el=document.createElement('span');el.id='inactivity-life';el.className='inactivity-life';$('turn-badge').append(el);}
+  const text=inactivityLifeText();
+  el.textContent=text;el.classList.toggle('hidden',!text);
+}
 function setTurnBadge(text){
+  text=inactivityWarningLabel()||text;
   if(text==='ESPERÁ'||text==='ESPERANDO')text=waitingTurnLabel();
   const badge=$('turn-badge');
   let label=badge.querySelector('.turn-badge-label');
@@ -1300,6 +1318,7 @@ function setTurnBadge(text){
   label.textContent=text;
 }
 function renderTurnTimer(){
+  renderInactivityLife();
   clearTimeout(turnTimerHandle);turnTimerHandle=null;
   let el=$('turn-timer');
   if(!el){el=document.createElement('div');el.id='turn-timer';el.className='turn-timer hidden';el.setAttribute('role','timer');$('turn-badge').append(el);}
@@ -1335,8 +1354,9 @@ function renderTurnTimer(){
       el.animate?.([{transform:'translateX(0)'},{transform:'translateX(-3px)'},{transform:'translateX(3px)'},{transform:'translateX(-2px)'},{transform:'translateX(0)'}],{duration:280});
     }
     if(!remaining.extra)delete el.dataset.warningTick;
+    const warning=inactivityWarningLabel(room);if(warning)setTurnBadge(warning);
     el.textContent=remaining.seconds+' s';
-    el.setAttribute('aria-label',name+(remaining.extra?' perderá su turno en ':' tiene ')+remaining.seconds+' segundos');
+    el.setAttribute('aria-label',name+(remaining.extra?(Number(room.timeoutCounts?.[turnClockPlayer(room)]||0)>=1?' perderá el partido en ':' perderá la mano en '):' tiene ')+remaining.seconds+' segundos');
     if(remaining.expired&&(state.demo||isCoordinator()))expireTurnClock(clock);
   }
   turnTimerHandle=setTimeout(renderTurnTimer,200);
