@@ -420,7 +420,13 @@ function watchRoom() {
   state.unsubscribe = fb.onValue(fb.ref(fb.db, `rooms/${code}/public`), (snapshot) => {
     if(code!==state.roomCode||version!==state.roomWatchVersion)return;
     if (!snapshot.exists()) { if(state.unsubscribe){state.unsubscribe();state.unsubscribe=null;}state.room=null;console.warn('[truco:room] unavailable',{code});toast('La mesa ya no está disponible.',true);showView('welcome-view');openLobby();return; }
-    state.room = snapshot.val();
+    const incoming=snapshot.val();
+    if(Number(incoming.matchNumber||1)!==Number(state.room?.matchNumber||1)){
+      state.privateUnsubscribe?.();state.privateUnsubscribe=null;state.privateHandKey=null;state.privateDeal=null;
+      state.hand=[];state.handOrder=[];state.renderedHandNumber=null;state.finalEvidenceKey=null;state.verifiedEnvido=null;
+      clearTimeout(state.resolutionTimer);state.resolutionTimer=null;state.resolutionTimerKey=null;
+    }
+    state.room = incoming;
     if(state.room.status==='closed'||roomExpired(state.room)){if(roomExpired(state.room))closeExpiredRoom(state.roomCode);if(state.unsubscribe){state.unsubscribe();state.unsubscribe=null;}const reason=state.room.closeReason;returnToLobby(reason==='draw-timeout'?'Se acabó el tiempo para elegir carta. La partida no comenzó.':reason==='draw-left'?'Un participante salió del sorteo. La partida no comenzó.':'La mesa cerró por inactividad.');return;}
     if(isCoordinator()&&state.room.status==='started'&&!state.room.resolvingTrick&&state.room.trickCards?.length===2&&(state.room.tricks||[]).length>0)recoverLegacyTrick(state.room);
     if(isCoordinator()&&state.room.status==='complete'&&!state.room.endReveal&&(Object.keys(state.room.flors||{}).length||state.room.envidoAudit)){
@@ -686,7 +692,11 @@ function handEnvido(hand, muestra) {
   for(let a=0;a<hand.length;a++)for(let b=a+1;b<hand.length;b++)if(!pieceOrder(hand[a],muestra)&&!pieceOrder(hand[b],muestra)&&hand[a].suit===hand[b].suit)best=Math.max(best,20+values[a]+values[b]);
   return best;
 }
-function florValue(hand,muestra) { return 20+hand.reduce((n,card)=>n+(pieceOrder(card,muestra)?envidoValue(card,muestra)-20:envidoValue(card,muestra)),0); }
+function florValue(hand,muestra) {
+  const pieces=hand.filter(card=>pieceOrder(card,muestra)>0).map(card=>envidoValue(card,muestra)).sort((a,b)=>b-a);
+  const common=hand.filter(card=>!pieceOrder(card,muestra)).reduce((sum,card)=>sum+envidoValue(card,muestra),0);
+  return pieces.length?pieces[0]+pieces.slice(1).reduce((sum,value)=>sum+value%10,0)+common:20+common;
+}
 function topFeed(room,text) { return [{text,time:Date.now()},...(room.feed||[]).slice(0,7)]; }
 const VALID_TARGET_POINTS=[10,20,30,40,50,60];
 function normalizeTargetPoints(value) {
@@ -902,20 +912,13 @@ async function callFlor() {
     await writeRoom({flors,envidoClosed:true,pendingBet:{type:'flor',single:true,caller:player,responder:other,stake:3,accepted:0,called:'flor',suspendedBet},feed:topFeed(room,`${room.players[player].name} canta flor. El rival debe responder si tiene flor.`)});
   }
 }
-async function settleHand(tricks, room) {
-  const wins={player1:0,player2:0};let firstWinner=null,tieNeedsNextWinner=false;
-  for(const trick of tricks){
-    if(!trick.winner){tieNeedsNextWinner=true;continue;}
-    if(tieNeedsNextWinner)return trick.winner;
-    wins[trick.winner]++;if(!firstWinner)firstWinner=trick.winner;
-    if(wins.player1===2)return'player1';if(wins.player2===2)return'player2';
-  }
+function settleHand(tricks,room){
+  if(tricks.length<2)return null;
+  const first=tricks[0].winner,second=tricks[1].winner;
+  if(first&&(!second||first===second))return first;
+  if(!first&&second)return second;
   if(tricks.length<3)return null;
-  let winner=null;
-  if(wins.player1!==wins.player2)winner=wins.player1>wins.player2?'player1':'player2';
-  else if(firstWinner)winner=firstWinner;
-  else winner=room.mano||'player1';
-  return winner;
+  return tricks[2].winner||first||room.mano||'player1';
 }
 async function nextHand(winner, scores, handNumber, message, envidoVerified=false) {
   if(!envidoVerified){scores=await verifyEnvido(scores);scores=settleSingleFlor(state.room,scores);}
@@ -1329,6 +1332,7 @@ function renderTurnTimer(){
 
 function renderGame() {
   if (!state.room) return;
+  renderMatchEnd();
   syncPrivateHand();
   if(state.demo&&state.room.status==='complete'&&!state.room.endReveal){
     const groups=buildEndEvidence(state.room,state.demoOriginalHands||{});
@@ -1433,8 +1437,101 @@ function renderGame() {
   alignHandWithControls();
   actions.querySelectorAll('[data-action]').forEach((button)=>button.addEventListener('click',()=>{const act=button.dataset.action;if(state.demo){demoAction(act);return;}if(['yes','no','raise'].includes(act)||act.startsWith('raise-'))answerBet(act);else if(act==='reveal')revealEnvido();else if(act==='flor')callFlor();else callBet(act);}));
   setTurnBadge(isTable?'MESA':roundPauseInfo(room)?'ESPERÁ':pending?(pending.responder===state.playerId?'RESPONDÉ':'ESPERANDO'):myTurn?'TU TURNO':'ESPERÁ');$('turn-badge').classList.toggle('waiting-turn',!myTurn||!!pending);
-  if(room.status==='complete') toast(room.matchResult?.reason==='inactivity'?room.matchResult.message:'¡Partida terminada!');
+  renderMatchEnd();
 }
+function matchEndKey(room=state.room){
+  return [state.roomCode,room?.matchNumber||1,room?.rematch?.id||'',room?.rematch?.status||''].join(':');
+}
+function matchWinner(room){
+  return room.matchResult?.winner||['player1','player2'].find(player=>Number(room.scores?.[player])>=targetPoints(room))||null;
+}
+function matchFinished(room){
+  return room?.status==='complete'&&!!(room.endReveal||(!room.envidoAudit&&!Object.keys(room.flors||{}).length));
+}
+function rematchRoom(room){
+  return {
+    deviceMode:room.deviceMode,targetPoints:targetPoints(room),table:room.table,players:room.players,
+    matchNumber:Number(room.matchNumber||1)+1,status:'drawing',createdAt:gameTime(),
+    scores:{player1:0,player2:0},handNumber:1,deckCount:40,trickCards:[],tricks:[],
+    openingDraw:newOpeningDraw(),feed:topFeed({feed:[]},'Revancha. Elegí una carta para sortear quién reparte.')
+  };
+}
+function rematchChanges(room,player,action,id){
+  if(!matchFinished(room)||!room.players?.[player])return null;
+  const request=room.rematch;
+  if(action==='request'){
+    if(request?.status==='pending')return null;
+    return {rematch:{id,requester:player,status:'pending'}};
+  }
+  if(request?.status!=='pending'||request.id!==id||request.requester===player)return null;
+  if(action==='accept')return rematchRoom(room);
+  if(action==='decline')return {rematch:{...request,status:'declined'}};
+  return null;
+}
+let rematchInFlight=false;
+async function respondRematch(action){
+  if(rematchInFlight||!['player1','player2'].includes(state.playerId))return;
+  rematchInFlight=true;
+  const code=state.roomCode,player=state.playerId,matchNumber=Number(state.room?.matchNumber||1);
+  const id=action==='request'?crypto.randomUUID():state.room?.rematch?.id;
+  try{
+    if(state.demo){
+      const changes=rematchChanges(state.room,player,action,id);
+      if(changes){
+        if(action==='accept'){
+          state.room=changes;state.hand=[];
+          const deck=shuffleDeck();state.demoHands={player1:deck.slice(0,3),player2:deck.slice(3,6)};
+          state.demoOriginalHands=structuredClone(state.demoHands);
+          state.demoTruth={player1:handEnvido(state.demoHands.player1,deck[6]),player2:handEnvido(state.demoHands.player2,deck[6])};
+          state.room.muestra=deck[6];state.finalEvidenceKey=null;state.verifiedEnvido=null;
+        }else Object.assign(state.room,changes);
+      }
+    }else{
+      const fb=state.firebase;
+      await fb.runTransaction(fb.ref(fb.db,`rooms/${code}/public`),room=>{
+        if(room===null)return null;
+        if(Number(room.matchNumber||1)!==matchNumber||room.players?.[player]?.uid!==state.uid)return;
+        const changes=rematchChanges(room,player,action,id);
+        if(!changes)return;
+        return action==='accept'?changes:{...room,...changes};
+      },{applyLocally:false});
+    }
+  }catch(error){console.error('[truco:rematch]',error);toast(firebaseError(error));}
+  finally{rematchInFlight=false;renderGame();}
+}
+function renderMatchEnd(){
+  const panel=$('match-end'),room=state.room,winner=room&&matchWinner(room);
+  const visible=matchFinished(room)&&!!winner&&state.dismissedMatchEnd!==matchEndKey(room);
+  panel.classList.toggle('hidden',!visible);
+  if(!visible)return;
+  const name=room.players?.[winner]?.name||'Jugador';
+  $('match-end-title').textContent='Ganó '+name;
+  $('match-end-score').innerHTML=['player1','player2'].map(player=>`<div class="${player===winner?'match-score-winner':''}"><strong>${Number(room.scores?.[player])||0}</strong><span>${escapeHtml(room.players?.[player]?.name||'Jugador')}</span></div>`).join('<b aria-hidden="true">–</b>');
+  const request=room.rematch,player=state.playerId,isPlayer=['player1','player2'].includes(player);
+  const pending=request?.status==='pending',incoming=pending&&request.requester!==player;
+  $('match-end-message').textContent=pending?(incoming?(room.players?.[request.requester]?.name||'Tu rival')+' quiere jugar la revancha.':'Revancha enviada. Esperando al rival…'):request?.status==='declined'?'La revancha no fue aceptada.':room.matchResult?.reason==='inactivity'?'Victoria por inactividad.':'Partida terminada';
+  $('request-rematch').classList.toggle('hidden',!isPlayer||pending);
+  $('accept-rematch').classList.toggle('hidden',!isPlayer||!incoming);
+  $('decline-rematch').classList.toggle('hidden',!isPlayer||!incoming);
+  for(const id of ['request-rematch','accept-rematch','decline-rematch'])$(id).disabled=rematchInFlight;
+  if(state.focusedMatchEnd!==matchEndKey(room)){
+    state.focusedMatchEnd=matchEndKey(room);
+    (isPlayer?(incoming?$('accept-rematch'):pending?$('close-match-end'):$('request-rematch')):$('close-match-end')).focus({preventScroll:true});
+  }
+}
+$('close-match-end').addEventListener('click',()=>{state.dismissedMatchEnd=matchEndKey();renderMatchEnd();});
+$('request-rematch').addEventListener('click',()=>respondRematch('request'));
+$('accept-rematch').addEventListener('click',()=>respondRematch('accept'));
+$('decline-rematch').addEventListener('click',()=>respondRematch('decline'));
+$('match-end').addEventListener('keydown',event=>{
+  if(event.key==='Escape'){$('close-match-end').click();return;}
+  if(event.key!=='Tab')return;
+  const buttons=[...$('match-end').querySelectorAll('button')].filter(button=>!button.disabled&&!button.classList.contains('hidden'));
+  const first=buttons[0],last=buttons.at(-1);
+  if(event.shiftKey&&document.activeElement===first){event.preventDefault();last?.focus();}
+  else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first?.focus();}
+});
+
 function alignHandWithControls(){
   requestAnimationFrame(()=>{
     if(state.handGestureActive)return;
@@ -1599,8 +1696,7 @@ function demoPlay(card,launchOrigin=null) {
   if(state.room.trickCards.length===2){
     const first=state.room.trickCards[0],second=state.room.trickCards[1],winner=cardStrength(first.card,state.room.muestra)===cardStrength(second.card,state.room.muestra)?null:(cardStrength(first.card,state.room.muestra)>cardStrength(second.card,state.room.muestra)?first.playerId:second.playerId);
     state.room.tricks=[...(state.room.tricks||[]),{winner}];
-    const wins={player1:state.room.tricks.filter((trick)=>trick.winner==='player1').length,player2:state.room.tricks.filter((trick)=>trick.winner==='player2').length};
-    const handWinner=wins.player1>=2?'player1':wins.player2>=2?'player2':state.room.tricks.length>=3?(wins.player1===wins.player2?(state.room.tricks.find((trick)=>trick.winner)?.winner||state.room.mano):wins.player1>wins.player2?'player1':'player2'):null;
+    const handWinner=settleHand(state.room.tricks,state.room);
     if(winner)state.room.feed.unshift({text:`${state.room.players[winner].name} se lleva la baza.`,time:Date.now()});
     state.room.resolvingTrick=true;state.room.resolutionId=crypto.randomUUID();state.room.resolutionEndsAt=gameTime()+3000;state.room.resolvedTrickWinner=winner;state.room.handComplete=!!handWinner;
     setTimeout(()=>{state.room.resolvingTrick=false;state.room.resolutionEndsAt=null;state.room.handComplete=false;state.room.trickCards=[];if(handWinner){demoFinishHand(handWinner,state.room.trucoLevel||1);return;}else{state.room.turn=winner||state.room.mano;state.room.trickNo++;}state.hand=state.playerId==='table'?[]:[...(state.demoHands[state.playerId]||[])];renderGame();},3000);

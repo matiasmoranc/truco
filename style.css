@@ -1225,3 +1225,19 @@ body { min-height:100dvh; }
 .waiting .seat-state{flex-shrink:0;padding:6px 9px;border-radius:7px;font-size:12px;font-weight:700;line-height:1.2}
 .waiting .seat-occupied .seat-state{background:#76c38b;color:#10291f}
 .waiting .seat-free .seat-state{background:#e8c983;color:#302719}
+
+/* Match result and a two-player rematch invitation. */
+.match-end{position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;padding:24px;background:#071d16f5;overflow-y:auto}
+.match-end-panel{position:relative;width:min(440px,100%);text-align:center;padding:44px 20px 28px;border:1px solid #d8b87566;border-radius:24px;background:#153e2e;box-shadow:0 20px 70px #0006}
+.match-end-close{position:absolute;right:12px;top:12px;width:40px;height:40px;border:1px solid #ffffff30;border-radius:12px;background:#ffffff08;font-size:26px}
+.match-end h2{font:700 clamp(26px,7vw,38px)/1.2 'DM Sans',sans-serif;margin:12px 0 28px;color:#f2d99f;overflow-wrap:anywhere}
+.match-end-score{display:flex;align-items:flex-start;justify-content:center;gap:18px}
+.match-end-score>div{flex:1;min-width:0}
+.match-end-score strong{display:block;font-size:clamp(48px,14vw,70px);line-height:1;font-variant-numeric:tabular-nums}
+.match-end-score span{display:block;margin-top:12px;font-size:16px;overflow-wrap:anywhere}
+.match-end-score>b{font-size:32px;padding-top:12px;color:#b6c7ba}
+.match-score-winner{color:#e8c983}
+.match-end p{margin:28px 0 20px;color:#d1e0d6;font-size:15px;line-height:1.5}
+.match-end-actions{display:flex;flex-direction:column;gap:10px}
+.match-end-actions .button{justify-content:center;border-radius:12px}
+.match-end-actions .button:not(.primary){background:#ffffff08;border:1px solid #ffffff30}

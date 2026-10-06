@@ -11,7 +11,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="./style.css?v=20261005-2201" />
+    <link rel="stylesheet" href="./style.css?v=20261005-2347" />
   </head>
   <body>
     <div class="grain" aria-hidden="true"></div>
@@ -110,6 +110,19 @@
         <div class="demo-device-switcher hidden" id="demo-device-switcher" role="group" aria-label="Cambiar dispositivo de prueba">
           <span>PROBAR VISTA</span><button type="button" data-demo-role="table" aria-pressed="false">Mesa</button><button type="button" data-demo-role="player1" aria-pressed="false">Jugador 1</button><button type="button" data-demo-role="player2" aria-pressed="false">Jugador 2</button>
         </div>
+        <section id="match-end" class="match-end hidden" role="dialog" aria-modal="true" aria-labelledby="match-end-title">
+          <div class="match-end-panel">
+            <button id="close-match-end" class="match-end-close" type="button" aria-label="Cerrar resultado">×</button>
+            <h2 id="match-end-title"></h2>
+            <div id="match-end-score" class="match-end-score"></div>
+            <p id="match-end-message" role="status"></p>
+            <div class="match-end-actions">
+              <button id="request-rematch" class="button primary" type="button">Revancha</button>
+              <button id="accept-rematch" class="button primary hidden" type="button">Aceptar revancha</button>
+              <button id="decline-rematch" class="button hidden" type="button">Ahora no</button>
+            </div>
+          </div>
+        </section>
         <div class="toast" id="toast" role="status"></div>
       </section>
 
@@ -121,6 +134,6 @@
       <section class="toast-global" id="global-toast" role="status"></section>
     </main>
     <dialog id="score-details" class="score-details" aria-labelledby="score-details-title"><div class="score-details-panel"><header class="score-details-header"><h2 id="score-details-title">Historial de manos</h2><button id="close-score-details" type="button" aria-label="Cerrar detalle"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button></header><div id="score-details-content"></div><button id="dismiss-score-details" class="score-details-dismiss" type="button">Cerrar</button></div></dialog>
-    <script type="module" src="./app.js?v=20261005-2332"></script>
+    <script type="module" src="./app.js?v=20261005-2347"></script>
   </body>
 </html>
