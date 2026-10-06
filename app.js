@@ -1709,17 +1709,22 @@ function chooseBotDecision(room,hand,level,memory,random=Math.random){
   return {kind:'play',card};
 }
 function scheduleBot(){
-  clearTimeout(state.botTimer);state.botTimer=null;
   const room=state.room;
-  if(!state.bot||!room||state.botActing)return;
+  if(!state.bot||!room||state.botActing){clearTimeout(state.botTimer);state.botTimer=null;return;}
   const key=(room.matchNumber||1)+':'+room.handNumber;
   if(state.botMemory?.key!==key)state.botMemory={key,played:[]};
   for(const item of room.trickCards||[])if(!state.botMemory.played.some(c=>c.id===item.card.id))state.botMemory.played.push({...item.card});
-  if(room.resolvingTrick||room.pendingNextHand||room.status==='revealing')return;
+  if(room.resolvingTrick||room.pendingNextHand||room.status==='revealing'){clearTimeout(state.botTimer);state.botTimer=null;return;}
   const ready=room.status==='drawing'?!room.openingDraw?.cards?.player2:
     room.status==='complete'?room.rematch?.status==='pending'&&room.rematch.requester==='player1':
     room.status==='started'&&(room.pendingBet?(room.pendingBet.revealMode?room.pendingBet.revealTurn==='player2':room.pendingBet.responder==='player2'):room.turn==='player2'||(!room.playedCount&&hasFlor(demoHand('player2'),room.muestra)&&room.flors?.player2==null));
-  if(!ready)return;
+  if(!ready){clearTimeout(state.botTimer);state.botTimer=null;return;}
+  const actionKey=room.status==='drawing'?key+':draw:'+room.openingDraw?.endsAt:
+    room.status==='complete'?key+':rematch:'+room.rematch?.id:
+    key+':'+turnClockKey(room)+':'+room.trucoLevel+':'+(room.flors?.player2??'');
+  if(state.botTimer&&state.botTimerRoom===room&&state.botTimerKey===actionKey)return;
+  clearTimeout(state.botTimer);state.botTimerRoom=room;state.botTimerKey=actionKey;
+  const delay=3000+Math.floor(Math.random()*(room.status==='drawing'?1001:2001));
   state.botTimer=setTimeout(()=>{
     state.botTimer=null;if(!state.bot||state.room!==room)return;
     const action=room.status==='drawing'?{kind:'draw'}:room.status==='complete'?{kind:'rematch'}:
@@ -1735,7 +1740,7 @@ function scheduleBot(){
     }finally{
       state.playerId=human;state.hand=state.room?.status==='drawing'?[]:[...demoHand(human)];state.botActing=false;renderGame();
     }
-  },3000+Math.floor(Math.random()*2001));
+  },delay);
 }
 
 function demoStart(role,deviceMode='table') {

@@ -1254,3 +1254,8 @@ body { min-height:100dvh; }
 .turn-badge .inactivity-life { position:absolute; left:calc(100% + 6px); top:50%; transform:translateY(-50%); display:flex; flex-direction:column; justify-content:center; gap:3px; width:8px; height:19px; max-height:100%; pointer-events:none; }
 .inactivity-circle { display:block; width:8px; height:8px; flex:0 0 8px; border:1.5px solid #e8c983; border-radius:50%; background:transparent; }
 .inactivity-circle.life-lost { border-color:#d67869; background:#d67869; }
+
+/* Keep the turn label and countdown on one compact row. */
+.player-mode .my-player-info { width:calc(100% - 40px); }
+.player-mode .turn-badge-label { white-space:nowrap; overflow-wrap:normal; overflow:hidden; text-overflow:ellipsis; min-width:0; max-width:none; }
+.turn-badge .turn-timer,.turn-badge .round-pause-timer { flex-shrink:0; white-space:nowrap; }
