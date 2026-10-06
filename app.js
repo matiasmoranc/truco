@@ -70,6 +70,13 @@ function spokenCall(text=''){
 function callNoticeText(text=''){
   return text.replace(/\bcanta (?=(?:envido|real envido|falta envido|truco|retruco|vale cuatro)\b)/gi,'dice ').replace(/(\bcanta flor\.)[\s\S]*$/i,'$1');
 }
+function callNoticeHtml(notice,room=state.room){
+  const main=notice.spoken||spokenCall(notice.text||'');
+  if(!main)return escapeHtml(callNoticeText(notice.text||''));
+  const name=room?.players?.[notice.from]?.name||'Tu rival';
+  const verb=main.toLowerCase()==='flor'?'canta':'dice';
+  return `${escapeHtml(name)} ${verb} <strong>${escapeHtml(main.toLocaleUpperCase('es-UY'))}</strong>`;
+}
 function makeCallNotice(text){
   text=callNoticeText(text);
   const spoken=spokenCall(text);
@@ -155,7 +162,7 @@ function renderCallNotice(){
   const foldVisible=notice?.kind==='fold'&&remaining>0;
   const visible=addressed&&(foldVisible||(notice?.kind!=='fold'&&(awaitingResponse||(!received?.pinned&&remaining>0))));
   el.classList.toggle('hidden',!visible);
-  el.textContent=visible?callNoticeText(notice.text):'';
+  el.innerHTML=visible?callNoticeHtml(notice):'';
   if(!visible)return;
   if(!awaitingResponse)callNoticeTimer=setTimeout(()=>{callNoticeTimer=null;renderCallNotice();},Math.max(0,remaining));
   if(callSeen.get(key)!==notice.id){
