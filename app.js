@@ -56,6 +56,7 @@ function unlockVoice(){
 let callNoticeTimer=null;
 const CALL_NOTICE_DURATION=4000;
 function spokenCall(text=''){
+  if(/\bdice QUIERO\b/i.test(text))return 'Quiero';
   if(/\bresponde:\s*tiene\b/i.test(text))return 'Tiene';
   if(/se fue al mazo/i.test(text))return 'Me voy al mazo';
   const points=text.match(/\bcanta (\d+) (tantos|son mejores|son iguales)\b/i);
@@ -866,7 +867,7 @@ async function answerBet(answer) {
     const status=scores[winner]>=targetPoints(state.room)?'complete':'started';
     await writeRoom({scores,florSettled:true,pendingBet:status==='complete'?null:(bet.suspendedBet||null),envidoClosed:true,feed:topFeed(state.room,`${state.room.players[state.playerId].name} quiere. Flores: ${flowers.player1} a ${flowers.player2}. ${state.room.players[winner].name} suma ${bet.stake}.`),status});return;
   }
-  await writeRoom({trucoLevel:bet.stake,pendingBet:null,feed:topFeed(state.room,`${state.room.players[state.playerId].name} quiere. El truco queda en ${bet.stake}.`) });
+  await writeRoom({trucoLevel:bet.stake,pendingBet:null,feed:topFeed(state.room,`${state.room.players[state.playerId].name} dice QUIERO`) });
 }
 async function revealEnvido(good=false,declaredNumber=null) {
   if(state.room?.turnClock?.key===turnClockKey()&&turnClockRemaining(state.room.turnClock).expired){renderTurnTimer();return;}
@@ -1704,7 +1705,7 @@ function scheduleBot(){
     }finally{
       state.playerId=human;state.hand=state.room?.status==='drawing'?[]:[...demoHand(human)];state.botActing=false;renderGame();
     }
-  },state.botDifficulty==='easy'?1200:850);
+  },3000+Math.floor(Math.random()*2001));
 }
 
 function demoStart(role,deviceMode='table') {
@@ -1792,7 +1793,7 @@ function demoAnswerAction(answer){
     room.pendingBet={...bet,reveals:{},revealMode:true,revealTurn:room.mano};demoFeed(`${room.players[player].name} quiere. Declara primero ${room.players[room.mano].name}.`);renderGame();return;
   }
   if(bet.type==='flor'){demoFeed(`${room.players[player].name} quiere.`);demoResolveFlor(bet);renderGame();return;}
-  room.trucoLevel=bet.stake;room.pendingBet=null;demoFeed(`${room.players[player].name} quiere. El truco queda en ${bet.stake}.`);renderGame();
+  room.trucoLevel=bet.stake;room.pendingBet=null;demoFeed(`${room.players[player].name} dice QUIERO`);renderGame();
 }
 function demoAction(action){
   if(action==='reveal')demoAnswerAction('yes');
