@@ -1262,3 +1262,38 @@ body { min-height:100dvh; }
 
 /* Shift played cards and their animation target together. */
 .trick-cards { transform:translateY(10px); }
+
+/* Desktop layout only: phone and tablet rules remain unchanged. */
+@media (min-width:1024px) {
+  .game.player-mode { height:100dvh; min-height:0; overflow:hidden; }
+  .game.player-mode .game-topbar { flex:0 0 64px; height:64px; padding:0 32px; }
+  .game.player-mode .game-layout { display:flex; flex:1 1 0; min-height:0; height:auto; overflow:hidden; }
+  .game.player-mode .felt-area { flex:1; width:100%; max-width:1200px; height:auto; min-height:0; margin:0 auto; padding:0; }
+  .game.player-mode .my-player-info { top:20px; z-index:30; }
+  .game.player-mode .turn-badge { font-size:12px; padding:10px 16px; }
+  .game.player-mode .center-table { display:block!important; position:absolute; top:70px; left:0; width:100%; height:280px; transform:none; }
+  .game.player-mode.two-device-mode .deck-stack { top:50%; left:auto; right:150px; width:78px; height:112px; transform:translateY(-50%); }
+  .game.player-mode.two-device-mode .muestra-card { top:50%; left:auto; right:194px; width:78px; height:112px; }
+  .game.player-mode.two-device-mode .played-card { width:88px; height:126px; }
+  .game.player-mode.two-device-mode .mobile-score { position:absolute; top:282px; right:140px; width:98px; height:min(var(--compact-tally-height),calc(100% - 320px)); max-height:none; padding:0; display:flex; flex-direction:column; gap:6px; }
+  .game.player-mode.two-device-mode .mobile-score-head { display:grid; grid-template-columns:42px 42px; gap:14px; width:100%; height:26px; flex:0 0 26px; }
+  .game.player-mode.two-device-mode .mobile-score-head h2 { margin:0; text-align:center; font-size:22px; }
+  .game.player-mode.two-device-mode .mobile-score-grid { display:grid; grid-template-columns:42px 1px 42px; gap:6px; flex:1; width:100%; height:auto; min-height:0; align-items:stretch; }
+  .game.player-mode.two-device-mode .mobile-score-divider { width:1px; height:100%; max-height:none; background:rgba(239,235,215,.35); }
+  .game.player-mode.two-device-mode .mobile-tally,
+  .game.player-mode.two-device-mode .compact-score-sticks { width:100%; height:100%; min-height:0; display:block; }
+  .game.player-mode .hand,
+  .game.player-mode.two-device-mode .hand { position:absolute; top:auto; bottom:142px; width:680px; max-width:calc(100% - 300px); min-height:0; height:196px; margin:0; align-items:flex-end; z-index:10; transform:none; }
+  .game.player-mode .hand-card,
+  .game.player-mode.two-device-mode .hand-card { width:140px; height:196px; flex:0 0 140px; margin-left:-28px; margin-right:-28px; }
+  .game.player-mode .hand-card:first-child { margin-left:0; }
+  .game.player-mode .hand-card:last-child { margin-right:0; }
+  .game.player-mode .player-controls { bottom:24px; width:680px; max-width:calc(100% - 56px); gap:10px; }
+  .game.player-mode .compact-actions .call-button,
+  .game.player-mode .compact-actions .pass-button { height:46px; min-height:46px; font-size:13px; padding:8px 12px; }
+  .game.player-mode .player-controls>.fold-hand { flex-basis:108px; width:108px; height:46px; font-size:11px; }
+  .game.player-mode .call-notice { top:40%; max-width:400px; font-size:16px; padding:14px 22px; }
+  .game.player-mode.declaring-envido .envido-picker { left:calc(50% - 340px); bottom:24px; width:540px; max-width:calc(100% - 200px); }
+  .game.player-mode.drawing-mode .center-table,
+  .game.player-mode.drawing-mode .hand { display:none!important; }
+}
