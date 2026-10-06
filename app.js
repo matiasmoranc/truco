@@ -29,6 +29,45 @@ let chatMuted=false;
 try{chatMuted=localStorage.getItem('truco-chat-muted')==='true';}catch{}
 const matchChat={key:null,messages:[],seen:new Set(),open:false,unread:0,sending:false,noticeTimers:new Map(),signature:''};
 function chatAvailable(){return !!(state.room&&!state.localGame&&['player1','player2'].includes(state.playerId)&&state.room.players?.player1&&state.room.players?.player2&&state.room.status!=='closed');}
+function peerChatMuted(room=state.room){
+  const peer=otherPlayer(state.playerId),preference=room?.chatPreferences?.[peer];
+  return !!(preference?.muted&&preference.uid===room?.players?.[peer]?.uid);
+}
+function renderChatComposer(){
+  const blocked=peerChatMuted(),input=$('chat-input');
+  input.disabled=blocked;input.classList.toggle('hidden',blocked);
+  $('chat-send').disabled=blocked||matchChat.sending;$('chat-send').classList.toggle('hidden',blocked);
+  $('chat-count').classList.toggle('hidden',blocked);
+  $('chat-blocked').classList.toggle('hidden',!blocked);
+  $('chat-blocked').textContent=blocked?`${state.room.players[otherPlayer(state.playerId)].name||'El rival'} ha silenciado los mensajes.`:'';
+  if(blocked)$('chat-error').classList.add('hidden');
+}
+let publishingChatMute=false;
+async function publishChatMute(){
+  if(!chatAvailable()||publishingChatMute)return;
+  const preference=state.room.chatPreferences?.[state.playerId];
+  if(!!preference?.muted===chatMuted&&(!preference||preference.uid===state.uid))return;
+  const key=chatContextKey(),desired=chatMuted,player=state.playerId,uid=state.uid,matchNumber=Number(state.room.matchNumber||1),fb=state.firebase;
+  publishingChatMute=true;
+  try{
+    const result=await fb.runTransaction(fb.ref(fb.db,`rooms/${state.roomCode}/public`),room=>{
+      if(!room||room.status==='closed'||Number(room.matchNumber||1)!==matchNumber||room.players?.[player]?.uid!==uid)return;
+      return {...room,chatPreferences:{...(room.chatPreferences||{}),[player]:{uid,muted:desired}}};
+    },{applyLocally:false});
+    if(!result.committed)throw new Error('chat-unavailable');
+  }catch(error){
+    console.error('[truco:chat-mute]',error);
+    if(key===chatContextKey()&&chatMuted===desired){
+      const current=state.room?.chatPreferences?.[player];chatMuted=!!(current?.muted&&current.uid===uid);
+      try{localStorage.setItem('truco-chat-muted',String(chatMuted));}catch{}
+      $('chat-muted').checked=chatMuted;updateChatUnread();
+      $('chat-error').textContent='No se pudo cambiar el silencio. Volvé a intentar.';$('chat-error').classList.remove('hidden');
+    }
+  }finally{
+    publishingChatMute=false;
+    if(key!==chatContextKey()||chatMuted!==desired)publishChatMute();
+  }
+}
 function chatContextKey(){return `${state.roomCode}:${state.room?.createdAt||''}:${state.room?.matchNumber||1}:${state.playerId}`;}
 function clearChatNotices(){
   for(const timer of matchChat.noticeTimers.values())clearTimeout(timer);
@@ -57,7 +96,8 @@ function renderChatHistory(){
 }
 function updateChatUnread(){
   const badge=$('chat-unread');badge.textContent=matchChat.unread>9?'9+':String(matchChat.unread);badge.classList.toggle('hidden',!matchChat.unread);
-  $('chat-toggle').setAttribute('aria-label',matchChat.unread?`Abrir chat, ${matchChat.unread} mensajes nuevos`:'Abrir chat');
+  $('chat-toggle').setAttribute('aria-label',(chatMuted?'Abrir chat, mensajes silenciados':'Abrir chat')+(matchChat.unread?`, ${matchChat.unread} mensajes nuevos`:''));
+  $('chat-toggle').classList.toggle('chat-is-muted',chatMuted);
 }
 function showChatNotice(message){
   const notice=document.createElement('div');notice.className='chat-notice';
@@ -86,7 +126,8 @@ function syncMatchChat(){
   matchChat.messages=messages;
   const signature=JSON.stringify(messages);
   if(signature!==matchChat.signature){matchChat.signature=signature;renderChatHistory();}
-  $('chat-muted').checked=chatMuted;updateChatUnread();
+  $('chat-muted').checked=chatMuted;updateChatUnread();renderChatComposer();
+  if(fresh)publishChatMute();
 }
 function openMatchChat(){
   syncMatchChat();if(!chatAvailable())return;
@@ -95,7 +136,7 @@ function openMatchChat(){
   $('chat-history').scrollTop=$('chat-history').scrollHeight;$('chat-close').focus();
 }
 async function sendMatchChat(event){
-  event.preventDefault();if(!chatAvailable()||matchChat.sending)return;
+  event.preventDefault();if(!chatAvailable()||matchChat.sending||peerChatMuted()){renderChatComposer();return;}
   const input=$('chat-input'),draft=input.value,text=draft.trim();
   if(!text||text.length>CHAT_LIMIT)return;
   const code=state.roomCode,key=chatContextKey(),sender=state.playerId,uid=state.uid,matchNumber=Number(state.room.matchNumber||1);
@@ -103,15 +144,18 @@ async function sendMatchChat(event){
   try{
     const fb=state.firebase,messageRef=fb.push(fb.ref(fb.db,`rooms/${code}/public/chatMessages`));
     const result=await fb.runTransaction(fb.ref(fb.db,`rooms/${code}/public`),room=>{
-      if(!room||room.status==='closed'||Number(room.matchNumber||1)!==matchNumber||room.players?.[sender]?.uid!==uid||!room.players?.[otherPlayer(sender)])return;
+      if(!room||room.status==='closed'||Number(room.matchNumber||1)!==matchNumber||room.players?.[sender]?.uid!==uid||!room.players?.[otherPlayer(sender)]||peerChatMuted(room))return;
       return {...room,chatMessages:{...(room.chatMessages||{}),[messageRef.key]:{sender,text,at:gameTime()}}};
     },{applyLocally:false});
-    if(!result.committed)throw new Error('chat-unavailable');
+    if(!result.committed){
+      if(key===chatContextKey()&&peerChatMuted(result.snapshot?.val())){state.room=result.snapshot.val();renderChatComposer();return;}
+      throw new Error('chat-unavailable');
+    }
     if(key===chatContextKey()&&input.value===draft){input.value='';$('chat-count').textContent='0/40';input.focus();}
   }catch(error){
     console.error('[truco:chat]',error);
     if(key===chatContextKey()){$('chat-error').textContent='No se pudo enviar. Volvé a intentar.';$('chat-error').classList.remove('hidden');}
-  }finally{if(key===chatContextKey()){matchChat.sending=false;$('chat-send').disabled=false;}}
+  }finally{if(key===chatContextKey()){matchChat.sending=false;renderChatComposer();}}
 }
 function showView(id) { document.documentElement.classList.remove('opening-invitation'); views.forEach((name) => $(name).classList.toggle('active', name === id)); if(id!=='game-view')closeMatchChat(true); }
 function suitSvg(suit){
@@ -2191,7 +2235,7 @@ $('chat-toggle').addEventListener('click',()=>matchChat.open?closeMatchChat():op
 $('chat-close').addEventListener('click',()=>{closeMatchChat();$('chat-toggle').focus();});
 $('chat-form').addEventListener('submit',sendMatchChat);
 $('chat-input').addEventListener('input',()=>{$('chat-input').value=$('chat-input').value.slice(0,CHAT_LIMIT);$('chat-count').textContent=`${$('chat-input').value.length}/${CHAT_LIMIT}`;});
-$('chat-muted').addEventListener('change',()=>{chatMuted=$('chat-muted').checked;try{localStorage.setItem('truco-chat-muted',String(chatMuted));}catch{}if(chatMuted)clearChatNotices();});
+$('chat-muted').addEventListener('change',()=>{chatMuted=$('chat-muted').checked;try{localStorage.setItem('truco-chat-muted',String(chatMuted));}catch{}if(chatMuted)clearChatNotices();updateChatUnread();publishChatMute();});
 $('match-chat').addEventListener('keydown',event=>{if(event.key==='Escape'){closeMatchChat();$('chat-toggle').focus();}});
 $('close-config').addEventListener('click',()=>showView('setup-view'));
 $('save-config').addEventListener('click',()=>{try{const cfg=JSON.parse($('firebase-config').value);if(!firebaseConfigValid(cfg))throw new Error('missing');state.config=cfg;localStorage.setItem(storageKey,JSON.stringify(cfg));toast('Configuración guardada.',true);runPendingAction();}catch{toast('Pegá una configuración Firebase válida.',true);}});
