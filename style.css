@@ -1211,3 +1211,17 @@ body { min-height:100dvh; }
 .reveal-mode.player-mode .my-player-info{z-index:130}
 .reveal-mode.player-mode .turn-badge{position:relative;background:#10291f;border-color:#d8b875;color:#f2d99f}
 .reveal-mode .round-pause-timer{z-index:131}
+
+/* Keep waiting content near the header and clearly mark each available seat. */
+.waiting .waiting-content{margin:0 auto;padding-top:28px;padding-bottom:24px}
+.waiting .seats{gap:12px}
+.waiting .seat{padding:16px 14px;border-radius:14px;border:1px solid;gap:12px}
+.waiting .seat-occupied{background:#234b38;border-color:#76c38b80}
+.waiting .seat-occupied .seat-icon{background:#76c38b1c;border-color:#76c38b;color:#a8e4b7}
+.waiting .seat-free{background:#d8b8750a;border:2px dashed #d8b87599}
+.waiting .seat-free .seat-icon{border-color:#d8b87599;color:#e8c983}
+.waiting .seat-name{min-width:0}
+.waiting .seat-name strong{overflow-wrap:anywhere}
+.waiting .seat-state{flex-shrink:0;padding:6px 9px;border-radius:7px;font-size:12px;font-weight:700;line-height:1.2}
+.waiting .seat-occupied .seat-state{background:#76c38b;color:#10291f}
+.waiting .seat-free .seat-state{background:#e8c983;color:#302719}
