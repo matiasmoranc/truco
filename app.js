@@ -24,7 +24,95 @@ async function prepareCardImages(){
 // Keep the decoded originals in memory throughout the game.
 preloadCardImages().catch(()=>{});
 
-function showView(id) { document.documentElement.classList.remove('opening-invitation'); views.forEach((name) => $(name).classList.toggle('active', name === id)); }
+const CHAT_LIMIT=40,CHAT_NOTICE_MS=4000;
+let chatMuted=false;
+try{chatMuted=localStorage.getItem('truco-chat-muted')==='true';}catch{}
+const matchChat={key:null,messages:[],seen:new Set(),open:false,unread:0,sending:false,noticeTimers:new Map(),signature:''};
+function chatAvailable(){return !!(state.room&&!state.localGame&&['player1','player2'].includes(state.playerId)&&state.room.players?.player1&&state.room.players?.player2&&state.room.status!=='closed');}
+function chatContextKey(){return `${state.roomCode}:${state.room?.createdAt||''}:${state.room?.matchNumber||1}:${state.playerId}`;}
+function clearChatNotices(){
+  for(const timer of matchChat.noticeTimers.values())clearTimeout(timer);
+  matchChat.noticeTimers.clear();$('chat-notices')?.replaceChildren();
+}
+function closeMatchChat(clearNotices=false){
+  matchChat.open=false;$('match-chat')?.classList.add('hidden');$('chat-toggle')?.setAttribute('aria-expanded','false');
+  if(clearNotices)clearChatNotices();
+}
+function chatMessageList(room){
+  return Object.entries(room?.chatMessages||{}).filter(([,message])=>message&&['player1','player2'].includes(message.sender)&&typeof message.text==='string'&&message.text.trim()&&message.text.length<=CHAT_LIMIT&&Number.isFinite(message.at)).map(([id,message])=>({id,...message})).sort((a,b)=>a.at-b.at||a.id.localeCompare(b.id));
+}
+function renderChatHistory(){
+  const history=$('chat-history');
+  const nearBottom=history.scrollHeight-history.scrollTop-history.clientHeight<32;
+  history.replaceChildren();
+  if(!matchChat.messages.length){const empty=document.createElement('p');empty.className='chat-empty';empty.textContent='Todavía no hay mensajes.';history.append(empty);}
+  for(const message of matchChat.messages){
+    const item=document.createElement('div');item.className='chat-message'+(message.sender===state.playerId?' chat-message-mine':'');
+    const name=document.createElement('strong');name.textContent=message.sender===state.playerId?'Vos':state.room.players?.[message.sender]?.name||'Rival';
+    const text=document.createElement('p');text.textContent=message.text;
+    item.append(name,text);history.append(item);
+  }
+  if(nearBottom||!matchChat.open)history.scrollTop=history.scrollHeight;
+}
+function updateChatUnread(){
+  const badge=$('chat-unread');badge.textContent=matchChat.unread>9?'9+':String(matchChat.unread);badge.classList.toggle('hidden',!matchChat.unread);
+  $('chat-toggle').setAttribute('aria-label',matchChat.unread?`Abrir chat, ${matchChat.unread} mensajes nuevos`:'Abrir chat');
+}
+function showChatNotice(message){
+  const notice=document.createElement('div');notice.className='chat-notice';
+  const content=document.createElement('div'),name=document.createElement('strong'),text=document.createElement('p'),close=document.createElement('button');
+  name.textContent=state.room.players?.[message.sender]?.name||'Rival';text.textContent=message.text;
+  close.type='button';close.textContent='×';close.setAttribute('aria-label','Cerrar mensaje');
+  const dismiss=()=>{clearTimeout(matchChat.noticeTimers.get(message.id));matchChat.noticeTimers.delete(message.id);notice.remove();};
+  close.addEventListener('click',dismiss);content.append(name,text);notice.append(content,close);$('chat-notices').append(notice);
+  matchChat.noticeTimers.set(message.id,setTimeout(dismiss,CHAT_NOTICE_MS));
+}
+function syncMatchChat(){
+  const available=chatAvailable();$('chat-toggle').classList.toggle('hidden',!available);
+  if(!available){closeMatchChat(true);return;}
+  const key=chatContextKey(),messages=chatMessageList(state.room),fresh=matchChat.key!==key;
+  if(fresh){
+    closeMatchChat(true);matchChat.key=key;matchChat.seen=new Set(messages.map(message=>message.id));matchChat.unread=0;matchChat.signature='';matchChat.sending=false;
+    $('chat-input').value='';$('chat-count').textContent='0/40';$('chat-send').disabled=false;$('chat-error').classList.add('hidden');
+  }
+  if(!fresh)for(const message of messages){
+    if(matchChat.seen.has(message.id))continue;
+    matchChat.seen.add(message.id);
+    if(message.sender===state.playerId)continue;
+    if(!matchChat.open)matchChat.unread++;
+    if(!chatMuted&&!matchChat.open&&$('game-view').classList.contains('active'))showChatNotice(message);
+  }
+  matchChat.messages=messages;
+  const signature=JSON.stringify(messages);
+  if(signature!==matchChat.signature){matchChat.signature=signature;renderChatHistory();}
+  $('chat-muted').checked=chatMuted;updateChatUnread();
+}
+function openMatchChat(){
+  syncMatchChat();if(!chatAvailable())return;
+  matchChat.open=true;matchChat.unread=0;clearChatNotices();updateChatUnread();
+  $('match-chat').classList.remove('hidden');$('chat-toggle').setAttribute('aria-expanded','true');
+  $('chat-history').scrollTop=$('chat-history').scrollHeight;$('chat-close').focus();
+}
+async function sendMatchChat(event){
+  event.preventDefault();if(!chatAvailable()||matchChat.sending)return;
+  const input=$('chat-input'),draft=input.value,text=draft.trim();
+  if(!text||text.length>CHAT_LIMIT)return;
+  const code=state.roomCode,key=chatContextKey(),sender=state.playerId,uid=state.uid,matchNumber=Number(state.room.matchNumber||1);
+  matchChat.sending=true;$('chat-send').disabled=true;$('chat-error').classList.add('hidden');
+  try{
+    const fb=state.firebase,messageRef=fb.push(fb.ref(fb.db,`rooms/${code}/public/chatMessages`));
+    const result=await fb.runTransaction(fb.ref(fb.db,`rooms/${code}/public`),room=>{
+      if(!room||room.status==='closed'||Number(room.matchNumber||1)!==matchNumber||room.players?.[sender]?.uid!==uid||!room.players?.[otherPlayer(sender)])return;
+      return {...room,chatMessages:{...(room.chatMessages||{}),[messageRef.key]:{sender,text,at:gameTime()}}};
+    },{applyLocally:false});
+    if(!result.committed)throw new Error('chat-unavailable');
+    if(key===chatContextKey()&&input.value===draft){input.value='';$('chat-count').textContent='0/40';input.focus();}
+  }catch(error){
+    console.error('[truco:chat]',error);
+    if(key===chatContextKey()){$('chat-error').textContent='No se pudo enviar. Volvé a intentar.';$('chat-error').classList.remove('hidden');}
+  }finally{if(key===chatContextKey()){matchChat.sending=false;$('chat-send').disabled=false;}}
+}
+function showView(id) { document.documentElement.classList.remove('opening-invitation'); views.forEach((name) => $(name).classList.toggle('active', name === id)); if(id!=='game-view')closeMatchChat(true); }
 function suitSvg(suit){
   const paths={
     table:'<path d="M5 14h38v6H5zM9 20h5v23H9zM34 20h5v23h-5zM10 5h28l5 9H5z"/>',
@@ -1405,6 +1493,7 @@ function renderTurnTimer(){
 
 function renderGame() {
   if (!state.room||state.botActing) return;
+  syncMatchChat();
   scheduleBot();
   renderMatchEnd();
   syncPrivateHand();
@@ -2097,6 +2186,12 @@ $('player-sound-toggle').addEventListener('click',()=>{
 document.addEventListener('click',event=>{if(event.isTrusted)unlockVoice();},{capture:true});
 document.addEventListener('touchend',event=>{if(event.isTrusted)unlockVoice();},{capture:true,passive:true});
 $('sound-toggle').addEventListener('click',()=>$('player-sound-toggle').click());
+$('chat-toggle').addEventListener('click',()=>matchChat.open?closeMatchChat():openMatchChat());
+$('chat-close').addEventListener('click',()=>{closeMatchChat();$('chat-toggle').focus();});
+$('chat-form').addEventListener('submit',sendMatchChat);
+$('chat-input').addEventListener('input',()=>{$('chat-input').value=$('chat-input').value.slice(0,CHAT_LIMIT);$('chat-count').textContent=`${$('chat-input').value.length}/${CHAT_LIMIT}`;});
+$('chat-muted').addEventListener('change',()=>{chatMuted=$('chat-muted').checked;try{localStorage.setItem('truco-chat-muted',String(chatMuted));}catch{}if(chatMuted)clearChatNotices();});
+$('match-chat').addEventListener('keydown',event=>{if(event.key==='Escape'){closeMatchChat();$('chat-toggle').focus();}});
 $('close-config').addEventListener('click',()=>showView('setup-view'));
 $('save-config').addEventListener('click',()=>{try{const cfg=JSON.parse($('firebase-config').value);if(!firebaseConfigValid(cfg))throw new Error('missing');state.config=cfg;localStorage.setItem(storageKey,JSON.stringify(cfg));toast('Configuración guardada.',true);runPendingAction();}catch{toast('Pegá una configuración Firebase válida.',true);}});
 if(new URLSearchParams(location.search).has('mesa'))showView('invite-view');
@@ -2110,4 +2205,3 @@ await preloadCardImages().catch(()=>{});
 const invitedRoom=new URLSearchParams(location.search).get('mesa');
 if(invitedRoom)await openInvitation(invitedRoom);
 else if (firebaseConfigValid(state.config)) openLobby();
-
