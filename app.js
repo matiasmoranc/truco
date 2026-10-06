@@ -43,6 +43,7 @@ function chatMessageList(room){
 }
 function renderChatHistory(){
   const history=$('chat-history');
+  const previousScroll=history.scrollTop;
   const nearBottom=history.scrollHeight-history.scrollTop-history.clientHeight<32;
   history.replaceChildren();
   if(!matchChat.messages.length){const empty=document.createElement('p');empty.className='chat-empty';empty.textContent='Todavía no hay mensajes.';history.append(empty);}
@@ -52,7 +53,7 @@ function renderChatHistory(){
     const text=document.createElement('p');text.textContent=message.text;
     item.append(name,text);history.append(item);
   }
-  if(nearBottom||!matchChat.open)history.scrollTop=history.scrollHeight;
+  history.scrollTop=nearBottom||!matchChat.open?history.scrollHeight:previousScroll;
 }
 function updateChatUnread(){
   const badge=$('chat-unread');badge.textContent=matchChat.unread>9?'9+':String(matchChat.unread);badge.classList.toggle('hidden',!matchChat.unread);
