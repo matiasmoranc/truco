@@ -1807,13 +1807,55 @@ async function startBotGame(name){
   try{localStorage.setItem('truco-player-name',name);}catch{}
   state.dismissedMatchEnd=null;renderGame();
 }
+// Estimate the remaining hand from public cards and sampled unseen rival cards.
+function botDeck(){
+  const suits=[['oro','♦'],['copa','♥'],['espada','♠'],['basto','♣']];
+  return suits.flatMap(([name,suit])=>[1,2,3,4,5,6,7,10,11,12].map(rank=>({id:name+'-'+rank,suit,rank})));
+}
+function botHandOutcome(room,mine,rival,winners,turn,pending=null,forced=null){
+  const tricks=winners.map(winner=>({winner})),winner=settleHand(tricks,room);
+  if(winner)return winner==='player2'?1:0;
+  const cards=turn==='player2'?mine:rival;
+  if(!cards.length)return room.mano==='player2'?1:0;
+  const choices=forced?cards.filter(card=>card.id===forced.id):cards;
+  const outcomes=choices.map(card=>{
+    const nextMine=turn==='player2'?mine.filter(c=>c.id!==card.id):mine;
+    const nextRival=turn==='player1'?rival.filter(c=>c.id!==card.id):rival;
+    if(!pending)return botHandOutcome(room,nextMine,nextRival,winners,otherPlayer(turn),{playerId:turn,card});
+    const first=cardStrength(pending.card,room.muestra),second=cardStrength(card,room.muestra);
+    const won=first===second?null:first>second?pending.playerId:turn;
+    return botHandOutcome(room,nextMine,nextRival,[...winners,won],won||room.mano);
+  });
+  return turn==='player2'?Math.max(...outcomes):Math.min(...outcomes);
+}
+function assessBotHand(room,hand,level,memory,random=Math.random){
+  const played=room.trickCards||[],pending=played.length===1?played[0]:null;
+  const known=new Set([...hand,...(memory.played||[]),...played.map(item=>item.card),room.muestra].filter(Boolean).map(card=>card.id));
+  const unseen=botDeck().filter(card=>!known.has(card.id));
+  const count=Math.max(0,3-(room.tricks||[]).length-played.filter(item=>item.playerId==='player1').length);
+  const samples=level==='hard'?144:level==='normal'?72:36;
+  const totals=new Map(hand.map(card=>[card.id,0]));
+  const winners=(room.tricks||[]).map(trick=>trick.winner);
+  let wins=0;
+  for(let sample=0;sample<samples;sample++){
+    const pool=[...unseen],rival=[];
+    for(let i=0;i<count&&pool.length;i++)rival.push(pool.splice(Math.min(pool.length-1,Math.floor(random()*pool.length)),1)[0]);
+    const turn=pending?otherPlayer(pending.playerId):room.turn||room.mano;
+    if(turn==='player2'){
+      let best=0;
+      for(const card of hand){const result=botHandOutcome(room,hand,rival,winners,turn,pending,card);totals.set(card.id,totals.get(card.id)+result);best=Math.max(best,result);}
+      wins+=best;
+    }else wins+=botHandOutcome(room,hand,rival,winners,turn,pending);
+  }
+  return {chance:wins/samples,cards:hand.map(card=>({card,chance:totals.get(card.id)/samples}))};
+}
 // The policy never receives the rival's hand or the original deal.
 function chooseBotDecision(room,hand,level,memory,random=Math.random){
   const me='player2',bet=room.pendingBet,flower=hasFlor(hand,room.muestra);
   const tantos=handEnvido(hand,room.muestra);
-  const strengths=hand.map(card=>cardStrength(card,room.muestra)).sort((a,b)=>b-a);
-  const power=(strengths[0]||0)+(strengths[1]||0)*0.65;
   const easy=level==='easy',hard=level==='hard';
+  let assessment;
+  const evaluate=()=>assessment||(assessment=assessBotHand(room,hand,level,memory,random));
   if(bet?.revealMode){
     if(bet.revealTurn!==me)return null;
     return {kind:'reveal',value:tantos,good:room.mano!==me&&tantos<Number(bet.reveals?.[room.mano])};
@@ -1840,9 +1882,12 @@ function chooseBotDecision(room,hand,level,memory,random=Math.random){
       if(!memory.envidoCalled&&tantos>=27&&canCallFirstRoundEnvido(room,me,hand)){
         memory.envidoCalled=true;return {kind:'action',value:'envido'};
       }
-      const won=(room.tricks||[]).some(trick=>trick.winner===me);
-      if(hard&&bet.stake<4&&power>=145)return {kind:'action',value:'raise'};
-      return {kind:'action',value:(easy?random()<0.7:won||power>=(bet.stake>=3?105:75))?'yes':'no'};
+      const chance=evaluate().chance;
+      if(chance===0)return {kind:'action',value:'no'};
+      if(hard&&bet.stake<4&&chance>=(bet.stake===2?0.84:0.93))return {kind:'action',value:'raise'};
+      const threshold=bet.stake>=4?0.68:bet.stake>=3?0.56:0.44;
+      const accepts=easy?chance>=0.3&&random()<0.65:chance>=threshold+(hard?0.04:0);
+      return {kind:'action',value:accepts?'yes':'no'};
     }
     return null;
   }
@@ -1854,25 +1899,20 @@ function chooseBotDecision(room,hand,level,memory,random=Math.random){
   const trucoLevel=Number(room.trucoLevel)||1;
   if(trucoLevel<4&&(trucoLevel===1||room.lastTrucoCaller!==me)&&!memory.trucoCalled){
     memory.trucoCalled=true;
-    if(easy?random()<0.25:power>=(hard?115:130))return {kind:'action',value:trucoLevel===1?'truco':trucoLevel===2?'retruco':'vale4'};
+    const chance=evaluate().chance;
+    if(chance>=(trucoLevel===1?0.7:trucoLevel===2?0.82:0.92)&&(easy?random()<0.25:true))return {kind:'action',value:trucoLevel===1?'truco':trucoLevel===2?'retruco':'vale4'};
   }
   const sorted=[...hand].sort((a,b)=>cardStrength(a,room.muestra)-cardStrength(b,room.muestra));
   let card;
-  if(easy)card=hand[Math.floor(random()*hand.length)];
-  else if(room.trickCards?.length){
+  if(easy)card=hand[Math.min(hand.length-1,Math.floor(random()*hand.length))];
+  else if(hard){
+    const options=evaluate().cards.sort((a,b)=>b.chance-a.chance||cardStrength(a.card,room.muestra)-cardStrength(b.card,room.muestra));
+    card=options[0].card;
+  }else if(room.trickCards?.length){
     const rival=cardStrength(room.trickCards[0].card,room.muestra);
-    // A tie suffices after winning the first trick.
-    const canTie=room.tricks?.[0]?.winner===me;
+    const canTie=settleHand([...(room.tricks||[]),{winner:null}],room)===me;
     card=sorted.find(c=>canTie?cardStrength(c,room.muestra)>=rival:cardStrength(c,room.muestra)>rival)||sorted[0];
-  }else{
-    card=sorted[sorted.length-1];
-    if(hard&&sorted.length>1){
-      const known=new Set([...hand,...(memory.played||[]),room.muestra].filter(Boolean).map(c=>c.id));
-      const unseen=shuffleDeck().filter(c=>!known.has(c.id));
-      const economical=sorted.find(c=>unseen.filter(other=>cardStrength(other,room.muestra)<cardStrength(c,room.muestra)).length/Math.max(1,unseen.length)>=0.8);
-      if(economical)card=economical;
-    }
-  }
+  }else card=sorted[sorted.length-1];
   return {kind:'play',card};
 }
 function scheduleBot(){
