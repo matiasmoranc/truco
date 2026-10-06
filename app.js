@@ -4,6 +4,26 @@ const views = ['welcome-view', 'invite-view', 'setup-view', 'waiting-view', 'gam
 const storageKey = 'truco-firebase-config';
 let state = { role: 'table', joining: false, config: null, firebase: null, roomCode: null, selectedRoom: null, uid: null, playerId: null, unsubscribe: null, privateUnsubscribe: null, lobbyUnsubscribe: null, room: null, hand: [], handOrder: [], handOrderKey: null, demo: false, demoHands: {}, nextAction: null, resolutionTimer: null, resolutionTimerKey: null, playActionInFlight: false, legacyRepairKey: null, emptyHandRepairKey: null };
 
+const cardImageCache=[];
+let cardImagesPromise=null;
+function preloadCardImages(){
+  if(cardImagesPromise)return cardImagesPromise;
+  cardImagesPromise=Promise.all(Array.from({length:13},(_,index)=>new Promise((resolve,reject)=>{
+    const image=new Image();cardImageCache.push(image);
+    image.decoding='async';
+    image.onload=()=>{(typeof image.decode==='function'?image.decode():Promise.resolve()).then(resolve,reject);};
+    image.onerror=()=>reject(new Error('No se pudo cargar la imagen de cartas '+(index+1)));
+    image.src=new URL('./assets/cards/'+(index+1)+'.jpg',document.baseURI).href;
+  }))).catch(error=>{cardImagesPromise=null;cardImageCache.length=0;throw error;});
+  return cardImagesPromise;
+}
+async function prepareCardImages(){
+  try{await preloadCardImages();return true;}
+  catch(error){console.error('[truco:cards]',error);toast('No se pudieron cargar las cartas. Volvé a intentar.',true);return false;}
+}
+// Keep the decoded originals in memory throughout the game.
+preloadCardImages().catch(()=>{});
+
 function showView(id) { document.documentElement.classList.remove('opening-invitation'); views.forEach((name) => $(name).classList.toggle('active', name === id)); }
 function suitSvg(suit){
   const paths={
@@ -264,9 +284,14 @@ function claimRoomSeat(current,person,role){
 }
 async function enterRoom() {
   if(state.enteringRoom)return;
+  const entryEpoch=state.navigationEpoch;
+  state.enteringRoom=true;$('enter-room').disabled=true;
+  const cardsReady=await prepareCardImages();
+  state.enteringRoom=false;$('enter-room').disabled=false;
+  if(!cardsReady||state.navigationEpoch!==entryEpoch)return;
   if(state.invitationEntry&&!$('player-name').value.trim()){showInvitationForm();$('invite-name').focus();return;}
   const name=cleanName($('player-name').value,state.role==='table'?'La mesa':'Jugador');
-  if(!state.joining&&$('play-bot').checked){startBotGame(name);return;}
+  if(!state.joining&&$('play-bot').checked){await startBotGame(name);return;}
   if(!firebaseConfigValid(state.config)){state.nextAction='enter';showConfig();return;}
   state.enteringRoom=true;
   state.navigationEpoch=(state.navigationEpoch||0)+1;
@@ -1632,8 +1657,8 @@ function updateBotSetup(){
   $('enter-room').textContent=enabled?'Jugar contra Bot':'Crear mesa';
 }
 function stopBot(){clearTimeout(state.botTimer);state.botTimer=null;state.bot=false;state.botMemory=null;}
-function startBotGame(name){
-  demoStart('player1','two');
+async function startBotGame(name){
+  if(!await demoStart('player1','two'))return;
   state.bot=true;state.botDifficulty=$('bot-level').value;
   state.roomCode='BOT1';state.room.targetPoints=Number($('target-points').value);
   state.room.players={player1:{name},player2:{name:'Bot · '+botLevelLabel(state.botDifficulty)}};
@@ -1743,7 +1768,8 @@ function scheduleBot(){
   },delay);
 }
 
-function demoStart(role,deviceMode='table') {
+async function demoStart(role,deviceMode='table') {
+  if(!await prepareCardImages())return false;
   stopBot();state.lobbyUnsubscribe?.();state.lobbyUnsubscribe=null;
   if(deviceMode==='two'&&role==='table')role='player1';
   if(state.unsubscribe)state.unsubscribe();
@@ -1756,7 +1782,7 @@ function demoStart(role,deviceMode='table') {
   state.room={deviceMode,status:'started',targetPoints:30,muestra:deck[6],table:{name:'La mesa'},players:{player1:{name:'Jugador 1'},player2:{name:'Nico'}},scores:{player1:0,player2:0},handNumber:1,deckCount:34,turn:'player1',mano:'player1',trickNo:1,trickCards:[],tricks:[],feed:[],playedCount:0,trucoLevel:1,lastTrucoCaller:null,pendingBet:null,flors:{},envidoClosed:false};
   state.room.status='drawing';state.room.openingDraw=newOpeningDraw();state.hand=[];
   state.demoTruth={player1:handEnvido(state.demoHands.player1,deck[6]),player2:handEnvido(state.demoHands.player2,deck[6])};
-  $('game-room-code').textContent='MESA · DEMO1';renderGame();showView('game-view');
+  $('game-room-code').textContent='MESA · DEMO1';renderGame();showView('game-view');return true;
 }
 function switchDemoRole(role) {
   if(state.bot||!state.demo||!['table','player1','player2'].includes(role)||(state.room?.deviceMode==='two'&&role==='table'))return;
@@ -2080,6 +2106,7 @@ try {
   const bundled = await import('./firebase-config.js');
   if (firebaseConfigValid(bundled.firebaseConfig)) state.config = bundled.firebaseConfig;
 } catch { /* Optional during initial setup. */ }
+await preloadCardImages().catch(()=>{});
 const invitedRoom=new URLSearchParams(location.search).get('mesa');
 if(invitedRoom)await openInvitation(invitedRoom);
 else if(new URLSearchParams(location.search).get('demo')==='two')demoStart('player1','two');

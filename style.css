@@ -1259,3 +1259,6 @@ body { min-height:100dvh; }
 .player-mode .my-player-info { width:calc(100% - 40px); }
 .player-mode .turn-badge-label { white-space:nowrap; overflow-wrap:normal; overflow:hidden; text-overflow:ellipsis; min-width:0; max-width:none; }
 .turn-badge .turn-timer,.turn-badge .round-pause-timer { flex-shrink:0; white-space:nowrap; }
+
+/* Shift played cards and their animation target together. */
+.trick-cards { transform:translateY(10px); }
