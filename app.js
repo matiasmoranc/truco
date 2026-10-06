@@ -73,7 +73,7 @@ function clearChatNotices(){
   matchChat.noticeTimers.clear();$('chat-notices')?.replaceChildren();
 }
 function closeMatchChat(clearNotices=false){
-  matchChat.open=false;$('match-chat')?.classList.add('hidden');$('chat-toggle')?.setAttribute('aria-expanded','false');
+  matchChat.open=false;$('chat-backdrop')?.classList.add('hidden');$('match-chat')?.classList.add('hidden');$('chat-toggle')?.setAttribute('aria-expanded','false');
   if(clearNotices)clearChatNotices();
 }
 function chatMessageList(room){
@@ -94,7 +94,6 @@ function renderChatHistory(){
   history.scrollTop=nearBottom||!matchChat.open?history.scrollHeight:previousScroll;
 }
 function updateChatUnread(){
-  const badge=$('chat-unread');badge.textContent=matchChat.unread>9?'9+':String(matchChat.unread);badge.classList.toggle('hidden',!matchChat.unread);
   $('chat-toggle').setAttribute('aria-label',(chatMuted?'Abrir chat, mensajes silenciados':'Abrir chat')+(matchChat.unread?`, ${matchChat.unread} mensajes nuevos`:''));
   $('chat-toggle').classList.toggle('chat-is-muted',chatMuted);
 }
@@ -132,7 +131,7 @@ function syncMatchChat(){
 function openMatchChat(){
   syncMatchChat();if(!chatAvailable())return;
   matchChat.open=true;matchChat.unread=0;clearChatNotices();updateChatUnread();
-  $('match-chat').classList.remove('hidden');$('chat-toggle').setAttribute('aria-expanded','true');
+  $('chat-backdrop').classList.remove('hidden');$('match-chat').classList.remove('hidden');$('chat-toggle').setAttribute('aria-expanded','true');
   $('chat-history').scrollTop=$('chat-history').scrollHeight;$('chat-close').focus();
 }
 async function sendMatchChat(event){
@@ -2273,6 +2272,7 @@ document.addEventListener('touchend',event=>{if(event.isTrusted)unlockVoice();},
 $('sound-toggle').addEventListener('click',()=>$('player-sound-toggle').click());
 $('chat-toggle').addEventListener('click',()=>matchChat.open?closeMatchChat():openMatchChat());
 $('chat-close').addEventListener('click',()=>{closeMatchChat();$('chat-toggle').focus();});
+$('chat-backdrop').addEventListener('click',()=>{closeMatchChat();$('chat-toggle').focus();});
 $('chat-form').addEventListener('submit',sendMatchChat);
 $('chat-input').addEventListener('input',()=>{$('chat-input').value=$('chat-input').value.slice(0,CHAT_LIMIT);$('chat-count').textContent=`${$('chat-input').value.length}/${CHAT_LIMIT}`;});
 $('chat-muted').addEventListener('change',()=>{chatMuted=$('chat-muted').checked;if(chatMuted)clearChatNotices();updateChatUnread();publishChatMute();});

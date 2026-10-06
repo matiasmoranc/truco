@@ -1300,7 +1300,6 @@ body { min-height:100dvh; }
 /* Match chat stays independent of cards, call notices and game timers. */
 .game-topbar .chat-toggle{position:relative;flex:0 0 38px;width:38px;height:38px;padding:8px;margin-left:8px;display:grid;place-items:center;border:1px solid rgba(239,235,215,.4);border-radius:50%;background:#193b2b;color:#f0eee2;touch-action:manipulation;z-index:80}
 .chat-toggle svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
-.chat-unread{position:absolute;top:-4px;right:-4px;min-width:16px;padding:2px 4px;border-radius:12px;background:#ead7a5;color:#15251b;font-size:9px;font-weight:700;line-height:1.2}
 .match-chat{position:fixed;top:74px;right:16px;z-index:180;width:360px;max-width:calc(100vw - 28px);max-height:calc(100dvh - 96px);display:flex;flex-direction:column;padding:16px;border:1px solid #a58f5c;border-radius:16px;background:#12382b;box-shadow:0 12px 40px #0006;color:#f0eee2}
 .chat-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
 .chat-heading h2{margin:0;font:600 18px 'DM Sans',sans-serif}
@@ -1339,3 +1338,6 @@ body { min-height:100dvh; }
 .chat-mute input:checked{background:#ead7a5;border-color:#ead7a5}
 .chat-mute input:checked::after{transform:translateX(16px);background:#12382b}
 .chat-mute input:focus-visible{outline:2px solid #ead7a5;outline-offset:3px}
+
+.chat-backdrop{position:fixed;inset:0;z-index:175;background:rgba(4,20,12,.2);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);touch-action:manipulation}
+.chat-backdrop.hidden{display:none!important}
