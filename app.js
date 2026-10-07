@@ -2725,19 +2725,18 @@ function explainFlor(hand,muestra){
   if(pieces.length===1&&common[0].suit===common[1].suit)return {value,explanation:'Es flor: '+cardStudyName(pieces[0])+' es pieza y las otras 2 cartas son del mismo palo.'};
   return {value,explanation:pieces.length===1?'No es flor: tenés una pieza, pero las otras 2 cartas son de palos diferentes.':'No es flor: las 3 cartas no son del mismo palo y no tenés piezas para formar otra combinación.'};
 }
-let studyExercise=null,studyNumber=0;
+let studyExercise=null;
 function makeStudyExercise(kind){
   // Envido exercises exclude flor hands, which belong to the flor practice.
   let pool,hand,muestra;const wantFlor=kind==='flor'&&Math.random()<0.5;
   do{pool=shuffleDeck();hand=pool.slice(0,3);muestra=pool[3];}while(kind==='envido'?hasFlor(hand,muestra):hasFlor(hand,muestra)!==wantFlor);
   return {kind,hand,muestra,answered:false};
 }
-function openStudy(kind){pauseLearning();studyNumber=0;nextStudy(kind);if(!$('learn-study-dialog').open)$('learn-study-dialog').showModal();}
+function openStudy(kind){pauseLearning();nextStudy(kind);if(!$('learn-study-dialog').open)$('learn-study-dialog').showModal();}
 function nextStudy(kind=studyExercise?.kind||'envido'){
-  studyExercise=makeStudyExercise(kind);studyNumber++;
+  studyExercise=makeStudyExercise(kind);
   $('learn-study-title').textContent=kind==='envido'?'¿Cuántos tantos tenés?':'¿Tenés flor?';
   $('learn-study-count-help').textContent=kind==='flor'?'Cómo saber si tenés flor':'Cómo contar el envido';
-  $('learn-study-step').textContent='Ejercicio '+studyNumber+' · '+(kind==='envido'?'Envido sin flor':'Reconocer flor');
   const cards=$('learn-study-cards');cards.replaceChildren();
   const add=(card,label)=>{const wrap=document.createElement('div'),caption=document.createElement('span'),image=document.createElement('div');wrap.className='study-card';caption.textContent=label;image.className='sprite-card';image.style.cssText=cardImageStyle(card);image.setAttribute('role','img');image.setAttribute('aria-label',cardAccessibleName(card));wrap.append(caption,image);cards.append(wrap);};
   studyExercise.hand.forEach((card,index)=>add(card,'Carta '+(index+1)));add(studyExercise.muestra,'Muestra');
