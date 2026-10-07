@@ -1396,8 +1396,8 @@ body { min-height:100dvh; }
 .learning-toolbar label{display:flex;align-items:center;gap:5px;font-size:12px;color:#ead39b;cursor:pointer}
 .learning-toolbar input{accent-color:#d8b875;width:16px;height:16px;margin:0}
 .learning-hint{position:absolute;z-index:156;top:118px;left:50%;transform:translateX(-50%);width:min(420px,calc(100% - 32px));max-height:62px;overflow:auto;padding:8px 12px;background:#0b291fed;border:1px solid #d8b87555;border-radius:8px;color:#e0e7dc;font-size:12px;line-height:1.4;text-align:center}
-.learning-mode #turn-badge{visibility:hidden}
-.learning-mode .learning-choice{outline:3px solid #efd082;outline-offset:3px;box-shadow:0 0 14px #efd08277}
+.learning-mode #turn-badge{visibility:visible}
+
 @media(max-width:640px){
   .learn-content{padding:22px 16px 32px}
   .learn-lessons{grid-template-columns:1fr}
@@ -1513,3 +1513,7 @@ body { min-height:100dvh; }
 
 /* Learning controls sit below the logo, starting at the left edge. */
 .learning-toolbar{left:16px;right:auto;transform:none;width:auto;max-width:none;justify-content:flex-start;gap:12px}
+
+/* Teaching games show the active player without clocks or inactivity lives. */
+.learning-mode #turn-badge .turn-timer,.learning-mode #turn-badge .round-pause-timer,.learning-mode #turn-badge .inactivity-life{display:none!important}
+.learning-mode #turn-badge.pause-countdown{visibility:hidden}
