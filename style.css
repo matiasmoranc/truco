@@ -1548,3 +1548,9 @@ body { min-height:100dvh; }
 .learning-message.score-message{width:fit-content;max-width:min(440px,calc(100vw - 32px))}
 .learning-message.score-message #learning-message-body{padding-top:0;padding-right:34px;min-height:30px}
 .learning-message.score-message #learning-message-body p:first-child{margin-left:0;margin-right:0}
+
+/* Vertical names distinguish the two strongest card groups. */
+.card-order-guide{margin-left:22px}
+.guide-labeled-group{position:relative}
+.guide-side-label{position:absolute;left:-24px;top:50%;transform:translateY(-50%) rotate(180deg);writing-mode:vertical-rl;color:var(--gold);font-size:14px;font-weight:700;letter-spacing:.08em;line-height:1;white-space:nowrap}
+.guide-pieces>p{color:#ead39b}
