@@ -1510,3 +1510,6 @@ body { min-height:100dvh; }
 .learning-message .learn-close{position:absolute;top:12px;right:12px;float:none}
 .learning-call-notice{width:max-content;max-width:100%;box-sizing:border-box;margin:0 auto 12px;padding:8px 14px;border:1px solid #d8b875;border-radius:12px;background:#ead7a5;color:#15251b;font-size:14px;line-height:1.35;text-align:center}
 .learning-call-notice strong{display:block;margin-top:4px;font-size:18px;font-weight:700}
+
+/* Learning controls sit below the logo, starting at the left edge. */
+.learning-toolbar{left:16px;right:auto;transform:none;width:auto;max-width:none;justify-content:flex-start;gap:12px}

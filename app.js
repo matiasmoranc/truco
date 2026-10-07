@@ -2772,7 +2772,6 @@ function openStudySheet(){pauseLearning();if(!$('learn-sheet-dialog').open)$('le
 $('learn-game').addEventListener('click',openLearning);
 $('learn-back').addEventListener('click',()=>{stopBot();showView('welcome-view');openLobby();});
 $('learn-free').addEventListener('click',()=>startLearning(0));
-$('learn-help').addEventListener('click',openLearningHelp);
 window.addEventListener('resize',positionLearningScoreArrow);
 $('learning-message-close').addEventListener('click',()=>$('learning-hint').close());
 $('learning-hint').addEventListener('close',()=>{if(state.learning){state.learning.acknowledgedMessage=state.learning.activeMessage;state.learning.activeMessage=null;state.learning.activeScoreMessage=false;}positionLearningScoreArrow();resumeLearning();});
