@@ -1367,3 +1367,5 @@ body { min-height:100dvh; }
 .brand-lockup .truco-logo{height:54.4px;width:81.6px}
 .mini-brand{line-height:0}
 @media(min-width:1024px){.mini-brand .truco-logo{height:36.72px;width:55.08px}}
+
+.truco-logo{filter:saturate(90%)}
