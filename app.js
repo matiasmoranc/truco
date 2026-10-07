@@ -381,6 +381,11 @@ async function firebaseServices() {
     state.uid=auth.currentUser.uid;
     state.firebase={db:dbSdk.getDatabase(app,state.config.databaseURL),...dbSdk};
     dbSdk.onValue(dbSdk.ref(state.firebase.db,'.info/serverTimeOffset'),snapshot=>{state.serverTimeOffset=Number(snapshot.val())||0;},error=>console.error('[truco:clock]',error));
+    dbSdk.onValue(dbSdk.ref(state.firebase.db,'.info/connected'),snapshot=>{
+      state.firebaseConnected=snapshot.val()===true;
+      if(state.firebaseConnected){roomPresenceContext=null;presenceWriteSerial++;syncRoomPresence();}
+      if(state.room)renderTurnTimer();
+    },error=>console.error('[truco:connection]',error));
     console.info('[truco:connection] authentication ready');
     return state.firebase;
   })().catch(error=>{firebaseReadyPromise=null;throw error;});
@@ -596,6 +601,7 @@ function watchRoom() {
       clearTimeout(state.resolutionTimer);state.resolutionTimer=null;state.resolutionTimerKey=null;
     }
     state.room = incoming;
+    syncRoomPresence();
     if(state.room.status==='closed'||roomExpired(state.room)){if(roomExpired(state.room))closeExpiredRoom(state.roomCode);if(state.unsubscribe){state.unsubscribe();state.unsubscribe=null;}const reason=state.room.closeReason;returnToLobby(reason==='draw-timeout'?'Se acabó el tiempo para elegir carta. La partida no comenzó.':reason==='draw-left'?'Un participante salió del sorteo. La partida no comenzó.':'La mesa cerró por inactividad.');return;}
     if(isCoordinator()&&state.room.status==='started'&&!state.room.resolvingTrick&&state.room.trickCards?.length===2&&(state.room.tricks||[]).length>0)recoverLegacyTrick(state.room);
     if(isCoordinator()&&state.room.status==='complete'&&!state.room.endReveal&&(Object.keys(state.room.flors||{}).length||state.room.envidoAudit)){
@@ -679,6 +685,7 @@ function openingDrawExpired(room,now=gameTime()){
   return room?.status==='drawing'&&Number.isFinite(draw?.endsAt)&&now>=draw.endsAt&&!(draw.cards?.player1&&draw.cards?.player2);
 }
 function returnToLobby(message=''){
+  stopRoomPresence();
   stopBot();
   clearTimeout(openingTimerHandle);openingTimerHandle=null;
   state.roomWatchVersion=(state.roomWatchVersion||0)+1;
@@ -1534,7 +1541,87 @@ function setTurnBadge(text){
   }
   label.textContent=text;
 }
+
+const RECONNECT_GRACE_MS=45000;
+let roomPresenceContext=null,presenceWriteSerial=0,disconnectExpiryPending=null;
+function disconnectedPlayer(room,now=gameTime()){
+  if(!room||!['started','timed-out','revealing'].includes(room.status))return null;
+  for(const player of ['player1','player2']){
+    const presence=room.connectionPresence?.[player];
+    if(presence?.uid!==room.players?.[player]?.uid||Number(presence?.matchNumber)!==Number(room.matchNumber||1)||presence.online!==false||!Number.isFinite(presence.disconnectedAt))continue;
+    return {player,presence,seconds:Math.max(0,Math.ceil((presence.disconnectedAt+RECONNECT_GRACE_MS-now)/1000))};
+  }
+  return null;
+}
+function stopRoomPresence(){
+  const previous=roomPresenceContext;roomPresenceContext=null;presenceWriteSerial++;
+  if(previous){
+    previous.disconnect.cancel().catch(console.error);
+    state.firebase.set(previous.ref,{uid:previous.uid,matchNumber:previous.matchNumber,session:previous.session,online:false,disconnectedAt:state.firebase.serverTimestamp()}).catch(console.error);
+  }
+}
+async function syncRoomPresence(){
+  if(state.localGame||!state.firebase||!state.room||!['player1','player2'].includes(state.playerId)||state.firebaseConnected!==true)return;
+  const room=state.room,code=state.roomCode,player=state.playerId,uid=state.uid,matchNumber=Number(room.matchNumber||1);
+  if(room.players?.[player]?.uid!==uid)return;
+  const key=[code,room.createdAt,matchNumber,player,uid].join(':');
+  if(roomPresenceContext?.key===key)return;
+  stopRoomPresence();
+  const fb=state.firebase,ref=fb.ref(fb.db,'rooms/'+code+'/public/connectionPresence/'+player),disconnect=fb.onDisconnect(ref);
+  const serial=++presenceWriteSerial,session=crypto.randomUUID(),context={key,ref,disconnect,uid,matchNumber,session};
+  roomPresenceContext=context;
+  try{
+    await disconnect.set({uid,matchNumber,session,online:false,disconnectedAt:fb.serverTimestamp()});
+    if(serial!==presenceWriteSerial||state.firebaseConnected!==true||state.roomCode!==code){await disconnect.cancel();return;}
+    await fb.set(ref,{uid,matchNumber,session,online:true});
+  }catch(error){
+    console.error('[truco:presence]',error);
+    if(roomPresenceContext===context)roomPresenceContext=null;
+  }
+}
+function disconnectMatchChanges(room,loser){
+  const winner=otherPlayer(loser),message=(room.players?.[loser]?.name||'El rival')+' no volvió a conectarse y pierde la partida.';
+  return {status:'complete',scores:capScores(room,{...room.scores,[winner]:targetPoints(room)}),
+    matchResult:{winner,loser,reason:'disconnect',message},turn:null,turnClock:null,turnTimeout:null,
+    pendingBet:null,pendingNextHand:null,resolvingTrick:false,resolutionId:null,resolutionEndsAt:null,
+    handComplete:false,trickCards:[],envidoAudit:null,endReveal:{done:true},feed:topFeed(room,message)};
+}
+async function expireDisconnectedPlayer(info){
+  if(state.firebaseConnected!==true||state.playerId===info.player)return;
+  const code=state.roomCode,matchNumber=Number(state.room.matchNumber||1),key=[code,matchNumber,info.player,info.presence.session].join(':');
+  if(disconnectExpiryPending===key)return;disconnectExpiryPending=key;
+  try{
+    const fb=state.firebase;
+    const result=await fb.runTransaction(fb.ref(fb.db,'rooms/'+code+'/public'),room=>{
+      if(!room||Number(room.matchNumber||1)!==matchNumber)return;
+      const current=disconnectedPlayer(room);
+      if(!current||current.player!==info.player||current.presence.session!==info.presence.session||current.seconds>0)return;
+      return {...room,...disconnectMatchChanges(room,info.player)};
+    },{applyLocally:false});
+    if(result.committed&&state.roomCode===code){state.room=result.snapshot.val();renderGame();}
+  }catch(error){console.error('[truco:disconnect-expiry]',error);}
+  finally{if(disconnectExpiryPending===key)disconnectExpiryPending=null;}
+}
+function renderConnectionNotice(){
+  let el=$('connection-notice');
+  if(!el){el=document.createElement('div');el.id='connection-notice';el.className='connection-notice hidden';el.setAttribute('role','status');$('game-view').append(el);}
+  const room=state.room,playing=room&&['started','timed-out','revealing'].includes(room.status)&&!state.localGame;
+  const info=playing&&disconnectedPlayer(room),ownOffline=playing&&state.firebaseConnected===false;
+  el.classList.toggle('hidden',!playing||(!info&&!ownOffline));
+  if(!playing)return null;
+  if(ownOffline){el.textContent='Se perdió tu conexión. Reconectando…';return null;}
+  if(info){
+    const mine=info.player===state.playerId,name=room.players?.[info.player]?.name||'El rival';
+    el.textContent=mine?'Reconectando…':name+' perdió la conexión. Tiene '+info.seconds+' s para volver.';
+    if(info.seconds===0)expireDisconnectedPlayer(info);
+    return info;
+  }
+  return null;
+}
+
 function renderTurnTimer(){
+  syncRoomPresence();
+  const disconnected=renderConnectionNotice();
   renderInactivityLife();
   clearTimeout(turnTimerHandle);turnTimerHandle=null;
   let el=$('turn-timer');
@@ -1543,6 +1630,7 @@ function renderTurnTimer(){
   const room=state.room,key=turnClockKey(room),visible=$('game-view').classList.contains('active');
   el.classList.toggle('hidden',!visible||!key||state.playerId==='table');
   if(!visible||!room)return;
+  if(disconnected){el.classList.add('hidden');turnTimerHandle=setTimeout(renderTurnTimer,250);return;}
   if(room.status==='timed-out')settleTurnTimeout(room);
   if(!key){
     turnTimerHandle=setTimeout(renderTurnTimer,250);return;
@@ -1767,7 +1855,7 @@ function renderMatchEnd(){
   $('match-end-score').innerHTML=['player1','player2'].map(player=>`<div class="${player===winner?'match-score-winner':''}"><strong>${capScores(room,room.scores)[player]||0}</strong><span>${escapeHtml(room.players?.[player]?.name||'Jugador')}</span></div>`).join('<b aria-hidden="true">–</b>');
   const request=room.rematch,player=state.playerId,isPlayer=['player1','player2'].includes(player);
   const pending=request?.status==='pending',incoming=pending&&request.requester!==player;
-  $('match-end-message').textContent=pending?(incoming?(room.players?.[request.requester]?.name||'Tu rival')+' quiere jugar la revancha.':'Revancha enviada. Esperando al rival…'):request?.status==='declined'?'La revancha no fue aceptada.':room.matchResult?.reason==='inactivity'?'Victoria por inactividad.':'Partida terminada';
+  $('match-end-message').textContent=pending?(incoming?(room.players?.[request.requester]?.name||'Tu rival')+' quiere jugar la revancha.':'Revancha enviada. Esperando al rival…'):request?.status==='declined'?'La revancha no fue aceptada.':room.matchResult?.reason==='inactivity'?'Victoria por inactividad.':room.matchResult?.reason==='disconnect'?'Victoria por desconexión.':'Partida terminada';
   $('request-rematch').classList.toggle('hidden',!isPlayer||pending);
   $('accept-rematch').classList.toggle('hidden',!isPlayer||!incoming);
   $('decline-rematch').classList.toggle('hidden',!isPlayer||!incoming);
@@ -2342,7 +2430,7 @@ $('role-options').querySelectorAll('.role-card').forEach((card)=>{
 $('back-home').addEventListener('click',()=>{showView('welcome-view');openLobby();});
 $('fold-hand').addEventListener('click',foldHand);
 $('enter-room').addEventListener('click',enterRoom);
-$('leave-room').addEventListener('click',()=>{stopBot();state.roomWatchVersion=(state.roomWatchVersion||0)+1;state.navigationEpoch=(state.navigationEpoch||0)+1;localStorage.removeItem('truco-last-seat');if(state.unsubscribe)state.unsubscribe();if(state.privateUnsubscribe)state.privateUnsubscribe();state.privateUnsubscribe=null;state.privateHandKey=null;state.room=null;state.localGame=false;showView('welcome-view');openLobby();});
+$('leave-room').addEventListener('click',()=>{stopRoomPresence();stopBot();state.roomWatchVersion=(state.roomWatchVersion||0)+1;state.navigationEpoch=(state.navigationEpoch||0)+1;localStorage.removeItem('truco-last-seat');if(state.unsubscribe)state.unsubscribe();if(state.privateUnsubscribe)state.privateUnsubscribe();state.privateUnsubscribe=null;state.privateHandKey=null;state.room=null;state.localGame=false;showView('welcome-view');openLobby();});
 $('game-home').addEventListener('click',()=>{if(state.room?.status==='drawing'){closeOpeningDraw('draw-left');return;}if(state.localGame){stopBot();state.localGame=false;showView('welcome-view');openLobby();return;}showView('waiting-view');});
 function limitMuestraOffset(x,y){
   const distance=Math.hypot(x,y),scale=distance>15?15/distance:1;

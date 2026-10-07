@@ -1368,4 +1368,6 @@ body { min-height:100dvh; }
 .mini-brand{line-height:0}
 @media(min-width:1024px){.mini-brand .truco-logo{height:36.72px;width:55.08px}}
 
-.truco-logo{filter:saturate(90%)}
+.truco-logo{filter:saturate(65%)}
+
+.connection-notice{position:fixed;z-index:155;top:76px;left:50%;transform:translateX(-50%);width:max-content;max-width:calc(100vw - 32px);padding:10px 14px;border:1px solid #e8c98388;border-radius:10px;background:#10291ff2;color:#e8c983;font-size:13px;text-align:center;line-height:1.4;pointer-events:none}
