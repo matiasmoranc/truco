@@ -1534,3 +1534,7 @@ body { min-height:100dvh; }
 .learn-path li::before{width:24px;height:24px;font-size:12px}
 .learn-path strong{font-size:14px;line-height:1.25}
 .learn-path span{font-size:12px;line-height:1.35}
+
+/* Match the learning menu actions to the start button. */
+.learn-content>.learn-practice-actions{flex-direction:column}
+.learn-content>.learn-practice-actions>.button{width:100%;height:56px;min-height:48px;flex:none;font-size:15px;border-radius:10px}
