@@ -1459,7 +1459,7 @@ function turnTimeoutChanges(room){
   }
   const message=name+' agotó los 45 segundos por tercera vez y pierde la partida. '+(room.players?.[winner]?.name||'El rival')+' gana por inactividad.';
   return {timeoutCounts,status:'complete',turn:null,turnClock:null,turnTimeout:null,
-    scores:{...room.scores,[winner]:Math.max(Number(room.scores?.[winner])||0,targetPoints(room))},
+    scores:{...room.scores,[winner]:targetPoints(room)},
     matchResult:{winner,loser,reason:'inactivity',message},
     pendingBet:null,pendingNextHand:null,resolvingTrick:false,resolutionId:null,resolutionEndsAt:null,
     resolvedWinner:null,resolvedTrickWinner:null,handComplete:false,trickCards:[],envidoAudit:null,
@@ -1479,7 +1479,7 @@ async function expireTurnClock(clock){
       if(!current||turnClockKey(current)!==clock.key||current.turnClock?.key!==clock.key||!turnClockRemaining(current.turnClock).expired)return;
       return {...current,...turnTimeoutChanges(current)};
     });
-    if(result.committed&&state.roomCode===code){state.room=result.snapshot.val();await settleTurnTimeout(state.room);}
+    if(result.committed&&state.roomCode===code){state.room=result.snapshot.val();await settleTurnTimeout(state.room);renderGame();}
   }catch(error){console.error('[truco:turn-clock]',error);}
   finally{turnClockWritePending=false;}
 }
@@ -1538,19 +1538,19 @@ function renderTurnTimer(){
     settleTurnTimeout(room);turnTimerHandle=setTimeout(renderTurnTimer,250);return;
   }
   if(!key){
-    if(room.turnClock&&!turnClockWritePending&&(state.localGame||isCoordinator())){
-      if(state.localGame)room.turnClock=null;
-      else{turnClockWritePending=true;writeRoom({turnClock:null}).catch(console.error).finally(()=>turnClockWritePending=false);}
-    }
     turnTimerHandle=setTimeout(renderTurnTimer,250);return;
   }
   let clock=room.turnClock;
   if(clock?.key!==key){
     el.textContent='';el.classList.add('hidden');
     if(state.localGame){clock=room.turnClock={key,startedAt:gameTime()};}
-    else if(isCoordinator()&&!turnClockWritePending){
+    else if((isCoordinator()||['player1','player2'].includes(state.playerId))&&!turnClockWritePending){
       turnClockWritePending=true;
-      writeRoom({turnClock:{key,startedAt:gameTime()}}).catch(console.error).finally(()=>turnClockWritePending=false);
+      const fb=state.firebase;
+      fb.runTransaction(fb.ref(fb.db,'rooms/'+state.roomCode+'/public'),current=>{
+        if(!current||turnClockKey(current)!==key||current.turnClock?.key===key)return;
+        return {...current,turnClock:{key,startedAt:gameTime()}};
+      }).catch(console.error).finally(()=>turnClockWritePending=false);
     }
   }
   if(clock?.key===key){
@@ -1565,7 +1565,7 @@ function renderTurnTimer(){
     const warning=inactivityWarningLabel(room);if(warning)setTurnBadge(warning);
     el.textContent=remaining.seconds+' s';
     el.setAttribute('aria-label',name+(remaining.extra?(Number(room.timeoutCounts?.[turnClockPlayer(room)]||0)>=2?' perderá el partido en ':' perderá la mano en '):' tiene ')+remaining.seconds+' segundos');
-    if(remaining.expired&&(state.localGame||isCoordinator()))expireTurnClock(clock);
+    if(remaining.expired&&(state.localGame||isCoordinator()||['player1','player2'].includes(state.playerId)))expireTurnClock(clock);
   }
   turnTimerHandle=setTimeout(renderTurnTimer,200);
 }
@@ -1817,6 +1817,12 @@ function renderEnvidoPicker(room){
   const wheel=el.querySelector('.number-wheel');
   const select=number=>{el.dataset.value=String(number);el.querySelectorAll('[data-number]').forEach(button=>{const distance=Math.abs(Number(button.dataset.number)-number);button.setAttribute('aria-selected',String(distance===0));button.dataset.distance=String(Math.min(distance,4));});const label=$('selected-points');if(label)label.textContent=number;};
   const syncWheel=()=>{const buttons=[...wheel.querySelectorAll('[data-number]')],center=wheel.getBoundingClientRect().left+wheel.clientWidth/2;let nearest=null,best=Infinity;buttons.forEach(button=>{const rect=button.getBoundingClientRect(),distance=Math.abs((rect.left+rect.width/2)-center);if(distance<best){best=distance;nearest=button;}const steps=distance/56;button.style.opacity=String(steps<.65?1:steps<1.65?.78:steps<2.65?.48:steps<3.65?.25:.1);});if(nearest)select(Math.max(Math.min(50,min),Number(nearest.dataset.number)));};
+  wheel.classList.add('wheel-hint');
+  const stopHint=()=>wheel.classList.remove('wheel-hint');
+  wheel.addEventListener('pointerdown',stopHint,{once:true,passive:true});
+  wheel.addEventListener('touchstart',stopHint,{once:true,passive:true});
+  wheel.addEventListener('keydown',stopHint,{once:true});
+  wheel.addEventListener('animationend',stopHint,{once:true});
   wheel.addEventListener('scroll',syncWheel,{passive:true});
   wheel.querySelectorAll('[data-number]').forEach(button=>button.addEventListener('click',()=>{select(Number(button.dataset.number));wheel.scrollTo({left:Number(button.dataset.number)*56,behavior:'smooth'});}));
   wheel.scrollLeft=Math.min(50,min)*56;select(Math.min(50,min));requestAnimationFrame(syncWheel);
