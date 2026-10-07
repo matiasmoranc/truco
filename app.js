@@ -1535,7 +1535,7 @@ function setTurnBadge(text){
   if(text==='ESPERÁ'||text==='ESPERANDO')text=waitingTurnLabel();
   if(state.learning&&state.localGame&&!roundPauseInfo()){
     const player=turnClockPlayer(state.room),name=state.room?.players?.[player]?.name;
-    text=name?'Turno de '+name:'';
+    text=player===state.playerId?'TU TURNO':name?'Turno de '+name:'';
   }
   const badge=$('turn-badge');
   let label=badge.querySelector('.turn-badge-label');
@@ -2635,8 +2635,8 @@ function showLearningMessage(){
 }
 function positionLearningControls(){
   if(!state.learning||!state.localGame)return;
-  const game=$('game-view'),box=game.getBoundingClientRect(),logo=game.querySelector('.game-topbar .truco-logo'),hand=$('hand').getBoundingClientRect();
-  if(logo)game.style.setProperty('--learning-exit-top',(logo.getBoundingClientRect().bottom-box.top+10)+'px');
+  const game=$('game-view'),box=game.getBoundingClientRect(),header=game.querySelector('.game-topbar'),hand=$('hand').getBoundingClientRect();
+  if(header)game.style.setProperty('--learning-exit-top',(header.getBoundingClientRect().bottom-box.top+10)+'px');
   game.style.setProperty('--learning-options-top',(hand.top+hand.height/2-box.top)+'px');
 }
 function renderLearning(){

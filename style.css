@@ -1518,8 +1518,7 @@ body { min-height:100dvh; }
 .learning-mode #turn-badge .turn-timer,.learning-mode #turn-badge .round-pause-timer,.learning-mode #turn-badge .inactivity-life{display:none!important}
 .learning-mode #turn-badge.pause-countdown{visibility:hidden}
 
-/* Keep the centered turn label below the left-hand learning controls. */
-.learning-mode.player-mode .my-player-info{top:52px}
+
 
 /* Exit sits below the logo; the two learning switches sit beside the player's cards. */
 .learning-toolbar{display:contents}
