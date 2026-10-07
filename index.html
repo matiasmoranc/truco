@@ -11,7 +11,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="./style.css?v=20261007-learn28" />
+    <link rel="stylesheet" href="./style.css?v=20261007-learn29" />
   </head>
   <body>
     <div class="grain" aria-hidden="true"></div>
@@ -36,13 +36,32 @@
 
       <section class="view learn-view" id="learn-view" aria-labelledby="learn-title">
         <header class="topbar"><button class="icon-button" id="learn-back" aria-label="Volver al inicio">←</button><span class="mini-brand"><img class="truco-logo" src="assets/truco-v3.png" alt="Truco" width="1536" height="1024"></span><span></span></header>
-        <div class="learn-content"><h1 id="learn-title">Aprendé jugando</h1><p>Truco uruguayo con muestra. Una regla por vez y un bot para practicar, sin reloj.</p><div id="learn-lessons" class="learn-lessons"></div><button id="learn-free" class="button primary">Partida libre con ayudas</button><p class="learn-small">Podés repetir cualquier lección o desactivar las ayudas cuando quieras.</p></div>
+        <div class="learn-content">
+          <h1 id="learn-title">Aprendé jugando</h1><p>De menos a más, con un bot y sin reloj. Empezá con partidas a 10 puntos.</p>
+          <ol class="learn-path"><li><strong>Lo básico</strong><span>Jugá las cartas y aprendé el truco. Sin envido ni flor.</span></li><li><strong>Sumá el envido</strong><span>Al terminar, elegí si querés aprender a cantar y contar los tantos.</span></li><li><strong>Sumá la flor</strong><span>Cuando te sientas cómodo, agregá la flor. Siempre podés volver atrás.</span></li></ol>
+          <button id="learn-free" class="button primary">Empezar por lo básico</button>
+          <h2>Practicá con tus cartas</h2><p>Ejercicios cortos con una explicación de cada respuesta.</p>
+          <div class="learn-practice-actions"><button id="learn-envido-study" class="button secondary">Sumar el envido</button><button id="learn-flor-study" class="button secondary">Reconocer la flor</button><button id="learn-sheet-menu" class="button secondary">Ver guía de cartas</button></div>
+        </div>
       </section>
       <dialog id="learn-coach-dialog" class="learn-coach-dialog" aria-labelledby="learn-coach-title">
         <p id="learn-coach-step" class="learn-small"></p><h2 id="learn-coach-title"></h2><div id="learn-coach-body"></div>
-        <div class="learn-dialog-actions"><button id="learn-coach-continue" class="button primary">Entendido, a jugar</button><button id="learn-coach-next" class="button secondary hidden">Siguiente lección</button><button id="learn-coach-menu" class="text-button">Ver lecciones</button></div>
+        <div class="learn-dialog-actions"><button id="learn-coach-continue" class="button primary">Entendido, a jugar</button><button id="learn-coach-next" class="button secondary hidden">Sumar el envido</button><button id="learn-coach-previous" class="button secondary hidden">Volver sin envido ni flor</button><button id="learn-coach-menu" class="text-button">Volver a aprender</button></div>
       </dialog>
-
+      <dialog id="learn-study-dialog" class="learn-coach-dialog learn-study-dialog" aria-labelledby="learn-study-title">
+        <button id="learn-study-close" class="learn-close" aria-label="Cerrar ejercicio">×</button>
+        <p id="learn-study-step" class="learn-small"></p><h2 id="learn-study-title"></h2>
+        <div id="learn-study-cards" class="study-cards"></div>
+        <form id="learn-study-envido" class="study-envido"><label for="learn-study-value">Tus tantos</label><input id="learn-study-value" type="number" min="0" max="50" step="1" inputmode="numeric" autocomplete="off" required><button id="learn-study-check" class="button primary" type="submit">Comprobar</button></form>
+        <div id="learn-study-flor" class="learn-practice-actions hidden"><button id="learn-study-yes" class="button primary">Sí, es flor</button><button id="learn-study-no" class="button secondary">No es flor</button></div>
+        <p id="learn-study-feedback" class="study-feedback" role="status" aria-live="polite"></p>
+        <div class="learn-dialog-actions"><button id="learn-study-next" class="button primary hidden">Otro ejercicio</button><button id="learn-study-sheet" class="button secondary">Ver guía de cartas</button></div>
+      </dialog>
+      <dialog id="learn-sheet-dialog" class="learn-coach-dialog learn-sheet-dialog" aria-labelledby="learn-sheet-title">
+        <button id="learn-sheet-close" class="learn-close" aria-label="Cerrar guía">×</button><h2 id="learn-sheet-title">Guía de cartas</h2>
+        <p class="learn-small">De mayor a menor fuerza. Podés ampliar la imagen.</p>
+        <a href="assets/guia-truco.png" target="_blank" rel="noopener"><img src="assets/guia-truco.png" alt="Guía de truco uruguayo: piezas, matas, cartas comunes, cálculo de envido y combinaciones de flor." width="1024" height="1536"></a>
+      </dialog>
       <section class="view invitation-view" id="invite-view" aria-label="Unirse a la mesa">
         <div class="invitation-content">
           <div class="brand-lockup"><img class="truco-logo" src="assets/truco-v3.png" alt="Truco Uruguayo" width="1536" height="1024"></div>
@@ -91,11 +110,11 @@
 
       <section class="game view" id="game-view">
         
-        <div id="learning-toolbar" class="learning-toolbar hidden"><button id="learn-help" type="button">Ver ayuda</button><label><input id="learn-hints" type="checkbox" checked> Ayudas</label><button id="learn-menu" type="button">Lecciones</button></div><div id="learning-hint" class="learning-hint hidden" role="status"></div>
+        <div id="learning-toolbar" class="learning-toolbar hidden"><button id="learn-help" type="button">Ver ayuda</button><label><input id="learn-hints" type="checkbox" checked> Ayudas</label><button id="learn-menu" type="button">Salir</button></div><div id="learning-hint" class="learning-hint hidden" role="status"></div>
         <div id="call-notice" class="call-notice hidden" role="status" aria-live="assertive"></div>
         <section id="opening-draw" class="opening-draw hidden" aria-live="polite"></section>
         <section id="envido-picker" class="envido-picker hidden" aria-label="Declarar tantos de envido"></section>
-        <header class="game-topbar"><button class="mini-brand" id="game-home" aria-label="Volver al inicio"><img class="truco-logo" src="assets/truco-v3.png" alt="Truco Uruguayo" width="1536" height="1024"></button><span class="room-pill" id="game-room-code">MESA · —</span><span class="connection"><span class="live-dot"></span> EN VIVO</span><button type="button" id="player-sound-toggle" class="player-sound-toggle hidden" aria-pressed="false">Voz silenciada</button><button type="button" id="chat-toggle" class="chat-toggle hidden" aria-label="Abrir chat" aria-expanded="false" aria-controls="match-chat"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v12H9l-5 4V4Z"/><path d="M8 8h8M8 12h5"/><path class="chat-mute-slash" d="m3 3 18 18"/></svg></button></header>
+        <header class="game-topbar"><button class="mini-brand" id="game-home" aria-label="Volver al inicio"><img class="truco-logo" src="assets/truco-v3.png" alt="Truco Uruguayo" width="1536" height="1024"></button><span class="room-pill" id="game-room-code">MESA · —</span><span class="connection"><span class="live-dot"></span> EN VIVO</span><button type="button" id="player-sound-toggle" class="player-sound-toggle hidden" aria-pressed="false">Voz silenciada</button><button type="button" id="game-sheet" class="game-help-toggle" aria-label="Ver guía de cartas" title="Guía de cartas"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5c-3-2-6-2-9-1v15c3-1 6-1 9 1 3-2 6-2 9-1V4c-3-1-6-1-9 1Z"/><path d="M12 5v15"/></svg></button><button type="button" id="chat-toggle" class="chat-toggle hidden" aria-label="Abrir chat" aria-expanded="false" aria-controls="match-chat"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v12H9l-5 4V4Z"/><path d="M8 8h8M8 12h5"/><path class="chat-mute-slash" d="m3 3 18 18"/></svg></button></header>
         <div id="chat-backdrop" class="chat-backdrop hidden" aria-hidden="true"></div>
         <section id="match-chat" class="match-chat hidden" role="dialog" aria-labelledby="chat-title">
           <div class="chat-heading"><h2 id="chat-title">Chat de la partida</h2><button type="button" id="chat-close" aria-label="Cerrar chat">×</button></div>
@@ -151,7 +170,7 @@
       <section class="toast-global" id="global-toast" role="status"></section>
     </main>
     <dialog id="score-details" class="score-details" aria-labelledby="score-details-title"><div class="score-details-panel"><header class="score-details-header"><h2 id="score-details-title">Historial de manos</h2><button id="close-score-details" type="button" aria-label="Cerrar detalle"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button></header><div id="score-details-content"></div><button id="dismiss-score-details" class="score-details-dismiss" type="button">Cerrar</button></div></dialog>
-    <script type="module" src="./app.js?v=20261007-learn28"></script>
+    <script type="module" src="./app.js?v=20261007-learn29"></script>
   </body>
 </html>
 

@@ -986,9 +986,9 @@ async function addPoints(playerId,points,description) {
   await writeRoom({scores,status:won?'complete':'started',feed:topFeed(state.room,`${state.room.players[playerId].name} ${description} (+${points}).`)});
 }
 function canCallFirstRoundEnvido(room,player,hand){
-  if(!room||room.status!=='started'||!['player1','player2'].includes(player)||room.resolvingTrick||room.pendingNextHand||Number(room.trickNo||1)!==1)return false;
+  if(!room||room.practiceRules?.envido===false||room.status!=='started'||!['player1','player2'].includes(player)||room.resolvingTrick||room.pendingNextHand||Number(room.trickNo||1)!==1)return false;
   if(room.envidoClosed||Object.keys(room.flors||{}).length>0||room.pendingBet?.type==='flor'||room.florSettled||Number(room.playedCount||0)>=2||(room.trickCards||[]).some(item=>item.playerId===player))return false;
-  return !!hand?.length&&!room.flors?.[player]&&!room.flors?.[otherPlayer(player)]&&!hasFlor(hand,room.muestra);
+  return !!hand?.length&&!room.flors?.[player]&&!room.flors?.[otherPlayer(player)]&&!roomHasFlor(room,hand);
 }
 
 async function callBet(kind) {
@@ -1000,7 +1000,7 @@ async function callBet(kind) {
   const played=Number(room.playedCount)||0;
   if(kind==='envido'||kind==='real'||kind==='falta'){
     if(!canCallFirstRoundEnvido(room,caller,state.hand)){toast('Cantá envido antes de tirar.');return;}
-    if(hasFlor(state.hand,room.muestra)){toast('Tenés flor. Cantá flor.');return;}
+    if(roomHasFlor(room,state.hand)){toast('Tenés flor. Cantá flor.');return;}
     if(room.flors?.[other]){toast('Hay flor. No hay envido.');return;}
     const base=pending?.type==='envido'?(pending.stake||0):0;
     const stake=envidoBetPoints(room,kind,base);
@@ -1036,8 +1036,8 @@ function scheduleLocalNextHand(room){
 async function answerBet(answer) {
   if(state.room?.turnClock?.key===turnClockKey()&&turnClockRemaining(state.room.turnClock).expired){renderTurnTimer();return;}
   const bet=state.room?.pendingBet;if(!bet||bet.responder!==state.playerId)return;
-  if(bet.type==='envido'&&hasFlor(state.hand,state.room.muestra)){toast('Tenés flor. Cantá flor.');return;}
-  if(bet.type==='flor'&&!florAnswers(bet,hasFlor(state.hand,state.room.muestra)).some(([action])=>action===answer))return;
+  if(bet.type==='envido'&&roomHasFlor(state.room,state.hand)){toast('Tenés flor. Cantá flor.');return;}
+  if(bet.type==='flor'&&!florAnswers(bet,roomHasFlor(state.room,state.hand)).some(([action])=>action===answer))return;
   if(bet.type==='flor' && bet.single && answer==='yes'){ await callFlor(); return; }
   if(answer==='raise'){
     if(bet.type==='truco'){
@@ -1111,7 +1111,7 @@ async function verifyEnvido(scores){
   return result;
 }
 async function callFlor() {
-  const room=state.room,player=state.playerId;if(!room||player==='table'||(room.playedCount||0)>0||room.flors?.[player]!=null||!hasFlor(state.hand,room.muestra)){toast('No tenés flor.');return;}
+  const room=state.room,player=state.playerId;if(!room||player==='table'||(room.playedCount||0)>0||room.flors?.[player]!=null||!roomHasFlor(room,state.hand)){toast('No tenés flor.');return;}
   const flors={...(room.flors||{}),[player]:florValue(state.hand,room.muestra)};
   const other=player==='player1'?'player2':'player1';
   const suspendedBet=room.pendingBet?.type==='truco'?room.pendingBet:(room.pendingBet?.suspendedBet||null);
@@ -1762,14 +1762,14 @@ function renderGame() {
   const actions=$('player-actions');actions.classList.toggle('hidden',isTable||room.status==='complete');
   const pending=room.pendingBet, other=state.playerId==='player1'?'player2':'player1';
   const canEnvido=canCallFirstRoundEnvido(room,state.playerId,state.hand);
-  const mustDeclareFlor=pending?.type==='envido'&&pending.responder===state.playerId&&hasFlor(state.hand,room.muestra)&&!room.flors?.[state.playerId];
+  const mustDeclareFlor=pending?.type==='envido'&&pending.responder===state.playerId&&roomHasFlor(room,state.hand)&&!room.flors?.[state.playerId];
   let buttons=[];
   if(mustDeclareFlor){buttons.push('<button class="call-button" data-action="flor"><strong>FLOR</strong></button>');}
   else if(pending?.revealMode){buttons.push('<span class="action-wait">'+(pending.revealTurn===state.playerId?'Deslizá para elegir tus tantos':'Esperando los tantos del rival…')+'</span>');}
-  else if(pending?.type==='flor'){if(pending.responder===state.playerId)buttons.push(...florAnswers(pending,hasFlor(state.hand,room.muestra)).map(([action,label])=>`<button class="${action==='yes'?'call-button':'pass-button'}" data-action="${action}">${label}</button>`));else buttons.push('<span class="action-wait">ESPERANDO RESPUESTA…</span>');}
-  else if(pending){if(pending.responder===state.playerId){if(['envido','truco'].includes(pending.type)&&(room.playedCount||0)===0&&hasFlor(state.hand,room.muestra)&&!room.flors?.[state.playerId])buttons.push('<button class="call-button" data-action="flor"><strong>FLOR</strong></button>');if(pending.type==='truco'&&canEnvido)buttons.push('<button class="pass-button" data-action="envido"><strong>ENVIDO</strong></button><button class="pass-button" data-action="real"><strong>REAL ENVIDO</strong></button><button class="pass-button" data-action="falta"><strong>FALTA ENVIDO</strong></button>');if(pending.type==='envido'&&!Object.keys(room.flors||{}).length){buttons.push('<div class="envido-action-grid"><div class="envido-action-row envido-raises"><button class="pass-button" data-action="raise-envido"><strong>ENVIDO</strong></button><button class="pass-button" data-action="raise-real"><strong>REAL ENVIDO</strong></button><button class="pass-button" data-action="raise-falta"><strong>FALTA ENVIDO</strong></button></div><div class="envido-action-row envido-answer"><button class="call-button" data-action="yes">QUIERO</button><button class="pass-button" data-action="no">NO QUIERO</button></div></div>');}else{buttons.push(`${pending.type==='flor'&&pending.single&&!hasFlor(state.hand,room.muestra)?'':`<button class="call-button" data-action="yes">${pending.type==='flor'?(pending.single?'FLOR':'LA MÍA ES FLOR'):'QUIERO'}</button>`}<button class="pass-button" data-action="no">${pending.type==='flor'&&pending.single?'TIENE':'NO QUIERO'}</button>`);}if(pending.type==='truco'&&pending.stake<4)buttons.push(`<button class="pass-button" data-action="raise">${pending.stake===2?'RETRUCO':'VALE 4'}</button>`);if(pending.type==='flor'&&!pending.single){buttons.push('<button class="pass-button" data-action="raise-conflor">CON FLOR ENVIDO</button><button class="pass-button" data-action="raise-faltaflor">CONTRA FLOR AL RESTO</button>');}}else buttons.push('<span class="action-wait">ESPERANDO RESPUESTA…</span>');}
+  else if(pending?.type==='flor'){if(pending.responder===state.playerId)buttons.push(...florAnswers(pending,roomHasFlor(room,state.hand)).map(([action,label])=>`<button class="${action==='yes'?'call-button':'pass-button'}" data-action="${action}">${label}</button>`));else buttons.push('<span class="action-wait">ESPERANDO RESPUESTA…</span>');}
+  else if(pending){if(pending.responder===state.playerId){if(['envido','truco'].includes(pending.type)&&(room.playedCount||0)===0&&roomHasFlor(room,state.hand)&&!room.flors?.[state.playerId])buttons.push('<button class="call-button" data-action="flor"><strong>FLOR</strong></button>');if(pending.type==='truco'&&canEnvido)buttons.push('<button class="pass-button" data-action="envido"><strong>ENVIDO</strong></button><button class="pass-button" data-action="real"><strong>REAL ENVIDO</strong></button><button class="pass-button" data-action="falta"><strong>FALTA ENVIDO</strong></button>');if(pending.type==='envido'&&!Object.keys(room.flors||{}).length){buttons.push('<div class="envido-action-grid"><div class="envido-action-row envido-raises"><button class="pass-button" data-action="raise-envido"><strong>ENVIDO</strong></button><button class="pass-button" data-action="raise-real"><strong>REAL ENVIDO</strong></button><button class="pass-button" data-action="raise-falta"><strong>FALTA ENVIDO</strong></button></div><div class="envido-action-row envido-answer"><button class="call-button" data-action="yes">QUIERO</button><button class="pass-button" data-action="no">NO QUIERO</button></div></div>');}else{buttons.push(`${pending.type==='flor'&&pending.single&&!roomHasFlor(room,state.hand)?'':`<button class="call-button" data-action="yes">${pending.type==='flor'?(pending.single?'FLOR':'LA MÍA ES FLOR'):'QUIERO'}</button>`}<button class="pass-button" data-action="no">${pending.type==='flor'&&pending.single?'TIENE':'NO QUIERO'}</button>`);}if(pending.type==='truco'&&pending.stake<4)buttons.push(`<button class="pass-button" data-action="raise">${pending.stake===2?'RETRUCO':'VALE 4'}</button>`);if(pending.type==='flor'&&!pending.single){buttons.push('<button class="pass-button" data-action="raise-conflor">CON FLOR ENVIDO</button><button class="pass-button" data-action="raise-faltaflor">CONTRA FLOR AL RESTO</button>');}}else buttons.push('<span class="action-wait">ESPERANDO RESPUESTA…</span>');}
   else {
-    if((room.playedCount||0)===0&&state.hand.length&&hasFlor(state.hand,room.muestra)&&!room.flors?.[state.playerId])buttons.push('<button class="call-button" data-action="flor"><strong>FLOR</strong></button>');
+    if((room.playedCount||0)===0&&state.hand.length&&roomHasFlor(room,state.hand)&&!room.flors?.[state.playerId])buttons.push('<button class="call-button" data-action="flor"><strong>FLOR</strong></button>');
     if(canEnvido)buttons.push('<button class="pass-button" data-action="envido"><strong>ENVIDO</strong></button><button class="pass-button" data-action="real"><strong>REAL</strong></button><button class="pass-button" data-action="falta"><strong>FALTA</strong></button>');
     if(!isTable&&room.status==='started'&&state.hand.length&&!room.resolvingTrick&&!room.pendingNextHand){
     const level=Number(room.trucoLevel)||1;if(level<4&&(level===1||room.lastTrucoCaller!==state.playerId))buttons.push(`<button class="call-button" data-action="${level===1?'truco':level===2?'retruco':'vale4'}"><strong>${level===1?'TRUCO':level===2?'RETRUCO':'VALE 4'}</strong></button>`);
@@ -1850,7 +1850,7 @@ async function respondRematch(action){
 }
 function renderMatchEnd(){
   const panel=$('match-end'),room=state.room,winner=room&&matchWinner(room);
-  const visible=!state.learning?.guided&&matchFinished(room)&&!!winner&&state.dismissedMatchEnd!==matchEndKey(room);
+  const visible=!state.learning&&matchFinished(room)&&!!winner&&state.dismissedMatchEnd!==matchEndKey(room);
   panel.classList.toggle('hidden',!visible);
   if(!visible)return;
   const name=room.players?.[winner]?.name||'Jugador';
@@ -2049,7 +2049,7 @@ function assessBotHand(room,hand,level,memory,random=Math.random){
 }
 // The policy never receives the rival's hand or the original deal.
 function chooseBotDecision(room,hand,level,memory,random=Math.random){
-  const me='player2',bet=room.pendingBet,flower=hasFlor(hand,room.muestra);
+  const me='player2',bet=room.pendingBet,flower=roomHasFlor(room,hand);
   const tantos=handEnvido(hand,room.muestra);
   const easy=level==='easy',hard=level==='hard';
   let assessment;
@@ -2070,7 +2070,7 @@ function chooseBotDecision(room,hand,level,memory,random=Math.random){
       return {kind:'action',value:bet.called==='falta'&&value<32?'no':'yes'};
     }
     if(bet.type==='envido'){
-      if(state.learning?.guided&&state.learning.index===2)return {kind:'action',value:'yes'};
+      
       if(hard&&tantos>=32&&!memory.envidoRaised&&bet.called!=='falta'){
         memory.envidoRaised=true;return {kind:'action',value:'raise-real'};
       }
@@ -2091,7 +2091,7 @@ function chooseBotDecision(room,hand,level,memory,random=Math.random){
     return null;
   }
   if(room.turn!==me||!hand.length)return null;
-  if(!state.learning?.guided&&!memory.envidoCalled&&canCallFirstRoundEnvido(room,me,hand)){
+  if(!memory.envidoCalled&&canCallFirstRoundEnvido(room,me,hand)){
     memory.envidoCalled=true;
     if(easy?random()<0.4:tantos>=25)return {kind:'action',value:hard&&tantos>=33?'real':'envido'};
   }
@@ -2123,7 +2123,7 @@ function scheduleBot(){
   if(room.resolvingTrick||room.pendingNextHand||room.status==='revealing'){clearTimeout(state.botTimer);state.botTimer=null;return;}
   const ready=room.status==='drawing'?!room.openingDraw?.cards?.player2:
     room.status==='complete'?room.rematch?.status==='pending'&&room.rematch.requester==='player1':
-    room.status==='started'&&(room.pendingBet?(room.pendingBet.revealMode?room.pendingBet.revealTurn==='player2':room.pendingBet.responder==='player2'):room.turn==='player2'||(!room.playedCount&&hasFlor(localHand('player2'),room.muestra)&&room.flors?.player2==null));
+    room.status==='started'&&(room.pendingBet?(room.pendingBet.revealMode?room.pendingBet.revealTurn==='player2':room.pendingBet.responder==='player2'):room.turn==='player2'||(!room.playedCount&&roomHasFlor(room,localHand('player2'))&&room.flors?.player2==null));
   if(!ready){clearTimeout(state.botTimer);state.botTimer=null;return;}
   const actionKey=room.status==='drawing'?key+':draw:'+room.openingDraw?.endsAt:
     room.status==='complete'?key+':rematch:'+room.rematch?.id:
@@ -2207,8 +2207,8 @@ function localAnswerAction(answer){
     revealEnvido();return;
   }
   if(bet.responder!==player)return;
-  if(bet.type==='envido'&&hasFlor(localHand(player),room.muestra)){toast('Tenés flor. Cantá flor.');return;}
-  if(bet.type==='flor'&&!florAnswers(bet,hasFlor(localHand(player),room.muestra)).some(([action])=>action===answer))return;
+  if(bet.type==='envido'&&roomHasFlor(room,localHand(player))){toast('Tenés flor. Cantá flor.');return;}
+  if(bet.type==='flor'&&!florAnswers(bet,roomHasFlor(room,localHand(player))).some(([action])=>action===answer))return;
   if(bet.type==='flor'&&bet.single&&answer==='yes'){localAction('flor');return;}
   if(answer==='raise'&&bet.type==='truco'){
     const value=bet.stake===2?3:4;room.pendingBet={...bet,caller:player,responder:bet.caller,stake:value};room.lastTrucoCaller=player;localFeed(`${room.players[player].name} canta ${value===3?'retruco':'vale cuatro'}.`);renderGame();return;
@@ -2236,7 +2236,7 @@ function localAnswerAction(answer){
 function localAction(action){
   if(action==='reveal')localAnswerAction('yes');
   else if(action==='flor'){
-    const room=state.room,player=state.playerId;if(player==='table'||room.playedCount>0||room.flors?.[player]!=null||!hasFlor(localHand(player),room.muestra)){toast('No tenés flor.');return;}
+    const room=state.room,player=state.playerId;if(player==='table'||room.playedCount>0||room.flors?.[player]!=null||!roomHasFlor(room,localHand(player))){toast('No tenés flor.');return;}
     const other=otherPlayer(player);room.flors={...(room.flors||{}),[player]:florValue(localHand(player),room.muestra)};room.envidoClosed=true;
     const suspendedBet=room.pendingBet?.type==='truco'?room.pendingBet:(room.pendingBet?.suspendedBet||null);
     room.pendingBet={type:'flor',called:'flor',single:!room.flors[other],caller:player,responder:other,stake:3,accepted:0,suspendedBet};
@@ -2284,7 +2284,7 @@ function localDealAfterHand(){
   if(finishLearningHand())return;
   const room=state.room;
   if(Math.max(...Object.values(room.scores))>=targetPoints(room)){room.status='complete';room.pendingBet=null;room.endReveal={done:true};renderGame();return;}
-  const deck=shuffleDeck(),mano=otherPlayer(room.mano);
+  const deck=learningDeck(room),mano=otherPlayer(room.mano);
   state.localHands={player1:deck.slice(0,3),player2:deck.slice(3,6)};
   state.localOriginalHands=structuredClone(state.localHands);
   state.localTruth={player1:handEnvido(state.localHands.player1,deck[6]),player2:handEnvido(state.localHands.player2,deck[6])};
@@ -2498,48 +2498,38 @@ document.addEventListener('visibilitychange',()=>{if(document.visibilityState===
 window.addEventListener('online',()=>{if(state.room){renderGame();renderTurnTimer();}});
 
 
-const LEARNING_LESSONS=[
-  {title:'La muestra y las piezas',intro:'La muestra marca el palo de las piezas: 2, 4, 5, caballo (11) y sota (10), en ese orden de fuerza. Son las cartas más altas. Para envido y flor valen 30, 29, 28, 27 y 27 tantos. Si la muestra es una pieza, el rey de ese palo ocupa su lugar.',mission:'Tu 2 de copa es la pieza más fuerte porque la muestra es de copa. Probá jugarla y terminá la mano.'},
-  {title:'Ganar una mano',intro:'Cada jugador recibe 3 cartas. Gana quien se lleva dos bazas. Si ganaste la primera y la segunda empata, ganás la mano. Sin truco, una mano vale 1 punto.',mission:'Tenés el 1 de espada, una mata. Después de las piezas, las matas van así: 1 de espada, 1 de basto, 7 de espada y 7 de oro. Jugá tus cartas y mirá quién gana cada baza.'},
-  {title:'El envido',intro:'Cantá antes de tirar tu primera carta, durante la primera ronda. Dos cartas comunes del mismo palo suman 20 más sus valores; sota, caballo y rey valen 0. Con una pieza, sumá su valor y la mejor carta restante. Si empatan, gana el mano.',mission:'Tus 7 y 6 de oro suman 20 + 7 + 6 = 33. Tocá ENVIDO, esperá al bot y arrastrá el selector hasta 33 para declarar. El envido vale 2 puntos; si el rival no quiere, normalmente cobrás 1.'},
-  {title:'Responder al truco',intro:'Truco querido: 2 puntos por la mano. Retruco: 3. Vale cuatro: 4. Si no querés, el rival cobra el valor anterior: 1, 2 o 3. El envido se resuelve primero si interrumpe un truco.',mission:'El bot te dijo TRUCO. Podés elegir QUIERO, NO QUIERO o RETRUCO. Probá una respuesta y mirá los puntos al terminar.'},
-  {title:'La flor',intro:'Tenés flor con tres cartas del mismo palo, dos o más piezas, o una pieza y dos cartas comunes del mismo palo. Cuando hay flor, no hay envido.',mission:'Tenés 2 y 5 de copa, más 6 de basto: tu flor suma 30 + 8 + 6 = 44. Con varias piezas, la mayor aporta su valor completo y las otras su última cifra. Cantá FLOR para practicar las respuestas.'}
+
+const LEARNING_STAGES=[
+  {title:'Lo básico',intro:'Primero jugamos manos y truco, sin envido ni flor. Recibís 3 cartas y buscás ganar dos bazas. Si ganás la primera y la segunda empata, ganás la mano. La muestra determina las piezas: 2, 4, 5, 11 y 10 de su palo, de mayor a menor. Una mano vale 1 punto; con truco querido vale 2, retruco 3 y vale cuatro 4.'},
+  {title:'Sumamos el envido',intro:'Ahora podés cantar envido antes de tirar tu primera carta. Dos cartas comunes del mismo palo suman 20 más sus valores. Sota, caballo y rey valen 0. Con una pieza sumás su valor y la mejor de las otras cartas, sin agregar 20. En esta etapa no se canta flor; practicamos con repartos sin flor para concentrarnos en el envido.'},
+  {title:'Sumamos la flor',intro:'Se juega con envido y flor. Tenés flor con 3 cartas del mismo palo, 2 o más piezas, o una pieza y 2 cartas comunes del mismo palo. Con flor no se juega envido. Para sumar varias piezas: la mayor vale completa y las otras aportan su última cifra.'}
 ];
-function learningCard(suit,rank){const name={'♦':'oro','♥':'copa','♠':'espada','♣':'basto'}[suit];return {id:name+'-'+rank,suit,rank,red:suit==='♦'||suit==='♥',label:rank===10?'Sota':rank===11?'Caballo':rank===12?'Rey':String(rank)};}
-function learningDeal(index){
-  const c=learningCard,muestra=c('♥',7);
-  const ordinary={player1:[c('♠',1),c('♦',3),c('♣',6)],player2:[c('♦',1),c('♠',4),c('♣',5)]};
-  const hands=index===0?{player1:[c('♥',2),c('♠',6),c('♦',3)],player2:[c('♦',4),c('♣',5),c('♠',10)]}:
-    index===2?{player1:[c('♦',7),c('♦',6),c('♠',4)],player2:[c('♠',6),c('♠',5),c('♣',1)]}:
-    index===4?{player1:[c('♥',2),c('♥',5),c('♣',6)],player2:[c('♦',1),c('♦',3),c('♦',6)]}:ordinary;
-  return {hands,muestra};
+function learningDeck(room){
+  let deck;do{deck=shuffleDeck();}while(room?.practiceRules?.envido&&room.practiceRules.flor===false&&(hasFlor(deck.slice(0,3),deck[6])||hasFlor(deck.slice(3,6),deck[6])));
+  return deck;
 }
+function roomHasFlor(room,hand){return room?.practiceRules?.flor!==false&&hasFlor(hand,room?.muestra);}
 function openLearning(){
-  if(state.learning){$('learn-coach-dialog').close();stopBot();}
-  if(state.localGame){clearTimeout(state.resolutionTimer);state.room=null;state.localGame=false;}
-  $('learn-lessons').replaceChildren();
-  LEARNING_LESSONS.forEach((lesson,index)=>{
-    const button=document.createElement('button');button.className='learn-lesson';button.type='button';
-    const title=document.createElement('strong');title.textContent=(index+1)+'. '+lesson.title;
-    const small=document.createElement('span');small.textContent=lesson.intro;
-    button.append(title,small);button.addEventListener('click',()=>startLearning(index));$('learn-lessons').append(button);
-  });
+  $('learn-coach-dialog').close();
+  if(state.learning){stopBot();clearTimeout(state.resolutionTimer);state.room=null;state.localGame=false;}
   showView('learn-view');
 }
-async function startLearning(index=null){
+async function startLearning(stage=0){
   if(state.learningStarting)return;state.learningStarting=true;
   try{
+    $('learn-coach-dialog').close();
     if(!await startLocalBotGame())return;
-    state.learning={index,guided:index!==null,hints:true,paused:false,complete:false};
+    state.learning={stage,hints:true,paused:false,complete:false};
     state.bot=true;state.botDifficulty='easy';state.botMemory=null;
     state.room.players={player1:{name:cleanName($('lobby-name').value||$('player-name').value,'Vos')},player2:{name:'Bot de práctica'}};
-    state.room.targetPoints=10;state.room.status='started';state.room.openingDraw=null;state.room.createdAt=gameTime();state.room.matchNumber=1;state.room.turnClock=null;
-    if(index!==null){
-      const deal=learningDeal(index);state.localHands=deal.hands;state.localOriginalHands=structuredClone(deal.hands);state.room.muestra=deal.muestra;state.hand=[...deal.hands.player1];
-      state.localTruth={player1:handEnvido(deal.hands.player1,deal.muestra),player2:handEnvido(deal.hands.player2,deal.muestra)};
-      if(index===3){state.room.pendingBet={type:'truco',called:'truco',caller:'player2',responder:'player1',stake:2};state.room.lastTrucoCaller='player2';localFeed('Bot de práctica dice truco.');}
-    }else state.hand=[...state.localHands.player1];
-    $('game-room-code').textContent='PRÁCTICA';state.dismissedMatchEnd=null;state.focusedMatchEnd=null;
+    Object.assign(state.room,{targetPoints:10,status:'started',openingDraw:null,createdAt:gameTime(),matchNumber:1,turnClock:null,practiceRules:{envido:stage>=1,flor:stage>=2}});
+    if(stage===1){
+      const deck=learningDeck(state.room);state.localHands={player1:deck.slice(0,3),player2:deck.slice(3,6)};
+      state.localOriginalHands=structuredClone(state.localHands);state.room.muestra=deck[6];
+      state.localTruth={player1:handEnvido(state.localHands.player1,deck[6]),player2:handEnvido(state.localHands.player2,deck[6])};
+    }
+    state.hand=[...state.localHands.player1];
+    state.dismissedMatchEnd=null;state.focusedMatchEnd=null;
     renderGame();showView('game-view');openLearningHelp();
   }catch(error){console.error('[truco:learning]',error);toast('No se pudo iniciar la práctica. Volvé a intentar.');}
   finally{state.learningStarting=false;}
@@ -2547,85 +2537,155 @@ async function startLearning(index=null){
 function learningGuidance(){
   const room=state.room,learning=state.learning;if(!learning||!room)return [];
   const original=state.localOriginalHands?.player1||state.hand,muestra=room.muestra,bet=room.pendingBet;
-  if(learning.complete)return ['Terminaste esta práctica. Tocá el marcador para ver cómo se sumaron los puntos. Podés repetirla, avanzar a la siguiente lección o jugar libremente.'];
-  if(bet?.revealMode&&bet.revealTurn==='player1'){
-    return ['Tenés '+handEnvido(original,muestra)+' tantos de envido. Arrastrá los números y tocá DECLARAR. Si no superás al rival, podés responder SON BUENAS. Declarar un valor falso cambia quién cobra los puntos al verificar las cartas.'];
+  if(learning.complete){
+    const winner=matchWinner(room),name=room.players?.[winner]?.name||'El jugador';
+    return [name+' ganó. Resultado: '+room.scores.player1+' a '+room.scores.player2+'. La partida era a 10.',
+      learning.stage===0?'Podés seguir practicando lo básico o sumar el envido.':learning.stage===1?'Podés seguir con envido, volver a lo básico o sumar la flor.':'Podés seguir con todas las reglas, quitar la flor o volver a lo básico.'];
   }
+  if(bet?.revealMode&&bet.revealTurn==='player1')return ['Tenés '+handEnvido(original,muestra)+' tantos. Arrastrá los números y tocá DECLARAR. Si no superás al rival, podés decir SON BUENAS.',explainEnvido(original,muestra).explanation];
   if(bet?.responder==='player1'){
-    if(bet.type==='truco')return ['El bot pide '+({2:'TRUCO',3:'RETRUCO',4:'VALE CUATRO'}[bet.stake]||'TRUCO')+'. QUIERO hace que la mano valga '+bet.stake+' puntos. NO QUIERO le da '+(bet.stake-1)+' al bot. Podés subir el canto si aparece esa opción.'];
-    if(bet.type==='envido')return ['QUIERO acepta la apuesta de '+bet.stake+' puntos de envido y después declaran los tantos. NO QUIERO la rechaza; el bot cobra '+(bet.accepted||1)+'. También podés subir el canto con las opciones que aparecen.'];
-    if(bet.type==='flor')return [bet.called==='conflor'?'Con flor envido: 3 puntos de flor más 2 de envido. Podés decir QUIERO, NO QUIERO o CONTRA FLOR AL RESTO. Si no querés, se pagan los 3 de flor.':bet.called==='falta'?'Contra flor al resto juega por la partida. Podés responder QUIERO o NO QUIERO.':bet.single?'Si tenés flor, contestá FLOR, CON FLOR ENVIDO o CONTRA FLOR AL RESTO. Si no tenés, respondé TIENE.':'El bot también tiene flor. Podés responder LA MÍA ES FLOR, CON FLOR ENVIDO o CONTRA FLOR AL RESTO.'];
+    if(bet.type==='truco')return ['QUIERO hace que la mano valga '+bet.stake+' puntos. NO QUIERO le da '+(bet.stake-1)+' al bot. Podés subir el canto si aparece esa opción.'];
+    if(bet.type==='envido')return ['QUIERO acepta '+bet.stake+' puntos de envido; después declaran los tantos. NO QUIERO lo rechaza. Si empatan, gana el mano.'];
+    if(bet.type==='flor')return [bet.called==='conflor'?'Con flor envido: 3 de flor más 2 de envido. Podés responder QUIERO, NO QUIERO o CONTRA FLOR AL RESTO. Si no querés, se pagan 3 de flor.':bet.called==='falta'?'Contra flor al resto juega por la partida. Podés responder QUIERO o NO QUIERO.':bet.single?'Si tenés flor, respondé FLOR o subí el canto. Si no tenés, respondé TIENE.':'El bot también tiene flor. Podés decir LA MÍA ES FLOR, CON FLOR ENVIDO o CONTRA FLOR AL RESTO.'];
   }
-  if(bet)return ['Esperá la respuesta del bot. En la práctica no hay límite de tiempo.'];
-  if(hasFlor(original,muestra)&&!room.florSettled&&!room.flors?.player1)return ['Tenés FLOR de '+florValue(original,muestra)+' tantos. Cantala antes de tirar; con flor no se juega envido.'];
-  if(room.resolvingTrick||room.pendingNextHand||room.status==='revealing')return ['Mirá el resultado de la baza y los puntos. El juego continúa después de esta breve pausa.'];
+  if(bet)return ['Esperá la respuesta del bot. No hay límite de tiempo.'];
+  if(roomHasFlor(room,original)&&!room.florSettled&&!room.flors?.player1)return ['Tenés FLOR de '+florValue(original,muestra)+' tantos. Cantala antes de tirar; con flor no se juega envido.',explainFlor(original,muestra).explanation];
+  if(room.resolvingTrick||room.pendingNextHand||room.status==='revealing')return ['Mirá las cartas y el resultado. El juego continúa después de esta breve pausa.'];
   const guidance=[];
-  if((!learning.guided||learning.index===2)&&canCallFirstRoundEnvido(room,'player1',state.hand))guidance.push('Tenés '+handEnvido(original,muestra)+' tantos. Podés cantar ENVIDO antes de tirar tu primera carta.');
+  if(canCallFirstRoundEnvido(room,'player1',state.hand))guidance.push('Tenés '+handEnvido(original,muestra)+' tantos. Podés cantar ENVIDO antes de tirar tu primera carta.');
   if(room.turn==='player1'&&state.hand.length){
     const opponent=(room.trickCards||[]).find(item=>item.playerId==='player2')?.card;
     const sorted=[...state.hand].sort((a,b)=>cardStrength(a,muestra)-cardStrength(b,muestra));
     const choice=opponent?sorted.find(card=>cardStrength(card,muestra)>cardStrength(opponent,muestra)):sorted[sorted.length-1];
-    const suits={'♦':'oro','♥':'copa','♠':'espada','♣':'basto'};
-    guidance.push(choice?'Podés probar el '+choice.rank+' de '+suits[choice.suit]+(pieceOrder(choice,muestra)?', que es una pieza.':opponent?' para ganar esta baza.':'. Es tu carta más fuerte.'):'Ninguna de tus cartas supera la que tiró el bot. Podés guardar tu mejor carta para otra baza.');
-  }else guidance.push('Ahora juega el bot. Mirá la carta que elige y cómo se resuelve la baza.');
+    guidance.push(choice?'Podés probar '+cardStudyName(choice)+(pieceOrder(choice,muestra)?', una pieza.':opponent?' para ganar esta baza.':', tu carta más fuerte.'):'No podés superar esa carta. Podés guardar tu mejor carta para otra baza.');
+  }else guidance.push('Ahora juega el bot. Mirá cómo se resuelve la baza.');
   return guidance;
 }
 function renderLearning(){
-  const active=!!(state.learning&&state.localGame),toolbar=$('learning-toolbar'),hint=$('learning-hint');
-  toolbar.classList.toggle('hidden',!active);$('game-view').classList.toggle('learning-mode',active);
-  if(!active){hint.classList.add('hidden');return;}
+  const active=!!(state.learning&&state.localGame);
+  $('learning-toolbar').classList.toggle('hidden',!active);$('game-view').classList.toggle('learning-mode',active);
+  $('learning-hint').classList.toggle('hidden',!active||!state.learning.hints);
+  if(!active)return;
   $('learn-hints').checked=state.learning.hints;
-  hint.classList.toggle('hidden',!state.learning.hints);
-  hint.textContent=learningGuidance()[0]||'Practicá a tu ritmo. Tocá Ver ayuda para una explicación.';
+  $('learning-hint').textContent=learningGuidance()[0]||'Practicá a tu ritmo.';
+  if(!state.learning.complete&&state.room.status==='complete'&&(!state.room.endReveal||state.room.endReveal.done)){
+    const room=state.room;queueMicrotask(()=>{if(state.room===room&&room.status==='complete'&&(!room.endReveal||room.endReveal.done))finishLearningHand();});
+  }
+}
+function pauseLearning(){if(state.learning){state.learning.paused=true;clearTimeout(state.botTimer);state.botTimer=null;}}
+function resumeLearning(){
+  if(state.learning&&!state.learning.complete&&!document.querySelector('.learn-coach-dialog[open]')){state.learning.paused=false;renderGame();}
 }
 function openLearningHelp(){
   if(!state.learning)return;
-  state.learning.paused=true;clearTimeout(state.botTimer);state.botTimer=null;
-  const index=state.learning.index,lesson=index===null?null:LEARNING_LESSONS[index];
-  $('learn-coach-step').textContent=lesson?'Lección '+(index+1)+' de '+LEARNING_LESSONS.length:'Práctica libre · Sin límite de tiempo';
-  $('learn-coach-title').textContent=state.learning.complete?'¡Práctica terminada!':lesson?.title||'Jugá con ayuda';
-  const body=$('learn-coach-body');body.replaceChildren();
-  const paragraphs=state.learning.complete?learningGuidance():[...(lesson?[lesson.intro,lesson.mission]:['Jugá una partida a 10 contra el bot fácil. Las ayudas explican tus cartas y tus opciones. Podés apagarlas y volver a activarlas.']),...learningGuidance()];
-  paragraphs.forEach(text=>{const p=document.createElement('p');p.textContent=text;body.append(p);});
-  $('learn-coach-continue').textContent=state.learning.complete?'Repetir práctica':'Entendido, a jugar';
-  $('learn-coach-next').classList.toggle('hidden',!state.learning.complete);
-  $('learn-coach-next').textContent=index!==null&&index<4?'Siguiente lección':'Jugar libre con ayudas';
-  const dialog=$('learn-coach-dialog');if(!dialog.open)dialog.showModal();
+  pauseLearning();
+  const stage=state.learning.stage,lesson=LEARNING_STAGES[stage],complete=state.learning.complete;
+  $('learn-coach-step').textContent='Etapa '+(stage+1)+' de 3 · Partidas a 10 · Sin reloj';
+  $('learn-coach-title').textContent=complete?'Partida terminada':lesson.title;
+  $('learn-coach-body').replaceChildren();
+  (complete?learningGuidance():[lesson.intro,...learningGuidance()]).forEach(text=>{const p=document.createElement('p');p.textContent=text;$('learn-coach-body').append(p);});
+  $('learn-coach-continue').textContent=complete?'Seguir jugando así':'Entendido, a jugar';
+  $('learn-coach-next').classList.toggle('hidden',!complete);
+  $('learn-coach-next').textContent=stage===0?'Sumar el envido':stage===1?'Sumar la flor':'Quitar la flor';
+  $('learn-coach-previous').classList.toggle('hidden',!complete||stage===0);
+  $('learn-coach-previous').textContent='Volver sin envido ni flor';
+  if(!$('learn-coach-dialog').open)$('learn-coach-dialog').showModal();
 }
 function finishLearningHand(){
-  if(!state.learning?.guided)return false;
-  state.learning.complete=true;state.learning.paused=true;clearTimeout(state.botTimer);state.botTimer=null;
-  state.room.status='practice-complete';state.room.pendingBet=null;state.room.turn=null;state.room.turnClock=null;
+  if(!state.learning||Math.max(...Object.values(state.room?.scores||{}))<10)return false;
+  if(state.learning.complete)return true;
+  state.learning.complete=true;pauseLearning();
+  Object.assign(state.room,{status:'complete',pendingBet:null,turn:null,turnClock:null,endReveal:{done:true}});
   renderGame();openLearningHelp();return true;
 }
-$('learn-game').addEventListener('click',openLearning);
-$('learn-back').addEventListener('click',()=>{stopBot();showView('welcome-view');openLobby();});
-$('learn-free').addEventListener('click',()=>startLearning());
-$('learn-help').addEventListener('click',openLearningHelp);
-$('learn-menu').addEventListener('click',openLearning);
-$('learn-hints').addEventListener('change',event=>{if(state.learning){state.learning.hints=event.target.checked;renderLearning();highlightLearningChoice();}});
-$('learn-coach-dialog').addEventListener('close',()=>{if(state.learning&&!state.learning.complete){state.learning.paused=false;renderGame();}});
-$('learn-coach-continue').addEventListener('click',()=>{const index=state.learning?.index,repeat=state.learning?.complete;$('learn-coach-dialog').close();if(repeat)startLearning(index);});
-$('learn-coach-next').addEventListener('click',()=>{const index=state.learning?.index;$('learn-coach-dialog').close();startLearning(index!==null&&index<4?index+1:null);});
-$('learn-coach-menu').addEventListener('click',openLearning);
-
 function highlightLearningChoice(){
   document.querySelectorAll('.learning-choice').forEach(element=>element.classList.remove('learning-choice'));
   if(!state.learning?.hints||state.learning.complete||state.room?.status!=='started')return;
-  const room=state.room,bet=room.pendingBet;
-  let button;
+  const room=state.room,bet=room.pendingBet;let button;
   if(bet?.revealMode&&bet.revealTurn==='player1')button=$('declare-points');
   else if(bet?.responder==='player1')button=document.querySelector('#player-actions [data-action="yes"]');
   else if(!bet){
     const original=state.localOriginalHands.player1;
-    if(hasFlor(original,room.muestra)&&!room.florSettled&&!room.flors?.player1)button=document.querySelector('#player-actions [data-action="flor"]');
-    else if(state.learning.guided&&state.learning.index===2&&canCallFirstRoundEnvido(room,'player1',state.hand))button=document.querySelector('#player-actions [data-action="envido"]');
+    if(roomHasFlor(room,original)&&!room.florSettled&&!room.flors?.player1)button=document.querySelector('#player-actions [data-action="flor"]');
     else if(room.turn==='player1'){
       const opponent=(room.trickCards||[]).find(item=>item.playerId==='player2')?.card;
       const cards=[...state.hand].sort((a,b)=>cardStrength(a,room.muestra)-cardStrength(b,room.muestra));
-      const choice=opponent?cards.find(card=>cardStrength(card,room.muestra)>cardStrength(opponent,room.muestra)):cards[cards.length-1];
+      const choice=opponent?cards.find(card=>cardStrength(card,room.muestra)>cardStrength(opponent,room.muestra)):cards.at(-1);
       if(choice)button=[...document.querySelectorAll('#hand [data-card]')].find(element=>element.dataset.card===choice.id);
     }
-  }
-  button?.classList.add('learning-choice');
+  }button?.classList.add('learning-choice');
 }
+function cardStudyName(card){return card.label+' de '+({'♦':'oro','♥':'copa','♠':'espada','♣':'basto'}[card.suit]||card.suit);}
+function explainEnvido(hand,muestra){
+  const pieces=hand.filter(card=>pieceOrder(card,muestra)),value=handEnvido(hand,muestra);
+  if(pieces.length===1){
+    const piece=pieces[0],other=hand.filter(card=>card.id!==piece.id).sort((a,b)=>envidoValue(b,muestra)-envidoValue(a,muestra))[0];
+    return {value,explanation:cardStudyName(piece)+' es pieza: '+envidoValue(piece,muestra)+'. Sumás '+envidoValue(other,muestra)+' de '+cardStudyName(other)+': '+envidoValue(piece,muestra)+' + '+envidoValue(other,muestra)+' = '+value+'. Con una pieza no agregás 20.'};
+  }
+  let pair=null,best=-1;
+  for(let a=0;a<hand.length;a++)for(let b=a+1;b<hand.length;b++)if(hand[a].suit===hand[b].suit){const sum=envidoValue(hand[a],muestra)+envidoValue(hand[b],muestra);if(sum>best){best=sum;pair=[hand[a],hand[b]];}}
+  if(pair)return {value,explanation:'Elegís las dos mejores cartas del mismo palo: '+cardStudyName(pair[0])+' y '+cardStudyName(pair[1])+'. Sumás 20 + '+envidoValue(pair[0],muestra)+' + '+envidoValue(pair[1],muestra)+' = '+value+'. Sota, caballo y rey comunes valen 0.'};
+  return {value,explanation:'No hay piezas ni dos cartas del mismo palo. Tus cartas valen '+hand.map(card=>envidoValue(card,muestra)).join(', ')+': elegís el mayor, '+value+'. Sota, caballo y rey comunes valen 0.'};
+}
+function explainFlor(hand,muestra){
+  const pieces=hand.filter(card=>pieceOrder(card,muestra)),common=hand.filter(card=>!pieceOrder(card,muestra));
+  const value=hasFlor(hand,muestra);
+  if(pieces.length>=2)return {value,explanation:'Es flor porque tenés '+pieces.length+' piezas: '+pieces.map(cardStudyName).join(', ')+'. La muestra es '+cardStudyName(muestra)+'.'};
+  if(hand.every(card=>card.suit===hand[0].suit))return {value,explanation:'Es flor porque las 3 cartas son del mismo palo.'};
+  if(pieces.length===1&&common[0].suit===common[1].suit)return {value,explanation:'Es flor: '+cardStudyName(pieces[0])+' es pieza y las otras 2 cartas son del mismo palo.'};
+  return {value,explanation:pieces.length===1?'No es flor: tenés una pieza, pero las otras 2 cartas son de palos diferentes.':'No es flor: las 3 cartas no son del mismo palo y no tenés piezas para formar otra combinación.'};
+}
+let studyExercise=null,studyNumber=0;
+function makeStudyExercise(kind){
+  // Envido exercises exclude flor hands, which belong to the flor practice.
+  let pool,hand,muestra;const wantFlor=kind==='flor'&&Math.random()<0.5;
+  do{pool=shuffleDeck();hand=pool.slice(0,3);muestra=pool[3];}while(kind==='envido'?hasFlor(hand,muestra):hasFlor(hand,muestra)!==wantFlor);
+  return {kind,hand,muestra,answered:false};
+}
+function openStudy(kind){pauseLearning();studyNumber=0;nextStudy(kind);if(!$('learn-study-dialog').open)$('learn-study-dialog').showModal();}
+function nextStudy(kind=studyExercise?.kind||'envido'){
+  studyExercise=makeStudyExercise(kind);studyNumber++;
+  $('learn-study-title').textContent=kind==='envido'?'¿Cuántos tantos tenés?':'¿Tenés flor?';
+  $('learn-study-step').textContent='Ejercicio '+studyNumber+' · '+(kind==='envido'?'Envido sin flor':'Reconocer flor');
+  const cards=$('learn-study-cards');cards.replaceChildren();
+  const add=(card,label)=>{const wrap=document.createElement('div'),caption=document.createElement('span'),image=document.createElement('div');wrap.className='study-card';caption.textContent=label;image.className='sprite-card';image.style.cssText=cardImageStyle(card);image.setAttribute('role','img');image.setAttribute('aria-label',cardAccessibleName(card));wrap.append(caption,image);cards.append(wrap);};
+  studyExercise.hand.forEach((card,index)=>add(card,'Carta '+(index+1)));add(studyExercise.muestra,'Muestra');
+  $('learn-study-envido').classList.toggle('hidden',kind!=='envido');$('learn-study-flor').classList.toggle('hidden',kind!=='flor');
+  $('learn-study-value').value='';$('learn-study-check').disabled=false;
+  $('learn-study-feedback').textContent='';$('learn-study-feedback').className='study-feedback';
+  $('learn-study-next').classList.add('hidden');
+  $('learn-study-flor').querySelectorAll('button').forEach(button=>button.disabled=false);
+}
+function checkStudy(answer){
+  if(!studyExercise||studyExercise.answered)return;
+  const exercise=studyExercise,result=exercise.kind==='envido'?explainEnvido(exercise.hand,exercise.muestra):explainFlor(exercise.hand,exercise.muestra);
+  if(exercise.kind==='envido'&&(!Number.isInteger(answer)||answer<0||answer>50)){ $('learn-study-feedback').textContent='Escribí un número entero entre 0 y 50.';return;}
+  const correct=answer===result.value;exercise.answered=true;
+  $('learn-study-feedback').textContent=(correct?'¡Correcto! ':exercise.kind==='envido'?'Tu respuesta fue '+answer+'. Tenés '+result.value+' tantos. ':result.value?'Esta mano sí tiene flor. ':'Esta mano no tiene flor. ')+result.explanation;
+  $('learn-study-feedback').className='study-feedback '+(correct?'study-correct':'study-incorrect');
+  $('learn-study-check').disabled=true;$('learn-study-flor').querySelectorAll('button').forEach(button=>button.disabled=true);
+  $('learn-study-next').classList.remove('hidden');
+}
+function openStudySheet(){pauseLearning();if(!$('learn-sheet-dialog').open)$('learn-sheet-dialog').showModal();}
+$('learn-game').addEventListener('click',openLearning);
+$('learn-back').addEventListener('click',()=>{stopBot();showView('welcome-view');openLobby();});
+$('learn-free').addEventListener('click',()=>startLearning(0));
+$('learn-help').addEventListener('click',openLearningHelp);
+$('learn-menu').addEventListener('click',openLearning);
+$('game-sheet').addEventListener('click',openStudySheet);
+$('learn-sheet-menu').addEventListener('click',openStudySheet);
+$('learn-sheet-close').addEventListener('click',()=>$('learn-sheet-dialog').close());
+$('learn-envido-study').addEventListener('click',()=>openStudy('envido'));
+$('learn-flor-study').addEventListener('click',()=>openStudy('flor'));
+$('learn-study-close').addEventListener('click',()=>$('learn-study-dialog').close());
+$('learn-study-sheet').addEventListener('click',openStudySheet);
+$('learn-study-next').addEventListener('click',()=>nextStudy());
+$('learn-study-envido').addEventListener('submit',event=>{event.preventDefault();const raw=$('learn-study-value').value.trim();if(raw===''){$('learn-study-feedback').textContent='Escribí tus tantos antes de comprobar.';return;}checkStudy(Number(raw));});
+$('learn-study-yes').addEventListener('click',()=>checkStudy(true));
+$('learn-study-no').addEventListener('click',()=>checkStudy(false));
+$('learn-hints').addEventListener('change',event=>{if(state.learning){state.learning.hints=event.target.checked;renderLearning();highlightLearningChoice();}});
+for(const id of ['learn-coach-dialog','learn-study-dialog','learn-sheet-dialog'])$(id).addEventListener('close',resumeLearning);
+$('learn-coach-continue').addEventListener('click',()=>{const stage=state.learning?.stage||0,complete=state.learning?.complete;$('learn-coach-dialog').close();if(complete)startLearning(stage);});
+$('learn-coach-next').addEventListener('click',()=>{const stage=state.learning.stage;$('learn-coach-dialog').close();startLearning(stage===2?1:stage+1);});
+$('learn-coach-previous').addEventListener('click',()=>{$('learn-coach-dialog').close();startLearning(0);});
+$('learn-coach-menu').addEventListener('click',openLearning);

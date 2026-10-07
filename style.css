@@ -1404,3 +1404,34 @@ body { min-height:100dvh; }
   .learn-lesson{padding:16px}
   .learn-coach-dialog{padding:20px}
 }
+
+/* Progressive practice and card exercises, scoped to learning views. */
+.learn-content h2{font-size:20px;color:#ead39b;margin:28px 0 8px}
+.learn-path{list-style:none;padding:0;counter-reset:stage;display:grid;gap:12px;margin:24px 0}
+.learn-path li{counter-increment:stage;display:grid;grid-template-columns:32px 1fr;gap:5px 12px;padding:15px;background:#15392b;border:1px solid #d8b87555;border-radius:10px}
+.learn-path li::before{content:counter(stage);grid-row:1/3;width:30px;height:30px;border:1px solid #d8b875;color:#ead39b;border-radius:50%;display:grid;place-items:center}
+.learn-path strong{color:#ead39b}.learn-path span{font-size:13px;line-height:1.5;color:#c2cec4}
+.learn-practice-actions{display:flex;flex-wrap:wrap;gap:10px}
+.learn-practice-actions>.button{justify-content:center;min-height:44px;min-width:130px;flex:1;font-size:13px;border-radius:8px}
+.learn-study-dialog{width:min(600px,calc(100vw - 24px))}
+.learn-close{float:right;width:36px;height:36px;border:1px solid #d8b87588;border-radius:8px;background:transparent;color:#ead39b;font-size:25px;line-height:1}
+.study-cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:22px 0}
+.study-card{min-width:0;text-align:center}
+.study-card>span{display:block;margin-bottom:8px;color:#c2cec4;font-size:12px}
+.study-card>.sprite-card{width:100%;aspect-ratio:280/435;height:auto;border-radius:7px;box-shadow:0 3px 10px #0004}
+.study-card:last-child{padding-left:8px;border-left:1px solid #d8b87566}
+.study-card:last-child>span{color:#ead39b;font-weight:700}
+.study-envido{display:grid;grid-template-columns:auto 72px 1fr;align-items:center;gap:12px}
+.study-envido input{width:72px;height:44px;border:1px solid #d8b875;background:#0b291f;color:#fff;border-radius:8px;text-align:center;font-size:21px}
+.study-envido>.button{font-size:14px;justify-content:center;min-height:44px;border-radius:8px}
+.study-feedback{font-size:14px;line-height:1.6;margin:18px 0}
+.study-correct{border-left:3px solid #9fc8a1;padding-left:12px;color:#d2ead3}
+.study-incorrect{border-left:3px solid #e8c983;padding-left:12px;color:#ead7a5}
+.learn-sheet-dialog{width:min(740px,calc(100vw - 24px))}
+.learn-sheet-dialog img{display:block;width:100%;height:auto;border-radius:10px}
+.learning-toolbar{gap:7px;width:calc(100% - 24px);max-width:440px}
+.learning-toolbar button{padding:7px 8px}
+@media(max-width:400px){.study-cards{gap:6px}.learn-study-dialog{padding:16px}.study-envido{gap:8px}.study-envido label{font-size:12px}.learning-toolbar button{font-size:11px;padding:7px 6px}}
+
+.game-topbar .game-help-toggle{position:relative;flex:0 0 38px;width:38px;height:38px;padding:8px;margin-left:8px;display:grid;place-items:center;border:1px solid rgba(239,235,215,.4);border-radius:50%;background:#193b2b;color:#f0eee2;touch-action:manipulation;z-index:80}
+.game-help-toggle svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
