@@ -1554,3 +1554,7 @@ body { min-height:100dvh; }
 .guide-labeled-group{position:relative}
 .guide-side-label{position:absolute;left:-24px;top:50%;transform:translateY(-50%) rotate(180deg);writing-mode:vertical-rl;color:var(--gold);font-size:14px;font-weight:700;letter-spacing:.08em;line-height:1;white-space:nowrap}
 .guide-pieces>p{color:#ead39b}
+
+/* Invalid turn feedback remains red for the whole shake in every game mode. */
+#turn-badge.turn-rejected{color:#ff7167;border-color:#ff7167}
+#turn-badge.turn-rejected .turn-badge-label,#turn-badge.turn-rejected .turn-timer,#turn-badge.turn-rejected .round-pause-timer{color:#ff7167;border-color:#ff7167}

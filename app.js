@@ -1503,7 +1503,10 @@ function shakeTurnBadge(){
   const badge=$('turn-badge');
   if(!badge)return;
   badge.getAnimations?.().forEach(animation=>animation.cancel());
+  clearTimeout(badge._shakeTimer);
+  badge.classList.add('turn-rejected');
   badge.animate?.([{translate:'0 0'},{translate:'-5px 0'},{translate:'5px 0'},{translate:'-4px 0'},{translate:'4px 0'},{translate:'0 0'}],{duration:400,easing:'ease-out'});
+  badge._shakeTimer=setTimeout(()=>badge.classList.remove('turn-rejected'),400);
 }
 function waitingTurnLabel(room=state.room){
   const pending=room?.pendingBet;
