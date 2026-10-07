@@ -2797,10 +2797,15 @@ $('learn-points-info').addEventListener('change',event=>{
   state.learning.pointsInfo=event.target.checked;
   if(!event.target.checked){
     state.learning.scoreMessages=[];
-    if(state.learning.activeScoreMessage&&$('learning-hint').open){$('learning-hint').close();return;}
+    if($('learning-hint').open)$('learning-hint').close();
+    pauseLearning();
+    $('learning-points-tip').showModal();
+    return;
   }
   renderLearning();
 });
+$('learning-points-tip-close').addEventListener('click',()=>$('learning-points-tip').close());
+$('learning-points-tip').addEventListener('close',resumeLearning);
 for(const id of ['learn-coach-dialog','learn-study-dialog','learn-sheet-dialog','learn-envido-help-dialog','learn-flor-help-dialog'])$(id).addEventListener('close',resumeLearning);
 $('learn-coach-continue').addEventListener('click',()=>{const stage=state.learning?.stage||0,complete=state.learning?.complete;$('learn-coach-dialog').close();if(complete)startLearning(stage);});
 $('learn-coach-next').addEventListener('click',()=>{const stage=state.learning.stage;$('learn-coach-dialog').close();startLearning(stage===2?1:stage+1);});
