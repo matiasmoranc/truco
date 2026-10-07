@@ -1478,3 +1478,6 @@ body { min-height:100dvh; }
 
 .learning-score-arrow{position:fixed;inset:0;width:100vw;height:100dvh;overflow:visible;pointer-events:none}
 .learning-score-highlight{outline:2px solid #ead39b;outline-offset:4px;border-radius:8px}
+
+/* Reference and practice windows stay distinct from in-game teaching messages. */
+.learn-coach-dialog:not(.learning-message)::backdrop{background:rgba(4,24,15,.62);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
