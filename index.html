@@ -11,7 +11,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="./style.css?v=20261007-learn31" />
+    <link rel="stylesheet" href="./style.css?v=20261007-learn32" />
   </head>
   <body>
     <div class="grain" aria-hidden="true"></div>
@@ -68,6 +68,18 @@
           <h3>Una pieza</h3><p>Las piezas son del palo de la muestra: 2 = 30, 4 = 29, 5 = 28, 11 = 27 y 10 = 27. Sumá el valor de la pieza y la mejor de las otras cartas. No agregues 20.</p><p class="count-example">Ejemplo: pieza de 30 + 6 = 36 tantos.</p>
           <p>Si la muestra es una pieza, el 12 de ese palo ocupa su lugar y vale lo mismo que esa pieza.</p>
           <h3>¿Y si tenés flor?</h3><p>Con flor no se juega envido. En estos ejercicios de envido se muestran manos sin flor.</p>
+        </div>
+      </dialog>
+      <dialog id="learn-flor-help-dialog" class="learn-coach-dialog" aria-labelledby="learn-flor-help-title">
+        <button id="learn-flor-help-close" class="learn-close" aria-label="Cerrar ayuda de flor">×</button>
+        <h2 id="learn-flor-help-title">Cómo saber si tenés flor</h2>
+        <div class="envido-count-help">
+          <p>Mirá tus tres cartas y el palo de la muestra. Tenés flor si se cumple alguna de estas condiciones:</p>
+          <h3>Tres cartas del mismo palo</h3><p>Por ejemplo: 3, 6 y 7 de copas.</p>
+          <h3>Una pieza y dos comunes del mismo palo</h3><p>Las dos comunes deben compartir palo entre sí. Por ejemplo: 2 de la muestra, 6 y 7 de copas.</p>
+          <h3>Dos o tres piezas</h3><p>Con dos piezas ya tenés flor, sin importar la tercera carta.</p>
+          <h3>¿Cuáles son las piezas?</h3><p>Son el 2, 4, 5, 11 y 10 del palo de la muestra. Si la muestra es una pieza, el 12 de ese palo ocupa su lugar.</p>
+          <p class="count-example">Si no se cumple ninguna de estas condiciones, no tenés flor.</p>
         </div>
       </dialog>
       <dialog id="learn-sheet-dialog" class="learn-coach-dialog learn-sheet-dialog" aria-labelledby="learn-sheet-title">
@@ -127,7 +139,7 @@
 
       <section class="game view" id="game-view">
         
-        <div id="learning-toolbar" class="learning-toolbar hidden"><button id="learn-help" type="button">Ver ayuda</button><label><input id="learn-hints" type="checkbox" checked> Ayudas</label><button id="learn-menu" type="button">Salir</button></div><dialog id="learning-hint" class="learn-coach-dialog learning-message" aria-labelledby="learning-message-title"><h2 id="learning-message-title">Antes de seguir</h2><div id="learning-message-body"></div><div class="learn-dialog-actions"><button id="learning-message-continue" class="button primary" type="button">Entendido, continuar</button></div></dialog>
+        <div id="learning-toolbar" class="learning-toolbar hidden"><button id="learn-help" type="button">Ver ayuda</button><label><input id="learn-hints" type="checkbox" checked> Ayudas</label><button id="learn-menu" type="button">Salir</button></div><dialog id="learning-hint" class="learn-coach-dialog learning-message" aria-labelledby="learning-message-title"><svg id="learning-score-arrow" class="learning-score-arrow hidden" aria-hidden="true"><defs><marker id="learning-arrow-tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#ead39b"/></marker></defs><path id="learning-score-arrow-path" fill="none" stroke="#ead39b" stroke-width="3" marker-end="url(#learning-arrow-tip)"/></svg><h2 id="learning-message-title">Antes de seguir</h2><div id="learning-message-body"></div><div class="learn-dialog-actions"><button id="learning-message-continue" class="button primary" type="button">Entendido, continuar</button></div></dialog>
         <div id="call-notice" class="call-notice hidden" role="status" aria-live="assertive"></div>
         <section id="opening-draw" class="opening-draw hidden" aria-live="polite"></section>
         <section id="envido-picker" class="envido-picker hidden" aria-label="Declarar tantos de envido"></section>
@@ -187,7 +199,7 @@
       <section class="toast-global" id="global-toast" role="status"></section>
     </main>
     <dialog id="score-details" class="score-details" aria-labelledby="score-details-title"><div class="score-details-panel"><header class="score-details-header"><h2 id="score-details-title">Historial de manos</h2><button id="close-score-details" type="button" aria-label="Cerrar detalle"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button></header><div id="score-details-content"></div><button id="dismiss-score-details" class="score-details-dismiss" type="button">Cerrar</button></div></dialog>
-    <script type="module" src="./app.js?v=20261007-learn31"></script>
+    <script type="module" src="./app.js?v=20261007-learn32"></script>
   </body>
 </html>
 

@@ -1385,7 +1385,7 @@ body { min-height:100dvh; }
 .learn-content>.button{width:100%;justify-content:center;min-height:48px;font-size:15px;border-radius:10px}
 .learn-small{font-size:12px;line-height:1.5;color:#b9c7bc}
 .learn-coach-dialog{width:min(480px,calc(100vw - 32px));max-height:85dvh;margin:auto;padding:24px;color:var(--ink);background:#123b2c;border:1px solid var(--gold);border-radius:18px;overflow:auto;box-shadow:0 20px 60px #0006}
-.learn-coach-dialog::backdrop{background:#04180fc9;backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)}
+.learn-coach-dialog::backdrop{background:transparent;backdrop-filter:none;-webkit-backdrop-filter:none}
 .learn-coach-dialog h2{color:#ead39b;font-size:25px;margin:10px 0 18px}
 #learn-coach-body p{font-size:15px;line-height:1.55;color:#e0e7dc}
 .learn-dialog-actions{display:flex;flex-direction:column;gap:10px;margin-top:22px}
@@ -1460,3 +1460,21 @@ body { min-height:100dvh; }
 .envido-count-help h3{font-size:16px;color:#ead39b;margin:22px 0 8px}
 .envido-count-help p{font-size:14px;line-height:1.6;color:#e0e7dc;margin:8px 0}
 .envido-count-help .count-example{padding:9px 12px;border-left:2px solid #d8b875;background:#0b291f;color:#ead39b;border-radius:0 6px 6px 0}
+
+/* Keep teaching help compact and the cards behind it clearly visible. */
+.learn-coach-dialog{max-height:55dvh;padding:16px;box-shadow:0 4px 14px #0003}
+.learn-coach-dialog h2{font-size:20px;margin:4px 40px 12px 0}
+#learn-coach-body p{font-size:14px;line-height:1.4;margin:7px 0}
+.learn-coach-dialog .learn-dialog-actions{gap:7px;margin-top:12px}
+.learn-coach-dialog .learn-dialog-actions>.button{min-height:40px;padding:9px 12px}
+.learn-coach-dialog .learn-dialog-actions>.text-button{padding:6px}
+.learning-message{width:min(440px,calc(100vw - 32px));max-height:40dvh;padding:14px 16px}
+.learning-message h2{margin:0 0 9px;font-size:18px}
+#learning-message-body p{font-size:14px;line-height:1.4;margin:7px 0}
+#learning-message-continue{width:100%;min-height:40px;padding:9px 12px;font-size:13px;letter-spacing:normal;margin-top:9px;border-radius:9px;justify-content:center}
+.envido-count-help h3{font-size:15px;margin:14px 0 5px}
+.envido-count-help p{line-height:1.4;margin:6px 0}
+.learn-study-dialog{max-height:85dvh}
+
+.learning-score-arrow{position:fixed;inset:0;width:100vw;height:100dvh;overflow:visible;pointer-events:none}
+.learning-score-highlight{outline:2px solid #ead39b;outline-offset:4px;border-radius:8px}

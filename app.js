@@ -2173,6 +2173,7 @@ function localScore(player,points,description){
   const before={...state.room,scores:{...state.room.scores}};
   state.room.scores[player]=Math.min(targetPoints(state.room),(state.room.scores[player]||0)+amount);
   state.room.handScoreEntries=scoringEntries(before,state.room.scores,description);
+  queueLearningPoints(before,state.room.scores,state.room.handScoreEntries);
   localFeed(`${state.room.players[player].name} ${description} (+${amount}).`);
   if(state.room.scores[player]>=targetPoints(state.room)){state.room.status='complete';state.room.lastHandScore=buildHandSummary(before,state.room.scores,description,null);state.room.handScoreHistory=handScoreHistory(state.room,state.room.lastHandScore);}
 }
@@ -2277,6 +2278,7 @@ function localFinishHand(winner,points){
   room.scores=capScores(room,settleSingleFlor(room,room.scores));
   room.lastHandScore=buildHandSummary(before,room.scores,`${room.players[winner].name} gana la mano (${points} puntos).`,state.localTruth||{});room.handScoreEntries=[];
   room.handScoreHistory=handScoreHistory(room,room.lastHandScore);
+  queueLearningPoints(before,room.scores,room.lastHandScore.entries);
   if(groups.length){localShowEvidence(groups);renderGame();return;}
   localDealAfterHand();
 }
@@ -2286,6 +2288,9 @@ function localShowEvidence(groups){
   scheduleLocalTransition(room,()=>{if(!state.localGame||state.room!==room||room.status!=='revealing')return;localDealAfterHand();},5000);
 }
 function localDealAfterHand(){
+  if(state.learning&&(state.learning.scoreMessages?.length||state.learning.activeScoreMessage)){
+    state.learning.afterScoreMessage=localDealAfterHand;renderGame();return;
+  }
   if(finishLearningHand())return;
   const room=state.room;
   if(Math.max(...Object.values(room.scores))>=targetPoints(room)){room.status='complete';room.pendingBet=null;room.endReveal={done:true};renderGame();return;}
@@ -2524,7 +2529,7 @@ async function startLearning(stage=0){
   try{
     $('learn-coach-dialog').close();
     if(!await startLocalBotGame())return;
-    state.learning={stage,hints:true,paused:true,pausedAt:gameTime(),complete:false};
+    state.learning={stage,hints:true,paused:true,pausedAt:gameTime(),complete:false,scoreMessages:[]};
     state.bot=true;state.botDifficulty='easy';state.botMemory=null;
     state.room.players={player1:{name:cleanName($('lobby-name').value||$('player-name').value,'Vos')},player2:{name:'Bot de práctica'}};
     Object.assign(state.room,{targetPoints:10,status:'started',openingDraw:null,createdAt:gameTime(),matchNumber:1,turnClock:null,practiceRules:{envido:stage>=1,flor:stage>=2}});
@@ -2569,27 +2574,62 @@ function learningGuidance(){
 function learningMessageKey(){
   return JSON.stringify([state.room?.handNumber,state.room?.trickNo,learningGuidance()]);
 }
+function queueLearningPoints(before,after,entries){
+  if(!state.learning?.hints)return;
+  for(const player of ['player1','player2']){
+    const points=(after[player]||0)-(before.scores[player]||0);if(points<=0)continue;
+    const details=(entries||[]).slice((before.handScoreEntries||[]).length).filter(entry=>entry.player===player).map(entry=>entry.detail);
+    const wonRounds=(before.tricks||[]).filter(round=>round.winner===player).length;
+    const reason=details.map(detail=>{
+      if(!detail.startsWith('Mano ganada'))return detail;
+      const level=Number(before.trucoLevel)||1;
+      if(level>1)return 'Se jugó '+({2:'truco',3:'retruco',4:'vale cuatro'}[level]||'truco')+'. '+({2:'Truco = 2 puntos',3:'Retruco = 3 puntos',4:'Vale cuatro = 4 puntos'}[level]||'');
+      if(wonRounds>=2)return (player==='player1'?'Ganaste':'Ganó')+' dos rondas.';
+      if(wonRounds===1)return 'Ganó una ronda y la otra empató. Una ronda ganada y una empatada alcanzan para ganar la mano.';
+      return 'El rival se fue al mazo o no quiso el truco. La mano sin truco vale 1 punto.';
+    }).join('\n');
+    const subject=player==='player1'?'Sumaste':(before.players?.[player]?.name||'El bot')+' sumó';
+    state.learning.scoreMessages??=[];
+    state.learning.scoreMessages.push(subject+' '+points+' '+(points===1?'punto':'puntos')+'.\n'+(reason||'Por los puntos de esta mano.')+(after[player]>=targetPoints(before)?'\n'+(player==='player1'?'Llegaste':'Llegó')+' al límite de la partida: '+targetPoints(before)+' puntos.':''));
+  }
+}
+function positionLearningScoreArrow(){
+  const dialog=$('learning-hint'),arrow=$('learning-score-arrow');
+  const active=dialog.open&&state.learning?.activeScoreMessage;
+  arrow.classList.toggle('hidden',!active);
+  document.querySelectorAll('.scoreboard,.mobile-score').forEach(marker=>marker.classList.toggle('learning-score-highlight',!!active));
+  if(!active)return;
+  const marker=[...document.querySelectorAll('.mobile-score,.scoreboard')].find(el=>el.getBoundingClientRect().width&&el.getBoundingClientRect().height);
+  if(!marker){arrow.classList.add('hidden');return;}
+  const box=dialog.getBoundingClientRect(),target=marker.getBoundingClientRect();
+  const x1=box.right-20,y1=box.top+20,x2=target.left+target.width/2,y2=target.top+target.height/2;
+  arrow.setAttribute('viewBox','0 0 '+window.innerWidth+' '+window.innerHeight);
+  $('learning-score-arrow-path').setAttribute('d','M '+x1+' '+y1+' Q '+x1+' '+(Math.min(y1,y2)-40)+' '+x2+' '+y2);
+}
 function showLearningMessage(){
   if(!state.learning?.hints||state.learning.paused||state.learning.complete||document.querySelector('.learn-coach-dialog[open]'))return;
-  const room=state.room,bet=room.pendingBet;
-  // Waiting for the bot needs no explanation; explain the next player decision or result.
-  if(!room.resolvingTrick&&!room.pendingNextHand&&room.status!=='revealing'&&
-    (bet?(bet.revealMode?bet.revealTurn!=='player1':bet.responder!=='player1'):room.turn!=='player1'))return;
-  const key=learningMessageKey();
-  if(state.learning.acknowledgedMessage===key)return;
-  pauseLearning();state.learning.activeMessage=key;
+  const room=state.room,bet=room.pendingBet,scoreMessage=state.learning.scoreMessages?.shift();
+  // Explain actual scoring and new calls; ordinary turns and round pauses need no popup.
+  if(!scoreMessage&&(!bet||(bet.revealMode?bet.revealTurn!=='player1':bet.responder!=='player1')))return;
+  const key=scoreMessage?'score:'+crypto.randomUUID():learningMessageKey();
+  if(!scoreMessage&&state.learning.acknowledgedMessage===key)return;
+  pauseLearning();state.learning.activeMessage=key;state.learning.activeScoreMessage=!!scoreMessage;
+  $('learning-message-title').textContent=scoreMessage?'Mirá el marcador':'Antes de seguir';
   const body=$('learning-message-body');body.replaceChildren();
-  learningGuidance().forEach(text=>{const p=document.createElement('p');p.textContent=text;body.append(p);});
+  (scoreMessage?scoreMessage.split('\n'):learningGuidance()).forEach(text=>{const p=document.createElement('p');p.textContent=text;body.append(p);});
   $('learning-hint').showModal();
+  requestAnimationFrame(positionLearningScoreArrow);
 }
 function renderLearning(){
   const active=!!(state.learning&&state.localGame);
   $('learning-toolbar').classList.toggle('hidden',!active);$('game-view').classList.toggle('learning-mode',active);
   if(!active){if($('learning-hint').open)$('learning-hint').close();return;}
   $('learn-hints').checked=state.learning.hints;
+  showLearningMessage();
+  if(state.learning.paused)return;
   if(!state.learning.complete&&state.room.status==='complete'&&(!state.room.endReveal||state.room.endReveal.done)){
     const room=state.room;queueMicrotask(()=>{if(state.room===room&&room.status==='complete'&&(!room.endReveal||room.endReveal.done))finishLearningHand();});
-  }else showLearningMessage();
+  }
 }
 function armLearningTransition(transition){
   transition.dueAt=gameTime()+transition.remaining;
@@ -2628,6 +2668,9 @@ function resumeLearning(){
     if(learning.transition)armLearningTransition(learning.transition);
   }
   renderGame();
+  if(!learning.paused&&!document.querySelector('.learn-coach-dialog[open]')&&learning.afterScoreMessage){
+    const callback=learning.afterScoreMessage;learning.afterScoreMessage=null;callback();
+  }
 }
 function openLearningHelp(){
   if(!state.learning)return;
@@ -2699,6 +2742,7 @@ function openStudy(kind){pauseLearning();studyNumber=0;nextStudy(kind);if(!$('le
 function nextStudy(kind=studyExercise?.kind||'envido'){
   studyExercise=makeStudyExercise(kind);studyNumber++;
   $('learn-study-title').textContent=kind==='envido'?'¿Cuántos tantos tenés?':'¿Tenés flor?';
+  $('learn-study-count-help').textContent=kind==='flor'?'Cómo saber si tenés flor':'Cómo contar el envido';
   $('learn-study-step').textContent='Ejercicio '+studyNumber+' · '+(kind==='envido'?'Envido sin flor':'Reconocer flor');
   const cards=$('learn-study-cards');cards.replaceChildren();
   const add=(card,label)=>{const wrap=document.createElement('div'),caption=document.createElement('span'),image=document.createElement('div');wrap.className='study-card';caption.textContent=label;image.className='sprite-card';image.style.cssText=cardImageStyle(card);image.setAttribute('role','img');image.setAttribute('aria-label',cardAccessibleName(card));wrap.append(caption,image);cards.append(wrap);};
@@ -2720,14 +2764,16 @@ function checkStudy(answer){
   $('learn-study-check').disabled=true;$('learn-study-flor').querySelectorAll('button').forEach(button=>button.disabled=true);
   $('learn-study-next').classList.remove('hidden');
 }
+function openFlorCountHelp(){pauseLearning();if(!$('learn-flor-help-dialog').open)$('learn-flor-help-dialog').showModal();}
 function openEnvidoCountHelp(){pauseLearning();if(!$('learn-envido-help-dialog').open)$('learn-envido-help-dialog').showModal();}
 function openStudySheet(){pauseLearning();if(!$('learn-sheet-dialog').open)$('learn-sheet-dialog').showModal();}
 $('learn-game').addEventListener('click',openLearning);
 $('learn-back').addEventListener('click',()=>{stopBot();showView('welcome-view');openLobby();});
 $('learn-free').addEventListener('click',()=>startLearning(0));
 $('learn-help').addEventListener('click',openLearningHelp);
+window.addEventListener('resize',positionLearningScoreArrow);
 $('learning-message-continue').addEventListener('click',()=>$('learning-hint').close());
-$('learning-hint').addEventListener('close',()=>{if(state.learning){state.learning.acknowledgedMessage=state.learning.activeMessage;state.learning.activeMessage=null;}resumeLearning();});
+$('learning-hint').addEventListener('close',()=>{if(state.learning){state.learning.acknowledgedMessage=state.learning.activeMessage;state.learning.activeMessage=null;state.learning.activeScoreMessage=false;}positionLearningScoreArrow();resumeLearning();});
 $('learn-menu').addEventListener('click',openLearning);
 $('game-sheet').addEventListener('click',openStudySheet);
 $('learn-sheet-menu').addEventListener('click',openStudySheet);
@@ -2736,14 +2782,15 @@ $('learn-envido-study').addEventListener('click',()=>openStudy('envido'));
 $('learn-flor-study').addEventListener('click',()=>openStudy('flor'));
 $('learn-study-close').addEventListener('click',()=>$('learn-study-dialog').close());
 $('learn-study-sheet').addEventListener('click',openStudySheet);
-$('learn-study-count-help').addEventListener('click',openEnvidoCountHelp);
+$('learn-study-count-help').addEventListener('click',()=>studyExercise?.kind==='flor'?openFlorCountHelp():openEnvidoCountHelp());
+$('learn-flor-help-close').addEventListener('click',()=>$('learn-flor-help-dialog').close());
 $('learn-envido-help-close').addEventListener('click',()=>$('learn-envido-help-dialog').close());
 $('learn-study-next').addEventListener('click',()=>nextStudy());
 $('learn-study-envido').addEventListener('submit',event=>{event.preventDefault();const raw=$('learn-study-value').value.trim();if(raw===''){$('learn-study-feedback').textContent='Escribí tus tantos antes de comprobar.';return;}checkStudy(Number(raw));});
 $('learn-study-yes').addEventListener('click',()=>checkStudy(true));
 $('learn-study-no').addEventListener('click',()=>checkStudy(false));
 $('learn-hints').addEventListener('change',event=>{if(state.learning){state.learning.hints=event.target.checked;renderLearning();highlightLearningChoice();}});
-for(const id of ['learn-coach-dialog','learn-study-dialog','learn-sheet-dialog','learn-envido-help-dialog'])$(id).addEventListener('close',resumeLearning);
+for(const id of ['learn-coach-dialog','learn-study-dialog','learn-sheet-dialog','learn-envido-help-dialog','learn-flor-help-dialog'])$(id).addEventListener('close',resumeLearning);
 $('learn-coach-continue').addEventListener('click',()=>{const stage=state.learning?.stage||0,complete=state.learning?.complete;$('learn-coach-dialog').close();if(complete)startLearning(stage);});
 $('learn-coach-next').addEventListener('click',()=>{const stage=state.learning.stage;$('learn-coach-dialog').close();startLearning(stage===2?1:stage+1);});
 $('learn-coach-previous').addEventListener('click',()=>{$('learn-coach-dialog').close();startLearning(0);});
