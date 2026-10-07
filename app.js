@@ -1,6 +1,6 @@
 const FIREBASE_VERSION = '12.4.0';
 const $ = (id) => document.getElementById(id);
-const views = ['welcome-view', 'invite-view', 'setup-view', 'waiting-view', 'game-view', 'config-view'];
+const views = ['welcome-view', 'invite-view', 'setup-view', 'waiting-view', 'game-view', 'config-view', 'learn-view'];
 const storageKey = 'truco-firebase-config';
 let state = { role: 'table', joining: false, config: null, firebase: null, roomCode: null, selectedRoom: null, uid: null, playerId: null, unsubscribe: null, privateUnsubscribe: null, lobbyUnsubscribe: null, room: null, hand: [], handOrder: [], handOrderKey: null, localGame: false, localHands: {}, nextAction: null, resolutionTimer: null, resolutionTimerKey: null, playActionInFlight: false, legacyRepairKey: null, emptyHandRepairKey: null };
 
@@ -1442,6 +1442,7 @@ function turnClockPlayer(room=state.room){
   return room?.turn;
 }
 function turnClockKey(room=state.room){
+  if(state.learning&&state.localGame)return null;
   if(room?.status==='timed-out'&&room.turnTimeout)return ['timeout',room.handNumber||1,room.turnTimeout.loser||otherPlayer(room.turnTimeout.winner),room.timeoutCounts?.[room.turnTimeout.loser||otherPlayer(room.turnTimeout.winner)]||1].join(':');
   if(!room||room.status!=='started'||room.resolvingTrick||room.pendingNextHand||room.endReveal&&!room.endReveal.done)return null;
   const player=turnClockPlayer(room);
@@ -1680,6 +1681,7 @@ function renderTurnTimer(){
 function renderGame() {
   if (!state.room||state.botActing) return;
   syncMatchChat();
+  renderLearning();
   scheduleBot();
   renderMatchEnd();
   syncPrivateHand();
@@ -1728,7 +1730,7 @@ function renderGame() {
   const leftPlayer=twoPhones?state.playerId:'player1',rightPlayer=otherPlayer(leftPlayer);
   $('mobile-tally-1').innerHTML=tallyRenderer(room.scores?.[leftPlayer]||0,targetPoints(room));$('mobile-tally-2').innerHTML=tallyRenderer(room.scores?.[rightPlayer]||0,targetPoints(room));
   $('deck-count').textContent=room.deckCount??40;
-  $('game-room-code').textContent=state.bot?'CONTRA BOT · '+botLevelLabel(state.botDifficulty).toUpperCase():'MESA ABIERTA';
+  $('game-room-code').textContent=state.learning?'PRÁCTICA':state.bot?'CONTRA BOT · '+botLevelLabel(state.botDifficulty).toUpperCase():'MESA ABIERTA';
   $('my-name').textContent=isTable?tableName:(mine?.name||'Vos'); $('my-avatar').textContent=(isTable?tableName:(mine?.name||'V')).slice(0,1).toUpperCase();
   $('opponent-name').textContent=isTable?'Los jugadores':(opponent?.name||'Esperando rival'); $('opponent-avatar').textContent=(isTable?'T':(opponent?.name||'J').slice(0,1)).toUpperCase();
   const myTurn=!isTable&&room.turn===state.playerId&&room.status==='started'&&!room.resolvingTrick&&state.hand.length>0&&!room.pendingBet&&!room.pendingNextHand;
@@ -1778,12 +1780,13 @@ function renderGame() {
   const canAct=room.status==='started'&&!room.resolvingTrick&&!room.pendingNextHand;
   const availableButtons=canAct?buttons.filter(button=>button.includes('data-action=')):[];
   actions.innerHTML=availableButtons.length?'<div class="action-buttons compact-actions">'+availableButtons.join('')+'</div>':'';
-  foldButton.classList.toggle('hidden',isTable);
+  foldButton.classList.toggle('hidden',isTable||!!state.learning?.complete);
   renderEnvidoPicker(room);
   alignHandWithControls();
   actions.querySelectorAll('[data-action]').forEach((button)=>button.addEventListener('click',()=>{const act=button.dataset.action;if(state.localGame){localAction(act);return;}if(['yes','no','raise'].includes(act)||act.startsWith('raise-'))answerBet(act);else if(act==='reveal')revealEnvido();else if(act==='flor')callFlor();else callBet(act);}));
   setTurnBadge(isTable?'MESA':roundPauseInfo(room)?'ESPERÁ':pending?(pending.responder===state.playerId?'RESPONDÉ':'ESPERANDO'):myTurn?'TU TURNO':'ESPERÁ');$('turn-badge').classList.toggle('waiting-turn',!myTurn||!!pending);
   renderMatchEnd();
+  highlightLearningChoice();
 }
 function matchEndKey(room=state.room){
   return [state.roomCode,room?.matchNumber||1,room?.rematch?.id||'',room?.rematch?.status||''].join(':');
@@ -1847,7 +1850,7 @@ async function respondRematch(action){
 }
 function renderMatchEnd(){
   const panel=$('match-end'),room=state.room,winner=room&&matchWinner(room);
-  const visible=matchFinished(room)&&!!winner&&state.dismissedMatchEnd!==matchEndKey(room);
+  const visible=!state.learning?.guided&&matchFinished(room)&&!!winner&&state.dismissedMatchEnd!==matchEndKey(room);
   panel.classList.toggle('hidden',!visible);
   if(!visible)return;
   const name=room.players?.[winner]?.name||'Jugador';
@@ -1993,7 +1996,7 @@ function updateBotSetup(){
   if(enabled)updateMode('two');
   $('enter-room').textContent=enabled?'Jugar contra Bot':'Crear mesa';
 }
-function stopBot(){clearTimeout(state.botTimer);state.botTimer=null;state.bot=false;state.botMemory=null;}
+function stopBot(){state.learning=null;$('learning-toolbar')?.classList.add('hidden');$('learning-hint')?.classList.add('hidden');$('game-view').classList.remove('learning-mode');clearTimeout(state.botTimer);state.botTimer=null;state.bot=false;state.botMemory=null;}
 async function startBotGame(name){
   if(!await startLocalBotGame())return;
   state.bot=true;state.botDifficulty=$('bot-level').value;
@@ -2067,6 +2070,7 @@ function chooseBotDecision(room,hand,level,memory,random=Math.random){
       return {kind:'action',value:bet.called==='falta'&&value<32?'no':'yes'};
     }
     if(bet.type==='envido'){
+      if(state.learning?.guided&&state.learning.index===2)return {kind:'action',value:'yes'};
       if(hard&&tantos>=32&&!memory.envidoRaised&&bet.called!=='falta'){
         memory.envidoRaised=true;return {kind:'action',value:'raise-real'};
       }
@@ -2087,12 +2091,12 @@ function chooseBotDecision(room,hand,level,memory,random=Math.random){
     return null;
   }
   if(room.turn!==me||!hand.length)return null;
-  if(!memory.envidoCalled&&canCallFirstRoundEnvido(room,me,hand)){
+  if(!state.learning?.guided&&!memory.envidoCalled&&canCallFirstRoundEnvido(room,me,hand)){
     memory.envidoCalled=true;
     if(easy?random()<0.4:tantos>=25)return {kind:'action',value:hard&&tantos>=33?'real':'envido'};
   }
   const trucoLevel=Number(room.trucoLevel)||1;
-  if(trucoLevel<4&&(trucoLevel===1||room.lastTrucoCaller!==me)&&!memory.trucoCalled){
+  if(!state.learning?.guided&&trucoLevel<4&&(trucoLevel===1||room.lastTrucoCaller!==me)&&!memory.trucoCalled){
     memory.trucoCalled=true;
     const chance=evaluate().chance;
     if(chance>=(trucoLevel===1?0.7:trucoLevel===2?0.82:0.92)&&(easy?random()<0.25:true))return {kind:'action',value:trucoLevel===1?'truco':trucoLevel===2?'retruco':'vale4'};
@@ -2112,7 +2116,7 @@ function chooseBotDecision(room,hand,level,memory,random=Math.random){
 }
 function scheduleBot(){
   const room=state.room;
-  if(!state.bot||!room||state.botActing){clearTimeout(state.botTimer);state.botTimer=null;return;}
+  if(!state.bot||!room||state.botActing||state.learning?.paused){clearTimeout(state.botTimer);state.botTimer=null;return;}
   const key=(room.matchNumber||1)+':'+room.handNumber;
   if(state.botMemory?.key!==key)state.botMemory={key,played:[]};
   for(const item of room.trickCards||[])if(!state.botMemory.played.some(c=>c.id===item.card.id))state.botMemory.played.push({...item.card});
@@ -2277,6 +2281,7 @@ function localShowEvidence(groups){
   setTimeout(()=>{if(!state.localGame||state.room!==room||room.status!=='revealing')return;localDealAfterHand();},5000);
 }
 function localDealAfterHand(){
+  if(finishLearningHand())return;
   const room=state.room;
   if(Math.max(...Object.values(room.scores))>=targetPoints(room)){room.status='complete';room.pendingBet=null;room.endReveal={done:true};renderGame();return;}
   const deck=shuffleDeck(),mano=otherPlayer(room.mano);
@@ -2491,3 +2496,136 @@ else if (firebaseConfigValid(state.config)) openLobby();
 
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&state.room){renderGame();renderTurnTimer();if(!state.localGame&&isCoordinator())scheduleTableResolution();}});
 window.addEventListener('online',()=>{if(state.room){renderGame();renderTurnTimer();}});
+
+
+const LEARNING_LESSONS=[
+  {title:'La muestra y las piezas',intro:'La muestra marca el palo de las piezas: 2, 4, 5, caballo (11) y sota (10), en ese orden de fuerza. Son las cartas más altas. Para envido y flor valen 30, 29, 28, 27 y 27 tantos. Si la muestra es una pieza, el rey de ese palo ocupa su lugar.',mission:'Tu 2 de copa es la pieza más fuerte porque la muestra es de copa. Probá jugarla y terminá la mano.'},
+  {title:'Ganar una mano',intro:'Cada jugador recibe 3 cartas. Gana quien se lleva dos bazas. Si ganaste la primera y la segunda empata, ganás la mano. Sin truco, una mano vale 1 punto.',mission:'Tenés el 1 de espada, una mata. Después de las piezas, las matas van así: 1 de espada, 1 de basto, 7 de espada y 7 de oro. Jugá tus cartas y mirá quién gana cada baza.'},
+  {title:'El envido',intro:'Cantá antes de tirar tu primera carta, durante la primera ronda. Dos cartas comunes del mismo palo suman 20 más sus valores; sota, caballo y rey valen 0. Con una pieza, sumá su valor y la mejor carta restante. Si empatan, gana el mano.',mission:'Tus 7 y 6 de oro suman 20 + 7 + 6 = 33. Tocá ENVIDO, esperá al bot y arrastrá el selector hasta 33 para declarar. El envido vale 2 puntos; si el rival no quiere, normalmente cobrás 1.'},
+  {title:'Responder al truco',intro:'Truco querido: 2 puntos por la mano. Retruco: 3. Vale cuatro: 4. Si no querés, el rival cobra el valor anterior: 1, 2 o 3. El envido se resuelve primero si interrumpe un truco.',mission:'El bot te dijo TRUCO. Podés elegir QUIERO, NO QUIERO o RETRUCO. Probá una respuesta y mirá los puntos al terminar.'},
+  {title:'La flor',intro:'Tenés flor con tres cartas del mismo palo, dos o más piezas, o una pieza y dos cartas comunes del mismo palo. Cuando hay flor, no hay envido.',mission:'Tenés 2 y 5 de copa, más 6 de basto: tu flor suma 30 + 8 + 6 = 44. Con varias piezas, la mayor aporta su valor completo y las otras su última cifra. Cantá FLOR para practicar las respuestas.'}
+];
+function learningCard(suit,rank){const name={'♦':'oro','♥':'copa','♠':'espada','♣':'basto'}[suit];return {id:name+'-'+rank,suit,rank,red:suit==='♦'||suit==='♥',label:rank===10?'Sota':rank===11?'Caballo':rank===12?'Rey':String(rank)};}
+function learningDeal(index){
+  const c=learningCard,muestra=c('♥',7);
+  const ordinary={player1:[c('♠',1),c('♦',3),c('♣',6)],player2:[c('♦',1),c('♠',4),c('♣',5)]};
+  const hands=index===0?{player1:[c('♥',2),c('♠',6),c('♦',3)],player2:[c('♦',4),c('♣',5),c('♠',10)]}:
+    index===2?{player1:[c('♦',7),c('♦',6),c('♠',4)],player2:[c('♠',6),c('♠',5),c('♣',1)]}:
+    index===4?{player1:[c('♥',2),c('♥',5),c('♣',6)],player2:[c('♦',1),c('♦',3),c('♦',6)]}:ordinary;
+  return {hands,muestra};
+}
+function openLearning(){
+  if(state.learning){$('learn-coach-dialog').close();stopBot();}
+  if(state.localGame){clearTimeout(state.resolutionTimer);state.room=null;state.localGame=false;}
+  $('learn-lessons').replaceChildren();
+  LEARNING_LESSONS.forEach((lesson,index)=>{
+    const button=document.createElement('button');button.className='learn-lesson';button.type='button';
+    const title=document.createElement('strong');title.textContent=(index+1)+'. '+lesson.title;
+    const small=document.createElement('span');small.textContent=lesson.intro;
+    button.append(title,small);button.addEventListener('click',()=>startLearning(index));$('learn-lessons').append(button);
+  });
+  showView('learn-view');
+}
+async function startLearning(index=null){
+  if(state.learningStarting)return;state.learningStarting=true;
+  try{
+    if(!await startLocalBotGame())return;
+    state.learning={index,guided:index!==null,hints:true,paused:false,complete:false};
+    state.bot=true;state.botDifficulty='easy';state.botMemory=null;
+    state.room.players={player1:{name:cleanName($('lobby-name').value||$('player-name').value,'Vos')},player2:{name:'Bot de práctica'}};
+    state.room.targetPoints=10;state.room.status='started';state.room.openingDraw=null;state.room.createdAt=gameTime();state.room.matchNumber=1;state.room.turnClock=null;
+    if(index!==null){
+      const deal=learningDeal(index);state.localHands=deal.hands;state.localOriginalHands=structuredClone(deal.hands);state.room.muestra=deal.muestra;state.hand=[...deal.hands.player1];
+      state.localTruth={player1:handEnvido(deal.hands.player1,deal.muestra),player2:handEnvido(deal.hands.player2,deal.muestra)};
+      if(index===3){state.room.pendingBet={type:'truco',called:'truco',caller:'player2',responder:'player1',stake:2};state.room.lastTrucoCaller='player2';localFeed('Bot de práctica dice truco.');}
+    }else state.hand=[...state.localHands.player1];
+    $('game-room-code').textContent='PRÁCTICA';state.dismissedMatchEnd=null;state.focusedMatchEnd=null;
+    renderGame();showView('game-view');openLearningHelp();
+  }catch(error){console.error('[truco:learning]',error);toast('No se pudo iniciar la práctica. Volvé a intentar.');}
+  finally{state.learningStarting=false;}
+}
+function learningGuidance(){
+  const room=state.room,learning=state.learning;if(!learning||!room)return [];
+  const original=state.localOriginalHands?.player1||state.hand,muestra=room.muestra,bet=room.pendingBet;
+  if(learning.complete)return ['Terminaste esta práctica. Tocá el marcador para ver cómo se sumaron los puntos. Podés repetirla, avanzar a la siguiente lección o jugar libremente.'];
+  if(bet?.revealMode&&bet.revealTurn==='player1'){
+    return ['Tenés '+handEnvido(original,muestra)+' tantos de envido. Arrastrá los números y tocá DECLARAR. Si no superás al rival, podés responder SON BUENAS. Declarar un valor falso cambia quién cobra los puntos al verificar las cartas.'];
+  }
+  if(bet?.responder==='player1'){
+    if(bet.type==='truco')return ['El bot pide '+({2:'TRUCO',3:'RETRUCO',4:'VALE CUATRO'}[bet.stake]||'TRUCO')+'. QUIERO hace que la mano valga '+bet.stake+' puntos. NO QUIERO le da '+(bet.stake-1)+' al bot. Podés subir el canto si aparece esa opción.'];
+    if(bet.type==='envido')return ['QUIERO acepta la apuesta de '+bet.stake+' puntos de envido y después declaran los tantos. NO QUIERO la rechaza; el bot cobra '+(bet.accepted||1)+'. También podés subir el canto con las opciones que aparecen.'];
+    if(bet.type==='flor')return [bet.called==='conflor'?'Con flor envido: 3 puntos de flor más 2 de envido. Podés decir QUIERO, NO QUIERO o CONTRA FLOR AL RESTO. Si no querés, se pagan los 3 de flor.':bet.called==='falta'?'Contra flor al resto juega por la partida. Podés responder QUIERO o NO QUIERO.':bet.single?'Si tenés flor, contestá FLOR, CON FLOR ENVIDO o CONTRA FLOR AL RESTO. Si no tenés, respondé TIENE.':'El bot también tiene flor. Podés responder LA MÍA ES FLOR, CON FLOR ENVIDO o CONTRA FLOR AL RESTO.'];
+  }
+  if(bet)return ['Esperá la respuesta del bot. En la práctica no hay límite de tiempo.'];
+  if(hasFlor(original,muestra)&&!room.florSettled&&!room.flors?.player1)return ['Tenés FLOR de '+florValue(original,muestra)+' tantos. Cantala antes de tirar; con flor no se juega envido.'];
+  if(room.resolvingTrick||room.pendingNextHand||room.status==='revealing')return ['Mirá el resultado de la baza y los puntos. El juego continúa después de esta breve pausa.'];
+  const guidance=[];
+  if((!learning.guided||learning.index===2)&&canCallFirstRoundEnvido(room,'player1',state.hand))guidance.push('Tenés '+handEnvido(original,muestra)+' tantos. Podés cantar ENVIDO antes de tirar tu primera carta.');
+  if(room.turn==='player1'&&state.hand.length){
+    const opponent=(room.trickCards||[]).find(item=>item.playerId==='player2')?.card;
+    const sorted=[...state.hand].sort((a,b)=>cardStrength(a,muestra)-cardStrength(b,muestra));
+    const choice=opponent?sorted.find(card=>cardStrength(card,muestra)>cardStrength(opponent,muestra)):sorted[sorted.length-1];
+    const suits={'♦':'oro','♥':'copa','♠':'espada','♣':'basto'};
+    guidance.push(choice?'Podés probar el '+choice.rank+' de '+suits[choice.suit]+(pieceOrder(choice,muestra)?', que es una pieza.':opponent?' para ganar esta baza.':'. Es tu carta más fuerte.'):'Ninguna de tus cartas supera la que tiró el bot. Podés guardar tu mejor carta para otra baza.');
+  }else guidance.push('Ahora juega el bot. Mirá la carta que elige y cómo se resuelve la baza.');
+  return guidance;
+}
+function renderLearning(){
+  const active=!!(state.learning&&state.localGame),toolbar=$('learning-toolbar'),hint=$('learning-hint');
+  toolbar.classList.toggle('hidden',!active);$('game-view').classList.toggle('learning-mode',active);
+  if(!active){hint.classList.add('hidden');return;}
+  $('learn-hints').checked=state.learning.hints;
+  hint.classList.toggle('hidden',!state.learning.hints);
+  hint.textContent=learningGuidance()[0]||'Practicá a tu ritmo. Tocá Ver ayuda para una explicación.';
+}
+function openLearningHelp(){
+  if(!state.learning)return;
+  state.learning.paused=true;clearTimeout(state.botTimer);state.botTimer=null;
+  const index=state.learning.index,lesson=index===null?null:LEARNING_LESSONS[index];
+  $('learn-coach-step').textContent=lesson?'Lección '+(index+1)+' de '+LEARNING_LESSONS.length:'Práctica libre · Sin límite de tiempo';
+  $('learn-coach-title').textContent=state.learning.complete?'¡Práctica terminada!':lesson?.title||'Jugá con ayuda';
+  const body=$('learn-coach-body');body.replaceChildren();
+  const paragraphs=state.learning.complete?learningGuidance():[...(lesson?[lesson.intro,lesson.mission]:['Jugá una partida a 10 contra el bot fácil. Las ayudas explican tus cartas y tus opciones. Podés apagarlas y volver a activarlas.']),...learningGuidance()];
+  paragraphs.forEach(text=>{const p=document.createElement('p');p.textContent=text;body.append(p);});
+  $('learn-coach-continue').textContent=state.learning.complete?'Repetir práctica':'Entendido, a jugar';
+  $('learn-coach-next').classList.toggle('hidden',!state.learning.complete);
+  $('learn-coach-next').textContent=index!==null&&index<4?'Siguiente lección':'Jugar libre con ayudas';
+  const dialog=$('learn-coach-dialog');if(!dialog.open)dialog.showModal();
+}
+function finishLearningHand(){
+  if(!state.learning?.guided)return false;
+  state.learning.complete=true;state.learning.paused=true;clearTimeout(state.botTimer);state.botTimer=null;
+  state.room.status='practice-complete';state.room.pendingBet=null;state.room.turn=null;state.room.turnClock=null;
+  renderGame();openLearningHelp();return true;
+}
+$('learn-game').addEventListener('click',openLearning);
+$('learn-back').addEventListener('click',()=>{stopBot();showView('welcome-view');openLobby();});
+$('learn-free').addEventListener('click',()=>startLearning());
+$('learn-help').addEventListener('click',openLearningHelp);
+$('learn-menu').addEventListener('click',openLearning);
+$('learn-hints').addEventListener('change',event=>{if(state.learning){state.learning.hints=event.target.checked;renderLearning();highlightLearningChoice();}});
+$('learn-coach-dialog').addEventListener('close',()=>{if(state.learning&&!state.learning.complete){state.learning.paused=false;renderGame();}});
+$('learn-coach-continue').addEventListener('click',()=>{const index=state.learning?.index,repeat=state.learning?.complete;$('learn-coach-dialog').close();if(repeat)startLearning(index);});
+$('learn-coach-next').addEventListener('click',()=>{const index=state.learning?.index;$('learn-coach-dialog').close();startLearning(index!==null&&index<4?index+1:null);});
+$('learn-coach-menu').addEventListener('click',openLearning);
+
+function highlightLearningChoice(){
+  document.querySelectorAll('.learning-choice').forEach(element=>element.classList.remove('learning-choice'));
+  if(!state.learning?.hints||state.learning.complete||state.room?.status!=='started')return;
+  const room=state.room,bet=room.pendingBet;
+  let button;
+  if(bet?.revealMode&&bet.revealTurn==='player1')button=$('declare-points');
+  else if(bet?.responder==='player1')button=document.querySelector('#player-actions [data-action="yes"]');
+  else if(!bet){
+    const original=state.localOriginalHands.player1;
+    if(hasFlor(original,room.muestra)&&!room.florSettled&&!room.flors?.player1)button=document.querySelector('#player-actions [data-action="flor"]');
+    else if(state.learning.guided&&state.learning.index===2&&canCallFirstRoundEnvido(room,'player1',state.hand))button=document.querySelector('#player-actions [data-action="envido"]');
+    else if(room.turn==='player1'){
+      const opponent=(room.trickCards||[]).find(item=>item.playerId==='player2')?.card;
+      const cards=[...state.hand].sort((a,b)=>cardStrength(a,room.muestra)-cardStrength(b,room.muestra));
+      const choice=opponent?cards.find(card=>cardStrength(card,room.muestra)>cardStrength(opponent,room.muestra)):cards[cards.length-1];
+      if(choice)button=[...document.querySelectorAll('#hand [data-card]')].find(element=>element.dataset.card===choice.id);
+    }
+  }
+  button?.classList.add('learning-choice');
+}
