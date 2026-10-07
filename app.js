@@ -1422,10 +1422,12 @@ function saveHandOrder(order){
 
 let turnTimerHandle=null,turnClockWritePending=false,turnTimeoutSettling=false;
 function turnClockPlayer(room=state.room){
+  if(room?.status==='timed-out')return room.turnTimeout?.loser||otherPlayer(room.turnTimeout?.winner);
   if(room?.pendingBet)return room.pendingBet.revealMode?room.pendingBet.revealTurn:room.pendingBet.responder;
   return room?.turn;
 }
 function turnClockKey(room=state.room){
+  if(room?.status==='timed-out'&&room.turnTimeout)return ['timeout',room.handNumber||1,room.turnTimeout.loser||otherPlayer(room.turnTimeout.winner),room.timeoutCounts?.[room.turnTimeout.loser||otherPlayer(room.turnTimeout.winner)]||1].join(':');
   if(!room||room.status!=='started'||room.resolvingTrick||room.pendingNextHand||room.endReveal&&!room.endReveal.done)return null;
   const player=turnClockPlayer(room);
   if(!['player1','player2'].includes(player))return null;
@@ -1455,7 +1457,7 @@ function turnTimeoutChanges(room){
   timeoutCounts[loser]=(Number(timeoutCounts[loser])||0)+1;
   const name=room.players?.[loser]?.name||'El jugador';
   if(timeoutCounts[loser]<3){
-    return {timeoutCounts,status:'timed-out',turn:null,pendingBet:null,turnTimeout:{winner,message:name+' agotó su tiempo y pierde la mano ('+timeoutCounts[loser]+' de 3 faltas por inactividad).'}};
+    return {timeoutCounts,status:'timed-out',turn:null,turnClock:null,pendingBet:null,turnTimeout:{winner,loser,message:name+' agotó su tiempo y pierde la mano ('+timeoutCounts[loser]+' de 3 faltas por inactividad).'}};
   }
   const message=name+' agotó los 45 segundos por tercera vez y pierde la partida. '+(room.players?.[winner]?.name||'El rival')+' gana por inactividad.';
   return {timeoutCounts,status:'complete',turn:null,turnClock:null,turnTimeout:null,
@@ -1534,9 +1536,7 @@ function renderTurnTimer(){
   const room=state.room,key=turnClockKey(room),visible=$('game-view').classList.contains('active');
   el.classList.toggle('hidden',!visible||!key||state.playerId==='table');
   if(!visible||!room)return;
-  if(room.status==='timed-out'){
-    settleTurnTimeout(room);turnTimerHandle=setTimeout(renderTurnTimer,250);return;
-  }
+  if(room.status==='timed-out')settleTurnTimeout(room);
   if(!key){
     turnTimerHandle=setTimeout(renderTurnTimer,250);return;
   }
@@ -1563,6 +1563,7 @@ function renderTurnTimer(){
     }
     if(!remaining.extra)delete el.dataset.warningTick;
     const warning=inactivityWarningLabel(room);if(warning)setTurnBadge(warning);
+    if(room.status==='timed-out')setTurnBadge(name+' · Inactividad');
     el.textContent=remaining.seconds+' s';
     el.setAttribute('aria-label',name+(remaining.extra?(Number(room.timeoutCounts?.[turnClockPlayer(room)]||0)>=2?' perderá el partido en ':' perderá la mano en '):' tiene ')+remaining.seconds+' segundos');
     if(remaining.expired&&(state.localGame||isCoordinator()||['player1','player2'].includes(state.playerId)))expireTurnClock(clock);
@@ -2381,3 +2382,6 @@ const invitedRoom=new URLSearchParams(location.search).get('mesa');
 if(invitedRoom)await openInvitation(invitedRoom);
 else if (firebaseConfigValid(state.config)) openLobby();
 
+
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&state.room){renderGame();renderTurnTimer();if(!state.localGame&&isCoordinator())scheduleTableResolution();}});
+window.addEventListener('online',()=>{if(state.room){renderGame();renderTurnTimer();}});
