@@ -2565,8 +2565,8 @@ function learningGuidance(){
       const raise=stake<4?({2:'RETRUCO',3:'VALE CUATRO'}[stake]+' es una pregunta al rival: si acepta, juegan por '+(stake+1)+' puntos; si no acepta, ganás '+stake+' puntos.'):'';
       return [text,...(raise?[raise]:[])];
     }
-    if(bet.type==='envido')return ['QUIERO acepta '+bet.stake+' puntos de envido; después declaran los tantos. NO QUIERO lo rechaza. Si empatan, gana el mano.'];
-    if(bet.type==='flor')return [bet.called==='conflor'?'Con flor envido: 3 de flor más 2 de envido. Podés responder QUIERO, NO QUIERO o CONTRA FLOR AL RESTO. Si no querés, se pagan 3 de flor.':bet.called==='falta'?'Contra flor al resto juega por la partida. Podés responder QUIERO o NO QUIERO.':bet.single?'Si tenés flor, respondé FLOR o subí el canto. Si no tenés, respondé TIENE.':'El bot también tiene flor. Podés decir LA MÍA ES FLOR, CON FLOR ENVIDO o CONTRA FLOR AL RESTO.'];
+    if(bet.type==='envido'){const points=Number(bet.stake)||2,declined=Number(bet.accepted)||1;return ['Si aceptás, el que sume más tantos de envido gana '+points+' puntos. Si no aceptás, el rival gana '+declined+' '+(declined===1?'punto':'puntos')+'.'];}
+    if(bet.type==='flor'){const points=Number(bet.stake)||3,declined=declinedFlorPoints(bet);return [bet.single&&!roomHasFlor(room,original)?'Si no tenés flor, el rival gana 3 puntos.':'Si aceptás, el que sume más tantos de flor gana '+points+' puntos. Si no aceptás, el rival gana '+declined+' '+(declined===1?'punto':'puntos')+'.'];}
   }
   if(bet)return ['Esperá la respuesta del bot. No hay límite de tiempo.'];
   if(roomHasFlor(room,original)&&!room.florSettled&&!room.flors?.player1)return ['Tenés FLOR de '+florValue(original,muestra)+' tantos. Cantala antes de tirar; con flor no se juega envido.',explainFlor(original,muestra).explanation];
@@ -2633,6 +2633,10 @@ function showLearningMessage(){
   else{$('learning-hint').removeAttribute('aria-label');$('learning-hint').setAttribute('aria-labelledby','learning-message-title');}
   const body=$('learning-message-body');body.replaceChildren();
   (scoreMessage?[scoreMessage]:learningGuidance()).flatMap(text=>text.replace(/\.\s*/g,'.\n').split('\n')).filter(text=>text.trim()).forEach(text=>{const p=document.createElement('p');p.textContent=text;body.append(p);});
+  const studyButton=$('learning-message-study'),kind=!scoreMessage&&['envido','flor'].includes(bet?.type)?bet.type:null;
+  studyButton.classList.toggle('hidden',!kind);
+  studyButton.dataset.studyKind=kind||'';
+  studyButton.textContent=kind==='flor'?'Cómo sumar mis puntos de flor':'Cómo sumar mis puntos de envido';
   $('learning-hint').showModal();
   requestAnimationFrame(positionLearningScoreArrow);
 }
@@ -2778,6 +2782,7 @@ $('learn-back').addEventListener('click',()=>{stopBot();showView('welcome-view')
 $('learn-free').addEventListener('click',()=>startLearning(0));
 window.addEventListener('resize',()=>{positionLearningScoreArrow();positionLearningControls();});
 $('learning-message-close').addEventListener('click',()=>$('learning-hint').close());
+$('learning-message-study').addEventListener('click',event=>{const kind=event.currentTarget.dataset.studyKind;if(kind==='envido'||kind==='flor')openStudy(kind);});
 $('learning-hint').addEventListener('close',()=>{if(state.learning){state.learning.acknowledgedMessage=state.learning.activeMessage;state.learning.activeMessage=null;state.learning.activeScoreMessage=false;}positionLearningScoreArrow();resumeLearning();});
 $('learn-menu').addEventListener('click',openLearning);
 $('game-sheet').addEventListener('click',openStudySheet);
