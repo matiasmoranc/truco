@@ -1421,6 +1421,14 @@ function saveHandOrder(order){
 }
 
 let turnTimerHandle=null,turnClockWritePending=false,turnTimeoutSettling=false;
+const turnClockDisplayCache=new Map();
+function beginTurnClockWrite(){
+  if(turnClockWritePending&&gameTime()-turnClockWritePending.startedAt<10000)return null;
+  const token={startedAt:gameTime()};turnClockWritePending=token;return token;
+}
+function endTurnClockWrite(token){
+  if(turnClockWritePending===token)turnClockWritePending=false;
+}
 function turnClockPlayer(room=state.room){
   if(room?.status==='timed-out')return room.turnTimeout?.loser||otherPlayer(room.turnTimeout?.winner);
   if(room?.pendingBet)return room.pendingBet.revealMode?room.pendingBet.revealTurn:room.pendingBet.responder;
@@ -1468,8 +1476,7 @@ function turnTimeoutChanges(room){
     endReveal:{done:true},feed:topFeed(room,message)};
 }
 async function expireTurnClock(clock){
-  if(turnClockWritePending)return;
-  turnClockWritePending=true;
+  const token=beginTurnClockWrite();if(!token)return;
   try{
     if(state.localGame){
       if(turnClockKey()!==clock.key||!turnClockRemaining(clock).expired)return;
@@ -1480,10 +1487,10 @@ async function expireTurnClock(clock){
     const result=await fb.runTransaction(fb.ref(fb.db,'rooms/'+code+'/public'),current=>{
       if(!current||turnClockKey(current)!==clock.key||current.turnClock?.key!==clock.key||!turnClockRemaining(current.turnClock).expired)return;
       return {...current,...turnTimeoutChanges(current)};
-    });
-    if(result.committed&&state.roomCode===code){state.room=result.snapshot.val();await settleTurnTimeout(state.room);renderGame();}
+    },{applyLocally:false});
+    if(result.committed&&state.roomCode===code){state.room=result.snapshot.val();renderGame();settleTurnTimeout(state.room);}
   }catch(error){console.error('[truco:turn-clock]',error);}
-  finally{turnClockWritePending=false;}
+  finally{endTurnClockWrite(token);}
 }
 function shakeTurnBadge(){
   const badge=$('turn-badge');
@@ -1540,19 +1547,30 @@ function renderTurnTimer(){
   if(!key){
     turnTimerHandle=setTimeout(renderTurnTimer,250);return;
   }
+  const cacheKey=[state.roomCode,room.createdAt,room.matchNumber||1,key].join(':');
   let clock=room.turnClock;
-  if(clock?.key!==key){
-    el.textContent='';el.classList.add('hidden');
+  if(clock?.key===key)turnClockDisplayCache.set(cacheKey,clock);
+  else{
     if(state.localGame){clock=room.turnClock={key,startedAt:gameTime()};}
-    else if((isCoordinator()||['player1','player2'].includes(state.playerId))&&!turnClockWritePending){
-      turnClockWritePending=true;
-      const fb=state.firebase;
-      fb.runTransaction(fb.ref(fb.db,'rooms/'+state.roomCode+'/public'),current=>{
-        if(!current||turnClockKey(current)!==key||current.turnClock?.key===key)return;
-        return {...current,turnClock:{key,startedAt:gameTime()}};
-      }).catch(console.error).finally(()=>turnClockWritePending=false);
+    else{
+      // Keep a visible clock while the shared start is confirmed or retried.
+      clock=turnClockDisplayCache.get(cacheKey)||{key,startedAt:gameTime()};
+      turnClockDisplayCache.set(cacheKey,clock);
+      if(isCoordinator()||['player1','player2'].includes(state.playerId)){
+        const token=beginTurnClockWrite();
+        if(token){
+          const fb=state.firebase,code=state.roomCode,matchNumber=Number(room.matchNumber||1);
+          fb.runTransaction(fb.ref(fb.db,'rooms/'+code+'/public'),current=>{
+            if(!current||Number(current.matchNumber||1)!==matchNumber||turnClockKey(current)!==key||current.turnClock?.key===key)return;
+            return {...current,turnClock:{key,startedAt:gameTime()}};
+          },{applyLocally:false}).then(result=>{
+            if(result.committed&&state.roomCode===code&&turnClockKey()===key){state.room=result.snapshot.val();renderTurnTimer();}
+          }).catch(error=>console.error('[truco:clock-start]',error)).finally(()=>endTurnClockWrite(token));
+        }
+      }
     }
   }
+  if(turnClockDisplayCache.size>100)turnClockDisplayCache.delete(turnClockDisplayCache.keys().next().value);
   if(clock?.key===key){
     const remaining=turnClockRemaining(clock),name=room.players?.[turnClockPlayer(room)]?.name||'Jugador';
     el.classList.toggle('turn-timer-warning',remaining.extra);
@@ -1566,7 +1584,7 @@ function renderTurnTimer(){
     if(room.status==='timed-out')setTurnBadge(name+' · Inactividad');
     el.textContent=remaining.seconds+' s';
     el.setAttribute('aria-label',name+(remaining.extra?(Number(room.timeoutCounts?.[turnClockPlayer(room)]||0)>=2?' perderá el partido en ':' perderá la mano en '):' tiene ')+remaining.seconds+' segundos');
-    if(remaining.expired&&(state.localGame||isCoordinator()||['player1','player2'].includes(state.playerId)))expireTurnClock(clock);
+    if(remaining.expired&&room.turnClock?.key===key&&(state.localGame||isCoordinator()||['player1','player2'].includes(state.playerId)))expireTurnClock(clock);
   }
   turnTimerHandle=setTimeout(renderTurnTimer,200);
 }
