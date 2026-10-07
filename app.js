@@ -2714,11 +2714,13 @@ function checkStudy(answer){
   const exercise=studyExercise,result=exercise.kind==='envido'?explainEnvido(exercise.hand,exercise.muestra):explainFlor(exercise.hand,exercise.muestra);
   if(exercise.kind==='envido'&&(!Number.isInteger(answer)||answer<0||answer>50)){ $('learn-study-feedback').textContent='Escribí un número entero entre 0 y 50.';return;}
   const correct=answer===result.value;exercise.answered=true;
-  $('learn-study-feedback').textContent=(correct?'¡Correcto! ':exercise.kind==='envido'?'Tu respuesta fue '+answer+'. Tenés '+result.value+' tantos. ':result.value?'Esta mano sí tiene flor. ':'Esta mano no tiene flor. ')+result.explanation;
+  const feedback=(correct?'¡Correcto! ':exercise.kind==='envido'?'Tu respuesta fue '+answer+'. Tenés '+result.value+' tantos. ':result.value?'Esta mano sí tiene flor. ':'Esta mano no tiene flor. ')+result.explanation;
+  $('learn-study-feedback').textContent=feedback.replace(/\.\s*/g,'.\n').trim();
   $('learn-study-feedback').className='study-feedback '+(correct?'study-correct':'study-incorrect');
   $('learn-study-check').disabled=true;$('learn-study-flor').querySelectorAll('button').forEach(button=>button.disabled=true);
   $('learn-study-next').classList.remove('hidden');
 }
+function openEnvidoCountHelp(){pauseLearning();if(!$('learn-envido-help-dialog').open)$('learn-envido-help-dialog').showModal();}
 function openStudySheet(){pauseLearning();if(!$('learn-sheet-dialog').open)$('learn-sheet-dialog').showModal();}
 $('learn-game').addEventListener('click',openLearning);
 $('learn-back').addEventListener('click',()=>{stopBot();showView('welcome-view');openLobby();});
@@ -2734,12 +2736,14 @@ $('learn-envido-study').addEventListener('click',()=>openStudy('envido'));
 $('learn-flor-study').addEventListener('click',()=>openStudy('flor'));
 $('learn-study-close').addEventListener('click',()=>$('learn-study-dialog').close());
 $('learn-study-sheet').addEventListener('click',openStudySheet);
+$('learn-study-count-help').addEventListener('click',openEnvidoCountHelp);
+$('learn-envido-help-close').addEventListener('click',()=>$('learn-envido-help-dialog').close());
 $('learn-study-next').addEventListener('click',()=>nextStudy());
 $('learn-study-envido').addEventListener('submit',event=>{event.preventDefault();const raw=$('learn-study-value').value.trim();if(raw===''){$('learn-study-feedback').textContent='Escribí tus tantos antes de comprobar.';return;}checkStudy(Number(raw));});
 $('learn-study-yes').addEventListener('click',()=>checkStudy(true));
 $('learn-study-no').addEventListener('click',()=>checkStudy(false));
 $('learn-hints').addEventListener('change',event=>{if(state.learning){state.learning.hints=event.target.checked;renderLearning();highlightLearningChoice();}});
-for(const id of ['learn-coach-dialog','learn-study-dialog','learn-sheet-dialog'])$(id).addEventListener('close',resumeLearning);
+for(const id of ['learn-coach-dialog','learn-study-dialog','learn-sheet-dialog','learn-envido-help-dialog'])$(id).addEventListener('close',resumeLearning);
 $('learn-coach-continue').addEventListener('click',()=>{const stage=state.learning?.stage||0,complete=state.learning?.complete;$('learn-coach-dialog').close();if(complete)startLearning(stage);});
 $('learn-coach-next').addEventListener('click',()=>{const stage=state.learning.stage;$('learn-coach-dialog').close();startLearning(stage===2?1:stage+1);});
 $('learn-coach-previous').addEventListener('click',()=>{$('learn-coach-dialog').close();startLearning(0);});

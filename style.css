@@ -1455,3 +1455,8 @@ body { min-height:100dvh; }
 .guide-flor strong{color:#ead39b;padding-top:7px}
 .learn-sheet-dialog{width:min(560px,calc(100vw - 24px))}
 @media(max-width:400px){.card-order-guide{font-size:12px}.guide-flor{gap:12px}}
+
+.study-feedback{white-space:pre-line}
+.envido-count-help h3{font-size:16px;color:#ead39b;margin:22px 0 8px}
+.envido-count-help p{font-size:14px;line-height:1.6;color:#e0e7dc;margin:8px 0}
+.envido-count-help .count-example{padding:9px 12px;border-left:2px solid #d8b875;background:#0b291f;color:#ead39b;border-radius:0 6px 6px 0}
