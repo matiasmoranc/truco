@@ -1352,3 +1352,13 @@ body { min-height:100dvh; }
 /* Keep the complete envido declaration on one line. */
 .player-mode.declaring-envido #declare-points{font-size:14px;letter-spacing:.02em;white-space:nowrap;min-width:0;display:flex;align-items:center;justify-content:center;gap:5px;line-height:1}
 .player-mode.declaring-envido .envido-picker p{font-size:11px;letter-spacing:0}
+
+@media (hover:hover) and (pointer:fine){
+  .number-wheel{cursor:grab;user-select:none}
+  .number-wheel button{cursor:inherit;user-select:none}
+  .number-wheel.mouse-dragging{cursor:grabbing}
+}
+@media (min-width:1024px){
+  .game.player-mode.declaring-envido .envido-picker{position:fixed;left:calc(50% - 340px);bottom:24px;transform:none;width:540px;max-width:none;box-sizing:border-box}
+  .game.player-mode.declaring-envido .player-controls>.fold-hand{position:absolute;left:auto;right:0;bottom:0;top:auto;transform:none;width:108px;margin:0}
+}

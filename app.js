@@ -1805,6 +1805,33 @@ function renderTally(points,target){
   }
   return `<svg class="score-sticks" xmlns="http://www.w3.org/2000/svg" width="90" height="${height}" viewBox="0 0 90 ${height}" role="img" aria-label="${n} puntos de ${limit}" style="display:block;width:100%;height:${height}px;overflow:visible"><line x1="0" y1="${halfHeight}" x2="90" y2="${halfHeight}" stroke="#efebd7" stroke-opacity=".42" stroke-width="2"/><g fill="none" stroke="#f0eee2" stroke-width="4" stroke-linecap="round">${lines.join('')}</g></svg>`;
 }
+function enableMouseWheelDrag(wheel,stopHint,syncWheel){
+  let drag=null,suppressClick=false;
+  wheel.addEventListener('pointerdown',event=>{
+    if(event.pointerType!=='mouse'||event.button!==0)return;
+    stopHint();suppressClick=false;
+    drag={id:event.pointerId,x:event.clientX,left:wheel.scrollLeft,moved:false};
+  });
+  wheel.addEventListener('pointermove',event=>{
+    if(!drag||event.pointerId!==drag.id)return;
+    const delta=event.clientX-drag.x;
+    if(!drag.moved&&Math.abs(delta)<4)return;
+    if(!drag.moved){drag.moved=true;wheel.setPointerCapture(event.pointerId);wheel.style.scrollSnapType='none';wheel.classList.add('mouse-dragging');}
+    event.preventDefault();wheel.scrollLeft=drag.left-delta;syncWheel();
+  });
+  const finish=event=>{
+    if(!drag||event.pointerId!==drag.id)return;
+    suppressClick=drag.moved;
+    if(wheel.hasPointerCapture(event.pointerId))wheel.releasePointerCapture(event.pointerId);
+    wheel.style.scrollSnapType='';wheel.classList.remove('mouse-dragging');
+    if(drag.moved){const step=wheel.querySelector('[data-number]').getBoundingClientRect().width;wheel.scrollTo({left:Math.round(wheel.scrollLeft/step)*step,behavior:'smooth'});}
+    drag=null;
+  };
+  wheel.addEventListener('pointerup',finish);
+  wheel.addEventListener('pointercancel',finish);
+  wheel.addEventListener('pointerleave',event=>{if(drag&&!drag.moved)drag=null;});
+  wheel.addEventListener('click',event=>{if(suppressClick){event.preventDefault();event.stopImmediatePropagation();suppressClick=false;}},true);
+}
 function renderEnvidoPicker(room){
   const el=$('envido-picker'),bet=room.pendingBet,active=bet?.revealMode&&bet.revealTurn===state.playerId;
   el.classList.toggle('hidden',!active);
@@ -1828,6 +1855,7 @@ function renderEnvidoPicker(room){
   wheel.addEventListener('pointerdown',stopHint,{once:true,passive:true});
   wheel.addEventListener('touchstart',stopHint,{once:true,passive:true});
   wheel.addEventListener('keydown',stopHint,{once:true});
+  enableMouseWheelDrag(wheel,stopHint,syncWheel);
   wheel.addEventListener('scroll',syncWheel,{passive:true});
   wheel.querySelectorAll('[data-number]').forEach(button=>button.addEventListener('click',()=>{stopHint();select(Number(button.dataset.number));wheel.scrollTo({left:Number(button.dataset.number)*step(),behavior:'smooth'});}));
   wheel.scrollLeft=initial*step();select(initial);requestAnimationFrame(syncWheel);
