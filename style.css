@@ -1471,7 +1471,6 @@ body { min-height:100dvh; }
 .learning-message{width:min(440px,calc(100vw - 32px));max-height:40dvh;padding:14px 16px}
 .learning-message h2{margin:0 0 9px;font-size:18px}
 #learning-message-body p{font-size:14px;line-height:1.4;margin:7px 0}
-#learning-message-continue{width:100%;min-height:40px;padding:9px 12px;font-size:13px;letter-spacing:normal;margin-top:9px;border-radius:9px;justify-content:center}
 .envido-count-help h3{font-size:15px;margin:14px 0 5px}
 .envido-count-help p{line-height:1.4;margin:6px 0}
 .learn-study-dialog{max-height:85dvh}
@@ -1504,3 +1503,10 @@ body { min-height:100dvh; }
 #welcome-view .home-actions #create-room{background:#e8c983;color:#10291f;border:1px solid #e8c983}
 #welcome-view .home-actions #learn-game{background:#10291f;color:#e8c983;border:1px solid #e8c983;box-shadow:0 5px 22px #0002}
 #welcome-view .home-actions #learn-game:hover{background:#214b38}
+
+/* Keep the received call and the response explanation in the same visible layer. */
+.learning-message{max-height:65dvh}
+.learning-message h2{margin:3px 40px 12px 0;text-align:left;min-height:30px}
+.learning-message .learn-close{position:absolute;top:12px;right:12px;float:none}
+.learning-call-notice{width:max-content;max-width:100%;box-sizing:border-box;margin:0 auto 12px;padding:8px 14px;border:1px solid #d8b875;border-radius:12px;background:#ead7a5;color:#15251b;font-size:14px;line-height:1.35;text-align:center}
+.learning-call-notice strong{display:block;margin-top:4px;font-size:18px;font-weight:700}

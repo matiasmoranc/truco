@@ -314,7 +314,11 @@ function renderCallNotice(){
   if(awaitingResponse&&received)received.pinned=true;
   const foldVisible=notice?.kind==='fold'&&remaining>0;
   const visible=addressed&&(foldVisible||(notice?.kind!=='fold'&&(awaitingResponse||(!received?.pinned&&remaining>0))));
-  el.classList.toggle('hidden',!visible);
+  const teachingNotice=visible&&$('learning-hint').open&&!state.learning?.activeScoreMessage;
+  const helpNotice=$('learning-call-notice');
+  helpNotice.classList.toggle('hidden',!teachingNotice);
+  helpNotice.innerHTML=teachingNotice?callNoticeHtml(notice):'';
+  el.classList.toggle('hidden',!visible||teachingNotice);
   el.innerHTML=visible?callNoticeHtml(notice):'';
   if(!visible)return;
   if(!awaitingResponse)callNoticeTimer=setTimeout(()=>{callNoticeTimer=null;renderCallNotice();},Math.max(0,remaining));
@@ -2548,7 +2552,12 @@ function learningGuidance(){
   }
   if(bet?.revealMode&&bet.revealTurn==='player1')return ['Tenés '+handEnvido(original,muestra)+' tantos. Arrastrá los números y tocá DECLARAR. Si no superás al rival, podés decir SON BUENAS.',explainEnvido(original,muestra).explanation];
   if(bet?.responder==='player1'){
-    if(bet.type==='truco')return ['QUIERO hace que la mano valga '+bet.stake+' puntos. NO QUIERO le da '+(bet.stake-1)+' al bot. Podés subir el canto si aparece esa opción.'];
+    if(bet.type==='truco'){
+      const stake=Number(bet.stake)||2,declined=stake-1;
+      const text='QUIERO hace que jueguen por '+stake+' puntos. NO QUIERO le da '+declined+' '+(declined===1?'punto':'puntos')+' al rival y se vuelve a repartir.';
+      const raise=stake<4?({2:'RETRUCO',3:'VALE CUATRO'}[stake]+' es una pregunta al rival: si acepta, juegan por '+(stake+1)+' puntos; si no acepta, ganás '+stake+' puntos.'):'';
+      return [text,...(raise?[raise]:[])];
+    }
     if(bet.type==='envido')return ['QUIERO acepta '+bet.stake+' puntos de envido; después declaran los tantos. NO QUIERO lo rechaza. Si empatan, gana el mano.'];
     if(bet.type==='flor')return [bet.called==='conflor'?'Con flor envido: 3 de flor más 2 de envido. Podés responder QUIERO, NO QUIERO o CONTRA FLOR AL RESTO. Si no querés, se pagan 3 de flor.':bet.called==='falta'?'Contra flor al resto juega por la partida. Podés responder QUIERO o NO QUIERO.':bet.single?'Si tenés flor, respondé FLOR o subí el canto. Si no tenés, respondé TIENE.':'El bot también tiene flor. Podés decir LA MÍA ES FLOR, CON FLOR ENVIDO o CONTRA FLOR AL RESTO.'];
   }
@@ -2608,9 +2617,9 @@ function showLearningMessage(){
   const key=scoreMessage?'score:'+crypto.randomUUID():learningMessageKey();
   if(!scoreMessage&&state.learning.acknowledgedMessage===key)return;
   pauseLearning();state.learning.activeMessage=key;state.learning.activeScoreMessage=!!scoreMessage;
-  $('learning-message-title').textContent=scoreMessage?'Mirá el marcador':'Antes de seguir';
+  $('learning-message-title').textContent=scoreMessage?'Mirá el marcador':'Antes de responder';
   const body=$('learning-message-body');body.replaceChildren();
-  (scoreMessage?scoreMessage.split('\n'):learningGuidance()).forEach(text=>{const p=document.createElement('p');p.textContent=text;body.append(p);});
+  (scoreMessage?[scoreMessage]:learningGuidance()).flatMap(text=>text.replace(/\.\s*/g,'.\n').split('\n')).filter(text=>text.trim()).forEach(text=>{const p=document.createElement('p');p.textContent=text;body.append(p);});
   $('learning-hint').showModal();
   requestAnimationFrame(positionLearningScoreArrow);
 }
@@ -2765,7 +2774,7 @@ $('learn-back').addEventListener('click',()=>{stopBot();showView('welcome-view')
 $('learn-free').addEventListener('click',()=>startLearning(0));
 $('learn-help').addEventListener('click',openLearningHelp);
 window.addEventListener('resize',positionLearningScoreArrow);
-$('learning-message-continue').addEventListener('click',()=>$('learning-hint').close());
+$('learning-message-close').addEventListener('click',()=>$('learning-hint').close());
 $('learning-hint').addEventListener('close',()=>{if(state.learning){state.learning.acknowledgedMessage=state.learning.activeMessage;state.learning.activeMessage=null;state.learning.activeScoreMessage=false;}positionLearningScoreArrow();resumeLearning();});
 $('learn-menu').addEventListener('click',openLearning);
 $('game-sheet').addEventListener('click',openStudySheet);
