@@ -1520,3 +1520,10 @@ body { min-height:100dvh; }
 
 /* Keep the centered turn label below the left-hand learning controls. */
 .learning-mode.player-mode .my-player-info{top:52px}
+
+/* Exit sits below the logo; the two learning switches sit beside the player's cards. */
+.learning-toolbar{display:contents}
+.learning-toolbar #learn-menu{position:absolute;z-index:156;top:var(--learning-exit-top,66px);left:10px;margin:0}
+.learning-options{position:absolute;z-index:156;right:10px;top:var(--learning-options-top,65%);transform:translateY(-50%);display:flex;flex-direction:column;align-items:flex-start;gap:12px;padding:5px 0}
+.learning-message.score-message #learning-message-body{padding-top:12px}
+.learning-message.score-message #learning-message-body p:first-child{margin-left:24px;margin-right:40px}
