@@ -1435,3 +1435,23 @@ body { min-height:100dvh; }
 
 .game-topbar .game-help-toggle{position:relative;flex:0 0 38px;width:38px;height:38px;padding:8px;margin-left:8px;display:grid;place-items:center;border:1px solid rgba(239,235,215,.4);border-radius:50%;background:#193b2b;color:#f0eee2;touch-action:manipulation;z-index:80}
 .game-help-toggle svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+
+/* Explicit secondary styles prevent the browser's white button default. */
+#learn-game.button,.learn-view .button.secondary,.learn-coach-dialog .button.secondary{background:#15392b;color:#ead39b;border:1px solid #d8b87588;border-radius:9px;font-weight:600}
+#learn-game.button:hover,.learn-view .button.secondary:hover,.learn-coach-dialog .button.secondary:hover{background:#214b38;border-color:#ead39b}
+#learn-game.button:focus-visible,.learn-view button:focus-visible,.learn-coach-dialog button:focus-visible{outline:2px solid #ead39b;outline-offset:3px}
+.home-actions #learn-game{width:100%;min-height:44px;justify-content:center;margin-top:8px}
+.learning-message{position:fixed;inset:0;max-width:440px;max-height:75dvh;text-align:center}
+#learning-message-body p{font-size:15px;line-height:1.55;color:#e0e7dc}
+.learning-message h2{font-size:22px}
+.card-order-guide{font-size:14px;line-height:1.5;color:#e0e7dc}
+.card-order-guide table{width:100%;border-collapse:collapse;text-align:left}
+.card-order-guide td{padding:6px 0}
+.card-order-guide td:last-child{color:#ead39b;white-space:nowrap;padding-left:12px}
+.card-order-guide p{margin:0;padding:7px 0}
+.card-order-guide>p{color:#ead39b}
+.guide-group,.guide-flor{border-top:1px solid #d8b87588;padding:8px 0}
+.guide-flor{display:grid;grid-template-columns:auto 1fr;gap:18px}
+.guide-flor strong{color:#ead39b;padding-top:7px}
+.learn-sheet-dialog{width:min(560px,calc(100vw - 24px))}
+@media(max-width:400px){.card-order-guide{font-size:12px}.guide-flor{gap:12px}}

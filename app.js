@@ -1026,7 +1026,7 @@ function scheduleLocalNextHand(room){
   const pending=room.pendingNextHand;
   if(!pending)return;
   clearTimeout(state.resolutionTimer);state.resolutionTimerKey=pending.id;
-  state.resolutionTimer=setTimeout(()=>{
+  state.resolutionTimer=scheduleLocalTransition(room,()=>{
     if(!state.localGame||state.room!==room||room.pendingNextHand?.id!==pending.id)return;
     room.pendingNextHand=null;state.resolutionTimer=null;state.resolutionTimerKey=null;
     localFinishHand(pending.winner,pending.foldPoints);
@@ -1074,6 +1074,7 @@ async function answerBet(answer) {
   await writeRoom({trucoLevel:bet.stake,pendingBet:null,feed:topFeed(state.room,`${state.room.players[state.playerId].name} dice QUIERO`) });
 }
 async function revealEnvido(good=false,declaredNumber=null) {
+  if(state.learning?.paused)return;
   if(state.room?.turnClock?.key===turnClockKey()&&turnClockRemaining(state.room.turnClock).expired){renderTurnTimer();return;}
   const room=state.room,bet=room?.pendingBet,player=state.playerId;
   if(bet?.type!=='envido'||!bet.revealMode||bet.revealTurn!==player)return;
@@ -1242,7 +1243,7 @@ function scheduleTableResolution() {
           const msg=`${current.players[winner].name} gana la mano y suma ${points} ${points===1?'tanto':'tantos'}.${florists.length===1&&!current.florSettled?' Además cobra 3 por la flor.':''}`;
           await finishLiveHand(winner,scores,msg);
         }else{
-          await writeRoom({trickCards:[],resolvingTrick:false,resolutionId:null,resolutionEndsAt:null,resolvedWinner:null,resolvedTrickWinner:null,handComplete:false,trickNo:(Number(current.trickNo)||1)+1,turn:trickWinner||current.mano||'player1',feed:topFeed(current,trickWinner?`${current.players[trickWinner].name} gana la baza.`:'Baza parda. Sigue la mano.')});
+          await writeRoom({trickCards:[],resolvingTrick:false,resolutionId:null,resolutionEndsAt:null,resolvedWinner:null,resolvedTrickWinner:null,handComplete:false,trickNo:(Number(current.trickNo)||1)+1,turn:trickWinner||current.mano||'player1',feed:topFeed(current,trickWinner?`${current.players[trickWinner].name} gana la ronda.`:'Ronda parda. Sigue la mano.')});
         }
       }else if(isRedeal&&state.room?.pendingNextHand?.id===room.pendingNextHand.id){
         const pending=state.room.pendingNextHand;
@@ -1385,7 +1386,7 @@ async function playCard(card) {
     patches[`rooms/${state.roomCode}/public/resolvedWinner`] = handWinner;
     patches[`rooms/${state.roomCode}/public/handComplete`] = ended;
     patches[`rooms/${state.roomCode}/public/playedCount`] = (state.room.playedCount||0)+1;
-    patches[`rooms/${state.roomCode}/public/feed`] = topFeed(state.room,winner?`${state.room.players[winner].name} gana la baza.`:'Baza parda.');
+    patches[`rooms/${state.roomCode}/public/feed`] = topFeed(state.room,winner?`${state.room.players[winner].name} gana la ronda.`:'Ronda parda.');
   }
   try{await fb.update(fb.ref(fb.db), patches);}catch(error){console.error(error);toast(firebaseError(error));}finally{state.playActionInFlight=false;}
 }
@@ -1996,7 +1997,7 @@ function updateBotSetup(){
   if(enabled)updateMode('two');
   $('enter-room').textContent=enabled?'Jugar contra Bot':'Crear mesa';
 }
-function stopBot(){state.learning=null;$('learning-toolbar')?.classList.add('hidden');$('learning-hint')?.classList.add('hidden');$('game-view').classList.remove('learning-mode');clearTimeout(state.botTimer);state.botTimer=null;state.bot=false;state.botMemory=null;}
+function stopBot(){clearTimeout(state.learning?.transition?.timer);$('learning-hint')?.close();state.learning=null;$('learning-toolbar')?.classList.add('hidden');$('game-view').classList.remove('learning-mode');clearTimeout(state.botTimer);state.botTimer=null;state.bot=false;state.botMemory=null;}
 async function startBotGame(name){
   if(!await startLocalBotGame())return;
   state.bot=true;state.botDifficulty=$('bot-level').value;
@@ -2132,7 +2133,7 @@ function scheduleBot(){
   clearTimeout(state.botTimer);state.botTimerRoom=room;state.botTimerKey=actionKey;
   const delay=3000+Math.floor(Math.random()*(room.status==='drawing'?1001:2001));
   state.botTimer=setTimeout(()=>{
-    state.botTimer=null;if(!state.bot||state.room!==room)return;
+    state.botTimer=null;if(!state.bot||state.room!==room||state.learning?.paused)return;
     const action=room.status==='drawing'?{kind:'draw'}:room.status==='complete'?{kind:'rematch'}:
       chooseBotDecision(room,[...localHand('player2')],state.botDifficulty,state.botMemory);
     if(!action)return;
@@ -2182,6 +2183,7 @@ function localResolveFlor(bet){
   state.room.pendingBet=bet.suspendedBet||null;state.room.envidoClosed=true;state.room.florSettled=true;
 }
 function localCallAction(kind){
+  if(state.learning?.paused)return;
   const room=state.room,caller=state.playerId;if(!room||caller==='table'||room.status!=='started'||room.resolvingTrick||room.pendingNextHand||!localHand(caller).length)return;
   const other=otherPlayer(caller),pending=room.pendingBet;
   const overTruco=pending?.type==='truco'&&pending.responder===caller;
@@ -2201,6 +2203,7 @@ function localCallAction(kind){
   }
 }
 function localAnswerAction(answer){
+  if(state.learning?.paused)return;
   if(state.room?.turnClock?.key===turnClockKey()&&turnClockRemaining(state.room.turnClock).expired){renderTurnTimer();return;}
   const room=state.room,bet=room?.pendingBet,player=state.playerId;if(!bet)return;
   if(bet.type==='envido'&&bet.revealMode&&answer==='yes'){
@@ -2234,6 +2237,7 @@ function localAnswerAction(answer){
   room.trucoLevel=bet.stake;room.pendingBet=null;localFeed(`${room.players[player].name} dice QUIERO`);renderGame();
 }
 function localAction(action){
+  if(state.learning?.paused)return;
   if(action==='reveal')localAnswerAction('yes');
   else if(action==='flor'){
     const room=state.room,player=state.playerId;if(player==='table'||room.playedCount>0||room.flors?.[player]!=null||!roomHasFlor(room,localHand(player))){toast('No tenés flor.');return;}
@@ -2245,6 +2249,7 @@ function localAction(action){
   else localCallAction(action);
 }
 function localPlay(card,launchOrigin=null) {
+  if(state.learning?.paused)return;
   if(state.room?.turnClock?.key===turnClockKey()&&turnClockRemaining(state.room.turnClock).expired){renderTurnTimer();return;}
   const player=state.playerId;if(player==='table')return;
   const pause=pauseMessage();if(pause){renderRoundPauseTimer();return;}
@@ -2258,10 +2263,10 @@ function localPlay(card,launchOrigin=null) {
     const first=state.room.trickCards[0],second=state.room.trickCards[1],winner=cardStrength(first.card,state.room.muestra)===cardStrength(second.card,state.room.muestra)?null:(cardStrength(first.card,state.room.muestra)>cardStrength(second.card,state.room.muestra)?first.playerId:second.playerId);
     state.room.tricks=[...(state.room.tricks||[]),{winner}];
     const handWinner=settleHand(state.room.tricks,state.room);
-    if(winner)state.room.feed.unshift({text:`${state.room.players[winner].name} se lleva la baza.`,time:Date.now()});
+    if(winner)state.room.feed.unshift({text:`${state.room.players[winner].name} se lleva la ronda.`,time:Date.now()});
     state.room.resolvingTrick=true;state.room.resolutionId=crypto.randomUUID();state.room.resolutionEndsAt=gameTime()+3000;state.room.resolvedTrickWinner=winner;state.room.handComplete=!!handWinner;
     const resolvingRoom=state.room;
-    setTimeout(()=>{if(!state.localGame||state.room!==resolvingRoom)return;state.room.resolvingTrick=false;state.room.resolutionEndsAt=null;state.room.handComplete=false;state.room.trickCards=[];if(handWinner){localFinishHand(handWinner,state.room.trucoLevel||1);return;}else{state.room.turn=winner||state.room.mano;state.room.trickNo++;}state.hand=state.playerId==='table'?[]:[...(state.localHands[state.playerId]||[])];renderGame();},3000);
+    scheduleLocalTransition(resolvingRoom,()=>{if(!state.localGame||state.room!==resolvingRoom)return;state.room.resolvingTrick=false;state.room.resolutionEndsAt=null;state.room.handComplete=false;state.room.trickCards=[];if(handWinner){localFinishHand(handWinner,state.room.trucoLevel||1);return;}else{state.room.turn=winner||state.room.mano;state.room.trickNo++;}state.hand=state.playerId==='table'?[]:[...(state.localHands[state.playerId]||[])];renderGame();},3000);
   }else state.room.turn=player==='player1'?'player2':'player1';
   renderGame();
 }
@@ -2278,7 +2283,7 @@ function localFinishHand(winner,points){
 function localShowEvidence(groups){
   const room=state.room;
   room.status='revealing';room.pendingBet=null;room.trickCards=[];room.turn=null;room.endReveal={id:crypto.randomUUID(),endsAt:gameTime()+5000,groups};
-  setTimeout(()=>{if(!state.localGame||state.room!==room||room.status!=='revealing')return;localDealAfterHand();},5000);
+  scheduleLocalTransition(room,()=>{if(!state.localGame||state.room!==room||room.status!=='revealing')return;localDealAfterHand();},5000);
 }
 function localDealAfterHand(){
   if(finishLearningHand())return;
@@ -2500,7 +2505,7 @@ window.addEventListener('online',()=>{if(state.room){renderGame();renderTurnTime
 
 
 const LEARNING_STAGES=[
-  {title:'Lo básico',intro:'Primero jugamos manos y truco, sin envido ni flor. Recibís 3 cartas y buscás ganar dos bazas. Si ganás la primera y la segunda empata, ganás la mano. La muestra determina las piezas: 2, 4, 5, 11 y 10 de su palo, de mayor a menor. Una mano vale 1 punto; con truco querido vale 2, retruco 3 y vale cuatro 4.'},
+  {title:'Lo básico',intro:'Primero jugamos manos y truco, sin envido ni flor. Recibís 3 cartas y buscás ganar dos rondas. Si ganás la primera y la segunda empata, ganás la mano. La muestra determina las piezas: 2, 4, 5, 11 y 10 de su palo, de mayor a menor. Una mano vale 1 punto; con truco querido vale 2, retruco 3 y vale cuatro 4.'},
   {title:'Sumamos el envido',intro:'Ahora podés cantar envido antes de tirar tu primera carta. Dos cartas comunes del mismo palo suman 20 más sus valores. Sota, caballo y rey valen 0. Con una pieza sumás su valor y la mejor de las otras cartas, sin agregar 20. En esta etapa no se canta flor; practicamos con repartos sin flor para concentrarnos en el envido.'},
   {title:'Sumamos la flor',intro:'Se juega con envido y flor. Tenés flor con 3 cartas del mismo palo, 2 o más piezas, o una pieza y 2 cartas comunes del mismo palo. Con flor no se juega envido. Para sumar varias piezas: la mayor vale completa y las otras aportan su última cifra.'}
 ];
@@ -2519,7 +2524,7 @@ async function startLearning(stage=0){
   try{
     $('learn-coach-dialog').close();
     if(!await startLocalBotGame())return;
-    state.learning={stage,hints:true,paused:false,complete:false};
+    state.learning={stage,hints:true,paused:true,pausedAt:gameTime(),complete:false};
     state.bot=true;state.botDifficulty='easy';state.botMemory=null;
     state.room.players={player1:{name:cleanName($('lobby-name').value||$('player-name').value,'Vos')},player2:{name:'Bot de práctica'}};
     Object.assign(state.room,{targetPoints:10,status:'started',openingDraw:null,createdAt:gameTime(),matchNumber:1,turnClock:null,practiceRules:{envido:stage>=1,flor:stage>=2}});
@@ -2550,35 +2555,83 @@ function learningGuidance(){
   }
   if(bet)return ['Esperá la respuesta del bot. No hay límite de tiempo.'];
   if(roomHasFlor(room,original)&&!room.florSettled&&!room.flors?.player1)return ['Tenés FLOR de '+florValue(original,muestra)+' tantos. Cantala antes de tirar; con flor no se juega envido.',explainFlor(original,muestra).explanation];
-  if(room.resolvingTrick||room.pendingNextHand||room.status==='revealing')return ['Mirá las cartas y el resultado. El juego continúa después de esta breve pausa.'];
+  if(room.resolvingTrick||room.pendingNextHand||room.status==='revealing')return ['Mirá las cartas y el resultado de la ronda. Cerrá este mensaje para continuar.'];
   const guidance=[];
   if(canCallFirstRoundEnvido(room,'player1',state.hand))guidance.push('Tenés '+handEnvido(original,muestra)+' tantos. Podés cantar ENVIDO antes de tirar tu primera carta.');
   if(room.turn==='player1'&&state.hand.length){
     const opponent=(room.trickCards||[]).find(item=>item.playerId==='player2')?.card;
     const sorted=[...state.hand].sort((a,b)=>cardStrength(a,muestra)-cardStrength(b,muestra));
     const choice=opponent?sorted.find(card=>cardStrength(card,muestra)>cardStrength(opponent,muestra)):sorted[sorted.length-1];
-    guidance.push(choice?'Podés probar '+cardStudyName(choice)+(pieceOrder(choice,muestra)?', una pieza.':opponent?' para ganar esta baza.':', tu carta más fuerte.'):'No podés superar esa carta. Podés guardar tu mejor carta para otra baza.');
-  }else guidance.push('Ahora juega el bot. Mirá cómo se resuelve la baza.');
+    guidance.push(choice?'Podés probar '+cardStudyName(choice)+(pieceOrder(choice,muestra)?', una pieza.':opponent?' para ganar esta ronda.':', tu carta más fuerte.'):'No podés superar esa carta. Podés guardar tu mejor carta para otra ronda.');
+  }else guidance.push('Ahora juega el bot. Mirá cómo se resuelve la ronda.');
   return guidance;
+}
+function learningMessageKey(){
+  return JSON.stringify([state.room?.handNumber,state.room?.trickNo,learningGuidance()]);
+}
+function showLearningMessage(){
+  if(!state.learning?.hints||state.learning.paused||state.learning.complete||document.querySelector('.learn-coach-dialog[open]'))return;
+  const room=state.room,bet=room.pendingBet;
+  // Waiting for the bot needs no explanation; explain the next player decision or result.
+  if(!room.resolvingTrick&&!room.pendingNextHand&&room.status!=='revealing'&&
+    (bet?(bet.revealMode?bet.revealTurn!=='player1':bet.responder!=='player1'):room.turn!=='player1'))return;
+  const key=learningMessageKey();
+  if(state.learning.acknowledgedMessage===key)return;
+  pauseLearning();state.learning.activeMessage=key;
+  const body=$('learning-message-body');body.replaceChildren();
+  learningGuidance().forEach(text=>{const p=document.createElement('p');p.textContent=text;body.append(p);});
+  $('learning-hint').showModal();
 }
 function renderLearning(){
   const active=!!(state.learning&&state.localGame);
   $('learning-toolbar').classList.toggle('hidden',!active);$('game-view').classList.toggle('learning-mode',active);
-  $('learning-hint').classList.toggle('hidden',!active||!state.learning.hints);
-  if(!active)return;
+  if(!active){if($('learning-hint').open)$('learning-hint').close();return;}
   $('learn-hints').checked=state.learning.hints;
-  $('learning-hint').textContent=learningGuidance()[0]||'Practicá a tu ritmo.';
   if(!state.learning.complete&&state.room.status==='complete'&&(!state.room.endReveal||state.room.endReveal.done)){
     const room=state.room;queueMicrotask(()=>{if(state.room===room&&room.status==='complete'&&(!room.endReveal||room.endReveal.done))finishLearningHand();});
+  }else showLearningMessage();
+}
+function armLearningTransition(transition){
+  transition.dueAt=gameTime()+transition.remaining;
+  transition.timer=setTimeout(()=>{
+    if(!state.learning||state.learning.transition!==transition||state.room!==transition.room||state.learning.paused)return;
+    state.learning.transition=null;transition.callback();
+  },transition.remaining);
+  return transition.timer;
+}
+function scheduleLocalTransition(room,callback,delay){
+  if(!state.learning)return setTimeout(callback,delay);
+  clearTimeout(state.learning.transition?.timer);
+  const transition={room,callback,remaining:Math.max(0,delay),timer:null,dueAt:null};
+  state.learning.transition=transition;
+  return state.learning.paused?null:armLearningTransition(transition);
+}
+function pauseLearning(){
+  const learning=state.learning;if(!learning)return;
+  if(!learning.paused){learning.pausedAt=gameTime();learning.paused=true;}
+  clearTimeout(state.botTimer);state.botTimer=null;
+  const transition=learning.transition;
+  if(transition?.timer!=null){
+    transition.remaining=Math.max(0,transition.dueAt-gameTime());
+    clearTimeout(transition.timer);transition.timer=null;
   }
 }
-function pauseLearning(){if(state.learning){state.learning.paused=true;clearTimeout(state.botTimer);state.botTimer=null;}}
 function resumeLearning(){
-  if(state.learning&&!state.learning.complete&&!document.querySelector('.learn-coach-dialog[open]')){state.learning.paused=false;renderGame();}
+  const learning=state.learning;
+  if(!learning||learning.complete||document.querySelector('.learn-coach-dialog[open]'))return;
+  if(learning.paused){
+    const elapsed=Math.max(0,gameTime()-(learning.pausedAt??gameTime())),room=state.room;
+    if(room?.resolutionEndsAt)room.resolutionEndsAt+=elapsed;
+    if(room?.pendingNextHand?.endsAt)room.pendingNextHand.endsAt+=elapsed;
+    if(room?.endReveal?.endsAt)room.endReveal.endsAt+=elapsed;
+    learning.paused=false;learning.pausedAt=null;
+    if(learning.transition)armLearningTransition(learning.transition);
+  }
+  renderGame();
 }
 function openLearningHelp(){
   if(!state.learning)return;
-  pauseLearning();
+  pauseLearning();state.learning.acknowledgedMessage=learningMessageKey();
   const stage=state.learning.stage,lesson=LEARNING_STAGES[stage],complete=state.learning.complete;
   $('learn-coach-step').textContent='Etapa '+(stage+1)+' de 3 · Partidas a 10 · Sin reloj';
   $('learn-coach-title').textContent=complete?'Partida terminada':lesson.title;
@@ -2671,6 +2724,8 @@ $('learn-game').addEventListener('click',openLearning);
 $('learn-back').addEventListener('click',()=>{stopBot();showView('welcome-view');openLobby();});
 $('learn-free').addEventListener('click',()=>startLearning(0));
 $('learn-help').addEventListener('click',openLearningHelp);
+$('learning-message-continue').addEventListener('click',()=>$('learning-hint').close());
+$('learning-hint').addEventListener('close',()=>{if(state.learning){state.learning.acknowledgedMessage=state.learning.activeMessage;state.learning.activeMessage=null;}resumeLearning();});
 $('learn-menu').addEventListener('click',openLearning);
 $('game-sheet').addEventListener('click',openStudySheet);
 $('learn-sheet-menu').addEventListener('click',openStudySheet);
