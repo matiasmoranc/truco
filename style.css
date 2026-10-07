@@ -1341,3 +1341,9 @@ body { min-height:100dvh; }
 
 .chat-backdrop{position:fixed;inset:0;z-index:175;background:rgba(4,20,12,.2);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);touch-action:manipulation}
 .chat-backdrop.hidden{display:none!important}
+
+/* Pauses show only their countdown; folded cards fly back to the deck. */
+.turn-badge.pause-countdown .turn-badge-label,.turn-badge.pause-countdown .inactivity-life{display:none!important}
+.turn-badge.pause-countdown .round-pause-timer{border-left:0;padding-left:0}
+.folding-hand .hand{visibility:hidden}
+.fold-card-flight{position:fixed!important;z-index:160!important;visibility:visible!important;pointer-events:none!important;animation:none!important;transform:none;margin:0!important}

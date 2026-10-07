@@ -268,6 +268,7 @@ function renderRoundPauseTimer(){
   const el=$('round-pause-timer'),pause=roundPauseInfo();
   const visible=!!pause&&state.playerId!=='table'&&$('game-view').classList.contains('active');
   el.classList.toggle('hidden',!visible);
+  $('turn-badge').classList.toggle('pause-countdown',!!pause);
   if(!visible){el.textContent='';return;}
   if(el.parentElement!==$('turn-badge'))$('turn-badge').append(el);
   el.textContent=pause.seconds+' s';
@@ -1271,6 +1272,26 @@ function foldHandChanges(room,loser){
   const notice={kind:'fold',id:crypto.randomUUID(),from:loser,to:winner,text:(room.players?.[loser]?.name||'El rival')+' se fue al mazo.',spoken:'Me voy al mazo',time:Date.now(),handNumber:room.handNumber||1};
   return {...sideChanges,callNotice:notice,turn:null,turnClock:null,pendingBet:null,pendingNextHand:{id:'fold:'+crypto.randomUUID(),winner,foldPoints:points,message,endsAt:gameTime()+3000},feed:topFeed(room,message)};
 }
+function animateFoldedHand(){
+  const room=state.room,notice=room?.callNotice;
+  const folding=!!(room?.pendingNextHand?.id?.startsWith('fold:')&&notice?.from===state.playerId&&notice.kind==='fold');
+  $('game-view').classList.toggle('folding-hand',folding);
+  if(!folding||state.foldAnimationKey===room.pendingNextHand.id)return;
+  const cards=[...$('hand').querySelectorAll('.hand-card')],deck=$('deck-stack');
+  if(!cards.length||!deck)return;
+  state.foldAnimationKey=room.pendingNextHand.id;
+  const target=deck.getBoundingClientRect();
+  cards.forEach((source,index)=>{
+    const rect=source.getBoundingClientRect(),flight=source.cloneNode(true);
+    flight.classList.remove('dragging','launching-card');flight.classList.add('card-flight','fold-card-flight');
+    flight.removeAttribute('data-card');flight.setAttribute('aria-hidden','true');flight.tabIndex=-1;
+    Object.assign(flight.style,{left:rect.left+'px',top:rect.top+'px',width:rect.width+'px',height:rect.height+'px'});
+    document.body.append(flight);
+    const dx=target.left+target.width/2-(rect.left+rect.width/2),dy=target.top+target.height/2-(rect.top+rect.height/2);
+    flight.animate?.([{transform:'translate(0,0) scale(1)',opacity:1},{transform:`translate(${dx}px,${dy}px) scale(.28) rotate(12deg)`,opacity:0}],{duration:650,delay:index*80,easing:'cubic-bezier(.4,0,.2,1)',fill:'forwards'});
+    setTimeout(()=>flight.remove(),700+index*80);
+  });
+}
 async function foldHand(){
   if(state.foldInFlight||state.playActionInFlight||!canFoldHand(state.room,state.playerId))return;
   state.foldInFlight=true;
@@ -1480,7 +1501,7 @@ function renderInactivityLife(){
   el.innerHTML=[0,1].map(index=>'<i class="inactivity-circle'+(index<status.lost?' life-lost':'')+'" aria-hidden="true"></i>').join('');
 }
 function setTurnBadge(text){
-  text=inactivityWarningLabel()||text;
+  text=roundPauseInfo()?'':inactivityWarningLabel()||text;
   if(text==='ESPERÁ'||text==='ESPERANDO')text=waitingTurnLabel();
   const badge=$('turn-badge');
   let label=badge.querySelector('.turn-badge-label');
@@ -1573,8 +1594,8 @@ function renderGame() {
     const mano=dealer?otherPlayer(dealer):null;
     const bothChosen=!!(cards.player1&&cards.player2);
     const prompt=bothChosen?'Los dos eligieron su carta':isTable?'Sorteo de quién reparte':cards[state.playerId]?'Ya elegiste tu carta':'Elegí tu carta';
-    const hint=bothChosen?(dealer?'La carta más alta reparte. La partida comienza enseguida.':'Empataron. Van a sacar otra carta.') :isTable?'Cada jugador debe tocar el mazo en su celular.':cards[state.playerId]?'Esperando que el otro jugador toque el mazo.':'Tocá el mazo para sortear quién reparte.';
-    $('opening-draw').innerHTML=`<div class="draw-prompt"><h2>${prompt}</h2><p>${hint}</p></div><div id="opening-timer" class="opening-timer" role="timer" aria-label="Tiempo para elegir carta"></div><button class="draw-deck" id="draw-deck" ${canDraw?'':'disabled'} aria-label="Sacar carta para sortear repartidor"></button><div class="draw-results">${['player1','player2'].map(player=>`<div class="draw-result ${dealer===player?'draw-winner':''}"><span>${escapeHtml(players[player]?.name||player)}${dealer===player?' · REPARTE':mano===player?' · EMPIEZA':''}</span>${cards[player]?`<div class="draw-card sprite-card ${cards[player].justDrawn?'draw-card-new':''}" style="${cardImageStyle(cards[player])}" aria-label="${cardAccessibleName(cards[player])}"></div>`:`<p>${isTable?'Esperando que toque el mazo':'Esperando carta'}</p>`}</div>`).join('')}</div>`;
+    const hint=bothChosen?(dealer?'':'Empataron. Van a sacar otra carta.') :isTable?'Cada jugador debe tocar el mazo en su celular.':cards[state.playerId]?'Esperando que el otro jugador toque el mazo.':'Tocá el mazo para sortear quién reparte.';
+    $('opening-draw').innerHTML=`<div class="draw-prompt"><h2>${prompt}</h2>${hint?`<p>${hint}</p>`:''}</div><div id="opening-timer" class="opening-timer" role="timer" aria-label="Tiempo para elegir carta"></div><button class="draw-deck" id="draw-deck" ${canDraw?'':'disabled'} aria-label="Sacar carta para sortear repartidor"></button><div class="draw-results">${['player1','player2'].map(player=>`<div class="draw-result ${dealer===player?'draw-winner':''}"><span>${escapeHtml(players[player]?.name||player)}${dealer===player?' · REPARTE':mano===player?' · EMPIEZA':''}</span>${cards[player]?`<div class="draw-card sprite-card ${cards[player].justDrawn?'draw-card-new':''}" style="${cardImageStyle(cards[player])}" aria-label="${cardAccessibleName(cards[player])}"></div>`:`<p>${isTable?'Esperando que toque el mazo':'Esperando carta'}</p>`}</div>`).join('')}</div>`;
     if(canDraw)$('draw-deck').addEventListener('click',()=>drawOpeningCard().catch(error=>{drawInFlight=false;toast(firebaseError(error));renderGame();}));
     $('hand').innerHTML='';$('player-actions').classList.add('hidden');$('fold-hand').classList.add('hidden');$('fold-hand').disabled=true;$('trick-cards').innerHTML='';$('deck-stack').classList.add('hidden');$('muestra-card').classList.add('hidden');$('envido-picker').classList.add('hidden');renderOpeningTimer();return;
   }
@@ -1593,6 +1614,7 @@ function renderGame() {
   setTurnBadge(isTable?'MESA':myTurn?'TU TURNO':'ESPERÁ'); $('turn-badge').classList.toggle('waiting-turn',!myTurn);
   const visibleHand=isTable?[]:orderedHand();
   if(!state.handGestureActive)$('hand').innerHTML=visibleHand.map((card) => `<button class="hand-card sprite-card ${card.red?'card-red':''} ${state.launchingCardId===card.id?'launching-card':''}" style="${cardImageStyle(card)}" aria-label="${cardAccessibleName(card)}" aria-disabled="${!myTurn}" data-card="${card.id}"><span class="sr-only">${cardAccessibleName(card)}</span></button>`).join('');
+  animateFoldedHand();
 
   $('trick-cards').innerHTML=sharedTable?(room.trickCards||[]).filter(({card,playerId})=>!(state.launchingCardId===card.id&&playerId===state.playerId)).map(({card,playerId})=>`<div class="played-card played-card-${playerId||'player1'} sprite-card ${card.red?'card-red':''}" style="${cardImageStyle(card)}" role="img" aria-label="${cardAccessibleName(card)}"><span class="sr-only">${cardAccessibleName(card)}</span></div>`).join(''):'';
   const sample=room.muestra;
