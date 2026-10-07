@@ -2505,7 +2505,7 @@ window.addEventListener('online',()=>{if(state.room){renderGame();renderTurnTime
 
 
 const LEARNING_STAGES=[
-  {title:'Lo básico',intro:'Primero jugamos manos y truco, sin envido ni flor. Recibís 3 cartas y buscás ganar dos rondas. Si ganás la primera y la segunda empata, ganás la mano. La muestra determina las piezas: 2, 4, 5, 11 y 10 de su palo, de mayor a menor. Una mano vale 1 punto; con truco querido vale 2, retruco 3 y vale cuatro 4.'},
+  {title:'Lo básico',intro:'Primero jugamos manos simples, sin envido ni flor.\nRecibís 3 cartas y buscás ganar dos rondas.\nSi ganás la primera y la segunda empata, ganás la mano.\nSi empatás la primera y ganás la segunda, ganás la mano.'},
   {title:'Sumamos el envido',intro:'Ahora podés cantar envido antes de tirar tu primera carta. Dos cartas comunes del mismo palo suman 20 más sus valores. Sota, caballo y rey valen 0. Con una pieza sumás su valor y la mejor de las otras cartas, sin agregar 20. En esta etapa no se canta flor; practicamos con repartos sin flor para concentrarnos en el envido.'},
   {title:'Sumamos la flor',intro:'Se juega con envido y flor. Tenés flor con 3 cartas del mismo palo, 2 o más piezas, o una pieza y 2 cartas comunes del mismo palo. Con flor no se juega envido. Para sumar varias piezas: la mayor vale completa y las otras aportan su última cifra.'}
 ];
@@ -2633,10 +2633,10 @@ function openLearningHelp(){
   if(!state.learning)return;
   pauseLearning();state.learning.acknowledgedMessage=learningMessageKey();
   const stage=state.learning.stage,lesson=LEARNING_STAGES[stage],complete=state.learning.complete;
-  $('learn-coach-step').textContent='Etapa '+(stage+1)+' de 3 · Partidas a 10 · Sin reloj';
+  $('learn-coach-step').textContent=stage===0?'Etapa 1 de 3':'Etapa '+(stage+1)+' de 3 · Partidas a 10 · Sin reloj';
   $('learn-coach-title').textContent=complete?'Partida terminada':lesson.title;
   $('learn-coach-body').replaceChildren();
-  (complete?learningGuidance():[lesson.intro,...learningGuidance()]).forEach(text=>{const p=document.createElement('p');p.textContent=text;$('learn-coach-body').append(p);});
+  (complete?learningGuidance():stage===0?lesson.intro.split('\n'):[lesson.intro,...learningGuidance()]).forEach(text=>{const p=document.createElement('p');p.textContent=text;$('learn-coach-body').append(p);});
   $('learn-coach-continue').textContent=complete?'Seguir jugando así':'Entendido, a jugar';
   $('learn-coach-next').classList.toggle('hidden',!complete);
   $('learn-coach-next').textContent=stage===0?'Sumar el envido':stage===1?'Sumar la flor':'Quitar la flor';
