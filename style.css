@@ -1481,3 +1481,16 @@ body { min-height:100dvh; }
 
 /* Reference and practice windows stay distinct from in-game teaching messages. */
 .learn-coach-dialog:not(.learning-message)::backdrop{background:rgba(4,24,15,.62);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
+
+/* Practice and reference windows can use the full available viewport height. */
+#learn-sheet-dialog,#learn-envido-help-dialog,#learn-flor-help-dialog,#learn-study-dialog{height:calc(100dvh - 24px);max-height:calc(100dvh - 24px);box-sizing:border-box;overflow:auto;overscroll-behavior:contain}
+.card-guide-intro{color:#e0e7dc;font-size:14px;line-height:1.5;margin:0 0 16px}
+.help-piece-values{list-style:none;padding:0;margin:8px 0 12px;color:#ead39b;font-size:14px;line-height:1.7}
+.help-card-example{margin:14px 0 22px}
+.help-example-cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;max-width:440px}
+.help-example-card{min-width:0}
+.help-example-card>span{display:block;color:#b9c7bc;font-size:12px;text-align:center;margin-bottom:6px}
+.help-example-card:last-child{border-left:1px solid #d8b87588;padding-left:8px}
+.help-example-card:last-child>span{color:#ead39b;font-weight:700}
+.help-example-card>.sprite-card{width:100%;aspect-ratio:280/435;border-radius:6px;background-color:#f5f0df}
+@media(max-width:400px){.help-example-cards{gap:6px}.help-example-card:last-child{padding-left:6px}}
