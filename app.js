@@ -1809,24 +1809,42 @@ function renderEnvidoPicker(room){
   const el=$('envido-picker'),bet=room.pendingBet,active=bet?.revealMode&&bet.revealTurn===state.playerId;
   el.classList.toggle('hidden',!active);
   $('game-view').classList.toggle('declaring-envido',!!active);
-  if(!active){el.dataset.key='';return;}
+  if(!active){el.stopWheelHint?.();el.dataset.key='';return;}
   const first=room.mano,opponentPoints=bet.reveals?.[first],second=state.playerId!==first,min=second?Number(opponentPoints):0;
   const key=`${room.handNumber}:${state.playerId}:${opponentPoints??'first'}`;
-  if(el.dataset.key===key)return;el.dataset.key=key;el.dataset.value=String(Math.min(50,min));
-  el.innerHTML=`<p>Declarar puntos de envido:</p><div class="number-wheel" role="listbox" aria-label="Tantos del 0 al 50">${Array.from({length:51},(_,number)=>`<button role="option" aria-selected="${number===min}" ${number<min?'disabled':''} data-number="${number}">${number}</button>`).join('')}</div><div class="declaration-buttons">${min<=50?'<button id="declare-points" class="call-button">DECLARAR <span id="selected-points">'+min+'</span></button>':''}${second?'<button id="good-points" class="pass-button">SON BUENAS</button>':''}</div>`;
+  if(el.dataset.key===key)return;el.stopWheelHint?.();el.dataset.key=key;const initial=Math.min(50,Math.max(20,min));el.dataset.value=String(initial);
+  el.innerHTML=`<p>Arrastra los números para seleccionar</p><div class="number-wheel" role="listbox" aria-label="Tantos del 0 al 50">${Array.from({length:51},(_,number)=>`<button role="option" aria-selected="${number===min}" ${number<min?'disabled':''} data-number="${number}">${number}</button>`).join('')}</div><div class="declaration-buttons">${min<=50?'<button id="declare-points" class="call-button">DECLARAR <span id="selected-points">'+min+'</span></button>':''}${second?'<button id="good-points" class="pass-button">SON BUENAS</button>':''}</div>`;
   const wheel=el.querySelector('.number-wheel');
+  const step=()=>wheel.querySelector('[data-number]').getBoundingClientRect().width;
+  let hintRunning=false,hintFrame=null;
   const select=number=>{el.dataset.value=String(number);el.querySelectorAll('[data-number]').forEach(button=>{const distance=Math.abs(Number(button.dataset.number)-number);button.setAttribute('aria-selected',String(distance===0));button.dataset.distance=String(Math.min(distance,4));});const label=$('selected-points');if(label)label.textContent=number;};
-  const syncWheel=()=>{const buttons=[...wheel.querySelectorAll('[data-number]')],center=wheel.getBoundingClientRect().left+wheel.clientWidth/2;let nearest=null,best=Infinity;buttons.forEach(button=>{const rect=button.getBoundingClientRect(),distance=Math.abs((rect.left+rect.width/2)-center);if(distance<best){best=distance;nearest=button;}const steps=distance/56;button.style.opacity=String(steps<.65?1:steps<1.65?.78:steps<2.65?.48:steps<3.65?.25:.1);});if(nearest)select(Math.max(Math.min(50,min),Number(nearest.dataset.number)));};
-  wheel.classList.add('wheel-hint');
-  const stopHint=()=>wheel.classList.remove('wheel-hint');
+  const syncWheel=()=>{const buttons=[...wheel.querySelectorAll('[data-number]')],center=wheel.getBoundingClientRect().left+wheel.clientWidth/2;let nearest=null,best=Infinity;buttons.forEach(button=>{const rect=button.getBoundingClientRect(),distance=Math.abs((rect.left+rect.width/2)-center);if(distance<best){best=distance;nearest=button;}const steps=distance/step();button.style.opacity=String(steps<.65?1:steps<1.65?.78:steps<2.65?.48:steps<3.65?.25:.1);});if(nearest&&!hintRunning)select(Math.max(Math.min(50,min),Number(nearest.dataset.number)));};
+  const stopHint=()=>{
+    if(!hintRunning)return;
+    hintRunning=false;cancelAnimationFrame(hintFrame);
+    wheel.style.scrollSnapType='';wheel.scrollLeft=initial*step();select(initial);syncWheel();
+  };
+  el.stopWheelHint=stopHint;
   wheel.addEventListener('pointerdown',stopHint,{once:true,passive:true});
   wheel.addEventListener('touchstart',stopHint,{once:true,passive:true});
   wheel.addEventListener('keydown',stopHint,{once:true});
-  wheel.addEventListener('animationend',stopHint,{once:true});
   wheel.addEventListener('scroll',syncWheel,{passive:true});
-  wheel.querySelectorAll('[data-number]').forEach(button=>button.addEventListener('click',()=>{select(Number(button.dataset.number));wheel.scrollTo({left:Number(button.dataset.number)*56,behavior:'smooth'});}));
-  wheel.scrollLeft=Math.min(50,min)*56;select(Math.min(50,min));requestAnimationFrame(syncWheel);
-  $('declare-points')?.addEventListener('click',()=>revealEnvido().catch(error=>toast(firebaseError(error))));
+  wheel.querySelectorAll('[data-number]').forEach(button=>button.addEventListener('click',()=>{stopHint();select(Number(button.dataset.number));wheel.scrollTo({left:Number(button.dataset.number)*step(),behavior:'smooth'});}));
+  wheel.scrollLeft=initial*step();select(initial);requestAnimationFrame(syncWheel);
+  if(!window.matchMedia('(prefers-reduced-motion: reduce)').matches){
+    hintRunning=true;wheel.style.scrollSnapType='none';
+    let started=null;
+    const animate=now=>{
+      if(!hintRunning)return;
+      if(!active||el.dataset.key!==key){stopHint();return;}
+      started??=now;
+      const progress=Math.min(1,(now-started)/2400);
+      wheel.scrollLeft=(initial+2*Math.sin(progress*2*Math.PI))*step();syncWheel();
+      if(progress<1)hintFrame=requestAnimationFrame(animate);else stopHint();
+    };
+    hintFrame=requestAnimationFrame(animate);
+  }
+  $('declare-points')?.addEventListener('click',()=>{stopHint();revealEnvido().catch(error=>toast(firebaseError(error)));});
   $('good-points')?.addEventListener('click',()=>revealEnvido(true).catch(error=>toast(firebaseError(error))));
 }
 function escapeHtml(value='') { return String(value).replace(/[&<>"']/g,(ch)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch])); }

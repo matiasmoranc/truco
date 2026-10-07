@@ -1349,7 +1349,6 @@ body { min-height:100dvh; }
 .fold-card-flight{position:fixed!important;z-index:160!important;visibility:visible!important;pointer-events:none!important;animation:none!important;transform:none;margin:0!important}
 
 
-@keyframes envido-wheel-hint{0%,100%{translate:0}25%,75%{translate:7px}50%{translate:-7px}}
-.number-wheel.wheel-hint button{animation:envido-wheel-hint 1.6s ease-in-out}
-.player-mode.declaring-envido #declare-points{font-size:20px}
-@media(prefers-reduced-motion:reduce){.number-wheel.wheel-hint button{animation:none}}
+/* Keep the complete envido declaration on one line. */
+.player-mode.declaring-envido #declare-points{font-size:14px;letter-spacing:.02em;white-space:nowrap;min-width:0;display:flex;align-items:center;justify-content:center;gap:5px;line-height:1}
+.player-mode.declaring-envido .envido-picker p{font-size:11px;letter-spacing:0}
