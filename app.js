@@ -2516,7 +2516,7 @@ window.addEventListener('online',()=>{if(state.room){renderGame();renderTurnTime
 
 const LEARNING_STAGES=[
   {title:'Lo básico',intro:'Primero jugamos manos simples, sin envido ni flor.\nRecibís 3 cartas y buscás ganar dos rondas.\nSi ganás la primera y la segunda empata, ganás la mano.\nSi empatás la primera y ganás la segunda, ganás la mano.'},
-  {title:'Sumamos el envido',intro:'Ahora podés cantar envido antes de tirar tu primera carta.\nSi el rival acepta, el que tenga más tantos de envido gana 2 puntos; si no acepta, vos ganás 1 punto.\nYa te mostraremos cómo sumar tus puntos.'},
+  {title:'Sumamos el envido',intro:'Ahora podés cantar envido antes de tirar tu primera carta.\nSi el rival acepta, el que tenga más tantos de envido gana 2 puntos; si no acepta, vos ganás 1 punto.\nLuego el partido se sigue jugando con normalidad.\nYa te mostraremos cómo sumar tus puntos.'},
   {title:'Sumamos la flor',intro:'Se juega con envido y flor. Tenés flor con 3 cartas del mismo palo, 2 o más piezas, o una pieza y 2 cartas comunes del mismo palo. Con flor no se juega envido. Para sumar varias piezas: la mayor vale completa y las otras aportan su última cifra.'}
 ];
 function learningDeck(room){
