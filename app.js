@@ -333,16 +333,10 @@ function rememberPlayerName(name) {
     else localStorage.removeItem('truco-player-name');
   } catch { /* The game can still be used when browser storage is unavailable. */ }
 }
-for (const id of ['player-name', 'lobby-name']) {
-  $(id).value = savedPlayerName();
-  $(id).addEventListener('input', event => {
-    const name = cleanName(event.target.value, '');
-    rememberPlayerName(name);
-    for (const otherId of ['player-name', 'lobby-name']) {
-      if(otherId !== id) $(otherId).value = name;
-    }
-  });
-}
+$('player-name').value = savedPlayerName();
+$('player-name').addEventListener('input', event => {
+  rememberPlayerName(cleanName(event.target.value, ''));
+});
 function pickRole(role) {
   state.role = role;
   document.querySelectorAll('.role-card').forEach((card) => card.classList.toggle('selected', card.dataset.role === role));
@@ -577,7 +571,7 @@ function renderLobby(rooms) {
 }
 function joinOpenRoom(code, seat) {
   state.joining = true; state.selectedRoom = code; state.role = seat;
-  const name = cleanName($('lobby-name').value, seat === 'table' ? 'La mesa' : 'Jugador');
+  const name = cleanName($('player-name').value||savedPlayerName(), seat === 'table' ? 'La mesa' : 'Jugador');
   $('player-name').value = name;
   enterRoom();
 }
@@ -2531,7 +2525,7 @@ async function startLearning(stage=0){
     if(!await startLocalBotGame())return;
     state.learning={stage,hints:true,paused:true,pausedAt:gameTime(),complete:false,scoreMessages:[]};
     state.bot=true;state.botDifficulty='easy';state.botMemory=null;
-    state.room.players={player1:{name:cleanName($('lobby-name').value||$('player-name').value,'Vos')},player2:{name:'Bot de práctica'}};
+    state.room.players={player1:{name:cleanName($('player-name').value||savedPlayerName(),'Vos')},player2:{name:'Bot de práctica'}};
     Object.assign(state.room,{targetPoints:10,status:'started',openingDraw:null,createdAt:gameTime(),matchNumber:1,turnClock:null,practiceRules:{envido:stage>=1,flor:stage>=2}});
     if(stage===1){
       const deck=learningDeck(state.room);state.localHands={player1:deck.slice(0,3),player2:deck.slice(3,6)};
