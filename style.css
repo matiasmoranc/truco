@@ -1494,3 +1494,6 @@ body { min-height:100dvh; }
 .help-example-card:last-child>span{color:#ead39b;font-weight:700}
 .help-example-card>.sprite-card{width:100%;aspect-ratio:280/435;border-radius:6px;background-color:#f5f0df}
 @media(max-width:400px){.help-example-cards{gap:6px}.help-example-card:last-child{padding-left:6px}}
+
+/* Give stage introductions enough room to display their text naturally. */
+#learn-coach-dialog{max-height:calc(100dvh - 24px);box-sizing:border-box}
