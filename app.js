@@ -1027,7 +1027,7 @@ function scheduleLocalNextHand(room){
   state.resolutionTimer=scheduleLocalTransition(room,()=>{
     if(!state.localGame||state.room!==room||room.pendingNextHand?.id!==pending.id)return;
     room.pendingNextHand=null;state.resolutionTimer=null;state.resolutionTimerKey=null;
-    localFinishHand(pending.winner,pending.foldPoints);
+    localFinishHand(pending.winner,pending.foldPoints,pending.id.startsWith('fold:')?'fold':'declined');
   },Math.max(0,pending.endsAt-gameTime()));
 }
 
@@ -2272,12 +2272,13 @@ function localPlay(card,launchOrigin=null) {
   }else state.room.turn=player==='player1'?'player2':'player1';
   renderGame();
 }
-function localFinishHand(winner,points){
+function localFinishHand(winner,points,ending='rounds'){
   const room=state.room,before={...room,scores:{...room.scores}},groups=buildEndEvidence(room,state.localOriginalHands||{});
   room.scores=auditEnvidoScores(room,room.scores,state.localTruth||{});room.envidoAudit=null;
   room.scores[winner]=(room.scores[winner]||0)+points;
   room.scores=capScores(room,settleSingleFlor(room,room.scores));
-  room.lastHandScore=buildHandSummary(before,room.scores,`${room.players[winner].name} gana la mano (${points} puntos).`,state.localTruth||{});room.handScoreEntries=[];
+  const reason=ending==='fold'?'Cuando te vas al mazo, el rival gana los puntos que estaban en juego hasta ese momento.':ending==='declined'?'Al decir NO QUIERO, el rival gana los puntos que ya estaban aceptados y se vuelve a repartir.':`${room.players[winner].name} gana la mano (${points} puntos).`;
+  room.lastHandScore=buildHandSummary(before,room.scores,reason,state.localTruth||{});room.handScoreEntries=[];
   room.handScoreHistory=handScoreHistory(room,room.lastHandScore);
   queueLearningPoints(before,room.scores,room.lastHandScore.entries);
   if(groups.length){localShowEvidence(groups);renderGame();return;}
