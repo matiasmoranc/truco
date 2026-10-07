@@ -1537,3 +1537,14 @@ body { min-height:100dvh; }
 /* Match the learning menu actions to the start button. */
 .learn-content>.learn-practice-actions{flex-direction:column}
 .learn-content>.learn-practice-actions>.button{width:100%;height:56px;min-height:48px;flex:none;font-size:15px;border-radius:10px}
+
+/* In-game explanations size naturally around their text. */
+.learning-message{height:auto;min-height:0;padding:12px 14px;box-sizing:border-box}
+.learning-message .learn-close{top:8px;right:8px;width:30px;height:30px;font-size:22px}
+.learning-message h2{min-height:26px;margin:0 32px 8px 0}
+.learning-message #learning-message-body p{margin:5px 0}
+.learning-message #learning-message-body p:first-child{margin-top:0}
+.learning-message #learning-message-body p:last-child{margin-bottom:0}
+.learning-message.score-message{width:fit-content;max-width:min(440px,calc(100vw - 32px))}
+.learning-message.score-message #learning-message-body{padding-top:0;padding-right:34px;min-height:30px}
+.learning-message.score-message #learning-message-body p:first-child{margin-left:0;margin-right:0}
