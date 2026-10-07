@@ -1363,7 +1363,7 @@ body { min-height:100dvh; }
   .game.player-mode.declaring-envido .player-controls>.fold-hand{position:absolute;left:auto;right:0;bottom:0;top:auto;transform:none;width:108px;margin:0}
 }
 
-.truco-logo{display:block;object-fit:contain;height:40.8px;width:61.2px;flex-shrink:0}
-.brand-lockup .truco-logo{height:68px;width:102px}
+.truco-logo{display:block;object-fit:contain;height:32.64px;width:48.96px;flex-shrink:0}
+.brand-lockup .truco-logo{height:54.4px;width:81.6px}
 .mini-brand{line-height:0}
-@media(min-width:1024px){.mini-brand .truco-logo{height:45.9px;width:68.85px}}
+@media(min-width:1024px){.mini-brand .truco-logo{height:36.72px;width:55.08px}}
