@@ -2674,7 +2674,7 @@ function queueLearningTrucoReminder(){
   if(!learning||learning.stage!==0||!learning.hints||!learning.trucoReminderPending||Number(room.handNumber)<=Number(learning.trucoReminderAfterHand)||learning.hasCalledTruco||learning.trucoReminderShown||room.status!=='started'||room.pendingBet||room.resolvingTrick||room.pendingNextHand||room.endReveal&&!room.endReveal.done)return;
   learning.trucoReminderPending=false;learning.trucoReminderShown=true;
   learning.tutorialMessages??=[];
-  learning.tutorialMessages.push({title:'Podés cantar TRUCO',pointAtTruco:true,text:'Si tocás TRUCO, podés aumentar los puntos en juego. Sin truco se juega por 1 punto. Con truco se juega por 2 puntos. El rival tiene que aceptar; si no acepta, ganás 1 punto.'});
+  learning.tutorialMessages.push({title:'Podés gritar TRUCO',pointAtTruco:true,text:'Si tocás TRUCO, podés aumentar los puntos en juego. Sin truco se juega por 1 punto. Con truco se juega por 2 puntos. El rival tiene que aceptar; si no acepta, ganás 1 punto.'});
 }
 function showLearningMessage(){
   if(!state.learning||state.learning.paused||state.learning.complete||document.querySelector('.learn-coach-dialog[open]'))return;
