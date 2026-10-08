@@ -2631,10 +2631,13 @@ function queueLearningPoints(before,after,entries){
   }
 }
 function positionLearningScoreArrow(){
-  const dialog=$('learning-hint'),arrow=$('learning-score-arrow');
+  const tipActive=$('learning-points-tip').open;
+  $('learning-points-arrow').classList.toggle('hidden',!tipActive);
+  if(tipActive)$('learning-score-arrow').classList.add('hidden');
+  const dialog=tipActive?$('learning-points-tip'):$('learning-hint'),arrow=$(tipActive?'learning-points-arrow':'learning-score-arrow'),path=$(tipActive?'learning-points-arrow-path':'learning-score-arrow-path');
   const scoreActive=dialog.open&&state.learning?.activeScoreMessage,trucoActive=dialog.open&&state.learning?.activeTutorial?.pointAtTruco;
   const guideActive=dialog.open&&state.learning?.activeTutorial?.pointAtGuide;
-  const active=scoreActive||trucoActive||guideActive;
+  const active=tipActive||scoreActive||trucoActive||guideActive;
   arrow.classList.toggle('hidden',!active);
   document.querySelectorAll('.scoreboard,.mobile-score').forEach(marker=>marker.classList.toggle('learning-score-highlight',!!scoreActive));
   if(!active)return;
@@ -2643,7 +2646,7 @@ function positionLearningScoreArrow(){
     if(!target?.width||!target.height){arrow.classList.add('hidden');return;}
     const box=dialog.getBoundingClientRect(),x1=box.left+box.width*.65,y1=box.top-4,x2=target.left+target.width/2,y2=target.bottom+8;
     arrow.setAttribute('viewBox','0 0 '+window.innerWidth+' '+window.innerHeight);
-    $('learning-score-arrow-path').setAttribute('d','M '+x1+' '+y1+' C '+x1+' '+(y1-35)+' '+x2+' '+(y2+35)+' '+x2+' '+y2);
+    path.setAttribute('d','M '+x1+' '+y1+' C '+x1+' '+(y1-35)+' '+x2+' '+(y2+35)+' '+x2+' '+y2);
     return;
   }
   if(trucoActive){
@@ -2651,7 +2654,7 @@ function positionLearningScoreArrow(){
     if(!button){arrow.classList.add('hidden');return;}
     const box=dialog.getBoundingClientRect(),target=button.getBoundingClientRect(),x=target.left+target.width/2,y1=box.bottom-4,y2=target.top-6;
     arrow.setAttribute('viewBox','0 0 '+window.innerWidth+' '+window.innerHeight);
-    $('learning-score-arrow-path').setAttribute('d','M '+x+' '+y1+' C '+x+' '+(y1+20)+' '+x+' '+(y2-20)+' '+x+' '+y2);
+    path.setAttribute('d','M '+x+' '+y1+' C '+x+' '+(y1+20)+' '+x+' '+(y2-20)+' '+x+' '+y2);
     return;
   }
   const marker=[...document.querySelectorAll('.mobile-score,.scoreboard')].find(el=>el.getBoundingClientRect().width&&el.getBoundingClientRect().height);
@@ -2659,7 +2662,7 @@ function positionLearningScoreArrow(){
   const box=dialog.getBoundingClientRect(),target=marker.getBoundingClientRect();
   const x1=Math.max(box.left+20,Math.min(box.right-24,target.left-40)),y1=box.top+12,x2=target.left-8,y2=target.top+target.height*.65;
   arrow.setAttribute('viewBox','0 0 '+window.innerWidth+' '+window.innerHeight);
-  $('learning-score-arrow-path').setAttribute('d','M '+x1+' '+y1+' C '+x1+' '+y2+' '+(x2-28)+' '+y2+' '+x2+' '+y2);
+  path.setAttribute('d','M '+x1+' '+y1+' C '+x1+' '+y2+' '+(x2-28)+' '+y2+' '+x2+' '+y2);
 }
 function queueLearningAction(action,bet=state.room?.pendingBet){
   const learning=state.learning,room=state.room;
@@ -2815,8 +2818,8 @@ function openLearningHelp(){
   $('learn-coach-step').textContent='Etapa '+(stage+1)+' de 3';
   $('learn-coach-title').textContent=complete?'Partida terminada':lesson.title;
   $('learn-coach-body').replaceChildren();
-  (complete?learningGuidance():stage===1?['Primero vamos a practicar cómo sumar los puntos. Cuando estés listo, podés cerrar la práctica y seguimos jugando con envido.']:stage===0?lesson.intro.split('\n'):[lesson.intro,...learningGuidance()]).forEach(text=>{const p=document.createElement('p');p.textContent=text;$('learn-coach-body').append(p);});
-  $('learn-coach-continue').textContent=complete?'Seguir jugando así / Etapa '+(stage+1)+'/3':stage===1?'Practicar envido':'Entendido, a jugar';
+  (complete?learningGuidance():stage===1?['Primero vamos a practicar cómo sumar los puntos. Cuando estés listo, podés cerrar la práctica y seguimos jugando con envido.']:stage===0?lesson.intro.split('\n'):['Sumamos la flor. Se juega con envido y flor. Si algún jugador tiene flor, se cancelan las opciones del envido.','Tenés flor cuando tenés 3 cartas del mismo palo. Las piezas son comodines.']).forEach(text=>{const p=document.createElement('p');p.textContent=text;$('learn-coach-body').append(p);});
+  $('learn-coach-continue').textContent=complete?'Seguir jugando así / Etapa '+(stage+1)+'/3':stage===1?'Practicar envido':stage===2?'Practicar la flor':'Entendido, a jugar';
   $('learn-coach-next').classList.toggle('hidden',!complete);
   $('learn-coach-next').textContent=stage===0?'Sumar el envido / Etapa 2/3':stage===1?'Sumar la flor / Etapa 3/3':'Quitar la flor / Etapa 2/3';
   $('learn-coach-previous').classList.toggle('hidden',!complete||stage===0);
@@ -2900,7 +2903,7 @@ function markPracticeGuideCards(){
 function openStudySheet(){pauseLearning();markPracticeGuideCards();if(!$('learn-sheet-dialog').open)$('learn-sheet-dialog').showModal();}
 function continueLearningStage(){
   const stage=state.learning?.stage||0,complete=state.learning?.complete;
-  if(!complete&&stage===1)openStudy('envido');
+  if(!complete&&stage>=1)openStudy(stage===2?'flor':'envido');
   $('learn-coach-dialog').close();
   if(complete)startLearning(stage);
 }
@@ -2951,12 +2954,13 @@ $('learn-points-info').addEventListener('change',event=>{
     if($('learning-hint').open)$('learning-hint').close();
     pauseLearning();
     $('learning-points-tip').showModal();
+    requestAnimationFrame(positionLearningScoreArrow);
     return;
   }
   renderLearning();
 });
 $('learning-points-tip-close').addEventListener('click',()=>$('learning-points-tip').close());
-$('learning-points-tip').addEventListener('close',resumeLearning);
+$('learning-points-tip').addEventListener('close',()=>{positionLearningScoreArrow();resumeLearning();});
 for(const id of ['learn-coach-dialog','learn-study-dialog','learn-sheet-dialog','learn-envido-help-dialog','learn-flor-help-dialog'])$(id).addEventListener('close',resumeLearning);
 $('learn-coach-continue').addEventListener('click',continueLearningStage);
 $('learn-coach-next').addEventListener('click',()=>{const stage=state.learning.stage;$('learn-coach-dialog').close();startLearning(stage===2?1:stage+1);});
