@@ -350,6 +350,7 @@ function pickRole(role) {
 }
 function isCoordinator() { return state.playerId === 'table' || (state.room?.deviceMode === 'two' && state.room.table?.uid === state.uid); }
 function configureSetup() {
+  state.navigationEpoch=(state.navigationEpoch||0)+1;
   state.invitationEntry=false;
   $('play-bot').checked=false;updateBotSetup();
   state.joining = false;
@@ -2526,14 +2527,7 @@ $('save-config').addEventListener('click',()=>{try{const cfg=JSON.parse($('fireb
 if(new URLSearchParams(location.search).has('mesa'))showView('invite-view');
 state.config=loadConfig();
 setupSuitIcons();renderPointsPicker();
-try {
-  const bundled = await import('./firebase-config.js');
-  if (firebaseConfigValid(bundled.firebaseConfig)) state.config = bundled.firebaseConfig;
-} catch { /* Optional during initial setup. */ }
-await preloadCardImages().catch(()=>{});
-const invitedRoom=new URLSearchParams(location.search).get('mesa');
-if(invitedRoom)await openInvitation(invitedRoom);
-else if (firebaseConfigValid(state.config)) openLobby();
+
 
 
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&state.room){renderGame();renderTurnTimer();if(!state.localGame&&isCoordinator())scheduleTableResolution();}});
@@ -2552,6 +2546,7 @@ function learningDeck(room){
 }
 function roomHasFlor(room,hand){return room?.practiceRules?.flor!==false&&hasFlor(hand,room?.muestra);}
 function openLearning(){
+  state.navigationEpoch=(state.navigationEpoch||0)+1;
   $('learn-coach-dialog').close();
   if(state.learning){stopBot();clearTimeout(state.resolutionTimer);state.room=null;state.localGame=false;}
   showView('learn-view');
@@ -2966,3 +2961,36 @@ $('learn-coach-continue').addEventListener('click',continueLearningStage);
 $('learn-coach-next').addEventListener('click',()=>{const stage=state.learning.stage;$('learn-coach-dialog').close();startLearning(stage===2?1:stage+1);});
 $('learn-coach-previous').addEventListener('click',()=>{$('learn-coach-dialog').close();startLearning(0);});
 $('learn-coach-menu').addEventListener('click',openLearning);
+
+async function initializePage(){
+  try{
+    await Promise.all([
+      (async()=>{
+        try{
+          const bundled=await import('./firebase-config.js');
+          if(firebaseConfigValid(bundled.firebaseConfig))state.config=bundled.firebaseConfig;
+        }catch{ /* Optional during initial setup. */ }
+      })(),
+      preloadCardImages().catch(error=>console.error('[truco:startup-cards]',error))
+    ]);
+    const invitedRoom=new URLSearchParams(location.search).get('mesa');
+    if(invitedRoom)await openInvitation(invitedRoom);
+    else if(firebaseConfigValid(state.config)){
+      // Slow authentication must not prevent offline practice. Late lobby work
+      // checks the navigation epoch before changing the current view.
+      let startupTimer;
+      try{
+        await Promise.race([
+          openLobby(),
+          new Promise(resolve=>{startupTimer=setTimeout(resolve,12000);})
+        ]);
+      }finally{clearTimeout(startupTimer);}
+    }
+  }catch(error){console.error('[truco:startup]',error);}
+  finally{
+    $('app').inert=false;
+    $('startup-loading').hidden=true;
+    document.documentElement.classList.remove('page-loading');
+  }
+}
+await initializePage();
