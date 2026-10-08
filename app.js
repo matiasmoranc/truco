@@ -1110,7 +1110,7 @@ async function revealEnvido(good=false,declaredNumber=null) {
     const winner=good||number===Number(bet.reveals?.[first])?first:second;
     changes={pendingBet:bet.suspendedBet||null,envidoClosed:true,envidoAudit:{reveals,winner,stake:bet.stake,called:bet.called||'envido',calls:bet.calls||[bet.called||'envido'],handNumber:room.handNumber},feed:topFeed(room,good?`${room.players[player].name}: son buenas.`:`${room.players[player].name} canta ${number} son mejores.`)};
   }
-  if(state.localGame){const notice=makeCallNotice(changes.feed?.[0]?.text);if(notice)changes.callNotice=notice;Object.assign(room,changes);renderGame();}else await writeRoom(changes);
+  if(state.localGame){queueLearningAction(good?'good':'declare',bet);const notice=makeCallNotice(changes.feed?.[0]?.text);if(notice)changes.callNotice=notice;Object.assign(room,changes);renderGame();}else await writeRoom(changes);
 }
 function settleSingleFlor(room,scores) {
   const flowers=Object.keys(room.flors||{});
@@ -1342,7 +1342,7 @@ async function foldHand(){
   try{
     if(state.localGame){
       const room=state.room,changes=foldHandChanges(room,state.playerId),pending=changes.pendingNextHand;
-      Object.assign(room,changes);
+      queueLearningAction('fold');Object.assign(room,changes);
       // Keep the fold notice and the pending hand alive for the full 3-second pause.
       renderGame();
       scheduleLocalNextHand(room);
@@ -2222,7 +2222,7 @@ function localCallAction(kind){
     if(!canCallFirstRoundEnvido(room,caller,localHand(caller))){toast('El envido está cerrado o hay flor.');return;}
     const base=pending?.type==='envido'?(pending.stake||0):0;
     room.pendingBet={type:'envido',caller,responder:other,stake:envidoBetPoints(room,kind,base),accepted:base,called:kind,calls:[kind],reveals:{},suspendedBet:overTruco?pending:null};
-    localFeed(`${room.players[caller].name} canta ${kind==='real'?'real envido':kind==='falta'?'falta envido':'envido'}.`);renderGame();return;
+    queueLearningAction(kind);localFeed(`${room.players[caller].name} canta ${kind==='real'?'real envido':kind==='falta'?'falta envido':'envido'}.`);renderGame();return;
   }
   if(['truco','retruco','vale4'].includes(kind)){
     const wanted={truco:2,retruco:3,vale4:4}[kind],level=Number(room.trucoLevel)||1;
@@ -2248,11 +2248,12 @@ function localAnswerAction(answer){
   }
   if(answer.startsWith('raise-')&&bet.type==='envido'){
     const kind=answer.slice(6),value=envidoBetPoints(room,kind,bet.stake);
-    room.pendingBet={...bet,caller:player,responder:bet.caller,accepted:bet.stake,stake:value,called:kind,calls:[...(bet.calls||[bet.called||'envido']),kind],reveals:{}};localFeed(`${room.players[player].name} canta ${kind==='falta'?'falta envido':kind==='real'?'real envido':'envido'}.`);renderGame();return;
+    room.pendingBet={...bet,caller:player,responder:bet.caller,accepted:bet.stake,stake:value,called:kind,calls:[...(bet.calls||[bet.called||'envido']),kind],reveals:{}};queueLearningAction(answer);localFeed(`${room.players[player].name} canta ${kind==='falta'?'falta envido':kind==='real'?'real envido':'envido'}.`);renderGame();return;
   }
   if(bet.type==='flor'&&(answer==='raise-conflor'||answer==='raise-faltaflor')){
-    const kind=answer==='raise-faltaflor'?'falta':'conflor',value=florBetPoints(room,kind);room.flors={...room.flors,[player]:florValue(localHand(player),room.muestra)};room.pendingBet={...bet,single:false,caller:player,responder:bet.caller,accepted:bet.stake,stake:value,called:kind,calls:[...(bet.calls||[bet.called||'flor']),kind]};localFeed(`${room.players[player].name} responde ${kind==='conflor'?'con flor envido':'contra flor al resto'}.`);renderGame();return;
+    const kind=answer==='raise-faltaflor'?'falta':'conflor',value=florBetPoints(room,kind);room.flors={...room.flors,[player]:florValue(localHand(player),room.muestra)};room.pendingBet={...bet,single:false,caller:player,responder:bet.caller,accepted:bet.stake,stake:value,called:kind,calls:[...(bet.calls||[bet.called||'flor']),kind]};queueLearningAction(answer);localFeed(`${room.players[player].name} responde ${kind==='conflor'?'con flor envido':'contra flor al resto'}.`);renderGame();return;
   }
+  if(answer==='yes'||answer==='no')queueLearningAction(answer,bet);
   if(answer==='no'){
     localFeed(`${room.players[player].name} ${bet.type==='flor'&&bet.single?'responde: tiene':'no quiere'}.`);
     const points=bet.type==='truco'?Math.max(1,(bet.stake||2)-1):bet.type==='flor'?declinedFlorPoints(bet):(bet.accepted||1);
@@ -2274,7 +2275,7 @@ function localAction(action){
     const other=otherPlayer(player);room.flors={...(room.flors||{}),[player]:florValue(localHand(player),room.muestra)};room.envidoClosed=true;
     const suspendedBet=room.pendingBet?.type==='truco'?room.pendingBet:(room.pendingBet?.suspendedBet||null);
     room.pendingBet={type:'flor',called:'flor',single:!room.flors[other],caller:player,responder:other,stake:3,accepted:0,suspendedBet};
-    localFeed(`${room.players[player].name} canta flor.`);renderGame();
+    queueLearningAction('flor');localFeed(`${room.players[player].name} canta flor.`);renderGame();
   } else if(['yes','no','raise'].includes(action)||action.startsWith('raise-'))localAnswerAction(action);
   else localCallAction(action);
 }
@@ -2583,7 +2584,7 @@ function learningGuidance(){
     return [name+' ganó. Resultado: '+room.scores.player1+' a '+room.scores.player2+'. La partida era a 10.',
       learning.stage===0?'Podés seguir practicando lo básico o sumar el envido.':learning.stage===1?'Podés seguir con envido, volver a lo básico o sumar la flor.':'Podés seguir con todas las reglas, quitar la flor o volver a lo básico.'];
   }
-  if(bet?.revealMode&&bet.revealTurn==='player1')return ['Tenés '+handEnvido(original,muestra)+' tantos. Arrastrá los números y tocá DECLARAR. Si no superás al rival, podés decir SON BUENAS.',explainEnvido(original,muestra).explanation];
+  if(bet?.revealMode&&bet.revealTurn==='player1')return ['Arrastrá los números y tocá DECLARAR. Si no superás al rival, podés decir SON BUENAS.',explainEnvido(original,muestra).explanation];
   if(bet?.responder==='player1'){
     if(bet.type==='truco'){
       const stake=Number(bet.stake)||2,declined=stake-1;
@@ -2660,9 +2661,34 @@ function positionLearningScoreArrow(){
   arrow.setAttribute('viewBox','0 0 '+window.innerWidth+' '+window.innerHeight);
   $('learning-score-arrow-path').setAttribute('d','M '+x1+' '+y1+' C '+x1+' '+y2+' '+(x2-28)+' '+y2+' '+x2+' '+y2);
 }
+function queueLearningAction(action,bet=state.room?.pendingBet){
+  const learning=state.learning,room=state.room;
+  if(!learning?.hints||state.playerId!=='player1'||!room)return;
+  const pointsText=value=>value+' '+(value===1?'punto':'puntos');
+  const stake=Number(bet?.stake)||1;
+  const declined=bet?.type==='truco'?Math.max(1,stake-1):bet?.type==='flor'?declinedFlorPoints(bet):Number(bet?.accepted)||1;
+  let title,text;
+  if(action==='fold'){
+    title='Te fuiste al mazo';text='El rival gana los puntos que estaban en juego hasta ese momento. Se vuelve a repartir.';
+  }else if(action==='declare'||action==='good'){
+    title=action==='good'?'Dijiste SON BUENAS':'Declaraste tus tantos';
+    text=action==='good'?'Aceptaste que el rival tiene más tantos. Los puntos del envido se verifican al terminar la mano.':'El rival compara sus tantos con los que declaraste. Gana quien tenga más; si empatan, gana quien es mano. Los tantos se verifican al terminar la mano.';
+  }else if(action==='yes'||action==='no'){
+    const singleFlor=bet?.type==='flor'&&bet.single;
+    title=singleFlor&&action==='no'?'Dijiste TIENE':bet?.type==='flor'&&bet.called==='flor'&&action==='yes'?'Dijiste LA MÍA ES FLOR':'Dijiste '+(action==='yes'?'QUIERO':'NO QUIERO');
+    if(action==='no')text='El rival gana '+pointsText(declined)+'. '+(bet?.type==='truco'?'Se vuelve a repartir.':'La mano sigue jugando con normalidad.');
+    else if(bet?.type==='truco')text='Aceptaste jugar la mano por '+pointsText(stake)+'.';
+    else text='El que tenga más tantos de '+(bet?.type==='flor'?'flor':'envido')+' gana '+pointsText(stake)+'. Si empatan, gana quien es mano. '+(bet?.type==='envido'?'Ahora hay que declarar los tantos.':'Después se sigue jugando la mano.');
+  }else if(bet&&['envido','flor'].includes(bet.type)){
+    title='Dijiste '+betCallNames(bet).join(' + ').toUpperCase();
+    text='Si el rival acepta, el que tenga más tantos de '+bet.type+' gana '+pointsText(stake)+'. Si no acepta, ganás '+pointsText(declined)+'. Después se sigue jugando la mano.';
+    if(bet.suspendedBet?.type==='truco')text+=' Primero se resuelve el '+bet.type+' y después se responde el truco.';
+  }else return;
+  learning.tutorialMessages??=[];learning.tutorialMessages.push({title,text});
+}
 function queueLearningTrucoCall(stake,player){
   const learning=state.learning;
-  if(!learning||learning.stage!==0||player!=='player1')return;
+  if(!learning||player!=='player1')return;
   learning.hasCalledTruco=true;learning.trucoReminderPending=false;
   if(!learning.hints)return;
   const name={2:'TRUCO',3:'RETRUCO',4:'VALE 4'}[stake],declined=stake-1;
@@ -2810,7 +2836,7 @@ function explainEnvido(hand,muestra){
   const zeroNote=hand.some(card=>[10,11,12].includes(Number(card.rank))&&!pieceOrder(card,muestra))?' El 10, 11 y 12 comunes valen 0.':'';
   if(pieces.length===1){
     const piece=pieces[0],other=hand.filter(card=>card.id!==piece.id).sort((a,b)=>envidoValue(b,muestra)-envidoValue(a,muestra))[0];
-    return {value,explanation:cardStudyName(piece)+' es pieza: '+envidoValue(piece,muestra)+'. Sumás '+envidoValue(other,muestra)+' de '+cardStudyName(other)+': '+envidoValue(piece,muestra)+' + '+envidoValue(other,muestra)+' = '+value+'.'+zeroNote};
+    return {value,explanation:cardStudyName(piece)+' es pieza: vale '+envidoValue(piece,muestra)+' pts. Sumás '+envidoValue(other,muestra)+' pts del '+cardStudyName(other)+': '+envidoValue(piece,muestra)+' + '+envidoValue(other,muestra)+' = '+value+'.'+zeroNote};
   }
   let pair=null,best=-1;
   for(let a=0;a<hand.length;a++)for(let b=a+1;b<hand.length;b++)if(hand[a].suit===hand[b].suit){const sum=envidoValue(hand[a],muestra)+envidoValue(hand[b],muestra);if(sum>best){best=sum;pair=[hand[a],hand[b]];}}
