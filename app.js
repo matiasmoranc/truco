@@ -2708,10 +2708,29 @@ function positionLearningControls(){
   const game=$('game-view'),box=game.getBoundingClientRect(),header=game.querySelector('.game-topbar'),hand=$('hand').getBoundingClientRect();
   if(header)game.style.setProperty('--learning-exit-top',(header.getBoundingClientRect().bottom-box.top+10)+'px');
   game.style.setProperty('--learning-options-top',(hand.top+hand.height/2-box.top)+'px');
+  const cards=[...$('hand').querySelectorAll('.hand-card')].map(card=>card.getBoundingClientRect());
+  if(cards.length){
+    const felt=$('felt-area').getBoundingClientRect(),rounds=$('learning-rounds');
+    rounds.style.top=(Math.min(...cards.map(card=>card.top))-felt.top-18)+'px';
+    rounds.style.left=((Math.min(...cards.map(card=>card.left))+Math.max(...cards.map(card=>card.right)))/2-felt.left)+'px';
+  }
+}
+function renderLearningRounds(){
+  const el=$('learning-rounds'),active=!!(state.learning&&state.localGame);
+  el.classList.toggle('hidden',!active);
+  if(!active){el.replaceChildren();return;}
+  const rounds=state.room?.tricks||[],labels=[];
+  el.innerHTML=[0,1,2].map(index=>{
+    const round=rounds[index],result=!round?'pending':round.winner===state.playerId?'won':round.winner?'lost':'tied';
+    labels.push('Ronda '+(index+1)+': '+({pending:'pendiente',won:'ganada',lost:'perdida',tied:'empate'}[result]));
+    return '<i class="inactivity-circle round-'+result+'" aria-hidden="true"></i>';
+  }).join('');
+  el.setAttribute('aria-label',labels.join('. '));
 }
 function renderLearning(){
   const active=!!(state.learning&&state.localGame);
   $('learning-toolbar').classList.toggle('hidden',!active);$('game-view').classList.toggle('learning-mode',active);
+  renderLearningRounds();
   if(!active){if($('learning-hint').open)$('learning-hint').close();return;}
   $('learn-hints').checked=state.learning.hints;
   $('learn-points-info').checked=state.learning.pointsInfo!==false;

@@ -1565,3 +1565,8 @@ body { min-height:100dvh; }
 
 .card-order-guide .guide-owned{background:rgba(232,201,131,.12);outline:1px solid #e8c98388;outline-offset:2px;border-radius:5px}
 .guide-owned-cards{display:block;margin-top:4px;color:#e8c983;font-size:12px;font-weight:700;line-height:1.4;letter-spacing:0}
+
+.learning-rounds{position:absolute;z-index:12;display:flex;align-items:center;gap:5px;transform:translateX(-50%);pointer-events:none}
+.learning-rounds .round-won{border-color:#87c593;background:#87c593}
+.learning-rounds .round-lost{border-color:#d67869;background:#d67869}
+.learning-rounds .round-tied{background:#e8c983}
