@@ -2856,22 +2856,34 @@ function explainFlor(hand,muestra){
   else explanation=pieces.length===1?'No es flor: tenés una pieza, pero las otras 2 cartas son de palos diferentes.':'No es flor: las 3 cartas no son del mismo palo y no tenés piezas para formar otra combinación.';
   return {value,explanation:explanation+pieceNote};
 }
+function explainFlorPoints(hand,muestra){
+  const pieces=hand.filter(card=>pieceOrder(card,muestra)).sort((a,b)=>envidoValue(b,muestra)-envidoValue(a,muestra));
+  const common=hand.filter(card=>!pieceOrder(card,muestra)),value=florValue(hand,muestra);
+  const parts=pieces.length?[envidoValue(pieces[0],muestra),...pieces.slice(1).map(card=>envidoValue(card,muestra)%10),...common.map(card=>envidoValue(card,muestra))]:[20,...common.map(card=>envidoValue(card,muestra))];
+  let explanation=pieces.length?'Contás el valor completo de la pieza más alta: '+cardStudyName(pieces[0])+' vale '+envidoValue(pieces[0],muestra)+' pts.':'Las 3 cartas son del mismo palo. Sumás 20 más el valor de las 3 cartas.';
+  if(pieces.length>1)explanation+=' De las otras piezas sumás solo la última cifra: '+pieces.slice(1).map(card=>cardStudyName(card)+' aporta '+(envidoValue(card,muestra)%10)+' pts').join('; ')+'.';
+  if(pieces.length&&common.length)explanation+=' Sumás las cartas comunes: '+common.map(card=>cardStudyName(card)+' vale '+envidoValue(card,muestra)+' pts').join('; ')+'.';
+  if(common.some(card=>[10,11,12].includes(Number(card.rank))))explanation+=' El 10, 11 y 12 comunes valen 0.';
+  const replacement=pieces.find(card=>Number(card.rank)===12);
+  if(replacement)explanation+=' El '+cardStudyName(replacement)+' es una pieza porque toma el valor del '+cardStudyName(muestra)+' que está en la muestra.';
+  return {value,explanation:explanation+' Total: '+parts.join(' + ')+' = '+value+' pts.'};
+}
 let studyExercise=null;
 function makeStudyExercise(kind){
   // Envido exercises exclude flor hands, which belong to the flor practice.
-  let pool,hand,muestra;const wantFlor=kind==='flor'&&Math.random()<0.5;
+  let pool,hand,muestra;const wantFlor=kind==='flor-points'||(kind==='flor'&&Math.random()<0.5);
   do{pool=shuffleDeck();hand=pool.slice(0,3);muestra=pool[3];}while(kind==='envido'?hasFlor(hand,muestra):hasFlor(hand,muestra)!==wantFlor);
   return {kind,hand,muestra,answered:false};
 }
 function openStudy(kind){pauseLearning();nextStudy(kind);if(!$('learn-study-dialog').open)$('learn-study-dialog').showModal();}
 function nextStudy(kind=studyExercise?.kind||'envido'){
   studyExercise=makeStudyExercise(kind);
-  $('learn-study-title').textContent=kind==='envido'?'¿Cuántos tantos tenés?':'¿Tenés flor?';
-  $('learn-study-count-help').textContent=kind==='flor'?'Cómo saber si tenés flor':'Cómo contar el envido';
+  $('learn-study-title').textContent=kind==='envido'?'¿Cuántos tantos tenés?':kind==='flor-points'?'¿Cuántos puntos tiene tu flor?':'¿Tenés flor?';
+  $('learn-study-count-help').textContent=kind==='flor'?'Cómo saber si tenés flor':kind==='flor-points'?'Cómo sumar los puntos de la flor':'Cómo contar el envido';
   const cards=$('learn-study-cards');cards.replaceChildren();
   const add=(card,label)=>{const wrap=document.createElement('div'),caption=document.createElement('span'),image=document.createElement('div');wrap.className='study-card';caption.textContent=label;image.className='sprite-card';image.style.cssText=cardImageStyle(card);image.setAttribute('role','img');image.setAttribute('aria-label',cardAccessibleName(card));wrap.append(caption,image);cards.append(wrap);};
   studyExercise.hand.forEach((card,index)=>add(card,'Carta '+(index+1)));add(studyExercise.muestra,'Muestra');
-  $('learn-study-envido').classList.toggle('hidden',kind!=='envido');$('learn-study-flor').classList.toggle('hidden',kind!=='flor');
+  $('learn-study-envido').classList.toggle('hidden',kind==='flor');$('learn-study-flor').classList.toggle('hidden',kind!=='flor');
   $('learn-study-value').value='';$('learn-study-check').disabled=false;
   $('learn-study-feedback').textContent='';$('learn-study-feedback').className='study-feedback';
   $('learn-study-next').classList.add('hidden');
@@ -2879,15 +2891,16 @@ function nextStudy(kind=studyExercise?.kind||'envido'){
 }
 function checkStudy(answer){
   if(!studyExercise||studyExercise.answered)return;
-  const exercise=studyExercise,result=exercise.kind==='envido'?explainEnvido(exercise.hand,exercise.muestra):explainFlor(exercise.hand,exercise.muestra);
-  if(exercise.kind==='envido'&&(!Number.isInteger(answer)||answer<0||answer>50)){ $('learn-study-feedback').textContent='Escribí un número entero entre 0 y 50.';return;}
+  const exercise=studyExercise,result=exercise.kind==='envido'?explainEnvido(exercise.hand,exercise.muestra):exercise.kind==='flor-points'?explainFlorPoints(exercise.hand,exercise.muestra):explainFlor(exercise.hand,exercise.muestra);
+  if(exercise.kind!=='flor'&&(!Number.isInteger(answer)||answer<0||answer>50)){ $('learn-study-feedback').textContent='Escribí un número entero entre 0 y 50.';return;}
   const correct=answer===result.value;exercise.answered=true;
-  const feedback=(correct?'¡Correcto! ':exercise.kind==='envido'?'Tu respuesta fue '+answer+'. Tenés '+result.value+' tantos. ':result.value?'Esta mano sí tiene flor. ':'Esta mano no tiene flor. ')+result.explanation;
+  const feedback=(correct?'¡Correcto! ':exercise.kind!=='flor'?'Tu respuesta fue '+answer+'. '+(exercise.kind==='flor-points'?'Tu flor suma '+result.value+' pts. ':'Tenés '+result.value+' tantos. '):result.value?'Esta mano sí tiene flor. ':'Esta mano no tiene flor. ')+result.explanation;
   $('learn-study-feedback').textContent=feedback.replace(/\.\s*/g,'.\n').trim();
   $('learn-study-feedback').className='study-feedback '+(correct?'study-correct':'study-incorrect');
   $('learn-study-check').disabled=true;$('learn-study-flor').querySelectorAll('button').forEach(button=>button.disabled=true);
   $('learn-study-next').classList.remove('hidden');
 }
+function openFlorPointsHelp(){pauseLearning();if(!$('learn-flor-points-help-dialog').open)$('learn-flor-points-help-dialog').showModal();}
 function openFlorCountHelp(){pauseLearning();if(!$('learn-flor-help-dialog').open)$('learn-flor-help-dialog').showModal();}
 function openEnvidoCountHelp(){pauseLearning();if(!$('learn-envido-help-dialog').open)$('learn-envido-help-dialog').showModal();}
 function markPracticeGuideCards(){
@@ -2938,9 +2951,11 @@ $('learn-sheet-menu').addEventListener('click',openStudySheet);
 $('learn-sheet-close').addEventListener('click',()=>$('learn-sheet-dialog').close());
 $('learn-envido-study').addEventListener('click',()=>openStudy('envido'));
 $('learn-flor-study').addEventListener('click',()=>openStudy('flor'));
+$('learn-flor-points-study').addEventListener('click',()=>openStudy('flor-points'));
+$('learn-flor-points-help-close').addEventListener('click',()=>$('learn-flor-points-help-dialog').close());
 $('learn-study-close').addEventListener('click',()=>$('learn-study-dialog').close());
 $('learn-study-sheet').addEventListener('click',openStudySheet);
-$('learn-study-count-help').addEventListener('click',()=>studyExercise?.kind==='flor'?openFlorCountHelp():openEnvidoCountHelp());
+$('learn-study-count-help').addEventListener('click',()=>studyExercise?.kind==='flor-points'?openFlorPointsHelp():studyExercise?.kind==='flor'?openFlorCountHelp():openEnvidoCountHelp());
 $('learn-flor-help-close').addEventListener('click',()=>$('learn-flor-help-dialog').close());
 $('learn-envido-help-close').addEventListener('click',()=>$('learn-envido-help-dialog').close());
 $('learn-study-next').addEventListener('click',()=>nextStudy());
@@ -2963,7 +2978,7 @@ $('learn-points-info').addEventListener('change',event=>{
 });
 $('learning-points-tip-close').addEventListener('click',()=>$('learning-points-tip').close());
 $('learning-points-tip').addEventListener('close',()=>{positionLearningScoreArrow();resumeLearning();});
-for(const id of ['learn-coach-dialog','learn-study-dialog','learn-sheet-dialog','learn-envido-help-dialog','learn-flor-help-dialog'])$(id).addEventListener('close',resumeLearning);
+for(const id of ['learn-coach-dialog','learn-study-dialog','learn-sheet-dialog','learn-envido-help-dialog','learn-flor-help-dialog','learn-flor-points-help-dialog'])$(id).addEventListener('close',resumeLearning);
 $('learn-coach-continue').addEventListener('click',continueLearningStage);
 $('learn-coach-next').addEventListener('click',()=>{const stage=state.learning.stage;$('learn-coach-dialog').close();startLearning(stage===2?1:stage+1);});
 $('learn-coach-previous').addEventListener('click',()=>{$('learn-coach-dialog').close();startLearning(0);});
