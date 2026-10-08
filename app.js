@@ -2159,7 +2159,7 @@ function scheduleBot(){
     key+':'+turnClockKey(room)+':'+room.trucoLevel+':'+(room.flors?.player2??'');
   if(state.botTimer&&state.botTimerRoom===room&&state.botTimerKey===actionKey)return;
   clearTimeout(state.botTimer);state.botTimerRoom=room;state.botTimerKey=actionKey;
-  const delay=3000+Math.floor(Math.random()*(room.status==='drawing'?1001:2001));
+  const delay=2000;
   state.botTimer=setTimeout(()=>{
     state.botTimer=null;if(!state.bot||state.room!==room||state.learning?.paused)return;
     const action=room.status==='drawing'?{kind:'draw'}:room.status==='complete'?{kind:'rematch'}:
@@ -2305,7 +2305,7 @@ function localFinishHand(winner,points,ending='rounds'){
   room.scores=auditEnvidoScores(room,room.scores,state.localTruth||{});room.envidoAudit=null;
   room.scores[winner]=(room.scores[winner]||0)+points;
   room.scores=capScores(room,settleSingleFlor(room,room.scores));
-  const reason=ending==='fold'?'Cuando te vas al mazo, el rival gana los puntos que estaban en juego hasta ese momento.':ending==='declined'?'Al decir NO QUIERO, el rival gana los puntos que ya estaban aceptados y se vuelve a repartir.':`${room.players[winner].name} gana la mano (${points} puntos).`;
+  const reason=ending==='fold'?'Cuando te vas al mazo, el rival gana los puntos que estaban en juego hasta ese momento.':ending==='declined'?`${room.players[otherPlayer(winner)].name} dijo NO QUIERO. ${room.players[winner].name} gana ${points} ${points===1?'punto':'puntos'} por los puntos que estaban en juego hasta ese momento y se vuelve a repartir.`:`${room.players[winner].name} gana la mano (${points} puntos).`;
   room.lastHandScore=buildHandSummary(before,room.scores,reason,state.localTruth||{});room.handScoreEntries=[];
   room.handScoreHistory=handScoreHistory(room,room.lastHandScore);
   queueLearningPoints(before,room.scores,room.lastHandScore.entries);
@@ -2658,7 +2658,7 @@ function queueLearningTrucoCall(stake,player){
   if(!learning.hints)return;
   const name={2:'TRUCO',3:'RETRUCO',4:'VALE 4'}[stake],declined=stake-1;
   learning.tutorialMessages??=[];
-  learning.tutorialMessages.push({title:'Dijiste '+name,text:'Dijiste '+name+'. Si el rival acepta, juegan por '+stake+' puntos. Si el rival no acepta, ganás '+declined+' '+(declined===1?'punto':'puntos')+' y se vuelve a repartir.'});
+  learning.tutorialMessages.push({title:'Dijiste '+name,text:'Si el rival acepta, juegan por '+stake+' puntos. Si el rival no acepta, ganás '+declined+' '+(declined===1?'punto':'puntos')+' y se vuelve a repartir.'});
 }
 function queueLearningTrucoReminder(){
   const learning=state.learning,room=state.room;
