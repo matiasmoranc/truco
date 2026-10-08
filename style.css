@@ -1570,3 +1570,5 @@ body { min-height:100dvh; }
 .learning-rounds .round-won{border-color:#87c593;background:#87c593}
 .learning-rounds .round-lost{border-color:#d67869;background:#d67869}
 .learning-rounds .round-tied{background:#e8c983}
+
+@media(max-width:640px){#learn-view .topbar{display:grid;grid-template-columns:1fr auto 1fr}#learn-view .topbar>.icon-button{justify-self:start}#learn-view .topbar>.mini-brand{justify-self:center}}
