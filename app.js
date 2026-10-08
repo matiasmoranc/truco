@@ -2790,11 +2790,11 @@ function openLearningHelp(){
   $('learn-coach-title').textContent=complete?'Partida terminada':lesson.title;
   $('learn-coach-body').replaceChildren();
   (complete?learningGuidance():stage===1?['Primero vamos a practicar cómo sumar los puntos. Cuando estés listo, podés cerrar la práctica y seguimos jugando con envido.']:stage===0?lesson.intro.split('\n'):[lesson.intro,...learningGuidance()]).forEach(text=>{const p=document.createElement('p');p.textContent=text;$('learn-coach-body').append(p);});
-  $('learn-coach-continue').textContent=complete?'Seguir jugando así':stage===1?'Practicar envido':'Entendido, a jugar';
+  $('learn-coach-continue').textContent=complete?'Seguir jugando así / Etapa '+(stage+1)+'/3':stage===1?'Practicar envido':'Entendido, a jugar';
   $('learn-coach-next').classList.toggle('hidden',!complete);
-  $('learn-coach-next').textContent=stage===0?'Sumar el envido':stage===1?'Sumar la flor':'Quitar la flor';
+  $('learn-coach-next').textContent=stage===0?'Sumar el envido / Etapa 2/3':stage===1?'Sumar la flor / Etapa 3/3':'Quitar la flor / Etapa 2/3';
   $('learn-coach-previous').classList.toggle('hidden',!complete||stage===0);
-  $('learn-coach-previous').textContent='Volver sin envido ni flor';
+  $('learn-coach-previous').textContent='Volver a la Etapa 1 sin envido';
   if(!$('learn-coach-dialog').open)$('learn-coach-dialog').showModal();
 }
 function finishLearningHand(){
