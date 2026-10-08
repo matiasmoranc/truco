@@ -314,11 +314,12 @@ function renderCallNotice(){
   if(awaitingResponse&&received)received.pinned=true;
   const foldVisible=notice?.kind==='fold'&&remaining>0;
   const visible=addressed&&(foldVisible||(notice?.kind!=='fold'&&(awaitingResponse||(!received?.pinned&&remaining>0))));
-  const teachingNotice=visible&&$('learning-hint').open&&!state.learning?.activeScoreMessage;
+  const tutorialOpen=$('learning-hint').open&&!!state.learning?.activeTutorial;
+  const teachingNotice=visible&&!tutorialOpen&&$('learning-hint').open&&!state.learning?.activeScoreMessage;
   const helpNotice=$('learning-call-notice');
   helpNotice.classList.toggle('hidden',!teachingNotice);
   helpNotice.innerHTML=teachingNotice?callNoticeHtml(notice):'';
-  el.classList.toggle('hidden',!visible||teachingNotice);
+  el.classList.toggle('hidden',!visible||teachingNotice||tutorialOpen);
   el.innerHTML=visible?callNoticeHtml(notice):'';
   if(!visible)return;
   if(!awaitingResponse)callNoticeTimer=setTimeout(()=>{callNoticeTimer=null;renderCallNotice();},Math.max(0,remaining));
@@ -2227,6 +2228,7 @@ function localCallAction(kind){
     const wanted={truco:2,retruco:3,vale4:4}[kind],level=Number(room.trucoLevel)||1;
     if(pending||wanted!==level+1||level>=4||(level>1&&room.lastTrucoCaller===caller)){toast('Ese canto no está disponible.');return;}
     room.pendingBet={type:'truco',caller,responder:other,stake:wanted};room.lastTrucoCaller=caller;
+    queueLearningTrucoCall(wanted,caller);
     localFeed(`${room.players[caller].name} canta ${kind==='vale4'?'vale cuatro':kind}.`);renderGame();
   }
 }
@@ -2242,7 +2244,7 @@ function localAnswerAction(answer){
   if(bet.type==='flor'&&!florAnswers(bet,roomHasFlor(room,localHand(player))).some(([action])=>action===answer))return;
   if(bet.type==='flor'&&bet.single&&answer==='yes'){localAction('flor');return;}
   if(answer==='raise'&&bet.type==='truco'){
-    const value=bet.stake===2?3:4;room.pendingBet={...bet,caller:player,responder:bet.caller,stake:value};room.lastTrucoCaller=player;localFeed(`${room.players[player].name} canta ${value===3?'retruco':'vale cuatro'}.`);renderGame();return;
+    const value=bet.stake===2?3:4;room.pendingBet={...bet,caller:player,responder:bet.caller,stake:value};room.lastTrucoCaller=player;queueLearningTrucoCall(value,player);localFeed(`${room.players[player].name} canta ${value===3?'retruco':'vale cuatro'}.`);renderGame();return;
   }
   if(answer.startsWith('raise-')&&bet.type==='envido'){
     const kind=answer.slice(6),value=envidoBetPoints(room,kind,bet.stake);
@@ -2307,6 +2309,7 @@ function localFinishHand(winner,points,ending='rounds'){
   room.lastHandScore=buildHandSummary(before,room.scores,reason,state.localTruth||{});room.handScoreEntries=[];
   room.handScoreHistory=handScoreHistory(room,room.lastHandScore);
   queueLearningPoints(before,room.scores,room.lastHandScore.entries);
+  if(state.learning?.stage===0){state.learning.completedHands=(state.learning.completedHands||0)+1;if(state.learning.completedHands>=3&&!state.learning.hasCalledTruco){state.learning.trucoReminderPending=true;state.learning.trucoReminderAfterHand=room.handNumber;}}
   if(groups.length){localShowEvidence(groups);renderGame();return;}
   localDealAfterHand();
 }
@@ -2628,10 +2631,19 @@ function queueLearningPoints(before,after,entries){
 }
 function positionLearningScoreArrow(){
   const dialog=$('learning-hint'),arrow=$('learning-score-arrow');
-  const active=dialog.open&&state.learning?.activeScoreMessage;
+  const scoreActive=dialog.open&&state.learning?.activeScoreMessage,trucoActive=dialog.open&&state.learning?.activeTutorial?.pointAtTruco;
+  const active=scoreActive||trucoActive;
   arrow.classList.toggle('hidden',!active);
-  document.querySelectorAll('.scoreboard,.mobile-score').forEach(marker=>marker.classList.toggle('learning-score-highlight',!!active));
+  document.querySelectorAll('.scoreboard,.mobile-score').forEach(marker=>marker.classList.toggle('learning-score-highlight',!!scoreActive));
   if(!active)return;
+  if(trucoActive){
+    const button=$('player-actions').querySelector('[data-action="truco"]');
+    if(!button){arrow.classList.add('hidden');return;}
+    const box=dialog.getBoundingClientRect(),target=button.getBoundingClientRect(),x=target.left+target.width/2,y1=box.bottom-4,y2=target.top-6;
+    arrow.setAttribute('viewBox','0 0 '+window.innerWidth+' '+window.innerHeight);
+    $('learning-score-arrow-path').setAttribute('d','M '+x+' '+y1+' C '+x+' '+(y1+20)+' '+x+' '+(y2-20)+' '+x+' '+y2);
+    return;
+  }
   const marker=[...document.querySelectorAll('.mobile-score,.scoreboard')].find(el=>el.getBoundingClientRect().width&&el.getBoundingClientRect().height);
   if(!marker){arrow.classList.add('hidden');return;}
   const box=dialog.getBoundingClientRect(),target=marker.getBoundingClientRect();
@@ -2639,24 +2651,43 @@ function positionLearningScoreArrow(){
   arrow.setAttribute('viewBox','0 0 '+window.innerWidth+' '+window.innerHeight);
   $('learning-score-arrow-path').setAttribute('d','M '+x1+' '+y1+' C '+x1+' '+y2+' '+(x2-28)+' '+y2+' '+x2+' '+y2);
 }
+function queueLearningTrucoCall(stake,player){
+  const learning=state.learning;
+  if(!learning||learning.stage!==0||player!=='player1')return;
+  learning.hasCalledTruco=true;learning.trucoReminderPending=false;
+  if(!learning.hints)return;
+  const name={2:'TRUCO',3:'RETRUCO',4:'VALE 4'}[stake],declined=stake-1;
+  learning.tutorialMessages??=[];
+  learning.tutorialMessages.push({title:'Dijiste '+name,text:'Dijiste '+name+'. Si el rival acepta, juegan por '+stake+' puntos. Si el rival no acepta, ganás '+declined+' '+(declined===1?'punto':'puntos')+' y se vuelve a repartir.'});
+}
+function queueLearningTrucoReminder(){
+  const learning=state.learning,room=state.room;
+  if(!learning||learning.stage!==0||!learning.hints||!learning.trucoReminderPending||Number(room.handNumber)<=Number(learning.trucoReminderAfterHand)||learning.hasCalledTruco||learning.trucoReminderShown||room.status!=='started'||room.pendingBet||room.resolvingTrick||room.pendingNextHand||room.endReveal&&!room.endReveal.done)return;
+  learning.trucoReminderPending=false;learning.trucoReminderShown=true;
+  learning.tutorialMessages??=[];
+  learning.tutorialMessages.push({title:'Podés cantar TRUCO',pointAtTruco:true,text:'Si tocás TRUCO, podés aumentar los puntos en juego. Sin truco se juega por 1 punto. Con truco se juega por 2 puntos. El rival tiene que aceptar; si no acepta, ganás 1 punto.'});
+}
 function showLearningMessage(){
   if(!state.learning||state.learning.paused||state.learning.complete||document.querySelector('.learn-coach-dialog[open]'))return;
   if(state.learning.pointsInfo===false)state.learning.scoreMessages=[];
-  const room=state.room,bet=room.pendingBet,scoreMessage=state.learning.scoreMessages?.shift();
-  if(!scoreMessage&&!state.learning.hints)return;
+  if(!state.learning.hints)state.learning.tutorialMessages=[];
+  queueLearningTrucoReminder();
+  const tutorial=state.learning.tutorialMessages?.shift();
+  const room=state.room,bet=room.pendingBet,scoreMessage=tutorial?null:state.learning.scoreMessages?.shift();
+  if(!tutorial&&!scoreMessage&&!state.learning.hints)return;
   // Explain actual scoring and new calls; ordinary turns and round pauses need no popup.
-  if(!scoreMessage&&(!bet||(bet.revealMode?bet.revealTurn!=='player1':bet.responder!=='player1')))return;
-  const key=scoreMessage?'score:'+crypto.randomUUID():learningMessageKey();
-  if(!scoreMessage&&state.learning.acknowledgedMessage===key)return;
-  pauseLearning();state.learning.activeMessage=key;state.learning.activeScoreMessage=!!scoreMessage;
-  $('learning-message-title').textContent=scoreMessage?'':'Antes de responder';
+  if(!tutorial&&!scoreMessage&&(!bet||(bet.revealMode?bet.revealTurn!=='player1':bet.responder!=='player1')))return;
+  const key=tutorial?'tutorial:'+crypto.randomUUID():scoreMessage?'score:'+crypto.randomUUID():learningMessageKey();
+  if(!tutorial&&!scoreMessage&&state.learning.acknowledgedMessage===key)return;
+  pauseLearning();state.learning.activeMessage=key;state.learning.activeScoreMessage=!!scoreMessage;state.learning.activeTutorial=tutorial||null;
+  $('learning-message-title').textContent=scoreMessage?'':tutorial?.title||'Antes de responder';
   $('learning-message-title').classList.toggle('hidden',!!scoreMessage);
   $('learning-hint').classList.toggle('score-message',!!scoreMessage);
   if(scoreMessage){$('learning-hint').removeAttribute('aria-labelledby');$('learning-hint').setAttribute('aria-label','Puntos de la mano');}
   else{$('learning-hint').removeAttribute('aria-label');$('learning-hint').setAttribute('aria-labelledby','learning-message-title');}
   const body=$('learning-message-body');body.replaceChildren();
-  (scoreMessage?[scoreMessage]:learningGuidance()).flatMap(text=>text.replace(/\.\s*/g,'.\n').split('\n')).filter(text=>text.trim()).forEach(text=>{const p=document.createElement('p');p.textContent=text;body.append(p);});
-  const studyButton=$('learning-message-study'),kind=!scoreMessage&&['envido','flor'].includes(bet?.type)?bet.type:null;
+  (tutorial?[tutorial.text]:scoreMessage?[scoreMessage]:learningGuidance()).flatMap(text=>text.replace(/\.\s*/g,'.\n').split('\n')).filter(text=>text.trim()).forEach(text=>{const p=document.createElement('p');p.textContent=text;body.append(p);});
+  const studyButton=$('learning-message-study'),kind=!tutorial&&!scoreMessage&&['envido','flor'].includes(bet?.type)?bet.type:null;
   studyButton.classList.toggle('hidden',!kind);
   studyButton.dataset.studyKind=kind||'';
   studyButton.textContent=kind==='flor'?'Cómo sumar mis puntos de flor':'Cómo sumar mis puntos de envido';
@@ -2806,7 +2837,7 @@ $('learn-free').addEventListener('click',()=>startLearning(0));
 window.addEventListener('resize',()=>{positionLearningScoreArrow();positionLearningControls();});
 $('learning-message-close').addEventListener('click',()=>$('learning-hint').close());
 $('learning-message-study').addEventListener('click',event=>{const kind=event.currentTarget.dataset.studyKind;if(kind==='envido'||kind==='flor')openStudy(kind);});
-$('learning-hint').addEventListener('close',()=>{if(state.learning){state.learning.acknowledgedMessage=state.learning.activeMessage;state.learning.activeMessage=null;state.learning.activeScoreMessage=false;}positionLearningScoreArrow();resumeLearning();});
+$('learning-hint').addEventListener('close',()=>{if(state.learning){state.learning.acknowledgedMessage=state.learning.activeMessage;state.learning.activeMessage=null;state.learning.activeScoreMessage=false;state.learning.activeTutorial=null;}positionLearningScoreArrow();resumeLearning();});
 $('learn-menu').addEventListener('click',openLearning);
 $('game-sheet').addEventListener('click',openStudySheet);
 $('learn-sheet-menu').addEventListener('click',openStudySheet);
