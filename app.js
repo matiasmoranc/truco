@@ -2159,7 +2159,7 @@ function scheduleBot(){
     key+':'+turnClockKey(room)+':'+room.trucoLevel+':'+(room.flors?.player2??'');
   if(state.botTimer&&state.botTimerRoom===room&&state.botTimerKey===actionKey)return;
   clearTimeout(state.botTimer);state.botTimerRoom=room;state.botTimerKey=actionKey;
-  const delay=2000;
+  const delay=3000;
   state.botTimer=setTimeout(()=>{
     state.botTimer=null;if(!state.bot||state.room!==room||state.learning?.paused)return;
     const action=room.status==='drawing'?{kind:'draw'}:room.status==='complete'?{kind:'rematch'}:
