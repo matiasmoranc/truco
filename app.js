@@ -658,7 +658,7 @@ function renderWaiting() {
 function shuffleDeck() {
   const suits = [{name:'oro',symbol:'♦',red:true},{name:'copa',symbol:'♥',red:true},{name:'espada',symbol:'♠',red:false},{name:'basto',symbol:'♣',red:false}];
   const deck = [];
-  for (const suit of suits) for (const rank of [1,2,3,4,5,6,7,10,11,12]) deck.push({id:`${suit.name}-${rank}`, rank, suit:suit.symbol, red:suit.red, label:rank===10?'Sota':rank===11?'Caballo':rank===12?'Rey':String(rank)});
+  for (const suit of suits) for (const rank of [1,2,3,4,5,6,7,10,11,12]) deck.push({id:`${suit.name}-${rank}`, rank, suit:suit.symbol, red:suit.red, label:String(rank)});
   for (let i=deck.length-1;i>0;i--) { const j=Math.floor(Math.random()*(i+1)); [deck[i],deck[j]]=[deck[j],deck[i]]; }
   return deck;
 }
@@ -2776,17 +2776,18 @@ function finishLearningHand(){
   Object.assign(state.room,{status:'complete',pendingBet:null,turn:null,turnClock:null,endReveal:{done:true}});
   renderGame();openLearningHelp();return true;
 }
-function cardStudyName(card){return card.label+' de '+({'♦':'oro','♥':'copa','♠':'espada','♣':'basto'}[card.suit]||card.suit);}
+function cardStudyName(card){return String(card.rank)+' de '+({'♦':'oro','♥':'copa','♠':'espada','♣':'basto'}[card.suit]||card.suit);}
 function explainEnvido(hand,muestra){
   const pieces=hand.filter(card=>pieceOrder(card,muestra)),value=handEnvido(hand,muestra);
+  const zeroNote=hand.some(card=>[10,11,12].includes(Number(card.rank))&&!pieceOrder(card,muestra))?' El 10, 11 y 12 comunes valen 0.':'';
   if(pieces.length===1){
     const piece=pieces[0],other=hand.filter(card=>card.id!==piece.id).sort((a,b)=>envidoValue(b,muestra)-envidoValue(a,muestra))[0];
-    return {value,explanation:cardStudyName(piece)+' es pieza: '+envidoValue(piece,muestra)+'. Sumás '+envidoValue(other,muestra)+' de '+cardStudyName(other)+': '+envidoValue(piece,muestra)+' + '+envidoValue(other,muestra)+' = '+value+'. Con una pieza no agregás 20.'};
+    return {value,explanation:cardStudyName(piece)+' es pieza: '+envidoValue(piece,muestra)+'. Sumás '+envidoValue(other,muestra)+' de '+cardStudyName(other)+': '+envidoValue(piece,muestra)+' + '+envidoValue(other,muestra)+' = '+value+'.'+zeroNote};
   }
   let pair=null,best=-1;
   for(let a=0;a<hand.length;a++)for(let b=a+1;b<hand.length;b++)if(hand[a].suit===hand[b].suit){const sum=envidoValue(hand[a],muestra)+envidoValue(hand[b],muestra);if(sum>best){best=sum;pair=[hand[a],hand[b]];}}
-  if(pair)return {value,explanation:'Elegís las dos mejores cartas del mismo palo: '+cardStudyName(pair[0])+' y '+cardStudyName(pair[1])+'. Sumás 20 + '+envidoValue(pair[0],muestra)+' + '+envidoValue(pair[1],muestra)+' = '+value+'. Sota, caballo y rey comunes valen 0.'};
-  return {value,explanation:'No hay piezas ni dos cartas del mismo palo. Tus cartas valen '+hand.map(card=>envidoValue(card,muestra)).join(', ')+': elegís el mayor, '+value+'. Sota, caballo y rey comunes valen 0.'};
+  if(pair)return {value,explanation:'Elegís las dos mejores cartas del mismo palo: '+cardStudyName(pair[0])+' y '+cardStudyName(pair[1])+'. Sumás 20 + '+envidoValue(pair[0],muestra)+' + '+envidoValue(pair[1],muestra)+' = '+value+'.'+zeroNote};
+  return {value,explanation:'No hay piezas ni dos cartas del mismo palo. Tus cartas valen '+hand.map(card=>envidoValue(card,muestra)).join(', ')+': elegís el mayor, '+value+'.'+zeroNote};
 }
 function explainFlor(hand,muestra){
   const pieces=hand.filter(card=>pieceOrder(card,muestra)),common=hand.filter(card=>!pieceOrder(card,muestra));
