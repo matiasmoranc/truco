@@ -2836,6 +2836,22 @@ $('learn-game').addEventListener('click',openLearning);
 $('learn-back').addEventListener('click',()=>{stopBot();showView('welcome-view');openLobby();});
 $('learn-free').addEventListener('click',()=>startLearning(0));
 window.addEventListener('resize',()=>{positionLearningScoreArrow();positionLearningControls();});
+function indicateLearningMessageClose(event){
+  const dialog=event.currentTarget;
+  if(!dialog.open)return;
+  const box=dialog.getBoundingClientRect();
+  if(event.clientX>=box.left&&event.clientX<=box.right&&event.clientY>=box.top&&event.clientY<=box.bottom)return;
+  const button=dialog.querySelector('.learn-close');
+  if(!button)return;
+  button.getAnimations?.().forEach(animation=>animation.cancel());
+  clearTimeout(button._closeHintTimer);
+  button.classList.add('close-required');
+  button.animate?.([{translate:'0 0'},{translate:'-4px 0'},{translate:'4px 0'},{translate:'-3px 0'},{translate:'3px 0'},{translate:'0 0'}],{duration:450,easing:'ease-out'});
+  button._closeHintTimer=setTimeout(()=>button.classList.remove('close-required'),450);
+}
+for(const dialog of document.querySelectorAll('.learning-message')){
+  dialog.addEventListener('pointerdown',indicateLearningMessageClose);
+}
 $('learning-message-close').addEventListener('click',()=>$('learning-hint').close());
 $('learning-message-study').addEventListener('click',event=>{const kind=event.currentTarget.dataset.studyKind;if(kind==='envido'||kind==='flor')openStudy(kind);});
 $('learning-hint').addEventListener('close',()=>{if(state.learning){state.learning.acknowledgedMessage=state.learning.activeMessage;state.learning.activeMessage=null;state.learning.activeScoreMessage=false;state.learning.activeTutorial=null;}positionLearningScoreArrow();resumeLearning();});
