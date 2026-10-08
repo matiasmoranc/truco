@@ -247,7 +247,7 @@ function roundPauseInfo(room=state.room){
     const next=room.resolvedTrickWinner||room.mano;
     label=room.handComplete?'Siguiente mano':next===state.playerId?'Jugás en':'Pausa';
   }else if(room.status==='revealing'&&room.endReveal){
-    key='reveal:'+room.endReveal.id;endsAt=room.endReveal.endsAt;duration=5000;label='Siguiente mano';
+    key='reveal:'+room.endReveal.id;endsAt=room.endReveal.endsAt;duration=state.learning?3000:5000;label='Siguiente mano';
   }else if(room.pendingNextHand){
     key='redeal:'+room.pendingNextHand.id;endsAt=room.pendingNextHand.endsAt;duration=3000;label='Siguiente mano';
   }else return null;
@@ -256,7 +256,7 @@ function roundPauseInfo(room=state.room){
     if(!roundPauseArrivals.has(arrivalKey))roundPauseArrivals.set(arrivalKey,gameTime()+duration);
     endsAt=roundPauseArrivals.get(arrivalKey);
   }
-  return {key,label,endsAt:Number(endsAt),seconds:Math.max(0,Math.ceil((Number(endsAt)-gameTime())/1000))};
+  return {key,label,endsAt:Number(endsAt),seconds:Math.max(0,Math.ceil((Number(endsAt)-(state.learning?.paused?(state.learning.pausedAt??gameTime()):gameTime()))/1000))};
 }
 function pauseMessage(){
   const pause=roundPauseInfo();
@@ -2314,9 +2314,9 @@ function localFinishHand(winner,points,ending='rounds'){
   localDealAfterHand();
 }
 function localShowEvidence(groups){
-  const room=state.room;
-  room.status='revealing';room.pendingBet=null;room.trickCards=[];room.turn=null;room.endReveal={id:crypto.randomUUID(),endsAt:gameTime()+5000,groups};
-  scheduleLocalTransition(room,()=>{if(!state.localGame||state.room!==room||room.status!=='revealing')return;localDealAfterHand();},5000);
+  const room=state.room,delay=state.learning?3000:5000;
+  room.status='revealing';room.pendingBet=null;room.trickCards=[];room.turn=null;room.endReveal={id:crypto.randomUUID(),endsAt:gameTime()+delay,groups};
+  scheduleLocalTransition(room,()=>{if(!state.localGame||state.room!==room||room.status!=='revealing')return;localDealAfterHand();},delay);
 }
 function localDealAfterHand(){
   if(state.learning&&(state.learning.scoreMessages?.length||state.learning.activeScoreMessage)){
@@ -2561,7 +2561,7 @@ async function startLearning(stage=0){
     $('learn-coach-dialog').close();
     if(!await startLocalBotGame())return;
     state.learning={stage,hints:true,pointsInfo:true,paused:true,pausedAt:gameTime(),complete:false,scoreMessages:[]};
-    state.bot=true;state.botDifficulty='easy';state.botMemory=null;
+    state.bot=true;state.botDifficulty='normal';state.botMemory=null;
     state.room.players={player1:{name:cleanName($('player-name').value||savedPlayerName(),'Vos')},player2:{name:'Bot de práctica'}};
     Object.assign(state.room,{targetPoints:10,status:'started',openingDraw:null,createdAt:gameTime(),matchNumber:1,turnClock:null,practiceRules:{envido:stage>=1,flor:stage>=2}});
     if(stage===1){
