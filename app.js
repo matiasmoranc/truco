@@ -2560,7 +2560,7 @@ async function startLearning(stage=0){
   try{
     $('learn-coach-dialog').close();
     if(!await startLocalBotGame())return;
-    state.learning={stage,hints:true,pointsInfo:true,paused:true,pausedAt:gameTime(),complete:false,scoreMessages:[]};
+    state.learning={stage,hints:true,pointsInfo:true,paused:true,pausedAt:gameTime(),complete:false,scoreMessages:[],tutorialMessages:[{title:'Guía de cartas',pointAtGuide:true,text:'Podés tocar este ícono cuando quieras para abrir la guía. Te ayuda a reconocer tus cartas y saber cuáles son más poderosas.'}]};
     state.bot=true;state.botDifficulty='normal';state.botMemory=null;
     state.room.players={player1:{name:cleanName($('player-name').value||savedPlayerName(),'Vos')},player2:{name:'Bot de práctica'}};
     Object.assign(state.room,{targetPoints:10,status:'started',openingDraw:null,createdAt:gameTime(),matchNumber:1,turnClock:null,practiceRules:{envido:stage>=1,flor:stage>=2}});
@@ -2632,10 +2632,19 @@ function queueLearningPoints(before,after,entries){
 function positionLearningScoreArrow(){
   const dialog=$('learning-hint'),arrow=$('learning-score-arrow');
   const scoreActive=dialog.open&&state.learning?.activeScoreMessage,trucoActive=dialog.open&&state.learning?.activeTutorial?.pointAtTruco;
-  const active=scoreActive||trucoActive;
+  const guideActive=dialog.open&&state.learning?.activeTutorial?.pointAtGuide;
+  const active=scoreActive||trucoActive||guideActive;
   arrow.classList.toggle('hidden',!active);
   document.querySelectorAll('.scoreboard,.mobile-score').forEach(marker=>marker.classList.toggle('learning-score-highlight',!!scoreActive));
   if(!active)return;
+  if(guideActive){
+    const button=$('game-sheet'),target=button?.getBoundingClientRect();
+    if(!target?.width||!target.height){arrow.classList.add('hidden');return;}
+    const box=dialog.getBoundingClientRect(),x1=box.left+box.width*.65,y1=box.top-4,x2=target.left+target.width/2,y2=target.bottom+8;
+    arrow.setAttribute('viewBox','0 0 '+window.innerWidth+' '+window.innerHeight);
+    $('learning-score-arrow-path').setAttribute('d','M '+x1+' '+y1+' C '+x1+' '+(y1-35)+' '+x2+' '+(y2+35)+' '+x2+' '+y2);
+    return;
+  }
   if(trucoActive){
     const button=$('player-actions').querySelector('[data-action="truco"]');
     if(!button){arrow.classList.add('hidden');return;}
