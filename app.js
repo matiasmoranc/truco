@@ -2819,6 +2819,10 @@ function openLearningHelp(){
   $('learn-coach-next').textContent=stage===0?'Sumar el envido - Etapa 2/3':stage===1?'Sumar la flor - Etapa 3/3':'Quitar la flor - Etapa 2/3';
   $('learn-coach-previous').classList.toggle('hidden',!complete||stage===0);
   $('learn-coach-previous').textContent='Volver a la Etapa 1 sin envido';
+  const actions=$('learn-coach-continue').parentElement;
+  const stageButtons=stage===2?['learn-coach-previous','learn-coach-next','learn-coach-continue']:['learn-coach-previous','learn-coach-continue','learn-coach-next'];
+  stageButtons.forEach(id=>actions.insertBefore($(id),$('learn-coach-menu')));
+
   if(!$('learn-coach-dialog').open)$('learn-coach-dialog').showModal();
 }
 function finishLearningHand(){
@@ -2843,11 +2847,14 @@ function explainEnvido(hand,muestra){
 }
 function explainFlor(hand,muestra){
   const pieces=hand.filter(card=>pieceOrder(card,muestra)),common=hand.filter(card=>!pieceOrder(card,muestra));
-  const value=hasFlor(hand,muestra);
-  if(pieces.length>=2)return {value,explanation:'Es flor porque tenés '+pieces.length+' piezas: '+pieces.map(cardStudyName).join(', ')+'. La muestra es '+cardStudyName(muestra)+'.'};
-  if(hand.every(card=>card.suit===hand[0].suit))return {value,explanation:'Es flor porque las 3 cartas son del mismo palo.'};
-  if(pieces.length===1&&common[0].suit===common[1].suit)return {value,explanation:'Es flor: '+cardStudyName(pieces[0])+' es pieza y las otras 2 cartas son del mismo palo.'};
-  return {value,explanation:pieces.length===1?'No es flor: tenés una pieza, pero las otras 2 cartas son de palos diferentes.':'No es flor: las 3 cartas no son del mismo palo y no tenés piezas para formar otra combinación.'};
+  const value=hasFlor(hand,muestra),replacement=pieces.find(card=>Number(card.rank)===12);
+  const pieceNote=replacement?' El '+cardStudyName(replacement)+' es una pieza porque toma el valor del '+cardStudyName(muestra)+' que está en la muestra.':'';
+  let explanation;
+  if(pieces.length>=2)explanation='Es flor porque tenés '+pieces.length+' piezas: '+pieces.map(cardStudyName).join(', ')+'. La muestra es '+cardStudyName(muestra)+'.';
+  else if(hand.every(card=>card.suit===hand[0].suit))explanation='Es flor porque las 3 cartas son del mismo palo.';
+  else if(pieces.length===1&&common[0].suit===common[1].suit)explanation='Es flor: '+cardStudyName(pieces[0])+' es pieza y las otras 2 cartas son del mismo palo.';
+  else explanation=pieces.length===1?'No es flor: tenés una pieza, pero las otras 2 cartas son de palos diferentes.':'No es flor: las 3 cartas no son del mismo palo y no tenés piezas para formar otra combinación.';
+  return {value,explanation:explanation+pieceNote};
 }
 let studyExercise=null;
 function makeStudyExercise(kind){
