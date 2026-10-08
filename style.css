@@ -1580,3 +1580,10 @@ body { min-height:100dvh; }
 .startup-loading p{margin:0;font-family:'DM Sans',sans-serif;font-size:16px;line-height:1.4}
 .page-loading{overflow:hidden}
 .page-loading #app{visibility:hidden}
+
+/* A consistent, crisp return arrow for the lobby and learning screens. */
+.icon-button.back-navigation{display:grid;place-items:center;width:44px;height:44px;padding:0;border:1px solid #e8c98366;border-radius:12px;background:#e8c9830a;color:#e8c983;cursor:pointer;touch-action:manipulation}
+.back-navigation .back-icon{width:23px;height:23px;stroke-width:2;pointer-events:none}
+.icon-button.back-navigation:hover{background:#e8c9831a;border-color:#e8c983aa}
+.icon-button.back-navigation:active{background:#e8c98326}
+.icon-button.back-navigation:focus-visible{outline:2px solid #e8c983;outline-offset:3px}
