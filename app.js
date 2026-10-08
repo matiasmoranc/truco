@@ -2770,8 +2770,8 @@ function openLearningHelp(){
   $('learn-coach-step').textContent='Etapa '+(stage+1)+' de 3';
   $('learn-coach-title').textContent=complete?'Partida terminada':lesson.title;
   $('learn-coach-body').replaceChildren();
-  (complete?learningGuidance():stage<=1?lesson.intro.split('\n'):[lesson.intro,...learningGuidance()]).forEach(text=>{const p=document.createElement('p');p.textContent=text;$('learn-coach-body').append(p);});
-  $('learn-coach-continue').textContent=complete?'Seguir jugando así':'Entendido, a jugar';
+  (complete?learningGuidance():stage===1?['Primero vamos a practicar cómo sumar los puntos. Cuando estés listo, podés cerrar la práctica y seguimos jugando con envido.']:stage===0?lesson.intro.split('\n'):[lesson.intro,...learningGuidance()]).forEach(text=>{const p=document.createElement('p');p.textContent=text;$('learn-coach-body').append(p);});
+  $('learn-coach-continue').textContent=complete?'Seguir jugando así':stage===1?'Practicar envido':'Entendido, a jugar';
   $('learn-coach-next').classList.toggle('hidden',!complete);
   $('learn-coach-next').textContent=stage===0?'Sumar el envido':stage===1?'Sumar la flor':'Quitar la flor';
   $('learn-coach-previous').classList.toggle('hidden',!complete||stage===0);
@@ -2840,7 +2840,25 @@ function checkStudy(answer){
 }
 function openFlorCountHelp(){pauseLearning();if(!$('learn-flor-help-dialog').open)$('learn-flor-help-dialog').showModal();}
 function openEnvidoCountHelp(){pauseLearning();if(!$('learn-envido-help-dialog').open)$('learn-envido-help-dialog').showModal();}
-function openStudySheet(){pauseLearning();if(!$('learn-sheet-dialog').open)$('learn-sheet-dialog').showModal();}
+function markPracticeGuideCards(){
+  const hand=state.learning&&state.localGame&&$('game-view').classList.contains('active')?localHand('player1'):[];
+  for(const row of $('learn-sheet-dialog').querySelectorAll('[data-guide-strength]')){
+    row.querySelector('.guide-owned-cards')?.remove();
+    const cards=hand.filter(card=>cardStrength(card,state.room?.muestra)===Number(row.dataset.guideStrength));
+    row.classList.toggle('guide-owned',cards.length>0);
+    if(!cards.length)continue;
+    const label=document.createElement('span');label.className='guide-owned-cards';
+    label.textContent='Tenés: '+cards.map(cardStudyName).join(' · ');
+    (row.tagName==='TR'?row.cells[0]:row).append(label);
+  }
+}
+function openStudySheet(){pauseLearning();markPracticeGuideCards();if(!$('learn-sheet-dialog').open)$('learn-sheet-dialog').showModal();}
+function continueLearningStage(){
+  const stage=state.learning?.stage||0,complete=state.learning?.complete;
+  if(!complete&&stage===1)openStudy('envido');
+  $('learn-coach-dialog').close();
+  if(complete)startLearning(stage);
+}
 $('learn-game').addEventListener('click',openLearning);
 $('learn-back').addEventListener('click',()=>{stopBot();showView('welcome-view');openLobby();});
 $('learn-free').addEventListener('click',()=>startLearning(0));
@@ -2895,7 +2913,7 @@ $('learn-points-info').addEventListener('change',event=>{
 $('learning-points-tip-close').addEventListener('click',()=>$('learning-points-tip').close());
 $('learning-points-tip').addEventListener('close',resumeLearning);
 for(const id of ['learn-coach-dialog','learn-study-dialog','learn-sheet-dialog','learn-envido-help-dialog','learn-flor-help-dialog'])$(id).addEventListener('close',resumeLearning);
-$('learn-coach-continue').addEventListener('click',()=>{const stage=state.learning?.stage||0,complete=state.learning?.complete;$('learn-coach-dialog').close();if(complete)startLearning(stage);});
+$('learn-coach-continue').addEventListener('click',continueLearningStage);
 $('learn-coach-next').addEventListener('click',()=>{const stage=state.learning.stage;$('learn-coach-dialog').close();startLearning(stage===2?1:stage+1);});
 $('learn-coach-previous').addEventListener('click',()=>{$('learn-coach-dialog').close();startLearning(0);});
 $('learn-coach-menu').addEventListener('click',openLearning);
