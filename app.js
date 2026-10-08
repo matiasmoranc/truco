@@ -383,7 +383,7 @@ async function firebaseServices() {
     dbSdk.onValue(dbSdk.ref(state.firebase.db,'.info/serverTimeOffset'),snapshot=>{state.serverTimeOffset=Number(snapshot.val())||0;},error=>console.error('[truco:clock]',error));
     dbSdk.onValue(dbSdk.ref(state.firebase.db,'.info/connected'),snapshot=>{
       state.firebaseConnected=snapshot.val()===true;
-      if(state.firebaseConnected){roomPresenceContext=null;presenceWriteSerial++;syncRoomPresence();}
+      if(state.firebaseConnected){roomPresenceContext=null;presenceWriteSerial++;syncRoomPresence();retryRoomRestore();}
       if(state.room)renderTurnTimer();
     },error=>console.error('[truco:connection]',error));
     console.info('[truco:connection] authentication ready');
@@ -420,6 +420,78 @@ function claimRoomSeat(current,person,role){
   if(!seat)return;
   return {...current,players:{...players,[seat]:person}};
 }
+
+function savedRoomSeat(){
+  try{
+    const seat=JSON.parse(localStorage.getItem('truco-last-seat')||'null');
+    return /^[A-Z2-9]{5}$/.test(seat?.code||'')?seat:null;
+  }catch{return null;}
+}
+function setRoomUrl(code){
+  const url=new URL(location.href);
+  if(code)url.searchParams.set('mesa',code);else url.searchParams.delete('mesa');
+  history.replaceState(null,'',url);
+}
+function forgetRoomSeat(code){
+  const saved=savedRoomSeat();
+  if(!code||saved?.code===code){try{localStorage.removeItem('truco-last-seat');}catch{}}
+  if(!code||new URLSearchParams(location.search).get('mesa')===code)setRoomUrl(null);
+}
+function rememberRoomSeat(){
+  setRoomUrl(state.roomCode);
+  try{localStorage.setItem('truco-last-seat',JSON.stringify({code:state.roomCode,role:state.playerId,uid:state.uid,createdAt:state.room?.createdAt}));}catch{}
+}
+function attachLiveRoom(code,seat,room){
+  state.privateUnsubscribe?.();state.privateUnsubscribe=null;state.privateHandKey=null;state.privateDeal=null;
+  state.roomCode=code;state.playerId=seat;state.role=seat;state.joining=false;state.invitationEntry=false;
+  state.localGame=false;state.hand=[];state.room=room;state.restorePending=null;
+  state.lobbyUnsubscribe?.();state.lobbyUnsubscribe=null;
+  rememberRoomSeat();
+  showView(['drawing','started','revealing','complete','timed-out'].includes(room.status)?'game-view':'waiting-view');
+  watchRoom();
+  if(room.status==='waiting')renderWaiting();
+}
+async function restoreRoom(code){
+  if(!/^[A-Z2-9]{5}$/.test(code||'')||!firebaseConfigValid(state.config))return false;
+  const epoch=state.navigationEpoch||0;
+  try{
+    const fb=await firebaseServices();
+    if(epoch!==(state.navigationEpoch||0))return false;
+    const snapshot=await fb.get(fb.ref(fb.db,'rooms/'+code+'/public'));
+    if(epoch!==(state.navigationEpoch||0))return false;
+    const room=snapshot.val(),saved=savedRoomSeat();
+    const seat=roomSeatForUid(room,state.uid);
+    if(!room||room.status==='closed'||roomExpired(room)){
+      forgetRoomSeat(code);return false;
+    }
+    if(!seat||(saved?.code===code&&saved.createdAt!=null&&saved.createdAt!==room.createdAt)){
+      if(saved?.code===code){try{localStorage.removeItem('truco-last-seat');}catch{}}
+      return false;
+    }
+    attachLiveRoom(code,seat,room);
+    return true;
+  }catch(error){
+    console.error('[truco:restore]',error);
+    if(epoch===(state.navigationEpoch||0))state.restorePending={code,epoch};
+    return false;
+  }
+}
+async function retryRoomRestore(){
+  const pending=state.restorePending;
+  if(!pending||state.room||pending.epoch!==(state.navigationEpoch||0))return;
+  state.restorePending=null;
+  await restoreRoom(pending.code);
+}
+async function openInitialRoom(){
+  const epoch=state.navigationEpoch||0;
+  const invitedRoom=new URLSearchParams(location.search).get('mesa');
+  const code=invitedRoom||savedRoomSeat()?.code;
+  if(code&&await restoreRoom(code))return;
+  if(epoch!==(state.navigationEpoch||0)||state.room)return;
+  if(invitedRoom&&new URLSearchParams(location.search).get('mesa')===invitedRoom)await openInvitation(invitedRoom);
+  else if(firebaseConfigValid(state.config))await openLobby();
+}
+
 async function enterRoom() {
   if(state.enteringRoom)return;
   const entryEpoch=state.navigationEpoch;
@@ -470,18 +542,9 @@ async function enterRoom() {
       await fb.set(fb.ref(fb.db,`rooms/${code}/public`),joinedRoom);
       state.roomCode=code;state.playerId=role;
     }
-    if(state.privateUnsubscribe)state.privateUnsubscribe();
-    state.privateUnsubscribe=null;state.privateHandKey=null;state.privateDeal=null;
-    state.invitationEntry=false;
-    state.localGame=false;state.hand=[];state.room=joinedRoom;
     rememberPlayerName(name);
-    if(request.joining){const url=new URL(location.href);url.searchParams.delete('mesa');history.replaceState(null,'',url);}
-    localStorage.setItem('truco-last-seat',JSON.stringify({code:state.roomCode,role:state.playerId}));
-    if(state.lobbyUnsubscribe){state.lobbyUnsubscribe();state.lobbyUnsubscribe=null;}
+    attachLiveRoom(state.roomCode,state.playerId,joinedRoom);
     console.info('[truco:join] seated',{code:state.roomCode,role:state.playerId,status:joinedRoom.status});
-    showView(['drawing','started','revealing','complete'].includes(joinedRoom.status)?'game-view':'waiting-view');
-    watchRoom();
-    if(joinedRoom.status==='waiting')renderWaiting();
   }catch(error){
     console.error('[truco:join] failed',error);toast(firebaseError(error),true);
     if(state.invitationEntry)showInvitationForm();
@@ -593,7 +656,7 @@ function watchRoom() {
   if (state.unsubscribe) state.unsubscribe();
   state.unsubscribe = fb.onValue(fb.ref(fb.db, `rooms/${code}/public`), (snapshot) => {
     if(code!==state.roomCode||version!==state.roomWatchVersion)return;
-    if (!snapshot.exists()) { if(state.unsubscribe){state.unsubscribe();state.unsubscribe=null;}state.room=null;console.warn('[truco:room] unavailable',{code});toast('La mesa ya no está disponible.',true);showView('welcome-view');openLobby();return; }
+    if (!snapshot.exists()) { if(state.unsubscribe){state.unsubscribe();state.unsubscribe=null;}console.warn('[truco:room] unavailable',{code});returnToLobby('La mesa ya no está disponible.');return; }
     const incoming=snapshot.val();
     if(Number(incoming.matchNumber||1)!==Number(state.room?.matchNumber||1)){
       state.privateUnsubscribe?.();state.privateUnsubscribe=null;state.privateHandKey=null;state.privateDeal=null;
@@ -695,7 +758,7 @@ function returnToLobby(message=''){
   state.privateHandKey=null;state.privateDeal=null;
   clearTimeout(state.resolutionTimer);state.resolutionTimer=null;state.resolutionTimerKey=null;
   state.room=null;state.roomCode=null;state.localGame=false;state.hand=[];
-  try{localStorage.removeItem('truco-last-seat');}catch{}
+  forgetRoomSeat();
   showView('welcome-view');openLobby();
   if(message)toast(message,true);
 }
@@ -2182,6 +2245,7 @@ function scheduleBot(){
 async function startLocalBotGame() {
   const role='player1',deviceMode='two';
   if(!await prepareCardImages())return false;
+  forgetRoomSeat();
   stopBot();state.lobbyUnsubscribe?.();state.lobbyUnsubscribe=null;
   if(state.unsubscribe)state.unsubscribe();
   if(state.privateUnsubscribe)state.privateUnsubscribe();
@@ -2478,7 +2542,7 @@ $('role-options').querySelectorAll('.role-card').forEach((card)=>{
 $('back-home').addEventListener('click',()=>{showView('welcome-view');openLobby();});
 $('fold-hand').addEventListener('click',foldHand);
 $('enter-room').addEventListener('click',enterRoom);
-$('leave-room').addEventListener('click',()=>{stopRoomPresence();stopBot();state.roomWatchVersion=(state.roomWatchVersion||0)+1;state.navigationEpoch=(state.navigationEpoch||0)+1;localStorage.removeItem('truco-last-seat');if(state.unsubscribe)state.unsubscribe();if(state.privateUnsubscribe)state.privateUnsubscribe();state.privateUnsubscribe=null;state.privateHandKey=null;state.room=null;state.localGame=false;showView('welcome-view');openLobby();});
+$('leave-room').addEventListener('click',()=>{stopRoomPresence();stopBot();state.roomWatchVersion=(state.roomWatchVersion||0)+1;state.navigationEpoch=(state.navigationEpoch||0)+1;forgetRoomSeat();if(state.unsubscribe)state.unsubscribe();if(state.privateUnsubscribe)state.privateUnsubscribe();state.privateUnsubscribe=null;state.privateHandKey=null;state.room=null;state.localGame=false;showView('welcome-view');openLobby();});
 $('game-home').addEventListener('click',()=>{if(state.room?.status==='drawing'){closeOpeningDraw('draw-left');return;}if(state.localGame){stopBot();state.localGame=false;showView('welcome-view');openLobby();return;}showView('waiting-view');});
 function limitMuestraOffset(x,y){
   const distance=Math.hypot(x,y),scale=distance>15?15/distance:1;
@@ -2531,7 +2595,7 @@ setupSuitIcons();renderPointsPicker();
 
 
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&state.room){renderGame();renderTurnTimer();if(!state.localGame&&isCoordinator())scheduleTableResolution();}});
-window.addEventListener('online',()=>{if(state.room){renderGame();renderTurnTimer();}});
+window.addEventListener('online',()=>{if(state.room){renderGame();renderTurnTimer();}else retryRoomRestore();});
 
 
 
@@ -2995,19 +3059,16 @@ async function initializePage(){
       })(),
       preloadCardImages().catch(error=>console.error('[truco:startup-cards]',error))
     ]);
-    const invitedRoom=new URLSearchParams(location.search).get('mesa');
-    if(invitedRoom)await openInvitation(invitedRoom);
-    else if(firebaseConfigValid(state.config)){
-      // Slow authentication must not prevent offline practice. Late lobby work
-      // checks the navigation epoch before changing the current view.
-      let startupTimer;
-      try{
-        await Promise.race([
-          openLobby(),
-          new Promise(resolve=>{startupTimer=setTimeout(resolve,12000);})
-        ]);
-      }finally{clearTimeout(startupTimer);}
-    }
+    // Restore the authenticated seat before treating a room URL as an invitation.
+    // Keep slow connections from blocking offline practice indefinitely.
+    let startupTimer;
+    try{
+      await Promise.race([
+        openInitialRoom(),
+        new Promise(resolve=>{startupTimer=setTimeout(resolve,12000);})
+      ]);
+    }finally{clearTimeout(startupTimer);}
+
   }catch(error){console.error('[truco:startup]',error);}
   finally{
     $('app').inert=false;
