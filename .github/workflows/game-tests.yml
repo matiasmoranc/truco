@@ -1,0 +1,21 @@
+name: Game regression tests
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  game-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check JavaScript syntax
+        run: |
+          cp app.js /tmp/truco-app.mjs
+          node --check /tmp/truco-app.mjs
+      - name: Play regression scenarios
+        run: node --test tests/game-regression.cjs

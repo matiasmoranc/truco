@@ -1587,3 +1587,19 @@ body { min-height:100dvh; }
 .icon-button.back-navigation:hover{background:#e8c9831a;border-color:#e8c983aa}
 .icon-button.back-navigation:active{background:#e8c98326}
 .icon-button.back-navigation:focus-visible{outline:2px solid #e8c983;outline-offset:3px}
+
+/* Clear interaction feedback without moving the mobile layout. */
+.connection-recovering .hand-card{filter:brightness(.8)}
+.connection-recovering #player-actions button,.connection-recovering #fold-hand,.connection-recovering #envido-picker button{opacity:.55}
+.hand-card.card-touch,.hand-card.card-pending{outline:2px solid #e8c983;outline-offset:2px;filter:brightness(1.08)}
+.action-pending{box-shadow:inset 0 0 0 2px #fff7;animation:pending-action-glow 1s ease-in-out infinite}
+@keyframes pending-action-glow{50%{filter:brightness(1.18)}}
+.chat-quick{display:flex;flex-wrap:wrap;gap:7px;margin:10px 0}
+.chat-quick button{background:transparent;border:1px solid #e8c98366;border-radius:8px;padding:7px 9px;color:#e8c983;font:inherit;font-size:12px;cursor:pointer}
+.chat-quick button:disabled{opacity:.5;cursor:default}
+.chat-quick button:focus-visible{outline:2px solid #e8c983;outline-offset:2px}
+.session-score{font-size:13px;color:#e8c983;line-height:1.4;text-align:center;margin:10px 0}
+@media(prefers-reduced-motion:reduce){.action-pending{animation:none}}
+
+.learning-options #learn-repeat-help{width:24px;min-width:24px;height:24px;padding:0;border:1px solid #d9b76f;border-radius:50%;color:#ead39b;background:transparent;font-size:15px;line-height:22px;align-self:flex-end}
+.learning-options #learn-repeat-help:disabled{opacity:.4}
