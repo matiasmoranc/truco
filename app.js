@@ -279,18 +279,28 @@ function spokenCall(text=''){
 function callNoticeText(text=''){
   return text.replace(/\bcanta (?=(?:envido|real envido|falta envido|truco|retruco|vale cuatro)\b)/gi,'dice ').replace(/(\bcanta flor\.)[\s\S]*$/i,'$1');
 }
+function ownCallVerb(main,bet){
+  const call=main.toLocaleLowerCase('es-UY');
+  if(call==='truco')return 'Gritaste';
+  if(call==='flor')return 'Cantaste';
+  if(call==='envido'&&!(bet?.calls?.length>1)&&!(bet?.accepted>0))return 'Tocaste';
+  return 'Dijiste';
+}
 function callNoticeHtml(notice,room=state.room){
   const main=notice.spoken||spokenCall(notice.text||'');
   if(!main)return escapeHtml(callNoticeText(notice.text||''));
+  if(!state.learning&&notice.from===state.playerId){
+    return `${escapeHtml(notice.selfVerb||'Dijiste')} <strong>${escapeHtml(main.toLocaleUpperCase('es-UY'))}</strong>`;
+  }
   const name=room?.players?.[notice.from]?.name||'Tu rival';
   const verb=main.toLowerCase()==='flor'?'canta':'dice';
   return `${escapeHtml(name)} ${verb} <strong>${escapeHtml(main.toLocaleUpperCase('es-UY'))}</strong>`;
 }
-function makeCallNotice(text){
+function makeCallNotice(text,bet=state.room?.pendingBet){
   text=callNoticeText(text);
   const spoken=spokenCall(text);
   if(!spoken||!['player1','player2'].includes(state.playerId))return null;
-  return {...(spoken==='Me voy al mazo'?{kind:'fold'}:{}),id:crypto.randomUUID(),from:state.playerId,to:state.playerId==='player1'?'player2':'player1',text:spoken==='Tiene'||spoken==='Me voy al mazo'?text.split('.')[0]+'.':/\bcanta \d+ (tantos|son mejores|son iguales)\b/i.test(text)?spoken:text,spoken,time:Date.now(),handNumber:state.room?.handNumber||1};
+  return {...(spoken==='Me voy al mazo'?{kind:'fold'}:{}),id:crypto.randomUUID(),from:state.playerId,to:state.playerId==='player1'?'player2':'player1',text:spoken==='Tiene'||spoken==='Me voy al mazo'?text.split('.')[0]+'.':/\bcanta \d+ (tantos|son mejores|son iguales)\b/i.test(text)?spoken:text,spoken,selfVerb:ownCallVerb(spoken,bet),time:Date.now(),handNumber:state.room?.handNumber||1};
 }
 
 let roundPauseTimer=null;
@@ -346,6 +356,7 @@ function speakCall(text){
   window.speechSynthesis.speak(utterance);
 }
 function renderCallNotice(){
+  if(state.botActing)return;
   const role=state.playerId,key=`${state.roomCode}:${role}`;
   const liveNotice=state.room?.callNotice;
   const cached=receivedCallNotices.get(key)?.notice;
@@ -358,7 +369,9 @@ function renderCallNotice(){
   button.setAttribute('aria-pressed',String(soundEnabled));
   const el=$('call-notice');
   clearTimeout(callNoticeTimer);callNoticeTimer=null;
-  const addressed=notice?.to===role&&(notice.kind==='fold'||!notice.handNumber||notice.handNumber===state.room?.handNumber);
+  const incoming=notice?.to===role;
+  const own=!state.learning&&notice?.from===role;
+  const addressed=(incoming||own)&&(notice.kind==='fold'||!notice.handNumber||notice.handNumber===state.room?.handNumber);
   let received=receivedCallNotices.get(key);
   if(addressed&&received?.id!==notice.id){
     received={id:notice.id,at:Date.now(),pinned:false,notice};
@@ -366,7 +379,7 @@ function renderCallNotice(){
   }
   const remaining=received&&notice&&received.id===notice.id?CALL_NOTICE_DURATION-(Date.now()-received.at):0;
   const pending=state.room?.pendingBet;
-  const awaitingResponse=addressed&&notice?.kind!=='fold'&&pending&&notice.from===pending.caller&&
+  const awaitingResponse=incoming&&addressed&&notice?.kind!=='fold'&&pending&&notice.from===pending.caller&&
     (pending.revealMode?pending.revealTurn===role:pending.responder===role);
   if(awaitingResponse&&received)received.pinned=true;
   const foldVisible=notice?.kind==='fold'&&remaining>0;
@@ -1130,7 +1143,7 @@ async function writeRoom(changes) {
   const newBet=changes.pendingBet;
   const callLabel=newBet?.caller===state.playerId&&!newBet.revealMode
     ?(newBet.type==='envido'?({envido:'envido',real:'real envido',falta:'falta envido'}[newBet.called]||'envido'):newBet.type==='truco'?({2:'truco',3:'retruco',4:'vale cuatro'}[newBet.stake]||'truco'):null):null;
-  const notice=makeCallNotice(callLabel?`${state.room.players[state.playerId].name} dice ${callLabel}.`:changes.feed?.[0]?.text);
+  const notice=makeCallNotice(callLabel?`${state.room.players[state.playerId].name} dice ${callLabel}.`:changes.feed?.[0]?.text,newBet);
   if(notice)changes={...changes,callNotice:notice};
   for(const [key,value] of Object.entries(changes)) updates[`rooms/${state.roomCode}/public/${key}`]=value;
   await fb.update(fb.ref(fb.db),updates);

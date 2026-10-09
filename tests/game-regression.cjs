@@ -17,6 +17,17 @@ function harness(){
  vm.createContext(context);vm.runInContext(names.map(extract).join('\n'),context);return context;
 }
 const card=(suit,rank)=>({id:({'♦':'oro','♥':'copa','♠':'espada','♣':'basto'}[suit])+'-'+rank,suit,rank});
+test('Own normal-table calls use the requested verbs; raised envido and rival notices stay distinct',()=>{
+ const c=harness();c.escapeHtml=String;c.state={playerId:'player1',room:{handNumber:1,players:{player2:{name:'Ricky'}}}};
+ vm.runInContext(['spokenCall','callNoticeText','ownCallVerb','makeCallNotice','callNoticeHtml'].map(extract).join('\n'),c);
+ for(const [call,verb] of [['envido','Tocaste'],['truco','Gritaste'],['flor','Cantaste'],['retruco','Dijiste'],['vale cuatro','Dijiste'],['real envido','Dijiste'],['falta envido','Dijiste'],['con flor envido','Dijiste'],['contra flor al resto','Dijiste']]){
+  const n=c.makeCallNotice('Mati dice '+call+'.',{calls:[call],accepted:0});
+  assert.equal(c.callNoticeHtml(n),verb+' <strong>'+call.toUpperCase()+'</strong>');
+ }
+ const raised=c.makeCallNotice('Mati dice envido.',{calls:['envido','envido'],accepted:2});assert.equal(raised.selfVerb,'Dijiste');
+ c.state.playerId='player2';assert.equal(c.callNoticeHtml(raised,{players:{player1:{name:'Mati'}}}),'Mati dice <strong>ENVIDO</strong>');
+ c.state.playerId='player1';c.state.learning={};assert.equal(c.callNoticeHtml(raised,{players:{player1:{name:'Mati'}}}),'Mati dice <strong>ENVIDO</strong>');
+});
 const room=()=>({status:'started',targetPoints:20,matchNumber:1,handNumber:1,trickNo:1,playedCount:0,turn:'player1',mano:'player1',trucoLevel:1,muestra:card('♦',7),scores:{player1:0,player2:0},players:{player1:{name:'Mati',uid:'a'},player2:{name:'Ricky',uid:'b'}},tricks:[],trickCards:[],flors:{},feed:[],deckCount:33});
 test('Ties settle correctly, including all three tied rounds',()=>{const c=harness(),r=room();for(const [rounds,winner] of [[['player1',null],'player1'],[[null,'player2'],'player2'],[['player1','player2',null],'player1'],[[null,null,null],'player1']])assert.equal(c.settleHand(rounds.map(winner=>({winner})),r),winner);});
 test('Envido, flor, replacement king and score caps',()=>{const c=harness(),r=room();assert.equal(c.handEnvido([card('♥',6),card('♥',7),card('♠',10)],r.muestra),33);assert.equal(c.florValue([card('♦',2),card('♦',5),card('♠',6)],r.muestra),44);assert.equal(c.envidoValue(card('♦',12),card('♦',10)),27);assert.equal(c.capScores(r,{player1:22}).player1,20);assert.equal(c.faltaEnvidoPoints(r),20);r.scores.player1=15;assert.equal(c.faltaEnvidoPoints(r),5);assert.equal(c.envidoBetPoints(r,'real',4),2);assert.equal(c.florBetPoints(r,'falta'),20);});
