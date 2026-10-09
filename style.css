@@ -1626,3 +1626,12 @@ body { min-height:100dvh; }
 #auth-status:empty{display:none}
 @media(max-width:420px){.auth-card h1{font-size:23px}.account-card{padding:20px}}
 
+
+/* Equal side columns keep the logo centered regardless of username length. */
+#welcome-view .home-topbar{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:12px;height:64px}
+#welcome-view .home-topbar .home-edition{justify-self:start;text-align:left}
+#welcome-view .home-topbar .brand-lockup{justify-self:center;margin:0}
+#welcome-view .home-topbar .account-entry{justify-self:end;align-self:center;display:flex;align-items:center;justify-content:flex-end;gap:8px;max-width:100%;min-width:0;padding:6px 0;margin:0;border:0;background:transparent;color:#e8c983;text-align:right;font-size:14px}
+#account-username{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.account-user-icon{width:30px;height:30px;flex:0 0 30px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+@media(max-width:480px){#welcome-view .home-topbar{gap:8px}#welcome-view .home-topbar .account-entry{font-size:12px;gap:5px}#welcome-view .home-topbar .home-edition{font-size:12px}.account-user-icon{width:26px;height:26px;flex-basis:26px}}

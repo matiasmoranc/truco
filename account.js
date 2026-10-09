@@ -28,6 +28,7 @@ export function installAccount({ services, getState, rememberName, document, sto
   }
   function activate(user,name) {
     profileName=name;rememberName(name);cacheName(user.uid,name);
+    el('account-username').textContent=name;
     el('player-name').value=name;el('invite-name').value=name;
     ready=true;render();
     if(readyUid!==user.uid) {
@@ -43,7 +44,7 @@ export function installAccount({ services, getState, rememberName, document, sto
     const epoch=++generation;
     ready=false;loaded=false;profileName='';render();
     if(!registered(user)) {
-      readyUid=null;rememberName('');el('player-name').value='';el('invite-name').value='';
+      readyUid=null;el('account-username').textContent='';rememberName('');el('player-name').value='';el('invite-name').value='';
       el('auth-name').value='';message('');
       if(el('account-panel').open)el('account-panel').close();
       profilePromise=Promise.resolve();return profilePromise;
