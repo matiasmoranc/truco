@@ -1591,7 +1591,7 @@ body { min-height:100dvh; }
 /* Clear interaction feedback without moving the mobile layout. */
 .connection-recovering .hand-card{filter:brightness(.8)}
 .connection-recovering #player-actions button,.connection-recovering #fold-hand,.connection-recovering #envido-picker button{opacity:.55}
-.hand-card.card-touch,.hand-card.card-pending{outline:2px solid #e8c983;outline-offset:2px;filter:brightness(1.08)}
+.hand-card.card-touch,.hand-card.card-pending{filter:brightness(1.08)}
 .action-pending{box-shadow:inset 0 0 0 2px #fff7;animation:pending-action-glow 1s ease-in-out infinite}
 @keyframes pending-action-glow{50%{filter:brightness(1.18)}}
 .chat-quick{display:flex;flex-wrap:wrap;gap:7px;margin:10px 0}

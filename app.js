@@ -1243,7 +1243,7 @@ async function revealEnvido(good=false,declaredNumber=null) {
   if(player===first){changes={pendingBet:{...bet,reveals,revealTurn:second},feed:topFeed(room,`${room.players[player].name} canta ${number} tantos.`)};}
   else{
     const winner=good||number===Number(bet.reveals?.[first])?first:second;
-    changes={pendingBet:bet.suspendedBet||null,envidoClosed:true,envidoAudit:{reveals,winner,stake:bet.stake,called:bet.called||'envido',calls:bet.calls||[bet.called||'envido'],handNumber:room.handNumber},feed:topFeed(room,good?`${room.players[player].name}: son buenas.`:`${room.players[player].name} canta ${number} son mejores.`)};
+    changes={pendingBet:bet.suspendedBet||null,envidoClosed:true,envidoAudit:{reveals,winner,stake:bet.stake,called:bet.called||'envido',calls:bet.calls||[bet.called||'envido'],handNumber:room.handNumber},feed:topFeed(room,good?`${room.players[player].name}: son buenas.`:`${room.players[player].name} canta ${number} ${number===Number(bet.reveals?.[first])?'son iguales':'son mejores'}.`)};
   }
   if(state.localGame){queueLearningAction(good?'good':'declare',bet);const notice=makeCallNotice(changes.feed?.[0]?.text);if(notice)changes.callNotice=notice;Object.assign(room,changes);renderGame();}else await writeRoom(changes);
 }
@@ -1445,7 +1445,7 @@ function foldHandChanges(room,loser){
     const sidePoints=bet.revealMode?Number(bet.stake)||0:bet.type==='flor'?declinedFlorPoints(bet):Number(bet.accepted)||1;
     const scores={...room.scores};
     scores[winner]=(Number(scores[winner])||0)+sidePoints;
-    sideChanges.scores=scores;
+    sideChanges.scores=capScores(room,scores);
     sideChanges.envidoClosed=true;
     if(bet.type==='flor')sideChanges.florSettled=true;
   }
@@ -1486,10 +1486,14 @@ async function foldHand(){
       return;
     }
     const fb=state.firebase,code=state.roomCode,player=state.playerId,handNumber=state.room.handNumber;
-    await fb.runTransaction(fb.ref(fb.db,'rooms/'+code+'/public'),current=>{
+    const result=await fb.runTransaction(fb.ref(fb.db,'rooms/'+code+'/public'),current=>{
+      if(current===null)return null;
       if(!canFoldHand(current,player)||current.handNumber!==handNumber||current.players?.[player]?.uid!==state.uid)return;
       return {...current,...foldHandChanges(current,player)};
     },{applyLocally:false});
+    if(state.roomCode!==code||state.localGame)return;
+    if(result.committed){state.room=result.snapshot.val();renderGame();}
+    else{toast('La mano cambió. Volvé a intentar irte al mazo.');}
   }catch(error){console.error('[truco:fold]',error);toast(firebaseError(error));}
   finally{state.foldInFlight=false;renderGame();}
 }
@@ -1777,7 +1781,7 @@ function renderConnectionNotice(){
   if(!el){el=document.createElement('div');el.id='connection-notice';el.className='connection-notice hidden';el.setAttribute('role','status');$('game-view').append(el);}
   const room=state.room,playing=room&&room.status!=='closed'&&!state.localGame;
   const info=playing&&disconnectedPlayer(room),ownOffline=liveActionsBlocked();
-  el.classList.toggle('hidden',!playing||(!info&&!ownOffline&&!state.liveAction&&!state.playActionInFlight));
+  el.classList.toggle('hidden',!playing||(!info&&!ownOffline));
   syncLiveControls();
   if(!playing)return null;
   if(ownOffline){el.textContent='Reconectando…';return null;}
@@ -1787,7 +1791,6 @@ function renderConnectionNotice(){
     if(info.seconds===0)expireDisconnectedPlayer(info);
     return info;
   }
-  if(state.liveAction||state.playActionInFlight)el.textContent='Enviando jugada…';
   return null;
 }
 
