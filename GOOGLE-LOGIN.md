@@ -1,6 +1,6 @@
-# Activar cuentas de Google
+# Activar cuentas de Google y Apple
 
-La primera pantalla pide iniciar sesión con Google. No hay acceso de invitado ni se crean cuentas anónimas nuevas. Si una instalación anterior tiene una cuenta anónima, se vincula a Google para conservar su UID; si Google ya pertenece a otra cuenta, se abre esa cuenta.
+La primera pantalla pide iniciar sesión con Google o Apple. Apple se muestra solamente en dispositivos Apple. No hay acceso de invitado ni se crean cuentas anónimas nuevas. Si una instalación anterior tiene una cuenta anónima, se vincula a Google para conservar su UID; si Google ya pertenece a otra cuenta, se abre esa cuenta.
 
 Al registrarse, el jugador elige su nombre de usuario antes de entrar al lobby. Se guarda de forma privada en `profiles/{uid}/name`; no se guarda el correo en las mesas. Las siguientes visitas recuperan la sesión con la persistencia local de Firebase cuando el navegador permite almacenamiento. Un nombre previamente guardado para el mismo UID también se puede recuperar si la conexión tarda en responder.
 
@@ -25,7 +25,7 @@ GitHub Pages publica los archivos web, pero no despliega las reglas ni activa pr
 - Probar Safari de iPhone y Chrome de Android; permitir popups si el navegador los bloquea.
 - Verificar que un usuario no pueda leer ni escribir el perfil de otro UID.
 
-Apple y Facebook pueden agregarse después vinculándolos al mismo UID. Esta primera versión guarda el apodo; no agrega estadísticas globales ni sustituye la seguridad del motor de partidas.
+Facebook puede agregarse después. Las identidades de Apple y Google no se vinculan automáticamente. Esta primera versión guarda el apodo; no agrega estadísticas globales ni sustituye la seguridad del motor de partidas.
 
 
 
@@ -52,3 +52,21 @@ Un cambio correcto muestra "Nombre de usuario cambiado correctamente." durante d
 
 
 La ventana de cuenta se cierra con la X (o Escape); tocar el fondo no la descarta. Durante la confirmación de un cambio no puede reabrirse el formulario. Si falla la lectura del índice por permisos, el mensaje identifica que falta habilitar la reserva de nombres en Firebase.
+
+
+## Activar Apple (web)
+
+El código ya usa Firebase OAuthProvider('apple.com') con email/name y locale es. Se muestra en iPhone, iPad (incluido el modo escritorio) y Mac. No se crean usuarios invitados. La sesión utiliza la persistencia existente y el perfil usa el mismo UID autenticado que las reservas de nombres. Apple puede ocultar el correo; se pide el nombre de usuario del juego por separado. No se asocian automáticamente cuentas Apple/Google ni sus correos.
+
+La publicación en Pages no activa el proveedor. Se necesita pertenecer al Apple Developer Program para configurar Sign in with Apple:
+
+1. En Apple Developer → Certificates, Identifiers & Profiles, registrar un App ID propio y habilitar Sign in with Apple.
+2. Registrar un Services ID para el acceso web y asociarlo al App ID. Ejemplo de identificador: com.matiasmoranc.truco.web (debe estar disponible y pertenecer a tu cuenta).
+3. En su configuración web, registrar el dominio truco-6553d.firebaseapp.com y el sitio matiasmoranc.github.io. Return URL: https://truco-6553d.firebaseapp.com/__/auth/handler. Confirmar esta URL con la que muestra Firebase si se cambia el authDomain.
+4. Crear una clave con Sign in with Apple. Anotar Team ID y Key ID, y descargar el archivo .p8.
+5. En Firebase → Authentication → Sign-in method → Apple, habilitar y cargar Services ID, Team ID, Key ID y la clave privada .p8. Esa clave se carga únicamente en Firebase: no subirla al repositorio ni incluirla en el JavaScript.
+6. Guardar y probar en un iPhone/iPad y una Mac: entrar, elegir nombre único, recargar, cerrar sesión y volver a entrar. Comprobar cancelación, ventanas bloqueadas y Ocultar mi correo. En Windows/Android el botón no debe aparecer.
+
+El flujo web abre una ventana de Apple a través del SDK de Firebase; la autenticación real requiere completar los pasos anteriores. No se ha verificado una cuenta Apple real todavía. Las reglas de RTDB actuales validan por UID y no necesitan un cambio por este proveedor.
+
+Documentación oficial: https://firebase.google.com/docs/auth/web/apple
