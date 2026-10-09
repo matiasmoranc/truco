@@ -2493,6 +2493,7 @@ function localPlay(card,launchOrigin=null) {
   if(state.room.trickCards.length===2){
     const first=state.room.trickCards[0],second=state.room.trickCards[1],winner=cardStrength(first.card,state.room.muestra)===cardStrength(second.card,state.room.muestra)?null:(cardStrength(first.card,state.room.muestra)>cardStrength(second.card,state.room.muestra)?first.playerId:second.playerId);
     state.room.tricks=[...(state.room.tricks||[]),{winner,played:[...state.room.trickCards]}];
+    queueLearningRoundResult(winner,state.room.trickCards);
     const handWinner=settleHand(state.room.tricks,state.room);
     if(winner)state.room.feed.unshift({text:`${state.room.players[winner].name} se lleva la ronda.`,time:Date.now()});
     state.room.resolvingTrick=true;state.room.resolutionId=crypto.randomUUID();state.room.resolutionEndsAt=gameTime()+3000;state.room.resolvedTrickWinner=winner;state.room.handComplete=!!handWinner;
@@ -2751,7 +2752,7 @@ async function startLearning(stage=0){
   try{
     $('learn-coach-dialog').close();
     if(!await startLocalBotGame())return;
-    state.learning={stage,hints:true,pointsInfo:true,paused:true,pausedAt:gameTime(),complete:false,scoreMessages:[],tutorialMessages:[{title:'Guía de cartas',pointAtGuide:true,text:'Podés tocar este ícono cuando quieras para abrir la guía. Te ayuda a reconocer tus cartas y saber cuáles son más poderosas.'}]};
+    state.learning={stage,hints:true,pointsInfo:true,whoWins:true,roundMessages:[],paused:true,pausedAt:gameTime(),complete:false,scoreMessages:[],tutorialMessages:[{title:'Guía de cartas',pointAtGuide:true,text:'Podés tocar este ícono cuando quieras para abrir la guía. Te ayuda a reconocer tus cartas y saber cuáles son más poderosas.'}]};
     state.bot=true;state.botDifficulty='normal';state.botMemory=null;
     state.room.players={player1:{name:cleanName($('player-name').value||savedPlayerName(),'Vos')},player2:{name:'Bot de práctica'}};
     Object.assign(state.room,{targetPoints:10,status:'started',openingDraw:null,createdAt:gameTime(),matchNumber:1,turnClock:null,practiceRules:{envido:stage>=1,flor:stage>=2}});
@@ -2909,19 +2910,37 @@ function queueLearningTrucoReminder(){
   learning.tutorialMessages??=[];
   learning.tutorialMessages.push({title:'Podés gritar TRUCO',pointAtTruco:true,text:'Si tocás TRUCO, podés aumentar los puntos en juego. Sin truco se juega por 1 punto. Con truco se juega por 2 puntos. El rival tiene que aceptar; si no acepta, ganás 1 punto.'});
 }
+function queueLearningRoundResult(winner,played){
+  const learning=state.learning;
+  if(!learning||learning.whoWins===false||played.length!==2)return;
+  const won=winner==='player1';
+  const message={title:winner?(won?'Mataste':'Te mató'):'Empataron',text:winner?(won?'Tu carta es más alta que la del rival.':'Su carta es más alta que la tuya.'):'Las dos cartas tienen el mismo poder.',roundCards:structuredClone(played)};
+  (learning.roundMessages??=[]).push(message);
+}
+function setLearningWhoWins(enabled){
+  if(!state.learning)return;
+  state.learning.whoWins=enabled;
+  $('learn-who-wins').checked=enabled;
+  if(!enabled){
+    state.learning.roundMessages=[];
+    if(state.learning.activeTutorial?.roundCards&&$('learning-hint').open)$('learning-hint').close();
+  }
+  renderLearning();
+}
 function showLearningMessage(){
   if(!state.learning||state.learning.paused||state.learning.complete||document.querySelector('.learn-coach-dialog[open]'))return;
   if(state.learning.pointsInfo===false)state.learning.scoreMessages=[];
   if(!state.learning.hints)state.learning.tutorialMessages=[];
   queueLearningTrucoReminder();
-  const tutorial=state.learning.tutorialMessages?.shift();
+  const roundMessage=state.learning.whoWins!==false?state.learning.roundMessages?.shift():null;
+  const tutorial=roundMessage||state.learning.tutorialMessages?.shift();
   const room=state.room,bet=room.pendingBet,scoreMessage=tutorial?null:state.learning.scoreMessages?.shift();
   if(!tutorial&&!scoreMessage&&!state.learning.hints)return;
   // Explain actual scoring and new calls; ordinary turns and round pauses need no popup.
   if(!tutorial&&!scoreMessage&&(!bet||(bet.revealMode?bet.revealTurn!=='player1':bet.responder!=='player1')))return;
   const key=tutorial?'tutorial:'+crypto.randomUUID():scoreMessage?'score:'+crypto.randomUUID():learningMessageKey();
   if(!tutorial&&!scoreMessage&&(state.learning.acknowledgedMessage===key||learningSeen.has(learningHelpTopic(bet))))return;
-  if(!scoreMessage){const topic=tutorial?.topic||learningHelpTopic(bet);rememberLearningHelp(topic);}
+  if(!scoreMessage&&!roundMessage){const topic=tutorial?.topic||learningHelpTopic(bet);rememberLearningHelp(topic);}
   pauseLearning();state.learning.activeMessage=key;state.learning.activeScoreMessage=!!scoreMessage;state.learning.activeTutorial=tutorial||null;
   $('learning-message-title').textContent=scoreMessage?'':tutorial?.title||'Antes de responder';
   $('learning-message-title').classList.toggle('hidden',!!scoreMessage);
@@ -2934,6 +2953,8 @@ function showLearningMessage(){
   studyButton.classList.toggle('hidden',!kind);
   studyButton.dataset.studyKind=kind||'';
   studyButton.textContent=kind==='flor'?'Cómo sumar mis puntos de flor':'Cómo sumar mis puntos de envido';
+  $('learning-round-guide').classList.toggle('hidden',!roundMessage);
+  $('learning-round-disable').classList.toggle('hidden',!roundMessage);
   $('learning-hint').showModal();
   requestAnimationFrame(positionLearningScoreArrow);
 }
@@ -2968,6 +2989,7 @@ function renderLearning(){
   if(!active){if($('learning-hint').open)$('learning-hint').close();return;}
   $('learn-hints').checked=state.learning.hints;
   $('learn-points-info').checked=state.learning.pointsInfo!==false;
+  $('learn-who-wins').checked=state.learning.whoWins!==false;
   requestAnimationFrame(positionLearningControls);
   showLearningMessage();
   if(state.learning.paused)return;
@@ -3117,6 +3139,15 @@ function markPracticeGuideCards(){
   const hand=state.learning&&state.localGame&&$('game-view').classList.contains('active')?localHand('player1'):[];
   for(const row of $('learn-sheet-dialog').querySelectorAll('[data-guide-strength]')){
     row.querySelector('.guide-owned-cards')?.remove();
+    row.querySelector('.guide-played-cards')?.remove();
+    const played=state.learning?.activeTutorial?.roundCards||[];
+    const matches=played.filter(item=>cardStrength(item.card,state.room?.muestra)===Number(row.dataset.guideStrength));
+    row.classList.toggle('guide-played',matches.length>0);
+    if(matches.length){
+      const label=document.createElement('span');label.className='guide-played-cards';
+      label.textContent=matches.map(item=>(item.playerId==='player1'?'Vos jugaste: ':'El rival jugó: ')+cardStudyName(item.card)).join(' · ');
+      (row.tagName==='TR'?row.cells[0]:row).append(label);
+    }
     const cards=hand.filter(card=>cardStrength(card,state.room?.muestra)===Number(row.dataset.guideStrength));
     row.classList.toggle('guide-owned',cards.length>0);
     if(!cards.length)continue;
@@ -3125,7 +3156,22 @@ function markPracticeGuideCards(){
     (row.tagName==='TR'?row.cells[0]:row).append(label);
   }
 }
-function openStudySheet(){pauseLearning();markPracticeGuideCards();if(!$('learn-sheet-dialog').open)$('learn-sheet-dialog').showModal();}
+function renderGuidePlayedCards(){
+  const el=$('guide-played-round');el.replaceChildren();
+  const played=state.learning?.activeTutorial?.roundCards||[];
+  el.classList.toggle('hidden',!played.length);
+  if(!played.length)return;
+  const heading=document.createElement('p');heading.textContent='Cartas jugadas en esta ronda';el.append(heading);
+  const cards=document.createElement('div');cards.className='guide-round-cards';
+  for(const item of played){
+    const wrap=document.createElement('div'),label=document.createElement('span'),card=document.createElement('div');
+    label.textContent=item.playerId==='player1'?'Tu carta':'Carta del rival';
+    card.className='sprite-card';card.style.cssText=cardImageStyle(item.card);card.setAttribute('role','img');card.setAttribute('aria-label',cardAccessibleName(item.card));
+    wrap.append(label,card);cards.append(wrap);
+  }
+  el.append(cards);
+}
+function openStudySheet(){pauseLearning();renderGuidePlayedCards();markPracticeGuideCards();if(!$('learn-sheet-dialog').open)$('learn-sheet-dialog').showModal();}
 function continueLearningStage(){
   const stage=state.learning?.stage||0,complete=state.learning?.complete;
   if(!complete&&stage>=1)openStudy(stage===2?'flor':'envido');
@@ -3172,6 +3218,9 @@ $('learn-study-next').addEventListener('click',()=>nextStudy());
 $('learn-study-envido').addEventListener('submit',event=>{event.preventDefault();const raw=$('learn-study-value').value.trim();if(raw===''){$('learn-study-feedback').textContent='Escribí tus tantos antes de comprobar.';return;}checkStudy(Number(raw));});
 $('learn-study-yes').addEventListener('click',()=>checkStudy(true));
 $('learn-study-no').addEventListener('click',()=>checkStudy(false));
+$('learning-round-guide').addEventListener('click',openStudySheet);
+$('learning-round-disable').addEventListener('click',()=>setLearningWhoWins(false));
+$('learn-who-wins').addEventListener('change',event=>setLearningWhoWins(event.target.checked));
 $('learn-hints').addEventListener('change',event=>{if(state.learning){state.learning.hints=event.target.checked;renderLearning();}});
 $('learn-points-info').addEventListener('change',event=>{
   if(!state.learning)return;

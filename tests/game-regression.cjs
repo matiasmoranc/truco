@@ -11,7 +11,7 @@ function extract(name){
  for(;depth&&end<source.length;end++){if(source[end]==='{')depth++;else if(source[end]==='}')depth--;}
  return source.slice(start,end);
 }
-const names=['canRaiseEnvido','closeFinishedRoomChanges','pieceOrder','cardStrength','envidoValue','hasFlor','handEnvido','florValue','normalizeTargetPoints','targetPoints','capScores','faltanParaGanar','faltaEnvidoPoints','envidoBetPoints','florBetPoints','declinedFlorPoints','florAnswers','otherPlayer','settleHand','topFeed','matchWinner','matchFinished','sessionMatchResults','sessionWins','rematchRoom','rematchChanges','botDeck','botHandOutcome','rememberBotCards','botRiskAdjustment','assessBotHand','chooseBotDecision','disconnectedPlayer','disconnectMatchChanges','turnClockPlayer','turnClockRemaining','turnTimeoutChanges','declinedTrucoChanges','liveActionsBlocked','runLiveAction','privateHandMatchesRoom','roomHasFlor','canCallFirstRoundEnvido','enqueueLearningHelp','rememberLearningHelp','learningHelpTopic','localHand','localFeed','localCallAction','localAnswerAction','localPlay'];
+const names=['queueLearningRoundResult','canRaiseEnvido','closeFinishedRoomChanges','pieceOrder','cardStrength','envidoValue','hasFlor','handEnvido','florValue','normalizeTargetPoints','targetPoints','capScores','faltanParaGanar','faltaEnvidoPoints','envidoBetPoints','florBetPoints','declinedFlorPoints','florAnswers','otherPlayer','settleHand','topFeed','matchWinner','matchFinished','sessionMatchResults','sessionWins','rematchRoom','rematchChanges','botDeck','botHandOutcome','rememberBotCards','botRiskAdjustment','assessBotHand','chooseBotDecision','disconnectedPlayer','disconnectMatchChanges','turnClockPlayer','turnClockRemaining','turnTimeoutChanges','declinedTrucoChanges','liveActionsBlocked','runLiveAction','privateHandMatchesRoom','roomHasFlor','canCallFirstRoundEnvido','enqueueLearningHelp','rememberLearningHelp','learningHelpTopic','localHand','localFeed','localCallAction','localAnswerAction','localPlay'];
 function harness(){
  const context={account:{isReady:()=>true},console,Math:Object.create(Math),Date,crypto:require('node:crypto').webcrypto,structuredClone,Set,Map,navigator:{onLine:true},state:{},localStorage:{setItem(){}},learningSeen:new Set(),VALID_TARGET_POINTS:[10,20,30,40,50,60],RECONNECT_GRACE_MS:45000,gameTime:()=>100000,newOpeningDraw:()=>({cards:{}}),makeCallNotice:text=>({text}),renderGame(){},renderConnectionNotice(){},syncLiveControls(){},touchFeedback(){},toast(){},firebaseError:String,queueLearningAction(){},queueLearningTrucoCall(){},turnClockKey:()=>null,pauseMessage:()=>null,animatePlayedHandCard(){},shakeTurnBadge(){},scheduleLocalNextHand(){},scheduleLocalTransition(room,fn){context.transition=fn;},localFinishHand(winner,points){context.finished={winner,points};},localScore(player,points){context.state.room.scores[player]=Math.min(20,context.state.room.scores[player]+points);},localResolveFlor(){},revealEnvido(){}};
  vm.createContext(context);vm.runInContext(names.map(extract).join('\n'),context);return context;
@@ -61,4 +61,23 @@ test('Closing a finished result closes the shared room, but cannot close a new r
  assert.equal(c.closeFinishedRoomChanges(r,'table','b',1),null);
  assert.equal(c.closeFinishedRoomChanges(r,'player2','b',2),null);
  r.status='drawing';r.scores={player1:0,player2:0};assert.equal(c.closeFinishedRoomChanges(r,'player2','b',1),null);
+});
+
+
+test('Practice round help reports win, loss and tie in either play order and can be disabled independently',()=>{
+ for(const first of ['player1','player2']){
+  for(const winner of ['player1','player2',null]){
+   const c=harness(),played=[{playerId:first,card:card('♠',1)},{playerId:first==='player1'?'player2':'player1',card:card('♥',3)}];
+   c.state.learning={hints:false,pointsInfo:false,whoWins:true};
+   c.queueLearningRoundResult(winner,played);
+   const message=c.state.learning.roundMessages[0];
+   assert.equal(message.title,winner==='player1'?'Mataste':winner==='player2'?'Te mató':'Empataron');
+   assert.equal(message.roundCards.length,2);assert.notEqual(message.roundCards,played);
+   assert.equal(message.roundCards[0].playerId,first);
+   c.state.learning.whoWins=false;c.queueLearningRoundResult(winner,played);
+   assert.equal(c.state.learning.roundMessages.length,1);
+   assert.equal(c.state.learning.hints,false);assert.equal(c.state.learning.pointsInfo,false);
+  }
+ }
+ const c=harness();c.queueLearningRoundResult('player1',[]);assert.equal(c.state.learning,undefined);
 });
