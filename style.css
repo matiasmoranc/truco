@@ -1358,3 +1358,7 @@ body { min-height:100dvh; }
 .guide-round-cards .sprite-card{width:80px;height:120px;border-radius:8px}
 .guide-played-cards{display:block;color:#e8c983;font-size:12px;line-height:1.4;margin:4px 0}
 .card-order-guide .guide-played{box-shadow:inset 3px 0 #e8c983;background:rgba(232,201,131,.09)}
+
+/* Keep voice controls transparent and spoken calls on their gold panel. */
+#game-view #player-sound-toggle,#game-view #sound-toggle{background:transparent}
+#game-view #call-notice,#learning-hint #learning-call-notice{background:#ead7a5;color:#15251b;border-color:#d8b875}

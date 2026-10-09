@@ -2939,7 +2939,7 @@ function showLearningMessage(){
   // Explain actual scoring and new calls; ordinary turns and round pauses need no popup.
   if(!tutorial&&!scoreMessage&&(!bet||(bet.revealMode?bet.revealTurn!=='player1':bet.responder!=='player1')))return;
   const key=tutorial?'tutorial:'+crypto.randomUUID():scoreMessage?'score:'+crypto.randomUUID():learningMessageKey();
-  if(!tutorial&&!scoreMessage&&(state.learning.acknowledgedMessage===key||learningSeen.has(learningHelpTopic(bet))))return;
+  if(!tutorial&&!scoreMessage&&(state.learning.acknowledgedMessage===key||(bet?.type!=='truco'&&learningSeen.has(learningHelpTopic(bet)))))return;
   if(!scoreMessage&&!roundMessage){const topic=tutorial?.topic||learningHelpTopic(bet);rememberLearningHelp(topic);}
   pauseLearning();state.learning.activeMessage=key;state.learning.activeScoreMessage=!!scoreMessage;state.learning.activeTutorial=tutorial||null;
   $('learning-message-title').textContent=scoreMessage?'':tutorial?.title||'Antes de responder';
@@ -2956,6 +2956,7 @@ function showLearningMessage(){
   $('learning-round-guide').classList.toggle('hidden',!roundMessage);
   $('learning-round-disable').classList.toggle('hidden',!roundMessage);
   $('learning-hint').showModal();
+  renderCallNotice();
   requestAnimationFrame(positionLearningScoreArrow);
 }
 function positionLearningControls(){
