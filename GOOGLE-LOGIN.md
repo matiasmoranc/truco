@@ -4,7 +4,7 @@ La primera pantalla pide iniciar sesión con Google. No hay acceso de invitado n
 
 Al registrarse, el jugador elige su nombre de usuario antes de entrar al lobby. Se guarda de forma privada en `profiles/{uid}/name`; no se guarda el correo en las mesas. Las siguientes visitas recuperan la sesión con la persistencia local de Firebase cuando el navegador permite almacenamiento. Un nombre previamente guardado para el mismo UID también se puede recuperar si la conexión tarda en responder.
 
-Mi cuenta muestra solamente Cambiar nombre de usuario y Cerrar sesión. El formulario de edición aparece al elegir la primera opción. Cerrar sesión vuelve a la pantalla de Google y no crea una cuenta de invitado.
+En el encabezado del lobby, tocá tu nombre de usuario y el icono de perfil para abrir Mi cuenta. Mi cuenta muestra solamente Cambiar nombre de usuario y Cerrar sesión. El formulario de edición aparece al elegir la primera opción. Cerrar sesión vuelve a la pantalla de Google y no crea una cuenta de invitado.
 
 ## Configuración del proyecto truco-6553d
 
