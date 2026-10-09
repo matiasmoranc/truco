@@ -42,3 +42,10 @@ La pantalla de cambio oculta el menú de cuenta. Los nombres nuevos admiten de 1
 5. Probar con dos cuentas: un nombre tomado debe rechazar también su versión en mayúsculas. Probar puntos, guiones, espacios y cambiar solamente mayúsculas de un nombre propio.
 
 Los nombres de perfiles anteriores quedan reservados mediante la migración aunque sus dueños no hayan vuelto a entrar. Las nuevas reservas y los cambios de perfil son una actualización atómica: las reglas impiden que dos cuentas reclamen el mismo nombre. Si falta desplegar las reglas, guardar falla y mantiene el nombre anterior.
+
+
+### Protección mientras se migran los nombres
+
+La aplicación bloquea los cambios y registros de nombres hasta que el administrador termine de reservar los nombres existentes. Después de importar el índice en /usernames y publicar las reglas, crear en la raíz /usernameIndexReady con valor booleano true (no el texto "true"). No activar esa marca antes de completar la migración. Si ya existen duplicados, resolverlos primero: cada nombre debe pertenecer a una única cuenta. El cliente no puede modificar esta marca.
+
+Un cambio correcto muestra "Nombre de usuario cambiado correctamente." durante dos segundos, cierra Mi cuenta y vuelve al lobby.
