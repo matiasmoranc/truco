@@ -1336,7 +1336,7 @@ function buildEndEvidence(room,originals){
   const groups=[];
   for(const player of Object.keys(room.flors||{})){
     const cards=originals[player]||[];
-    if(cards.length===3)groups.push({player,label:'Flor',cards});
+    if(cards.length===3)groups.push({player,label:Object.keys(room.flors||{}).length>1?'Flor · '+florValue(cards,room.muestra)+' tantos':'Flor',cards});
   }
   const audit=room.envidoAudit;
   if(audit){
@@ -1865,6 +1865,7 @@ function renderGame() {
     const groups=buildEndEvidence(state.room,state.localOriginalHands||{});
     if(groups.length)localShowEvidence(groups);
   }
+  $('game-sheet').classList.toggle('hidden',!state.learning);
   renderCallNotice();
   renderTurnTimer();
   const room = state.room, players=room.players||{}, isTable=state.playerId==='table', mine=players[state.playerId], opponent=players[state.playerId==='player1'?'player2':'player1'];
@@ -3133,7 +3134,7 @@ $('learning-message-close').addEventListener('click',()=>$('learning-hint').clos
 $('learning-message-study').addEventListener('click',event=>{const kind=event.currentTarget.dataset.studyKind;if(kind==='envido'||kind==='flor')openStudy(kind);});
 $('learning-hint').addEventListener('close',()=>{if(state.learning){state.learning.acknowledgedMessage=state.learning.activeMessage;state.learning.activeMessage=null;state.learning.activeScoreMessage=false;state.learning.activeTutorial=null;}positionLearningScoreArrow();resumeLearning();});
 $('learn-menu').addEventListener('click',openLearning);
-$('game-sheet').addEventListener('click',openStudySheet);
+$('game-sheet').addEventListener('click',()=>{if(state.learning)openStudySheet();});
 $('learn-sheet-menu').addEventListener('click',openStudySheet);
 $('learn-sheet-close').addEventListener('click',()=>$('learn-sheet-dialog').close());
 $('learn-envido-study').addEventListener('click',()=>openStudy('envido'));
