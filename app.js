@@ -1,4 +1,4 @@
-import { installAccount } from './account.js?v=20261009-google1';
+import { installAccount } from './account.js?v=20261009-google-required3';
 const FIREBASE_VERSION = '12.4.0';
 const $ = (id) => document.getElementById(id);
 const views = ['welcome-view', 'invite-view', 'setup-view', 'waiting-view', 'game-view', 'config-view', 'learn-view'];
@@ -428,7 +428,19 @@ function loadConfig() {
   try { return JSON.parse(localStorage.getItem(storageKey) || 'null'); } catch { return null; }
 }
 let firebaseReadyPromise=null;
-const account=installAccount({services:firebaseServices,getState:()=>state,savedName:savedPlayerName,rememberName:rememberPlayerName,document});
+const account=installAccount({services:firebaseServices,getState:()=>state,rememberName:rememberPlayerName,document,onReady:openInitialRoom,onIdentityChange:resetAccountRoom,inRoom:()=>!!state.room&&!$('welcome-view').classList.contains('active')});
+function resetAccountRoom(){
+  stopRoomPresence();stopBot();forgetRoomSeat();
+  state.roomWatchVersion=(state.roomWatchVersion||0)+1;
+  state.navigationEpoch=(state.navigationEpoch||0)+1;
+  if(state.unsubscribe)state.unsubscribe();
+  if(state.privateUnsubscribe)state.privateUnsubscribe();
+  if(state.lobbyUnsubscribe)state.lobbyUnsubscribe();
+  state.unsubscribe=null;state.privateUnsubscribe=null;state.lobbyUnsubscribe=null;
+  state.room=null;state.hand=[];state.localGame=false;state.restorePending=null;
+  state.privateHandKey=null;state.connectionReady=false;
+  showView('welcome-view');
+}
 async function firebaseServices() {
   if(state.firebase)return state.firebase;
   if(firebaseReadyPromise)return firebaseReadyPromise;
@@ -440,19 +452,12 @@ async function firebaseServices() {
     ]);
     const app=appSdk.getApps().length?appSdk.getApp():appSdk.initializeApp(state.config);
     const auth=authSdk.getAuth(app);
+    // Keep Google sign-in across visits when browser storage is available.
+    try{await authSdk.setPersistence(auth,authSdk.browserLocalPersistence);}catch{ /* Use Firebase's available persistence when storage is restricted. */ }
     await auth.authStateReady();
-    if(!auth.currentUser)await authSdk.signInAnonymously(auth);
-    state.uid=auth.currentUser.uid;
+    state.uid=auth.currentUser?.uid||null;
     state.firebase={db:dbSdk.getDatabase(app,state.config.databaseURL),...dbSdk,auth,authSdk};
     authSdk.onAuthStateChanged(auth,user=>{
-      if(state.uid&&user?.uid!==state.uid&&state.room){
-        stopRoomPresence();stopBot();forgetRoomSeat();
-        state.roomWatchVersion=(state.roomWatchVersion||0)+1;
-        if(state.unsubscribe)state.unsubscribe();
-        if(state.privateUnsubscribe)state.privateUnsubscribe();
-        state.room=null;state.hand=[];state.localGame=false;
-        showView('welcome-view');
-      }
       account.observe(state.firebase,user);
     });
     dbSdk.onValue(dbSdk.ref(state.firebase.db,'.info/serverTimeOffset'),snapshot=>{state.serverTimeOffset=Number(snapshot.val())||0;},error=>console.error('[truco:clock]',error));
@@ -556,12 +561,14 @@ async function restoreRoom(code){
   }
 }
 async function retryRoomRestore(){
+  if(!account.isReady())return;
   const pending=state.restorePending;
   if(!pending||state.room||pending.epoch!==(state.navigationEpoch||0))return;
   state.restorePending=null;
   await restoreRoom(pending.code);
 }
 async function openInitialRoom(){
+  if(!account.isReady())return;
   const epoch=state.navigationEpoch||0;
   const invitedRoom=new URLSearchParams(location.search).get('mesa');
   const code=invitedRoom||savedRoomSeat()?.code;
@@ -572,6 +579,7 @@ async function openInitialRoom(){
 }
 
 async function enterRoom() {
+  if(!account.isReady())return;
   if(state.enteringRoom)return;
   const entryEpoch=state.navigationEpoch;
   state.enteringRoom=true;$('enter-room').disabled=true;
@@ -669,6 +677,7 @@ $('invite-cancel').addEventListener('click',()=>{
   openLobby();
 });
 async function openLobby() {
+  if(!account.isReady())return;
   if (!firebaseConfigValid(state.config)) { state.nextAction = 'lobby'; showConfig(); return; }
   try {
     const navigationEpoch=state.navigationEpoch||0;
@@ -3207,18 +3216,19 @@ async function initializePage(){
     let startupTimer;
     try{
       await Promise.race([
-        openInitialRoom(),
+        (async()=>{const fb=await firebaseServices();await account.observe(fb,fb.auth.currentUser);})(),
         new Promise(resolve=>{startupTimer=setTimeout(resolve,12000);})
       ]);
     }finally{clearTimeout(startupTimer);}
 
-  }catch(error){console.error('[truco:startup]',error);}
+  }catch(error){console.error('[truco:startup]',error);account.failed(error);}
   finally{
-    $('app').inert=false;
+    $('app').inert=!account.isReady();
     $('startup-loading').hidden=true;
     document.documentElement.classList.remove('page-loading');
   }
 }
 await initializePage();
+
 
 

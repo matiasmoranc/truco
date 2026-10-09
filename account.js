@@ -1,34 +1,86 @@
-export function installAccount({ services, getState, savedName, rememberName, document }) {
+export function installAccount({ services, getState, rememberName, document, storage=globalThis.localStorage, onReady=()=>{}, onIdentityChange=()=>{}, inRoom=()=>!!getState().room }) {
   const el=id=>document.getElementById(id);
-  let busy=false, unsubscribe=null, profileUid=null;
-  const message=text=>{el('account-status').textContent=text;};
-  const inRoom=()=>!!getState().room;
-  function render(user) {
-    el('account-summary').textContent=user&&!user.isAnonymous?'Cuenta conectada con Google':'Jugás como invitado';
-    el('account-google').hidden=!!user&&!user.isAnonymous;
-    el('account-logout').hidden=!user||user.isAnonymous;
-    el('account-guest').textContent=user&&!user.isAnonymous?'Seguir jugando':'Jugar como invitado';
-    for(const id of ['account-google','account-logout','account-save'])el(id).disabled=busy||!user||inRoom();
+  let busy=false, ready=false, profileKey=null, profilePromise=null, currentUser=null;
+  let profileName='', readyUid=null, generation=0, loaded=false;
+  const message=text=>{
+    el('auth-status').textContent=text;
+    el('account-status').textContent=text;
+  };
+  const registered=user=>!!user&&!user.isAnonymous&&user.providerData?.some(provider=>provider.providerId==='google.com');
+  const cleanName=value=>typeof value==='string'?value.trim().slice(0,18):'';
+  function cachedName(uid) {
+    try{return cleanName(storage?.getItem('truco-profile-name:'+uid));}catch{return '';}
   }
-  function observe(fb,user) {
-    if(unsubscribe)unsubscribe();
-    profileUid=user?.uid||null;
-    getState().uid=profileUid;
-    el('account-name').value=savedName();
-    message('');render(user);
-    if(!user)return;
+  function cacheName(uid,name) {
+    try{storage?.setItem('truco-profile-name:'+uid,name);}catch{}
+  }
+  function render() {
+    const google=registered(currentUser);
+    el('auth-gate').hidden=ready;
+    el('app').inert=!ready;
+    el('auth-login').hidden=google;
+    el('auth-register').hidden=!google||!loaded;
+    el('account-google').disabled=busy||!getState().firebase;
+    el('auth-name-save').disabled=busy||!google||!loaded;
+    for(const id of ['account-change-name','account-logout','account-save'])el(id).disabled=busy||!ready||inRoom();
+    el('auth-retry').hidden=!!getState().firebase&&(!google||loaded);
+    el('auth-retry').disabled=busy;
+  }
+  function activate(user,name) {
+    profileName=name;rememberName(name);cacheName(user.uid,name);
+    el('player-name').value=name;el('invite-name').value=name;
+    ready=true;render();
+    if(readyUid!==user.uid) {
+      readyUid=user.uid;
+      Promise.resolve(onReady()).catch(()=>message('No pudimos cargar las mesas. Revisá tu conexión.'));
+    }
+  }
+  function observe(fb,user,force=false) {
+    const key=user?user.uid+':'+registered(user):'signed-out';
+    if(!force&&key===profileKey)return profilePromise||Promise.resolve();
+    if(getState().uid&&getState().uid!==user?.uid)onIdentityChange();
+    profileKey=key;currentUser=user;getState().uid=user?.uid||null;
+    const epoch=++generation;
+    ready=false;loaded=false;profileName='';render();
+    if(!registered(user)) {
+      readyUid=null;rememberName('');el('player-name').value='';el('invite-name').value='';
+      el('auth-name').value='';message('');
+      if(el('account-panel').open)el('account-panel').close();
+      profilePromise=Promise.resolve();return profilePromise;
+    }
     const uid=user.uid;
-    unsubscribe=fb.onValue(fb.ref(fb.db,`profiles/${uid}`),snapshot=>{
-      if(profileUid!==uid)return;
-      const name=snapshot.val()?.name;
-      if(typeof name==='string'&&name.trim()){
-        rememberName(name);el('account-name').value=name;el('player-name').value=name;
-      }
-    },()=>{if(profileUid===uid)message('Tu apodo sigue guardado en este dispositivo. Para sincronizarlo, falta habilitar los perfiles en Firebase.');});
+    const cached=cachedName(uid);
+    if(cached)activate(user,cached);
+    else message('Cargando tu cuenta…');
+    profilePromise=(async()=>{
+      let timer;
+      try {
+        const snapshot=await Promise.race([
+          fb.get(fb.ref(fb.db,'profiles/'+uid)),
+          new Promise((resolve,reject)=>{timer=setTimeout(()=>reject(new Error('profile-timeout')),12000);})
+        ]);
+        if(epoch!==generation)return;
+        loaded=true;
+        const name=cleanName(snapshot.val()?.name);
+        if(name){activate(user,name);message('');}
+        else if(!cached){
+          el('auth-name').value='';
+          message('Elegí el nombre con el que vas a jugar.');
+        }
+      }catch(error){
+        if(epoch!==generation)return;
+        // A known profile can remain usable on a slow connection. New accounts
+        // must save their profile before entering the game.
+        loaded=false;
+        message(cached?'No pudimos actualizar tu nombre desde la cuenta.':
+          'No pudimos cargar tu perfil. Revisá la conexión y las reglas de perfiles en Firebase.');
+      }finally{clearTimeout(timer);if(epoch===generation)render();}
+    })();
+    return profilePromise;
   }
   function errorText(error) {
     switch(error?.code){
-      case 'auth/popup-closed-by-user':return 'Cerraste la ventana. Podés seguir como invitado.';
+      case 'auth/popup-closed-by-user':return 'Cerraste la ventana. Tocá Google para volver a intentar.';
       case 'auth/cancelled-popup-request':return 'Ya hay una ventana de acceso abierta.';
       case 'auth/popup-blocked':return 'Permití las ventanas emergentes y volvé a intentar.';
       case 'auth/operation-not-allowed':return 'Falta habilitar el acceso con Google en Firebase.';
@@ -37,19 +89,24 @@ export function installAccount({ services, getState, savedName, rememberName, do
       default:return 'No pudimos conectar tu cuenta. Revisá tu conexión y volvé a intentar.';
     }
   }
-  async function action(task) {
+  async function action(task,{allowRegistration=false}={}) {
     if(busy)return;
     if(inRoom()){message('Volvé al lobby antes de cambiar tu cuenta.');return;}
-    busy=true;
-    try {const fb=await services();render(fb.auth.currentUser);await task(fb);}
-    catch(error){message(errorText(error));}
-    finally{busy=false;render(getState().firebase?.auth.currentUser);}
+    busy=true;render();
+    try {
+      const fb=getState().firebase||await services();
+      if(!allowRegistration&&!ready)return;
+      await task(fb);
+    }catch(error){message(errorText(error));}
+    finally{busy=false;render();}
   }
   el('account-google').addEventListener('click',()=>action(async fb=>{
+    message('Abriendo Google…');
     const provider=new fb.authSdk.GoogleAuthProvider();
     provider.setCustomParameters({prompt:'select_account'});
     const user=fb.auth.currentUser;
     try{
+      // Preserve old anonymous seats when an existing installation first links Google.
       if(user?.isAnonymous)await fb.authSdk.linkWithPopup(user,provider);
       else await fb.authSdk.signInWithPopup(fb.auth,provider);
     }catch(error){
@@ -58,32 +115,52 @@ export function installAccount({ services, getState, savedName, rememberName, do
       if(!credential)throw error;
       await fb.authSdk.signInWithCredential(fb.auth,credential);
     }
-    message('Cuenta conectada. Guardá el apodo que querés usar.');
-  }));
-  el('account-save').addEventListener('click',()=>action(async fb=>{
-    const name=el('account-name').value.trim().slice(0,18);
-    if(!name){message('Escribí tu apodo.');return;}
-    rememberName(name);el('player-name').value=name;
+    await observe(fb,fb.auth.currentUser);
+  },{allowRegistration:true}));
+  async function save(fb,input,registration) {
+    const user=fb.auth.currentUser;
+    if(!registered(user)){message('Iniciá sesión con Google.');return;}
+    const name=cleanName(input.value);
+    if(!name){message('Escribí tu nombre de usuario.');input.focus();return;}
     try{
-      await fb.set(fb.ref(fb.db,`profiles/${fb.auth.currentUser.uid}/name`),name);
-      message('Apodo guardado.');
-    }catch{message('Apodo guardado en este dispositivo. No pudimos sincronizarlo: revisá la conexión y las reglas de perfiles en Firebase.');}
-  }));
+      await fb.set(fb.ref(fb.db,'profiles/'+user.uid+'/name'),name);
+      if(fb.auth.currentUser?.uid!==user.uid)return;
+      loaded=true;activate(user,name);
+      message(registration?'':'Nombre de usuario guardado.');
+      if(!registration){el('account-edit').hidden=true;el('account-menu').hidden=false;}
+    }catch{
+      message('No pudimos guardar tu nombre en la cuenta. Revisá la conexión y las reglas de perfiles en Firebase.');
+    }
+  }
+  el('auth-register').addEventListener('submit',event=>{
+    event.preventDefault();return action(fb=>save(fb,el('auth-name'),true),{allowRegistration:true});
+  });
+  el('account-edit').addEventListener('submit',event=>{
+    event.preventDefault();return action(fb=>save(fb,el('account-name'),false));
+  });
+  el('auth-retry').addEventListener('click',()=>action(async fb=>observe(fb,fb.auth.currentUser,true),{allowRegistration:true}));
   el('account-logout').addEventListener('click',()=>action(async fb=>{
     await fb.authSdk.signOut(fb.auth);
-    rememberName('');el('player-name').value='';
-    await fb.authSdk.signInAnonymously(fb.auth);
-    message('Ahora jugás como invitado.');
+    await observe(fb,null);
+    el('account-panel').close();
+    el('account-google').focus();
   }));
-  el('account-open').addEventListener('click',async()=>{
-    el('account-panel').showModal();
-    try{const fb=await services();render(fb.auth.currentUser);}catch{message('No pudimos conectar. Revisá tu conexión.');}
-    el('account-close').focus();
+  el('account-change-name').addEventListener('click',()=>{
+    if(!ready||inRoom())return;
+    message('');el('account-menu').hidden=true;el('account-edit').hidden=false;
+    el('account-name').value=profileName;el('account-name').focus();
+  });
+  el('account-edit-back').addEventListener('click',()=>{
+    message('');el('account-edit').hidden=true;el('account-menu').hidden=false;
+  });
+  el('account-open').addEventListener('click',()=>{
+    if(!ready)return;
+    el('account-menu').hidden=false;el('account-edit').hidden=true;message('');render();
+    el('account-panel').showModal();el('account-close').focus();
   });
   function close(){el('account-panel').close();el('account-open').focus();}
   el('account-close').addEventListener('click',close);
-  el('account-guest').addEventListener('click',close);
   el('account-panel').addEventListener('click',event=>{if(event.target===el('account-panel'))close();});
   el('account-panel').addEventListener('cancel',()=>el('account-open').focus());
-  return { observe };
+  return {observe,isReady:()=>ready,failed:error=>{message(errorText(error));render();}};
 }
