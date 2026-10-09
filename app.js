@@ -1,4 +1,4 @@
-import { installAccount } from './account.js?v=20261009-account-focus9';
+import { installAccount } from './account.js?v=20261009-apple-login10';
 const FIREBASE_VERSION = '12.4.0';
 const $ = (id) => document.getElementById(id);
 const views = ['welcome-view', 'invite-view', 'setup-view', 'waiting-view', 'game-view', 'config-view', 'learn-view'];
@@ -452,7 +452,7 @@ async function firebaseServices() {
     ]);
     const app=appSdk.getApps().length?appSdk.getApp():appSdk.initializeApp(state.config);
     const auth=authSdk.getAuth(app);
-    // Keep Google sign-in across visits when browser storage is available.
+    // Keep sign-in across visits when browser storage is available.
     try{await authSdk.setPersistence(auth,authSdk.browserLocalPersistence);}catch{ /* Use Firebase's available persistence when storage is restricted. */ }
     await auth.authStateReady();
     state.uid=auth.currentUser?.uid||null;

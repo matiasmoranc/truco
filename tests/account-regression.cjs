@@ -3,14 +3,14 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const path=require('node:path');
 const google=uid=>({uid,isAnonymous:false,providerData:[{providerId:'google.com'}]});
-async function harness(user=null,profile=null){
+async function harness(user=null,profile=null,navigator={platform:"Win32",userAgent:"Windows"}){
  const source=fs.readFileSync(path.join(__dirname,'../account.js'),'utf8');
  const {installAccount}=await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'));
  const nodes={},writes=[],cache=new Map();
  const document={getElementById(id){return nodes[id]??={value:'',hidden:false,disabled:false,textContent:'',handlers:{},addEventListener(type,fn){this.handlers[type]=fn},focus(){},showModal(){this.open=true},close(){this.open=false}}}};
- const fb={db:{},auth:{currentUser:user},authSdk:{GoogleAuthProvider:class{setCustomParameters(){} static credentialFromError(e){return e.credential}},async linkWithPopup(u){fb.auth.currentUser=google(u.uid)},async signInWithPopup(){fb.auth.currentUser=google('google')},async signInWithCredential(){fb.auth.currentUser=google('existing')},async signOut(){fb.auth.currentUser=null}},ref(db,path){return path},get:async(ref)=>({val:()=>ref==='usernameIndexReady'?true:ref?.startsWith('usernames/')?null:profile}),update:async(ref,value)=>{writes.push({ref,value})}};
+ const fb={db:{},auth:{currentUser:user},authSdk:{OAuthProvider:class{constructor(id){this.providerId=id;this.scopes=[]}addScope(scope){this.scopes.push(scope)}setCustomParameters(params){this.params=params}},GoogleAuthProvider:class{setCustomParameters(){} static credentialFromError(e){return e.credential}},async linkWithPopup(u){fb.auth.currentUser=google(u.uid)},async signInWithPopup(auth,provider){fb.auth.currentUser=provider?.providerId==='apple.com'?{uid:'apple',isAnonymous:false,providerData:[{providerId:'apple.com'}]}:google('google')},async signInWithCredential(){fb.auth.currentUser=google('existing')},async signOut(){fb.auth.currentUser=null}},ref(db,path){return path},get:async(ref)=>({val:()=>ref==='usernameIndexReady'?true:ref?.startsWith('usernames/')?null:profile}),update:async(ref,value)=>{writes.push({ref,value})}};
  const state={firebase:fb,room:null,uid:user?.uid||null};let name='',starts=0,resets=0;
- const account=installAccount({services:async()=>fb,getState:()=>state,rememberName:v=>name=v,document,storage:{getItem:k=>cache.get(k),setItem:(k,v)=>cache.set(k,v)},onReady:()=>{starts++},onIdentityChange:()=>{resets++}});
+ const account=installAccount({services:async()=>fb,getState:()=>state,rememberName:v=>name=v,document,navigator,storage:{getItem:k=>cache.get(k),setItem:(k,v)=>cache.set(k,v)},onReady:()=>{starts++},onIdentityChange:()=>{resets++}});
  await account.observe(fb,user);
  return {account,fb,state,nodes,writes,cache,name:()=>name,starts:()=>starts,resets:()=>resets,click:async id=>nodes[id].handlers.click(),submit:async id=>nodes[id].handlers.submit({preventDefault(){}})};
 }
@@ -139,4 +139,39 @@ test('A slow rename confirmation cannot reopen another editing dialog before it 
  h.nodes['account-name'].value='Otro';const pending=h.submit('account-edit');await new Promise(resolve=>setImmediate(resolve));
  await h.click('account-change-name');await h.click('account-open');assert.equal(h.nodes['account-edit'].hidden,true);
  await pending;assert.equal(h.nodes['account-panel'].open,false);
+});
+
+test('Apple sign-in is visible only on Apple devices, including desktop-mode iPads',async()=>{
+ for(const [navigator,visible] of [
+ [{platform:'iPhone',userAgent:'iPhone'},true],
+ [{platform:'MacIntel',userAgent:'Macintosh',maxTouchPoints:5},true],
+ [{platform:'MacIntel',userAgent:'Macintosh'},true],
+ [{platform:'Linux armv8',userAgent:'Android'},false],
+ [{platform:'Win32',userAgent:'Windows'},false],
+ [{platform:'Linux x86_64',userAgent:'Linux'},false]
+ ]){
+ const h=await harness(null,null,navigator);assert.equal(h.nodes['account-apple'].hidden,!visible);
+ }
+});
+test('Apple OAuth requests the right provider and asks first-time users for a name',async()=>{
+ const h=await harness(null,null,{platform:'iPhone',userAgent:'iPhone'});let used;
+ const signIn=h.fb.authSdk.signInWithPopup;h.fb.authSdk.signInWithPopup=async(auth,provider)=>{used=provider;await signIn(auth,provider)};
+ await h.click('account-apple');assert.equal(used.providerId,'apple.com');assert.deepEqual(used.scopes,['email','name']);assert.equal(used.params.locale,'es');
+ assert.equal(h.account.isReady(),false);h.nodes['auth-name'].value='AppleUser';await h.submit('auth-register');
+ assert.equal(h.account.isReady(),true);assert.equal(h.writes[0].value['usernames/appleuser'],'apple');
+});
+test('Existing Apple accounts restore their profile on reload without repeating registration',async()=>{
+ const user={uid:'apple',isAnonymous:false,providerData:[{providerId:'apple.com'}]};
+ const h=await harness(user,{name:'AppleUser'},{platform:'MacIntel',userAgent:'Macintosh'});
+ assert.equal(h.account.isReady(),true);assert.equal(h.name(),'AppleUser');assert.equal(h.starts(),1);
+ await h.account.observe(h.fb,user);assert.equal(h.starts(),1);
+});
+test('Unconfigured Apple sign-in reports Apple and never unlocks gameplay',async()=>{
+ const h=await harness(null,null,{platform:'iPhone',userAgent:'iPhone'});
+ h.fb.authSdk.signInWithPopup=async()=>{throw {code:'auth/operation-not-allowed'}};
+ await h.click('account-apple');assert.equal(h.account.isReady(),false);assert.match(h.nodes['auth-status'].textContent,/Apple/);
+});
+test('Hidden Apple action cannot start OAuth on Windows',async()=>{
+ const h=await harness();let calls=0;h.fb.authSdk.signInWithPopup=async()=>{calls++};
+ await h.click('account-apple');assert.equal(calls,0);
 });

@@ -1639,3 +1639,8 @@ body { min-height:100dvh; }
 
 /* The ID selector for the menu must respect its hidden state. */
 #account-menu[hidden]{display:none}
+
+#auth-login{display:flex;flex-direction:column;gap:12px}
+.auth-card #account-apple{display:flex;align-items:center;justify-content:center;gap:10px;background:#fff;color:#000;border:1px solid #fff;font-weight:600}
+.auth-card #account-apple[hidden]{display:none}
+.apple-mark{width:24px;height:24px;flex:0 0 24px}

@@ -1,4 +1,12 @@
-export function installAccount({ services, getState, rememberName, document, storage=globalThis.localStorage, onReady=()=>{}, onIdentityChange=()=>{}, onNameChanged=()=>{}, inRoom=()=>!!getState().room }) {
+export function isAppleDevice(navigator=globalThis.navigator) {
+  if(!navigator)return false;
+  const platform=navigator.userAgentData?.platform||navigator.platform||'';
+  const ua=navigator.userAgent||'';
+  if(/Android|Windows|CrOS/i.test(platform+' '+ua))return false;
+  return /Mac|iPhone|iPad|iPod/i.test(platform)||/iPhone|iPad|iPod|Macintosh/i.test(ua);
+}
+
+export function installAccount({ services, getState, rememberName, document, storage=globalThis.localStorage, navigator=globalThis.navigator, onReady=()=>{}, onIdentityChange=()=>{}, onNameChanged=()=>{}, inRoom=()=>!!getState().room }) {
   const el=id=>document.getElementById(id);
   let busy=false, ready=false, profileKey=null, profilePromise=null, currentUser=null;
   let profileName='', readyUid=null, generation=0, loaded=false;
@@ -6,7 +14,7 @@ export function installAccount({ services, getState, rememberName, document, sto
     el('auth-status').textContent=text;
     el('account-status').textContent=text;
   };
-  const registered=user=>!!user&&!user.isAnonymous&&user.providerData?.some(provider=>provider.providerId==='google.com');
+  const registered=user=>!!user&&!user.isAnonymous&&user.providerData?.some(provider=>['google.com','apple.com'].includes(provider.providerId));
   const validName=value=>typeof value==='string'&&/^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9._-]{1,18}$/.test(value);
   const nameKey=name=>name.toLowerCase().replaceAll('.', '%2E');
   const cleanName=value=>typeof value==='string'?value.trim().slice(0,18):'';
@@ -16,6 +24,8 @@ export function installAccount({ services, getState, rememberName, document, sto
   function cacheName(uid,name) {
     try{storage?.setItem('truco-profile-name:'+uid,name);}catch{}
   }
+  const appleDevice=isAppleDevice(navigator);
+  let loginProvider='Google';
   function render() {
     const google=registered(currentUser);
     el('auth-gate').hidden=ready;
@@ -23,6 +33,8 @@ export function installAccount({ services, getState, rememberName, document, sto
     el('auth-login').hidden=google;
     el('auth-register').hidden=!google||!loaded;
     el('account-google').disabled=busy||!getState().firebase;
+    el('account-apple').hidden=!appleDevice;
+    el('account-apple').disabled=busy||!getState().firebase;
     el('auth-name-save').disabled=busy||!google||!loaded;
     for(const id of ['account-change-name','account-logout','account-save'])el(id).disabled=busy||!ready||inRoom();
     el('auth-retry').hidden=!!getState().firebase&&(!google||loaded);
@@ -83,10 +95,10 @@ export function installAccount({ services, getState, rememberName, document, sto
   }
   function errorText(error) {
     switch(error?.code){
-      case 'auth/popup-closed-by-user':return 'Cerraste la ventana. Tocá Google para volver a intentar.';
+      case 'auth/popup-closed-by-user':return 'Cerraste la ventana. Elegí una opción para volver a intentar.';
       case 'auth/cancelled-popup-request':return 'Ya hay una ventana de acceso abierta.';
       case 'auth/popup-blocked':return 'Permití las ventanas emergentes y volvé a intentar.';
-      case 'auth/operation-not-allowed':return 'Falta habilitar el acceso con Google en Firebase.';
+      case 'auth/operation-not-allowed':return 'Falta configurar el acceso con '+loginProvider+' en Firebase.';
       case 'auth/unauthorized-domain':return 'Falta autorizar el dominio de esta página en Firebase.';
       case 'auth/account-exists-with-different-credential':return 'Este correo ya tiene otra forma de acceso. Usá el proveedor original para vincular Google.';
       default:return 'No pudimos conectar tu cuenta. Revisá tu conexión y volvé a intentar.';
@@ -104,7 +116,7 @@ export function installAccount({ services, getState, rememberName, document, sto
     finally{busy=false;render();}
   }
   el('account-google').addEventListener('click',()=>action(async fb=>{
-    message('Abriendo Google…');
+    loginProvider='Google';message('Abriendo Google…');
     const provider=new fb.authSdk.GoogleAuthProvider();
     provider.setCustomParameters({prompt:'select_account'});
     const user=fb.auth.currentUser;
@@ -120,9 +132,22 @@ export function installAccount({ services, getState, rememberName, document, sto
     }
     await observe(fb,fb.auth.currentUser);
   },{allowRegistration:true}));
+  el('account-apple').addEventListener('click',()=> {
+    if(!appleDevice)return;
+    return action(async fb=>{
+      loginProvider='Apple';message('Abriendo Apple…');
+      const provider=new fb.authSdk.OAuthProvider('apple.com');
+      provider.addScope('email');provider.addScope('name');
+      provider.setCustomParameters({locale:'es'});
+      // Apple authenticates separately. Never silently link a private relay
+      // identity with an existing Google account.
+      await fb.authSdk.signInWithPopup(fb.auth,provider);
+      await observe(fb,fb.auth.currentUser);
+    },{allowRegistration:true});
+  });
   async function save(fb,input,registration) {
     const user=fb.auth.currentUser;
-    if(!registered(user)){message('Iniciá sesión con Google.');return;}
+    if(!registered(user)){message('Iniciá sesión para guardar tu nombre.');return;}
     const name=input.value.normalize('NFC');
     if(!name){message('Escribí tu nombre de usuario.');input.focus();return;}
     if(!validName(name)){message('Usá de 1 a 18 letras, números, guion (-), guion bajo (_) o punto (.). Sin espacios.');input.focus();return;}
