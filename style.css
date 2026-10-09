@@ -1498,7 +1498,7 @@ body { min-height:100dvh; }
 #learn-coach-dialog{max-height:calc(100dvh - 24px);box-sizing:border-box}
 
 /* Paired lobby actions share shape, size and left-aligned labels. */
-#welcome-view .home-heading{display:block;width:100%;text-align:center}
+#welcome-view .home-heading{display:block;width:100%;text-align:left}
 #welcome-view .home-actions #create-room,#welcome-view .home-actions #learn-game{display:flex;align-items:center;justify-content:flex-start;text-align:left;width:100%;height:56px;min-height:56px;padding:0 20px;border-radius:14px;font-size:16px;font-weight:600;letter-spacing:normal;margin:0;box-sizing:border-box}
 #welcome-view .home-actions #create-room{background:#e8c983;color:#10291f;border:1px solid #e8c983}
 #welcome-view .home-actions #learn-game{background:transparent;color:#e8c983;border:1px solid #e8c983;box-shadow:0 5px 22px #0002}
