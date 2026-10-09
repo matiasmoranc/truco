@@ -27,3 +27,18 @@ GitHub Pages publica los archivos web, pero no despliega las reglas ni activa pr
 
 Apple y Facebook pueden agregarse después vinculándolos al mismo UID. Esta primera versión guarda el apodo; no agrega estadísticas globales ni sustituye la seguridad del motor de partidas.
 
+
+
+## Nombres únicos (actualización del 9 de octubre)
+
+La pantalla de cambio oculta el menú de cuenta. Los nombres nuevos admiten de 1 a 18 letras (incluyendo ñ y acentos), números, guion, guion bajo y punto; no admiten espacios. La reserva usa minúsculas y conserva la escritura elegida para mostrarla.
+
+**La publicación en GitHub Pages no despliega las reglas ni migra los datos de Firebase.** Antes de permitir nuevos registros o cambios:
+
+1. En Realtime Database → Data, exportar una copia privada de la base completa. No subirla a GitHub.
+2. Ejecutar `node scripts/build-username-index.cjs database-export.json usernames.json`. Si informa nombres duplicados, resolverlos en los perfiles antes de repetir. No elige un dueño arbitrariamente.
+3. En Data, crear/seleccionar exclusivamente el nodo `usernames` e importar allí `usernames.json`. Nunca importar este archivo en la raíz. Hacer esto sin registros/cambios simultáneos; si hubo cambios después de exportar, volver a exportar y generar el índice.
+4. En Rules, publicar el contenido completo de `firebase.database.rules.json`.
+5. Probar con dos cuentas: un nombre tomado debe rechazar también su versión en mayúsculas. Probar puntos, guiones, espacios y cambiar solamente mayúsculas de un nombre propio.
+
+Los nombres de perfiles anteriores quedan reservados mediante la migración aunque sus dueños no hayan vuelto a entrar. Las nuevas reservas y los cambios de perfil son una actualización atómica: las reglas impiden que dos cuentas reclamen el mismo nombre. Si falta desplegar las reglas, guardar falla y mantiene el nombre anterior.
