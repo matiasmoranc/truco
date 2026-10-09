@@ -22,7 +22,7 @@
     "profiles": {
       "$uid": {
         ".read": "auth != null && auth.uid == $uid",
-        ".write": "auth != null && auth.uid == $uid",
+        ".write": "auth != null && auth.uid == $uid && root.child('usernameIndexReady').val() == true",
         "name": {
           ".validate": "newData.isString() && newData.val().matches(/^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9._-]{1,18}$/) && newData.parent().parent().parent().child('usernames').child(newData.val().toLowerCase().replace('.', '%2E')).val() == auth.uid"
         },
@@ -34,9 +34,13 @@
     "usernames": {
       "$key": {
         ".read": "auth != null",
-        ".write": "auth != null && ((!data.exists() && newData.val() == auth.uid) || (data.val() == auth.uid && (newData.val() == auth.uid || (!newData.exists() && newData.parent().parent().child('profiles').child(auth.uid).child('name').val().toLowerCase().replace('.', '%2E') != $key))))",
+        ".write": "root.child('usernameIndexReady').val() == true && (auth != null && ((!data.exists() && newData.val() == auth.uid) || (data.val() == auth.uid && (newData.val() == auth.uid || (!newData.exists() && newData.parent().parent().child('profiles').child(auth.uid).child('name').val().toLowerCase().replace('.', '%2E') != $key)))))",
         ".validate": "newData.isString() && newData.val() == auth.uid && newData.parent().parent().child('profiles').child(auth.uid).child('name').val().toLowerCase().replace('.', '%2E') == $key"
       }
+    },
+    "usernameIndexReady": {
+      ".read": "auth != null",
+      ".write": false
     }
   }
 }

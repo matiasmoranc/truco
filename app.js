@@ -1,4 +1,4 @@
-import { installAccount } from './account.js?v=20261009-unique-names6';
+import { installAccount } from './account.js?v=20261009-name-confirm8';
 const FIREBASE_VERSION = '12.4.0';
 const $ = (id) => document.getElementById(id);
 const views = ['welcome-view', 'invite-view', 'setup-view', 'waiting-view', 'game-view', 'config-view', 'learn-view'];
@@ -428,7 +428,7 @@ function loadConfig() {
   try { return JSON.parse(localStorage.getItem(storageKey) || 'null'); } catch { return null; }
 }
 let firebaseReadyPromise=null;
-const account=installAccount({services:firebaseServices,getState:()=>state,rememberName:rememberPlayerName,document,onReady:openInitialRoom,onIdentityChange:resetAccountRoom,inRoom:()=>!!state.room&&!$('welcome-view').classList.contains('active')});
+const account=installAccount({services:firebaseServices,getState:()=>state,rememberName:rememberPlayerName,document,onReady:openInitialRoom,onIdentityChange:resetAccountRoom,onNameChanged:()=>showView('welcome-view'),inRoom:()=>!!state.room&&!$('welcome-view').classList.contains('active')});
 function resetAccountRoom(){
   stopRoomPresence();stopBot();forgetRoomSeat();
   state.roomWatchVersion=(state.roomWatchVersion||0)+1;

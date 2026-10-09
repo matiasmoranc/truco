@@ -8,7 +8,7 @@ async function harness(user=null,profile=null){
  const {installAccount}=await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'));
  const nodes={},writes=[],cache=new Map();
  const document={getElementById(id){return nodes[id]??={value:'',hidden:false,disabled:false,textContent:'',handlers:{},addEventListener(type,fn){this.handlers[type]=fn},focus(){},showModal(){this.open=true},close(){this.open=false}}}};
- const fb={db:{},auth:{currentUser:user},authSdk:{GoogleAuthProvider:class{setCustomParameters(){} static credentialFromError(e){return e.credential}},async linkWithPopup(u){fb.auth.currentUser=google(u.uid)},async signInWithPopup(){fb.auth.currentUser=google('google')},async signInWithCredential(){fb.auth.currentUser=google('existing')},async signOut(){fb.auth.currentUser=null}},ref(db,path){return path},get:async(ref)=>({val:()=>ref?.startsWith('usernames/')?null:profile}),update:async(ref,value)=>{writes.push({ref,value})}};
+ const fb={db:{},auth:{currentUser:user},authSdk:{GoogleAuthProvider:class{setCustomParameters(){} static credentialFromError(e){return e.credential}},async linkWithPopup(u){fb.auth.currentUser=google(u.uid)},async signInWithPopup(){fb.auth.currentUser=google('google')},async signInWithCredential(){fb.auth.currentUser=google('existing')},async signOut(){fb.auth.currentUser=null}},ref(db,path){return path},get:async(ref)=>({val:()=>ref==='usernameIndexReady'?true:ref?.startsWith('usernames/')?null:profile}),update:async(ref,value)=>{writes.push({ref,value})}};
  const state={firebase:fb,room:null,uid:user?.uid||null};let name='',starts=0,resets=0;
  const account=installAccount({services:async()=>fb,getState:()=>state,rememberName:v=>name=v,document,storage:{getItem:k=>cache.get(k),setItem:(k,v)=>cache.set(k,v)},onReady:()=>{starts++},onIdentityChange:()=>{resets++}});
  await account.observe(fb,user);
@@ -46,7 +46,7 @@ test('Mi cuenta shows only its menu until changing the username',async()=>{
  await h.click('account-open');assert.equal(h.nodes['account-edit'].hidden,true);assert.equal(h.nodes['account-menu'].hidden,false);
  await h.click('account-change-name');assert.equal(h.nodes['account-edit'].hidden,false);assert.equal(h.nodes['account-name'].value,'Mati');
  h.nodes['account-name'].value='Nuevo';await h.submit('account-edit');
- assert.equal(h.name(),'Nuevo');assert.equal(h.nodes['account-edit'].hidden,true);assert.equal(h.starts(),1);
+ assert.equal(h.name(),'Nuevo');assert.equal(h.nodes['account-edit'].hidden,true);assert.equal(h.nodes['account-panel'].open,false);assert.equal(h.starts(),1);
 });
 test('Registration failure cannot enter the game; retrying the save succeeds',async()=>{
  const h=await harness(google('new'));h.fb.update=async()=>{throw new Error('permission denied')};
@@ -86,22 +86,38 @@ test('Invalid characters and spaces are rejected without writing',async()=>{
 });
 test('Names are reserved case-insensitively; own capitalization can change',async()=>{
  const h=await harness(google('known'),{name:'Mati'});await h.click('account-change-name');
- h.fb.get=async ref=>({val:()=>ref?.startsWith('usernames/')?'another':{name:'Mati'}});
+ h.fb.get=async ref=>({val:()=>ref==='usernameIndexReady'?true:ref?.startsWith('usernames/')?'another':{name:'Mati'}});
  h.nodes['account-name'].value='MATI';await h.submit('account-edit');assert.equal(h.writes.length,0);assert.match(h.nodes['account-status'].textContent,/ya existe/);
- h.fb.get=async ref=>({val:()=>ref?.startsWith('usernames/')?'known':{name:'Mati'}});
+ h.fb.get=async ref=>({val:()=>ref==='usernameIndexReady'?true:ref?.startsWith('usernames/')?'known':{name:'Mati'}});
  await h.submit('account-edit');assert.equal(h.name(),'MATI');assert.deepEqual(h.writes[0].value,{'profiles/known/name':'MATI','usernames/mati':'known'});
 });
 test('Rename releases only a reservation owned by this user in the same update',async()=>{
  const h=await harness(google('known'),{name:'Mati'});await h.click('account-change-name');
- h.fb.get=async ref=>({val:()=>ref==='usernames/mati'?'known':ref?.startsWith('usernames/')?null:{name:'Mati'}});
+ h.fb.get=async ref=>({val:()=>ref==='usernameIndexReady'?true:ref==='usernames/mati'?'known':ref?.startsWith('usernames/')?null:{name:'Mati'}});
  h.nodes['account-name'].value='Nuevo';await h.submit('account-edit');assert.deepEqual(h.writes[0].value,{'profiles/known/name':'Nuevo','usernames/nuevo':'known','usernames/mati':null});
 });
 test('A claim lost to a concurrent save reports a duplicate and retains the old name',async()=>{
  const h=await harness(google('known'),{name:'Mati'});await h.click('account-change-name');let taken=false;
- h.fb.get=async ref=>({val:()=>ref==='usernames/nuevo'?(taken?'other':null):ref?.startsWith('usernames/')?null:{name:'Mati'}});
+ h.fb.get=async ref=>({val:()=>ref==='usernameIndexReady'?true:ref==='usernames/nuevo'?(taken?'other':null):ref?.startsWith('usernames/')?null:{name:'Mati'}});
  h.fb.update=async()=>{taken=true;throw new Error('permission denied')};
  h.nodes['account-name'].value='Nuevo';await h.submit('account-edit');assert.equal(h.name(),'Mati');assert.match(h.nodes['account-status'].textContent,/ya existe/);
 });
 test('The account menu hidden selector overrides its flex display',()=>{
  const css=fs.readFileSync(path.join(__dirname,'../style.css'),'utf8');assert.match(css,/#account-menu\[hidden\]\s*\{display:none\}/);
+});
+
+test('An incomplete legacy index blocks all username saves',async()=>{
+ const h=await harness(google('known'),{name:'Mati'});await h.click('account-change-name');
+ h.fb.get=async ref=>({val:()=>ref==='usernameIndexReady'?false:{name:'Mati'}});
+ h.nodes['account-name'].value='Otro';await h.submit('account-edit');
+ assert.equal(h.writes.length,0);assert.equal(h.name(),'Mati');assert.match(h.nodes['account-status'].textContent,/pausados/);
+});
+test('A successful rename shows confirmation for two seconds and then closes the account panel',async()=>{
+ const h=await harness(google('known'),{name:'Mati'});await h.click('account-open');await h.click('account-change-name');
+ h.nodes['account-name'].value='Otro';const pending=h.submit('account-edit');
+ await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(h.nodes['account-panel'].open,true);assert.equal(h.nodes['account-menu'].hidden,true);
+ assert.match(h.nodes['account-status'].textContent,/cambiado correctamente/);
+ await new Promise(resolve=>setTimeout(resolve,1000));assert.equal(h.nodes['account-panel'].open,true);
+ await pending;assert.equal(h.nodes['account-panel'].open,false);assert.equal(h.nodes['account-status'].textContent,'');
 });

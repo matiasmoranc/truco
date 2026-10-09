@@ -1,4 +1,4 @@
-export function installAccount({ services, getState, rememberName, document, storage=globalThis.localStorage, onReady=()=>{}, onIdentityChange=()=>{}, inRoom=()=>!!getState().room }) {
+export function installAccount({ services, getState, rememberName, document, storage=globalThis.localStorage, onReady=()=>{}, onIdentityChange=()=>{}, onNameChanged=()=>{}, inRoom=()=>!!getState().room }) {
   const el=id=>document.getElementById(id);
   let busy=false, ready=false, profileKey=null, profilePromise=null, currentUser=null;
   let profileName='', readyUid=null, generation=0, loaded=false;
@@ -128,6 +128,8 @@ export function installAccount({ services, getState, rememberName, document, sto
     if(!validName(name)){message('Usá de 1 a 18 letras, números, guion (-), guion bajo (_) o punto (.). Sin espacios.');input.focus();return;}
     const key=nameKey(name);
     try{
+      const indexReady=(await fb.get(fb.ref(fb.db,'usernameIndexReady'))).val();
+      if(indexReady!==true){message('Los cambios de nombre están pausados mientras reservamos los nombres existentes. Probá más tarde.');return;}
       const owner=(await fb.get(fb.ref(fb.db,'usernames/'+key))).val();
       if(owner&&owner!==user.uid){message('Ese nombre de usuario ya existe. Elegí otro.');input.focus();return;}
       const previous=(await fb.get(fb.ref(fb.db,'profiles/'+user.uid))).val()?.name;
@@ -140,8 +142,14 @@ export function installAccount({ services, getState, rememberName, document, sto
       await fb.update(fb.ref(fb.db),changes);
       if(fb.auth.currentUser?.uid!==user.uid)return;
       loaded=true;activate(user,name);
-      message(registration?'':'Nombre de usuario guardado.');
-      if(!registration){el('account-edit').hidden=true;el('account-menu').hidden=false;}
+      message(registration?'':'Nombre de usuario cambiado correctamente.');
+      if(!registration){
+        el('account-edit').hidden=true;el('account-menu').hidden=true;
+        const epoch=generation;
+        await new Promise(resolve=>setTimeout(resolve,2000));
+        if(epoch!==generation||fb.auth.currentUser?.uid!==user.uid)return;
+        message('');el('account-panel').close();onNameChanged();el('account-open').focus();
+      }
     }catch{
       try{const owner=(await fb.get(fb.ref(fb.db,'usernames/'+key))).val();if(owner&&owner!==user.uid){message('Ese nombre de usuario ya existe. Elegí otro.');return;}}catch{}
       message('No pudimos guardar tu nombre en la cuenta. Revisá la conexión y las reglas de perfiles en Firebase.');
