@@ -7,6 +7,8 @@ export function installAccount({ services, getState, rememberName, document, sto
     el('account-status').textContent=text;
   };
   const registered=user=>!!user&&!user.isAnonymous&&user.providerData?.some(provider=>provider.providerId==='google.com');
+  const validName=value=>typeof value==='string'&&/^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9._-]{1,18}$/.test(value);
+  const nameKey=name=>name.toLowerCase().replaceAll('.', '%2E');
   const cleanName=value=>typeof value==='string'?value.trim().slice(0,18):'';
   function cachedName(uid) {
     try{return cleanName(storage?.getItem('truco-profile-name:'+uid));}catch{return '';}
@@ -121,15 +123,27 @@ export function installAccount({ services, getState, rememberName, document, sto
   async function save(fb,input,registration) {
     const user=fb.auth.currentUser;
     if(!registered(user)){message('Iniciá sesión con Google.');return;}
-    const name=cleanName(input.value);
+    const name=input.value.normalize('NFC');
     if(!name){message('Escribí tu nombre de usuario.');input.focus();return;}
+    if(!validName(name)){message('Usá de 1 a 18 letras, números, guion (-), guion bajo (_) o punto (.). Sin espacios.');input.focus();return;}
+    const key=nameKey(name);
     try{
-      await fb.set(fb.ref(fb.db,'profiles/'+user.uid+'/name'),name);
+      const owner=(await fb.get(fb.ref(fb.db,'usernames/'+key))).val();
+      if(owner&&owner!==user.uid){message('Ese nombre de usuario ya existe. Elegí otro.');input.focus();return;}
+      const previous=(await fb.get(fb.ref(fb.db,'profiles/'+user.uid))).val()?.name;
+      const changes={['profiles/'+user.uid+'/name']:name,['usernames/'+key]:user.uid};
+      if(previous&&nameKey(previous)!==key){
+        const oldKey=nameKey(previous);
+        if((await fb.get(fb.ref(fb.db,'usernames/'+oldKey))).val()===user.uid)changes['usernames/'+oldKey]=null;
+      }
+      // Rules validate the claim and profile together, so concurrent saves cannot claim the same name.
+      await fb.update(fb.ref(fb.db),changes);
       if(fb.auth.currentUser?.uid!==user.uid)return;
       loaded=true;activate(user,name);
       message(registration?'':'Nombre de usuario guardado.');
       if(!registration){el('account-edit').hidden=true;el('account-menu').hidden=false;}
     }catch{
+      try{const owner=(await fb.get(fb.ref(fb.db,'usernames/'+key))).val();if(owner&&owner!==user.uid){message('Ese nombre de usuario ya existe. Elegí otro.');return;}}catch{}
       message('No pudimos guardar tu nombre en la cuenta. Revisá la conexión y las reglas de perfiles en Firebase.');
     }
   }
@@ -165,3 +179,4 @@ export function installAccount({ services, getState, rememberName, document, sto
   el('account-panel').addEventListener('cancel',()=>el('account-open').focus());
   return {observe,isReady:()=>ready,failed:error=>{message(errorText(error));render();}};
 }
+
