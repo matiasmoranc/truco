@@ -754,7 +754,7 @@ function watchRoom() {
     state.room = incoming;
     if(incoming.status==='complete'||state.persistedRoomCreatedAt!==incoming.createdAt)rememberRoomSeat();
     syncRoomPresence();
-    if(state.room.status==='closed'||roomExpired(state.room)){if(roomExpired(state.room))closeExpiredRoom(state.roomCode);if(state.unsubscribe){state.unsubscribe();state.unsubscribe=null;}const reason=state.room.closeReason;returnToLobby(reason==='draw-timeout'?'Se acabó el tiempo para elegir carta. La partida no comenzó.':reason==='draw-left'?'Un participante salió del sorteo. La partida no comenzó.':'La mesa cerró por inactividad.');return;}
+    if(state.room.status==='closed'||roomExpired(state.room)){if(roomExpired(state.room))closeExpiredRoom(state.roomCode);if(state.unsubscribe){state.unsubscribe();state.unsubscribe=null;}const reason=state.room.closeReason;returnToLobby(reason==='match-left'?'La mesa terminó. Volviste al lobby.':reason==='draw-timeout'?'Se acabó el tiempo para elegir carta. La partida no comenzó.':reason==='draw-left'?'Un participante salió del sorteo. La partida no comenzó.':'La mesa cerró por inactividad.');return;}
     if(isCoordinator()&&state.room.status==='started'&&!state.room.resolvingTrick&&state.room.trickCards?.length===2&&(state.room.tricks||[]).length>0)recoverLegacyTrick(state.room);
     if(isCoordinator()&&state.room.status==='complete'&&!state.room.endReveal&&(Object.keys(state.room.flors||{}).length||state.room.envidoAudit)){
       const key=`${state.roomCode}:${state.room.handNumber}`;
@@ -1211,6 +1211,10 @@ function scheduleLocalNextHand(room){
   },Math.max(0,pending.endsAt-gameTime()));
 }
 
+function canRaiseEnvido(bet){
+  return bet?.type==='envido'&&!bet.revealMode&&bet.called!=='falta'&&!(bet.calls||[]).includes('falta');
+}
+
 async function answerBet(answer) {
   if(liveActionsBlocked())return;
   if(state.room?.turnClock?.key===turnClockKey()&&turnClockRemaining(state.room.turnClock).expired){renderTurnTimer();return;}
@@ -1225,6 +1229,7 @@ async function answerBet(answer) {
     }
   }
   if(answer.startsWith('raise-')&&bet.type==='envido'){
+    if(!canRaiseEnvido(bet))return;
     const kind=answer.slice(6),stake=envidoBetPoints(state.room,kind,bet.stake);
     await writeRoom({pendingBet:{...bet,caller:state.playerId,responder:bet.caller,accepted:bet.stake,stake,called:kind,calls:[...(bet.calls||[bet.called||'envido']),kind],reveals:{}},feed:topFeed(state.room,`${state.room.players[state.playerId].name} canta ${kind==='falta'?'falta envido':kind==='real'?'real envido':'envido'}.`)});return;
   }
@@ -1968,7 +1973,7 @@ function renderGame() {
   if(mustDeclareFlor){buttons.push('<button class="call-button" data-action="flor"><strong>FLOR</strong></button>');}
   else if(pending?.revealMode){buttons.push('<span class="action-wait">'+(pending.revealTurn===state.playerId?'Deslizá para elegir tus tantos':'Esperando los tantos del rival…')+'</span>');}
   else if(pending?.type==='flor'){if(pending.responder===state.playerId)buttons.push(...florAnswers(pending,roomHasFlor(room,state.hand)).map(([action,label])=>`<button class="${action==='yes'?'call-button':'pass-button'}" data-action="${action}">${label}</button>`));else buttons.push('<span class="action-wait">ESPERANDO RESPUESTA…</span>');}
-  else if(pending){if(pending.responder===state.playerId){if(['envido','truco'].includes(pending.type)&&(room.playedCount||0)===0&&roomHasFlor(room,state.hand)&&!room.flors?.[state.playerId])buttons.push('<button class="call-button" data-action="flor"><strong>FLOR</strong></button>');if(pending.type==='truco'&&canEnvido)buttons.push('<button class="pass-button" data-action="envido"><strong>ENVIDO</strong></button><button class="pass-button" data-action="real"><strong>REAL ENVIDO</strong></button><button class="pass-button" data-action="falta"><strong>FALTA ENVIDO</strong></button>');if(pending.type==='envido'&&!Object.keys(room.flors||{}).length){buttons.push('<div class="envido-action-grid"><div class="envido-action-row envido-raises"><button class="pass-button" data-action="raise-envido"><strong>ENVIDO</strong></button><button class="pass-button" data-action="raise-real"><strong>REAL ENVIDO</strong></button><button class="pass-button" data-action="raise-falta"><strong>FALTA ENVIDO</strong></button></div><div class="envido-action-row envido-answer"><button class="call-button" data-action="yes">QUIERO</button><button class="pass-button" data-action="no">NO QUIERO</button></div></div>');}else{buttons.push(`${pending.type==='flor'&&pending.single&&!roomHasFlor(room,state.hand)?'':`<button class="call-button" data-action="yes">${pending.type==='flor'?(pending.single?'FLOR':'LA MÍA ES FLOR'):'QUIERO'}</button>`}<button class="pass-button" data-action="no">${pending.type==='flor'&&pending.single?'TIENE':'NO QUIERO'}</button>`);}if(pending.type==='truco'&&pending.stake<4)buttons.push(`<button class="pass-button" data-action="raise">${pending.stake===2?'RETRUCO':'VALE 4'}</button>`);if(pending.type==='flor'&&!pending.single){buttons.push('<button class="pass-button" data-action="raise-conflor">CON FLOR ENVIDO</button><button class="pass-button" data-action="raise-faltaflor">CONTRA FLOR AL RESTO</button>');}}else buttons.push('<span class="action-wait">ESPERANDO RESPUESTA…</span>');}
+  else if(pending){if(pending.responder===state.playerId){if(['envido','truco'].includes(pending.type)&&(room.playedCount||0)===0&&roomHasFlor(room,state.hand)&&!room.flors?.[state.playerId])buttons.push('<button class="call-button" data-action="flor"><strong>FLOR</strong></button>');if(pending.type==='truco'&&canEnvido)buttons.push('<button class="pass-button" data-action="envido"><strong>ENVIDO</strong></button><button class="pass-button" data-action="real"><strong>REAL ENVIDO</strong></button><button class="pass-button" data-action="falta"><strong>FALTA ENVIDO</strong></button>');if(canRaiseEnvido(pending)&&!Object.keys(room.flors||{}).length){buttons.push('<div class="envido-action-grid"><div class="envido-action-row envido-raises"><button class="pass-button" data-action="raise-envido"><strong>ENVIDO</strong></button><button class="pass-button" data-action="raise-real"><strong>REAL ENVIDO</strong></button><button class="pass-button" data-action="raise-falta"><strong>FALTA ENVIDO</strong></button></div><div class="envido-action-row envido-answer"><button class="call-button" data-action="yes">QUIERO</button><button class="pass-button" data-action="no">NO QUIERO</button></div></div>');}else{buttons.push(`${pending.type==='flor'&&pending.single&&!roomHasFlor(room,state.hand)?'':`<button class="call-button" data-action="yes">${pending.type==='flor'?(pending.single?'FLOR':'LA MÍA ES FLOR'):'QUIERO'}</button>`}<button class="pass-button" data-action="no">${pending.type==='flor'&&pending.single?'TIENE':'NO QUIERO'}</button>`);}if(pending.type==='truco'&&pending.stake<4)buttons.push(`<button class="pass-button" data-action="raise">${pending.stake===2?'RETRUCO':'VALE 4'}</button>`);if(pending.type==='flor'&&!pending.single){buttons.push('<button class="pass-button" data-action="raise-conflor">CON FLOR ENVIDO</button><button class="pass-button" data-action="raise-faltaflor">CONTRA FLOR AL RESTO</button>');}}else buttons.push('<span class="action-wait">ESPERANDO RESPUESTA…</span>');}
   else {
     if((room.playedCount||0)===0&&state.hand.length&&roomHasFlor(room,state.hand)&&!room.flors?.[state.playerId])buttons.push('<button class="call-button" data-action="flor"><strong>FLOR</strong></button>');
     if(canEnvido)buttons.push('<button class="pass-button" data-action="envido"><strong>ENVIDO</strong></button><button class="pass-button" data-action="real"><strong>REAL</strong></button><button class="pass-button" data-action="falta"><strong>FALTA</strong></button>');
@@ -2089,7 +2094,30 @@ function renderMatchEnd(){
     (isPlayer?(incoming?$('accept-rematch'):pending?$('close-match-end'):$('request-rematch')):$('close-match-end')).focus({preventScroll:true});
   }
 }
-$('close-match-end').addEventListener('click',()=>{state.dismissedMatchEnd=matchEndKey();renderMatchEnd();});
+function closeFinishedRoomChanges(room,player,uid,matchNumber){
+  if(!room||!matchFinished(room)||!['player1','player2'].includes(player)||room.players?.[player]?.uid!==uid||Number(room.matchNumber||1)!==matchNumber)return null;
+  return {...room,status:'closed',closedAt:gameTime(),closeReason:'match-left',turn:null,turnClock:null,pendingBet:null,rematch:null};
+}
+async function closeFinishedRoom(){
+  if(rematchInFlight)return;
+  const room=state.room,code=state.roomCode,player=state.playerId,uid=state.uid,matchNumber=Number(room?.matchNumber||1);
+  if(!matchFinished(room))return;
+  if(!['player1','player2'].includes(player)){returnToLobby();return;}
+  if(liveActionsBlocked()){toast('Esperá a recuperar la conexión para salir de la mesa.');return;}
+  rematchInFlight=true;$('close-match-end').disabled=true;
+  try{
+    if(state.localGame){returnToLobby();return;}
+    const fb=state.firebase;
+    const result=await fb.runTransaction(fb.ref(fb.db,`rooms/${code}/public`),current=>{
+      if(current===null)return null;
+      const changes=closeFinishedRoomChanges(current,player,uid,matchNumber);
+      return changes||undefined;
+    },{applyLocally:false});
+    if(result.committed&&state.roomCode===code)returnToLobby();
+  }catch(error){console.error('[truco:close-finished]',error);toast(firebaseError(error));}
+  finally{rematchInFlight=false;$('close-match-end').disabled=false;}
+}
+$('close-match-end').addEventListener('click',()=>closeFinishedRoom());
 $('request-rematch').addEventListener('click',event=>runLiveAction(event.currentTarget,()=>respondRematch('request')));
 $('accept-rematch').addEventListener('click',event=>runLiveAction(event.currentTarget,()=>respondRematch('accept')));
 $('decline-rematch').addEventListener('click',event=>runLiveAction(event.currentTarget,()=>respondRematch('decline')));
@@ -2447,6 +2475,7 @@ function localAnswerAction(answer){
     const value=bet.stake===2?3:4;room.pendingBet={...bet,caller:player,responder:bet.caller,stake:value};room.lastTrucoCaller=player;queueLearningTrucoCall(value,player);localFeed(`${room.players[player].name} canta ${value===3?'retruco':'vale cuatro'}.`);renderGame();return;
   }
   if(answer.startsWith('raise-')&&bet.type==='envido'){
+    if(!canRaiseEnvido(bet))return;
     const kind=answer.slice(6),value=envidoBetPoints(room,kind,bet.stake);
     room.pendingBet={...bet,caller:player,responder:bet.caller,accepted:bet.stake,stake:value,called:kind,calls:[...(bet.calls||[bet.called||'envido']),kind],reveals:{}};queueLearningAction(answer);localFeed(`${room.players[player].name} canta ${kind==='falta'?'falta envido':kind==='real'?'real envido':'envido'}.`);renderGame();return;
   }
