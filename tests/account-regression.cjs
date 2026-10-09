@@ -121,3 +121,22 @@ test('A successful rename shows confirmation for two seconds and then closes the
  await new Promise(resolve=>setTimeout(resolve,1000));assert.equal(h.nodes['account-panel'].open,true);
  await pending;assert.equal(h.nodes['account-panel'].open,false);assert.equal(h.nodes['account-status'].textContent,'');
 });
+
+test('Touching the dialog background or username input cannot dismiss it',async()=>{
+ const h=await harness(google('known'),{name:'Mati'});await h.click('account-open');await h.click('account-change-name');
+ h.nodes['account-panel'].handlers.click({target:h.nodes['account-panel']});
+ assert.equal(h.nodes['account-panel'].open,true);
+ h.nodes['account-panel'].handlers.click({target:h.nodes['account-name']});assert.equal(h.nodes['account-panel'].open,true);
+ await h.click('account-close');assert.equal(h.nodes['account-panel'].open,false);
+});
+test('Missing index read permission reports setup failure and never changes the name',async()=>{
+ const h=await harness(google('known'),{name:'Mati'});await h.click('account-change-name');
+ h.fb.get=async()=>{throw {code:'PERMISSION_DENIED'}};h.nodes['account-name'].value='Otro';await h.submit('account-edit');
+ assert.equal(h.writes.length,0);assert.equal(h.name(),'Mati');assert.match(h.nodes['account-status'].textContent,/Falta habilitar/);
+});
+test('A slow rename confirmation cannot reopen another editing dialog before it completes',async()=>{
+ const h=await harness(google('known'),{name:'Mati'});await h.click('account-open');await h.click('account-change-name');
+ h.nodes['account-name'].value='Otro';const pending=h.submit('account-edit');await new Promise(resolve=>setImmediate(resolve));
+ await h.click('account-change-name');await h.click('account-open');assert.equal(h.nodes['account-edit'].hidden,true);
+ await pending;assert.equal(h.nodes['account-panel'].open,false);
+});

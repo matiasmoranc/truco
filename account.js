@@ -127,9 +127,11 @@ export function installAccount({ services, getState, rememberName, document, sto
     if(!name){message('Escribí tu nombre de usuario.');input.focus();return;}
     if(!validName(name)){message('Usá de 1 a 18 letras, números, guion (-), guion bajo (_) o punto (.). Sin espacios.');input.focus();return;}
     const key=nameKey(name);
+    let savingStage='index';
     try{
       const indexReady=(await fb.get(fb.ref(fb.db,'usernameIndexReady'))).val();
       if(indexReady!==true){message('Los cambios de nombre están pausados mientras reservamos los nombres existentes. Probá más tarde.');return;}
+      savingStage='availability';
       const owner=(await fb.get(fb.ref(fb.db,'usernames/'+key))).val();
       if(owner&&owner!==user.uid){message('Ese nombre de usuario ya existe. Elegí otro.');input.focus();return;}
       const previous=(await fb.get(fb.ref(fb.db,'profiles/'+user.uid))).val()?.name;
@@ -139,6 +141,7 @@ export function installAccount({ services, getState, rememberName, document, sto
         if((await fb.get(fb.ref(fb.db,'usernames/'+oldKey))).val()===user.uid)changes['usernames/'+oldKey]=null;
       }
       // Rules validate the claim and profile together, so concurrent saves cannot claim the same name.
+      savingStage='save';
       await fb.update(fb.ref(fb.db),changes);
       if(fb.auth.currentUser?.uid!==user.uid)return;
       loaded=true;activate(user,name);
@@ -150,7 +153,10 @@ export function installAccount({ services, getState, rememberName, document, sto
         if(epoch!==generation||fb.auth.currentUser?.uid!==user.uid)return;
         message('');el('account-panel').close();onNameChanged();el('account-open').focus();
       }
-    }catch{
+    }catch(error){
+      if(savingStage==='index'){
+        message(['PERMISSION_DENIED','permission-denied','database/permission-denied'].includes(error?.code)?'Falta habilitar la reserva de nombres en Firebase. Por ahora no podemos cambiar tu nombre.':'No pudimos verificar los nombres existentes. Revisá tu conexión y volvé a intentar.');return;
+      }
       try{const owner=(await fb.get(fb.ref(fb.db,'usernames/'+key))).val();if(owner&&owner!==user.uid){message('Ese nombre de usuario ya existe. Elegí otro.');return;}}catch{}
       message('No pudimos guardar tu nombre en la cuenta. Revisá la conexión y las reglas de perfiles en Firebase.');
     }
@@ -169,7 +175,7 @@ export function installAccount({ services, getState, rememberName, document, sto
     el('account-google').focus();
   }));
   el('account-change-name').addEventListener('click',()=>{
-    if(!ready||inRoom())return;
+    if(busy||!ready||inRoom())return;
     message('');el('account-menu').hidden=true;el('account-edit').hidden=false;
     el('account-name').value=profileName;el('account-name').focus();
   });
@@ -177,13 +183,15 @@ export function installAccount({ services, getState, rememberName, document, sto
     message('');el('account-edit').hidden=true;el('account-menu').hidden=false;
   });
   el('account-open').addEventListener('click',()=>{
-    if(!ready)return;
+    if(busy||!ready)return;
     el('account-menu').hidden=false;el('account-edit').hidden=true;message('');render();
     el('account-panel').showModal();el('account-close').focus();
   });
   function close(){el('account-panel').close();el('account-open').focus();}
   el('account-close').addEventListener('click',close);
-  el('account-panel').addEventListener('click',event=>{if(event.target===el('account-panel'))close();});
+  // Only the explicit close control dismisses the dialog. Mobile keyboard and
+  // focus changes can retarget a tap to the dialog background.
+  el('account-panel').addEventListener('click',()=>{});
   el('account-panel').addEventListener('cancel',()=>el('account-open').focus());
   return {observe,isReady:()=>ready,failed:error=>{message(errorText(error));render();}};
 }

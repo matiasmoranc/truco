@@ -1,4 +1,4 @@
-import { installAccount } from './account.js?v=20261009-name-confirm8';
+import { installAccount } from './account.js?v=20261009-account-focus9';
 const FIREBASE_VERSION = '12.4.0';
 const $ = (id) => document.getElementById(id);
 const views = ['welcome-view', 'invite-view', 'setup-view', 'waiting-view', 'game-view', 'config-view', 'learn-view'];
