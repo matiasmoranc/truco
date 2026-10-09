@@ -1992,7 +1992,7 @@ function rematchRoom(room){
     deviceMode:room.deviceMode,targetPoints:targetPoints(room),table:room.table,players:room.players,
     sessionResults:sessionMatchResults(room),
     matchNumber:Number(room.matchNumber||1)+1,status:'drawing',createdAt:gameTime(),
-    scores:{player1:0,player2:0},handNumber:1,deckCount:40,trickCards:[],tricks:[],
+    scores:{player1:0,player2:0},handNumber:1,deckCount:40,trickNo:1,playedCount:0,trucoLevel:1,lastTrucoCaller:null,pendingBet:null,flors:{},florSettled:false,envidoClosed:false,timeoutCounts:{},turnClock:null,trickCards:[],tricks:[],
     openingDraw:newOpeningDraw(),feed:topFeed({feed:[]},'Revancha. Elegí una carta para sortear quién reparte.')
   };
 }
@@ -2020,6 +2020,10 @@ async function respondRematch(action){
       const changes=rematchChanges(state.room,player,action,id);
       if(changes){
         if(changes.status==='drawing'){
+          clearTimeout(state.botTimer);state.botTimer=null;state.botTimerKey=null;state.botTimerRoom=null;state.botMemory=null;
+          clearTimeout(state.resolutionTimer);state.resolutionTimer=null;state.resolutionTimerKey=null;
+          state.playActionInFlight=false;state.foldInFlight=false;state.pendingCardId=null;state.launchingCardId=null;
+          state.dismissedMatchEnd=null;state.focusedMatchEnd=null;state.handGestureActive=false;state.handOrder=[];
           state.room=changes;state.hand=[];
           const deck=shuffleDeck();state.localHands={player1:deck.slice(0,3),player2:deck.slice(3,6)};
           state.localOriginalHands=structuredClone(state.localHands);
