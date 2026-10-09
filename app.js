@@ -3136,7 +3136,8 @@ function openFlorPointsHelp(){pauseLearning();if(!$('learn-flor-points-help-dial
 function openFlorCountHelp(){pauseLearning();if(!$('learn-flor-help-dialog').open)$('learn-flor-help-dialog').showModal();}
 function openEnvidoCountHelp(){pauseLearning();if(!$('learn-envido-help-dialog').open)$('learn-envido-help-dialog').showModal();}
 function markPracticeGuideCards(){
-  const hand=state.learning&&state.localGame&&$('game-view').classList.contains('active')?localHand('player1'):[];
+  const roundGuide=!!state.learning?.activeTutorial?.roundCards;
+  const hand=!roundGuide&&state.learning&&state.localGame&&$('game-view').classList.contains('active')?localHand('player1'):[];
   for(const row of $('learn-sheet-dialog').querySelectorAll('[data-guide-strength]')){
     row.querySelector('.guide-owned-cards')?.remove();
     row.querySelector('.guide-played-cards')?.remove();

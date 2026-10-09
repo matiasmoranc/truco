@@ -1347,8 +1347,9 @@ body { min-height:100dvh; }
 .apple-mark{width:24px;height:24px;flex:0 0 24px}
 
 /* Independent round result help in learning mode. */
-#learning-round-guide,#learning-round-disable{display:block;text-align:left;margin:10px 0 0;padding:0;min-height:28px;color:var(--gold);text-decoration:underline;letter-spacing:normal;font-size:14px}
-#learning-round-disable{color:var(--muted);font-size:12px}
+#learning-hint #learning-round-guide,#learning-hint #learning-round-disable{display:block;width:auto;height:auto;min-width:0;min-height:28px;text-align:left;margin:8px 0 0;padding:0;background:transparent;border:0;border-radius:0;box-shadow:none;appearance:none;color:#e8c983;text-decoration:underline;text-underline-offset:3px;letter-spacing:normal;font-size:14px;line-height:1.4;font-weight:600}
+#learning-hint #learning-round-disable{color:var(--muted);font-size:12px;font-weight:400}
+#learning-hint #learning-round-guide:focus-visible,#learning-hint #learning-round-disable:focus-visible{outline:2px solid #e8c983;outline-offset:3px}
 #learning-round-guide.hidden,#learning-round-disable.hidden,#guide-played-round.hidden{display:none!important}
 .guide-played-round{margin:14px 0 20px}
 .guide-played-round>p{color:var(--gold);font-weight:700}
