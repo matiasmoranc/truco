@@ -2828,10 +2828,20 @@ function positionLearningScoreArrow(){
   const dialog=tipActive?$('learning-points-tip'):$('learning-hint'),arrow=$(tipActive?'learning-points-arrow':'learning-score-arrow'),path=$(tipActive?'learning-points-arrow-path':'learning-score-arrow-path');
   const scoreActive=dialog.open&&state.learning?.activeScoreMessage,trucoActive=dialog.open&&state.learning?.activeTutorial?.pointAtTruco;
   const guideActive=dialog.open&&state.learning?.activeTutorial?.pointAtGuide;
-  const active=tipActive||scoreActive||trucoActive||guideActive;
+  const roundActive=dialog.open&&!!state.learning?.activeTutorial?.roundCards;
+  const active=tipActive||scoreActive||trucoActive||guideActive||roundActive;
   arrow.classList.toggle('hidden',!active);
   document.querySelectorAll('.scoreboard,.mobile-score').forEach(marker=>marker.classList.toggle('learning-score-highlight',!!scoreActive));
   if(!active)return;
+  if(roundActive){
+    const target=$('learning-rounds').getBoundingClientRect(),box=dialog.getBoundingClientRect();
+    if(!target.width||!target.height){arrow.classList.add('hidden');return;}
+    const x2=target.left+target.width/2,y2=target.top-5;
+    const x1=Math.max(box.left+18,Math.min(box.right-18,x2)),y1=box.bottom-2;
+    arrow.setAttribute('viewBox','0 0 '+window.innerWidth+' '+window.innerHeight);
+    path.setAttribute('d','M '+x1+' '+y1+' C '+x1+' '+(y1+18)+' '+x2+' '+(y2-18)+' '+x2+' '+y2);
+    return;
+  }
   if(guideActive){
     const button=$('game-sheet'),target=button?.getBoundingClientRect();
     if(!target?.width||!target.height){arrow.classList.add('hidden');return;}
