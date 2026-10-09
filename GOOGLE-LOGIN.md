@@ -49,3 +49,6 @@ Los nombres de perfiles anteriores quedan reservados mediante la migración aunq
 La aplicación bloquea los cambios y registros de nombres hasta que el administrador termine de reservar los nombres existentes. Después de importar el índice en /usernames y publicar las reglas, crear en la raíz /usernameIndexReady con valor booleano true (no el texto "true"). No activar esa marca antes de completar la migración. Si ya existen duplicados, resolverlos primero: cada nombre debe pertenecer a una única cuenta. El cliente no puede modificar esta marca.
 
 Un cambio correcto muestra "Nombre de usuario cambiado correctamente." durante dos segundos, cierra Mi cuenta y vuelve al lobby.
+
+
+La ventana de cuenta se cierra con la X (o Escape); tocar el fondo no la descarta. Durante la confirmación de un cambio no puede reabrirse el formulario. Si falla la lectura del índice por permisos, el mensaje identifica que falta habilitar la reserva de nombres en Firebase.
