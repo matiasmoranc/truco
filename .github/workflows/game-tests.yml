@@ -18,4 +18,5 @@ jobs:
           cp app.js /tmp/truco-app.mjs
           node --check /tmp/truco-app.mjs
       - name: Play regression scenarios
-        run: node --test tests/game-regression.cjs
+        run: node --test tests/*.cjs
+

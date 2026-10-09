@@ -1,3 +1,4 @@
+import { installAccount } from './account.js?v=20261009-google1';
 const FIREBASE_VERSION = '12.4.0';
 const $ = (id) => document.getElementById(id);
 const views = ['welcome-view', 'invite-view', 'setup-view', 'waiting-view', 'game-view', 'config-view', 'learn-view'];
@@ -427,6 +428,7 @@ function loadConfig() {
   try { return JSON.parse(localStorage.getItem(storageKey) || 'null'); } catch { return null; }
 }
 let firebaseReadyPromise=null;
+const account=installAccount({services:firebaseServices,getState:()=>state,savedName:savedPlayerName,rememberName:rememberPlayerName,document});
 async function firebaseServices() {
   if(state.firebase)return state.firebase;
   if(firebaseReadyPromise)return firebaseReadyPromise;
@@ -441,7 +443,18 @@ async function firebaseServices() {
     await auth.authStateReady();
     if(!auth.currentUser)await authSdk.signInAnonymously(auth);
     state.uid=auth.currentUser.uid;
-    state.firebase={db:dbSdk.getDatabase(app,state.config.databaseURL),...dbSdk};
+    state.firebase={db:dbSdk.getDatabase(app,state.config.databaseURL),...dbSdk,auth,authSdk};
+    authSdk.onAuthStateChanged(auth,user=>{
+      if(state.uid&&user?.uid!==state.uid&&state.room){
+        stopRoomPresence();stopBot();forgetRoomSeat();
+        state.roomWatchVersion=(state.roomWatchVersion||0)+1;
+        if(state.unsubscribe)state.unsubscribe();
+        if(state.privateUnsubscribe)state.privateUnsubscribe();
+        state.room=null;state.hand=[];state.localGame=false;
+        showView('welcome-view');
+      }
+      account.observe(state.firebase,user);
+    });
     dbSdk.onValue(dbSdk.ref(state.firebase.db,'.info/serverTimeOffset'),snapshot=>{state.serverTimeOffset=Number(snapshot.val())||0;},error=>console.error('[truco:clock]',error));
     dbSdk.onValue(dbSdk.ref(state.firebase.db,'.info/connected'),snapshot=>{
       state.firebaseConnected=snapshot.val()===true;
@@ -3207,4 +3220,5 @@ async function initializePage(){
   }
 }
 await initializePage();
+
 

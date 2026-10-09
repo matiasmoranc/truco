@@ -18,6 +18,18 @@
           ".write": "auth != null && (auth.uid == $uid || auth.uid == root.child('rooms').child($room).child('public').child('table').child('uid').val())"
         }
       }
+    },
+    "profiles": {
+      "$uid": {
+        ".read": "auth != null && auth.uid == $uid",
+        ".write": "auth != null && auth.uid == $uid",
+        "name": {
+          ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 18"
+        },
+        "$other": {
+          ".validate": false
+        }
+      }
     }
   }
 }
