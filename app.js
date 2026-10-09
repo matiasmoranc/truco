@@ -502,6 +502,7 @@ function forgetRoomSeat(code){
 }
 function rememberRoomSeat(){
   state.persistedRoomCreatedAt=state.room?.createdAt;
+  if(state.room?.status==='complete'){forgetRoomSeat(state.roomCode);return;}
   setRoomUrl(state.roomCode);
   try{localStorage.setItem('truco-last-seat',JSON.stringify({code:state.roomCode,role:state.playerId,uid:state.uid,createdAt:state.room?.createdAt}));}catch{}
 }
@@ -526,7 +527,7 @@ async function restoreRoom(code){
     if(epoch!==(state.navigationEpoch||0))return false;
     const room=snapshot.val(),saved=savedRoomSeat();
     const seat=roomSeatForUid(room,state.uid);
-    if(!room||room.status==='closed'||roomExpired(room)){
+    if(!room||room.status==='closed'||room.status==='complete'||roomExpired(room)){
       forgetRoomSeat(code);return false;
     }
     if(!seat||(saved?.code===code&&saved.createdAt!=null&&saved.createdAt!==room.createdAt)){
@@ -729,7 +730,7 @@ function watchRoom() {
       clearTimeout(state.resolutionTimer);state.resolutionTimer=null;state.resolutionTimerKey=null;
     }
     state.room = incoming;
-    if(state.persistedRoomCreatedAt!==incoming.createdAt)rememberRoomSeat();
+    if(incoming.status==='complete'||state.persistedRoomCreatedAt!==incoming.createdAt)rememberRoomSeat();
     syncRoomPresence();
     if(state.room.status==='closed'||roomExpired(state.room)){if(roomExpired(state.room))closeExpiredRoom(state.roomCode);if(state.unsubscribe){state.unsubscribe();state.unsubscribe=null;}const reason=state.room.closeReason;returnToLobby(reason==='draw-timeout'?'Se acabó el tiempo para elegir carta. La partida no comenzó.':reason==='draw-left'?'Un participante salió del sorteo. La partida no comenzó.':'La mesa cerró por inactividad.');return;}
     if(isCoordinator()&&state.room.status==='started'&&!state.room.resolvingTrick&&state.room.trickCards?.length===2&&(state.room.tricks||[]).length>0)recoverLegacyTrick(state.room);
