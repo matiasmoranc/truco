@@ -2882,19 +2882,19 @@ function queueLearningTrucoReminder(){
   learning.tutorialMessages??=[];
   learning.tutorialMessages.push({title:'Podés gritar TRUCO',pointAtTruco:true,text:'Si tocás TRUCO, podés aumentar los puntos en juego. Sin truco se juega por 1 punto. Con truco se juega por 2 puntos. El rival tiene que aceptar; si no acepta, ganás 1 punto.'});
 }
-function showLearningMessage(repeat=false){
+function showLearningMessage(){
   if(!state.learning||state.learning.paused||state.learning.complete||document.querySelector('.learn-coach-dialog[open]'))return;
   if(state.learning.pointsInfo===false)state.learning.scoreMessages=[];
   if(!state.learning.hints)state.learning.tutorialMessages=[];
   queueLearningTrucoReminder();
-  const tutorial=repeat&&!state.room.pendingBet?state.learning.lastHelp:repeat?null:state.learning.tutorialMessages?.shift();
-  const room=state.room,bet=room.pendingBet,scoreMessage=tutorial||repeat?null:state.learning.scoreMessages?.shift();
+  const tutorial=state.learning.tutorialMessages?.shift();
+  const room=state.room,bet=room.pendingBet,scoreMessage=tutorial?null:state.learning.scoreMessages?.shift();
   if(!tutorial&&!scoreMessage&&!state.learning.hints)return;
   // Explain actual scoring and new calls; ordinary turns and round pauses need no popup.
   if(!tutorial&&!scoreMessage&&(!bet||(bet.revealMode?bet.revealTurn!=='player1':bet.responder!=='player1')))return;
   const key=tutorial?'tutorial:'+crypto.randomUUID():scoreMessage?'score:'+crypto.randomUUID():learningMessageKey();
-  if(!repeat&&!tutorial&&!scoreMessage&&(state.learning.acknowledgedMessage===key||learningSeen.has(learningHelpTopic(bet))))return;
-  if(!scoreMessage){const topic=tutorial?.topic||learningHelpTopic(bet);rememberLearningHelp(topic);state.learning.lastHelp=tutorial||{title:'Antes de responder',text:learningGuidance().join(' '),topic};}
+  if(!tutorial&&!scoreMessage&&(state.learning.acknowledgedMessage===key||learningSeen.has(learningHelpTopic(bet))))return;
+  if(!scoreMessage){const topic=tutorial?.topic||learningHelpTopic(bet);rememberLearningHelp(topic);}
   pauseLearning();state.learning.activeMessage=key;state.learning.activeScoreMessage=!!scoreMessage;state.learning.activeTutorial=tutorial||null;
   $('learning-message-title').textContent=scoreMessage?'':tutorial?.title||'Antes de responder';
   $('learning-message-title').classList.toggle('hidden',!!scoreMessage);
@@ -2940,7 +2940,6 @@ function renderLearning(){
   renderLearningRounds();
   if(!active){if($('learning-hint').open)$('learning-hint').close();return;}
   $('learn-hints').checked=state.learning.hints;
-  $('learn-repeat-help').disabled=!state.learning.hints;
   $('learn-points-info').checked=state.learning.pointsInfo!==false;
   requestAnimationFrame(positionLearningControls);
   showLearningMessage();
@@ -3146,7 +3145,6 @@ $('learn-study-next').addEventListener('click',()=>nextStudy());
 $('learn-study-envido').addEventListener('submit',event=>{event.preventDefault();const raw=$('learn-study-value').value.trim();if(raw===''){$('learn-study-feedback').textContent='Escribí tus tantos antes de comprobar.';return;}checkStudy(Number(raw));});
 $('learn-study-yes').addEventListener('click',()=>checkStudy(true));
 $('learn-study-no').addEventListener('click',()=>checkStudy(false));
-$('learn-repeat-help').addEventListener('click',()=>{if(state.learning?.hints)showLearningMessage(true);});
 $('learn-hints').addEventListener('change',event=>{if(state.learning){state.learning.hints=event.target.checked;renderLearning();}});
 $('learn-points-info').addEventListener('change',event=>{
   if(!state.learning)return;

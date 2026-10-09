@@ -1601,5 +1601,3 @@ body { min-height:100dvh; }
 .session-score{font-size:13px;color:#e8c983;line-height:1.4;text-align:center;margin:10px 0}
 @media(prefers-reduced-motion:reduce){.action-pending{animation:none}}
 
-.learning-options #learn-repeat-help{width:24px;min-width:24px;height:24px;padding:0;border:1px solid #d9b76f;border-radius:50%;color:#ead39b;background:transparent;font-size:15px;line-height:22px;align-self:flex-end}
-.learning-options #learn-repeat-help:disabled{opacity:.4}
