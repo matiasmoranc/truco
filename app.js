@@ -1246,7 +1246,9 @@ async function revealEnvido(good=false,declaredNumber=null) {
     const winner=good||number===Number(bet.reveals?.[first])?first:second;
     changes={pendingBet:bet.suspendedBet||null,envidoClosed:true,envidoAudit:{reveals,winner,stake:bet.stake,called:bet.called||'envido',calls:bet.calls||[bet.called||'envido'],handNumber:room.handNumber},feed:topFeed(room,good?`${room.players[player].name}: son buenas.`:`${room.players[player].name} canta ${number} ${number===Number(bet.reveals?.[first])?'son iguales':'son mejores'}.`)};
   }
-  if(state.localGame){queueLearningAction(good?'good':'declare',bet);const notice=makeCallNotice(changes.feed?.[0]?.text);if(notice)changes.callNotice=notice;Object.assign(room,changes);renderGame();}else await writeRoom(changes);
+  const finishFalta=player===second&&bet.called==='falta';
+  if(finishFalta){changes={...changes,pendingBet:null,turn:null,turnClock:null,pendingNextHand:{id:'falta:'+crypto.randomUUID(),winner:changes.envidoAudit.winner,foldPoints:0,endsAt:gameTime(),message:'Falta envido: se verifican los tantos y se asignan '+bet.stake+' puntos.'}};}
+  if(state.localGame){queueLearningAction(good?'good':'declare',bet);const notice=makeCallNotice(changes.feed?.[0]?.text);if(notice)changes.callNotice=notice;Object.assign(room,changes);if(finishFalta){room.pendingNextHand=null;localFinishHand(changes.envidoAudit.winner,0,'falta');return;}renderGame();}else await writeRoom(changes);
 }
 function settleSingleFlor(room,scores) {
   const flowers=Object.keys(room.flors||{});
@@ -1344,7 +1346,7 @@ function buildEndEvidence(room,originals){
     const liars=Object.entries(audit.reveals||{}).filter(([player,value])=>originals[player]?.length===3&&Number(value)!==truth[player]).map(([player])=>player);
     const declaredWinner=audit.reveals?.player1===audit.reveals?.player2&&audit.reveals?.player1!=null?room.mano:audit.winner;
     const winner=liars.length===2?null:liars.length===1?otherPlayer(liars[0]):declaredWinner;
-    for(const player of new Set([winner,...liars].filter(Boolean))){
+    for(const player of new Set([...(audit.called==='falta'?['player1','player2']:[]),winner,...liars].filter(Boolean))){
       if(originals[player]?.length!==3)continue;
       const declared=audit.reveals?.[player];
       const label=liars.includes(player)?`Envido · dijo ${declared}, tenía ${truth[player]}`:`Envido · ${truth[player]} tantos`;
@@ -2482,7 +2484,7 @@ function localFinishHand(winner,points,ending='rounds'){
   room.scores=auditEnvidoScores(room,room.scores,state.localTruth||{});room.envidoAudit=null;
   room.scores[winner]=(room.scores[winner]||0)+points;
   room.scores=capScores(room,settleSingleFlor(room,room.scores));
-  const reason=ending==='fold'?'Cuando te vas al mazo, el rival gana los puntos que estaban en juego hasta ese momento.':ending==='declined'?`${room.players[otherPlayer(winner)].name} dijo NO QUIERO. ${room.players[winner].name} gana ${points} ${points===1?'punto':'puntos'} por los puntos que estaban en juego hasta ese momento y se vuelve a repartir.`:`${room.players[winner].name} gana la mano (${points} puntos).`;
+  const reason=ending==='falta'?'Falta envido: se verifican los tantos y se asignan los puntos en juego.':ending==='fold'?'Cuando te vas al mazo, el rival gana los puntos que estaban en juego hasta ese momento.':ending==='declined'?`${room.players[otherPlayer(winner)].name} dijo NO QUIERO. ${room.players[winner].name} gana ${points} ${points===1?'punto':'puntos'} por los puntos que estaban en juego hasta ese momento y se vuelve a repartir.`:`${room.players[winner].name} gana la mano (${points} puntos).`;
   room.lastHandScore=buildHandSummary(before,room.scores,reason,state.localTruth||{});room.handScoreEntries=[];
   room.handScoreHistory=handScoreHistory(room,room.lastHandScore);
   queueLearningPoints(before,room.scores,room.lastHandScore.entries);
