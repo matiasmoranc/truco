@@ -2,7 +2,7 @@ import {initializeApp} from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-
 import {getAuth,onAuthStateChanged,GoogleAuthProvider,signInWithPopup,signOut,browserLocalPersistence,setPersistence} from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js';
 import {getFunctions,httpsCallable} from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-functions.js';
 const $=id=>document.getElementById(id);
-let auth,call,users=[],pageToken=null,selection=null,busy=false,epoch=0,metrics=null,metricsBusy=false,metricsTimer=null,pagesLoaded=1;
+let auth,call,users=[],pageToken=null,selection=null,busy=false,epoch=0,metrics=null,metricsBusy=false,metricsTimer=null,pagesLoaded=1,userScope='all';
 function say(message){$('status').textContent=message;}
 function errorText(e){return e.code==='functions/not-found'?'Falta publicar las funciones de administración en Firebase.':e.message||'No se pudo completar el cambio.';}
 function node(tag,text,className){const el=document.createElement(tag);el.textContent=text;if(className)el.className=className;return el;}
@@ -17,22 +17,25 @@ function openEdit(action,item){
  $('edit').showModal();
 }
 function renderUsers(){
+ const expanded=new Set([...$('user-list').querySelectorAll('details[open]')].map(el=>el.dataset.uid));
  const query=$('search').value.toLocaleLowerCase();$('user-list').replaceChildren();
  for(const u of users.filter(u=>[u.name,u.email,u.uid].some(v=>v.toLocaleLowerCase().includes(query)))){
-  const card=node('article','', 'card');card.append(node('h3',u.name||'Sin nombre'),node('p',u.email||'Sin correo'),node('small','UID: '+u.uid),node('strong',u.balance+' créditos'),node('small',u.locked+' reservados · '+(u.disabled?'Bloqueado':'Habilitado')+' · '+(metrics?.online.includes(u.uid)?'En línea':'Fuera de línea')));
-  const actions=node('div','','actions');actions.append(button('Editar créditos',()=>openEdit('credits',u)),button('Cambiar nombre',()=>openEdit('rename',u)),button(u.disabled?'Desbloquear':'Bloquear',()=>openEdit('block',u)),button('Eliminar usuario',()=>openEdit('delete',u)));card.append(actions);$('user-list').append(card);
+  const card=node('details','', 'card user-card');card.dataset.uid=u.uid;card.open=expanded.has(u.uid);
+  const summary=node('summary');summary.append(node('span',u.name||'Sin nombre'),node('strong',u.balance+' créditos'));card.append(summary);
+  const detail=node('div','','user-detail');detail.append(node('p',u.email||'Sin correo'),node('small','UID: '+u.uid),node('small',u.locked+' reservados · '+(u.disabled?'Bloqueado':'Habilitado')+' · '+(metrics?.online.includes(u.uid)?'En línea':'Fuera de línea')),node('small','Registro: '+new Date(u.createdAt).toLocaleDateString('es-UY')));card.append(detail);
+  const actions=node('div','','actions');actions.append(button('Editar créditos',()=>openEdit('credits',u)),button('Cambiar nombre',()=>openEdit('rename',u)),button(u.disabled?'Desbloquear':'Bloquear',()=>openEdit('block',u)),button('Eliminar usuario',()=>openEdit('delete',u)));detail.append(actions);$('user-list').append(card);
  }
  if(!$('user-list').children.length)$('user-list').append(node('p','No hay usuarios para mostrar.'));
  $('more').hidden=!pageToken;
 }
 async function refresh(more=false,preservePages=false){
- if(busy)return;busy=true;const generation=epoch;$('more').disabled=true;say('Cargando…');
+ if(busy)return;busy=true;const generation=epoch;$('more').disabled=true;$('user-scope').disabled=true;for(const b of document.querySelectorAll('[data-scope]'))b.disabled=true;say('Cargando…');
  try{
-  const result=(await call({action:'users',...(more&&pageToken?{pageToken}:{})})).data;
+  const result=(await call({action:'users',scope:userScope,...(more&&pageToken?{pageToken}:{})})).data;
   if(preservePages&&!more){
    let loaded=1;
    while(result.pageToken&&loaded<pagesLoaded){
-    const page=(await call({action:'users',pageToken:result.pageToken})).data;
+    const page=(await call({action:'users',scope:userScope,pageToken:result.pageToken})).data;
     result.users.push(...page.users);result.pageToken=page.pageToken;loaded++;
    }
   }
@@ -48,10 +51,14 @@ async function refresh(more=false,preservePages=false){
    const card=node('article','','card');card.append(node('h3',a.action),node('p',a.reason),node('p',a.uid||a.code||''),node('small',new Date(a.at).toLocaleString('es-UY')),node('small','Administrador: '+a.actor));
    if(a.before!==undefined)card.append(node('p',String(a.before)+' → '+String(a.after)));$('audit-list').append(card);
   }await refreshMetrics();say('');
- }catch(e){if(generation===epoch)say(errorText(e));}finally{busy=false;$('more').disabled=false;}
+ }catch(e){if(generation===epoch)say(errorText(e));}finally{busy=false;$('more').disabled=false;$('user-scope').disabled=false;for(const b of document.querySelectorAll('[data-scope]'))b.disabled=false;}
 }
 $('search').addEventListener('input',renderUsers);$('more').onclick=()=>refresh(true);
-for(const b of document.querySelectorAll('[data-tab]'))b.onclick=()=>{for(const section of ['metrics','users','tables','audit'])$(section).hidden=section!==b.dataset.tab;for(const tab of document.querySelectorAll('[data-tab]'))tab.classList.toggle('active',tab===b);};
+function showTab(name){for(const section of ['metrics','users','tables','audit'])$(section).hidden=section!==name;for(const tab of document.querySelectorAll('[data-tab]'))tab.classList.toggle('active',tab.dataset.tab===name);}
+for(const b of document.querySelectorAll('[data-tab]'))b.onclick=()=>showTab(b.dataset.tab);
+async function showUsers(scope){if(busy)return;userScope=scope;pagesLoaded=1;pageToken=null;users=[];$('search').value='';$('user-scope').value=scope;renderUsers();showTab('users');await refresh();}
+for(const b of document.querySelectorAll('[data-scope]'))b.onclick=()=>showUsers(b.dataset.scope);
+$('user-scope').onchange=()=>showUsers($('user-scope').value);
 for(const id of ['close','cancel'])$(id).onclick=()=>{if(!$('save').disabled)$('edit').close();};
 $('edit').addEventListener('cancel',e=>{if($('save').disabled)e.preventDefault();});
 $('edit-form').onsubmit=async event=>{
@@ -105,7 +112,7 @@ async function start(){
   $('login').onclick=async()=>{try{await signInWithPopup(auth,new GoogleAuthProvider());}catch(e){$('access-status').textContent=errorText(e);}};
   $('logout').onclick=()=>signOut(auth);
   onAuthStateChanged(auth,async user=>{
-   const generation=++epoch;pagesLoaded=1;clearInterval(metricsTimer);metricsTimer=null;metrics=null;users=[];pageToken=null;$('console').hidden=true;$('access').hidden=false;$('logout').hidden=!user;$('login').hidden=!!user;
+   const generation=++epoch;pagesLoaded=1;userScope='all';$('user-scope').value='all';clearInterval(metricsTimer);metricsTimer=null;metrics=null;users=[];pageToken=null;$('console').hidden=true;$('access').hidden=false;$('logout').hidden=!user;$('login').hidden=!!user;
    $('identity').textContent=user?'Tu UID: '+user.uid:'';$('access-status').textContent=user?'Verificando permisos…':'Iniciá sesión con tu cuenta administradora.';
    if(!user)return;
    try{const result=await call({action:'users'});if(generation!==epoch)return;users=result.data.users;pageToken=result.data.pageToken;$('access').hidden=true;$('console').hidden=false;renderUsers();await refresh();if(generation===epoch)metricsTimer=setInterval(()=>{if(!document.hidden&&!$('edit').open)refresh(false,true);},60000);}

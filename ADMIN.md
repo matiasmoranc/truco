@@ -31,3 +31,5 @@ No incluyas claves de servicio en el repositorio ni en admin.html.
 Usuarios totales Google/Apple, activos ahora y usuarios únicos diarios. Activos significa juego visible con una señal recibida en los últimos 90 segundos; varias pestañas cuentan como un solo usuario. Horario de Uruguay. Datos por día y hora durante los últimos 30 días, registrados a partir de esta actualización. Los visitantes sin sesión no se cuentan. El panel actualiza usuarios, mesas, historial y métricas cada minuto mientras está visible y no haya una edición abierta. También actualiza al confirmar cada cambio.
 
 Volvé a descargar el proyecto y desplegá functions,database para habilitar playerActivity y activityCleanup. Ninguna estadística histórica anterior se puede reconstruir con precisión.
+
+Los indicadores Activos ahora y Usuarios únicos hoy abren la lista filtrada de cuentas existentes. En Usuarios y créditos se puede volver a mostrar todos. Las filas muestran nombre y saldo, y al desplegarlas aparecen datos y acciones. Para habilitar estos filtros desplegá la función adminConsole después de descargar esta versión.

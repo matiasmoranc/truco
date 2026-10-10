@@ -122,7 +122,19 @@ exports.adminConsole=onCall(options,async request=>{
   if(!done.committed)throw new HttpsError('internal','La cuenta fue eliminada pero falta limpiar el perfil. Reintentá el mismo cambio.');return {ok:true};
  }
  if(action==='users'){
-  const page=await getAuth().listUsers(100,data.pageToken||undefined);
+  let page;
+  if(data.scope&&data.scope!=='all'){
+   if(!['active','today'].includes(data.scope))throw new HttpsError('invalid-argument','Filtro inválido.');
+   const now=Date.now(),scope=data.scope;
+   const snapshot=await db.ref(scope==='active'?'adminMetrics/presence':'adminMetrics/days/'+uruguayDate(now).day+'/users').get();
+   const metrics=scope==='active'?{presence:snapshot.val()||{}}:{days:{[uruguayDate(now).day]:{users:snapshot.val()||{}}}};
+   const ids=require('./activity-service.cjs').activityUserIds({scope,metrics,now});
+   const offset=data.pageToken?Number(data.pageToken):0;
+   if(!Number.isSafeInteger(offset)||offset<0)throw new HttpsError('invalid-argument','Página inválida.');
+   const batch=ids.slice(offset,offset+100);
+   const result=batch.length?await getAuth().getUsers(batch.map(uid=>({uid}))):{users:[]};
+   page={users:result.users,pageToken:offset+100<ids.length?String(offset+100):null};
+  }else page=await getAuth().listUsers(100,data.pageToken||undefined);
   const users=await Promise.all(page.users.filter(u=>!u.providerData.every(p=>!['google.com','apple.com'].includes(p.providerId))).map(async u=>{
    const [profile,wallet]=await Promise.all([db.ref('profiles/'+u.uid).get(),db.ref('creditEconomy/wallets/'+u.uid).get()]);
    return {uid:u.uid,email:u.email||'',name:profile.val()?.name||'',disabled:u.disabled,createdAt:u.metadata.creationTime,balance:wallet.val()?.balance??0,locked:wallet.val()?.locked??0};

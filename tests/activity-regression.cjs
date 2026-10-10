@@ -18,3 +18,13 @@ test('Malformed sessions cannot write arbitrary metric paths',()=>{
  for(const sessionId of ['../user','a/b','__proto__',''])assert.throws(()=>activityUpdates({uid:'a',sessionId,visible:true,now:100}));
  assert.throws(()=>activityUpdates({uid:'a',sessionId:'valid',visible:'true',now:100}));
 });
+
+test('Admin activity filters return sorted unique IDs for current Uruguay day and active sessions',()=>{
+ const {activityUserIds}=require('../functions/activity-service.cjs');
+ const now=Date.parse('2026-10-10T02:59:59Z');
+ const metrics={presence:{b:{a:{at:now-90000}},a:{a:{at:now},b:{at:now}},future:{a:{at:now+1}}},days:{'2026-10-09':{users:{b:true,a:true}},'2026-10-10':{users:{other:true}}}};
+ assert.deepEqual(activityUserIds({scope:'active',metrics,now}),['a']);
+ assert.deepEqual(activityUserIds({scope:'today',metrics,now}),['a','b']);
+ assert.deepEqual(activityUserIds({scope:'today',metrics:{},now}),[]);
+ assert.throws(()=>activityUserIds({scope:'invalid',metrics,now}));
+});
