@@ -1,4 +1,4 @@
-import { installCredits } from './credits.js?v=20261010-credits23';
+import { installCredits } from './credits.js?v=20261010-lobby25';
 import { installAccount } from './account.js?v=20261009-apple-login10';
 const FIREBASE_VERSION = '12.4.0';
 const $ = (id) => document.getElementById(id);
@@ -726,7 +726,7 @@ function renderLobby(rooms) {
     const available = seats.filter(([, , person]) => !person);
     const actions=[];
     if(!players.player1||!players.player2)actions.push(['player','Entrar']);
-    return `<article class="lobby-card"><div class="lobby-card-top"><div><h3>${escapeHtml(title)}</h3><p class="lobby-meta">${targetPoints(room)} puntos${room.managedCredits?' · '+room.creditMatch.stake+' créditos por jugador · '+(room.creditMatch.hasPassword?'Con clave':'Pública'):''}</p></div><span class="lobby-count" aria-label="${available.length} lugares disponibles">${seats.length-available.length}/${seats.length}</span></div><div class="lobby-join-options">${actions.map(([key,label])=>`<button class="button lobby-player-button" data-room="${code}" data-seat="${key}" ${room.managedCredits&&!roomSeatForUid(room,state.uid)&&((credits.wallet()?.balance??0)<room.creditMatch.stake||(credits.wallet()?.locked??0)>0)?'disabled':''}>${label}</button>`).join('')}</div></article>`;
+    return `<article class="lobby-card"><div class="lobby-card-top"><div><h3>${escapeHtml(title)}</h3><div class="lobby-details"><div><span>Partida a</span><strong>${targetPoints(room)} puntos</strong></div><div><span>Entrada</span><strong>${room.managedCredits?escapeHtml(String(room.creditMatch.stake))+' créditos':'Sin créditos'}</strong></div><div><span>Mesa</span><strong class="lobby-privacy">${room.managedCredits&&room.creditMatch.hasPassword?'Privada · Con clave':'Pública'}</strong></div></div></div><span class="lobby-count" aria-label="${available.length} lugares disponibles">${seats.length-available.length}/${seats.length}</span></div><div class="lobby-join-options">${actions.map(([key,label])=>`<button class="button lobby-player-button" data-room="${code}" data-seat="${key}" ${room.managedCredits&&!roomSeatForUid(room,state.uid)&&((credits.wallet()?.balance??0)<room.creditMatch.stake||(credits.wallet()?.locked??0)>0)?'disabled':''}>${label}</button>`).join('')}</div></article>`;
   }).join('');
 }
 function joinOpenRoom(code, seat) {
