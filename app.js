@@ -1,6 +1,7 @@
 import { installActivity } from './activity.js?v=20261010-adminstats32';
 import { installCredits } from './credits.js?v=20261010-adminstats32';
-import { installAccount } from './account.js?v=20261010-authslow42';
+import { installAccount } from './account.js?v=20261010-authinit43';
+import { initializeGameAuth } from './auth-init.js?v=20261010-authinit43';
 const FIREBASE_VERSION = '12.4.0';
 const $ = (id) => document.getElementById(id);
 const views = ['welcome-view', 'invite-view', 'setup-view', 'waiting-view', 'game-view', 'config-view', 'learn-view'];
@@ -453,16 +454,14 @@ async function firebaseServices() {
   if(state.firebase)return state.firebase;
   if(firebaseReadyPromise)return firebaseReadyPromise;
   firebaseReadyPromise=(async()=>{
+    state.authLoadingStage='modules';
     const [appSdk,dbSdk,authSdk]=await Promise.all([
       import(`https://www.gstatic.com/firebasejs/${FIREBASE_VERSION}/firebase-app.js`),
       import(`https://www.gstatic.com/firebasejs/${FIREBASE_VERSION}/firebase-database.js`),
       import(`https://www.gstatic.com/firebasejs/${FIREBASE_VERSION}/firebase-auth.js`)
     ]);
     const app=appSdk.getApps().length?appSdk.getApp():appSdk.initializeApp(state.config);
-    const auth=authSdk.getAuth(app);
-    // Keep sign-in across visits when browser storage is available.
-    try{await authSdk.setPersistence(auth,authSdk.browserLocalPersistence);}catch{ /* Use Firebase's available persistence when storage is restricted. */ }
-    await auth.authStateReady();
+    const auth=await initializeGameAuth(authSdk,app,{onStage:stage=>{state.authLoadingStage=stage;}});
     state.uid=auth.currentUser?.uid||null;
     state.firebase={db:dbSdk.getDatabase(app,state.config.databaseURL),...dbSdk,auth,authSdk};
     authSdk.onAuthStateChanged(auth,user=>{
@@ -3358,7 +3357,7 @@ async function initializePage(){
     $('startup-loading').hidden=true;
     document.documentElement.classList.remove('page-loading');
   };
-  const slowTimer=setTimeout(()=>{account.loadingSlow();releaseLoading();},12000);
+  const slowTimer=setTimeout(()=>{account.loadingSlow(state.authLoadingStage||'config');releaseLoading();},12000);
   try{
     try{
       const bundled=await import('./firebase-config.js');

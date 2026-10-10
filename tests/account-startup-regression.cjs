@@ -14,7 +14,7 @@ function setup(platform){
 test('Slow iPhone startup shows Apple immediately and offers retry without enabling unready providers',()=>{
  const app=setup('iPhone');assert.equal(app.el('account-apple').hidden,false);assert.equal(app.el('account-google').disabled,true);
  assert.match(app.el('auth-status').textContent,/Preparando/);assert.equal(app.el('auth-retry').hidden,true);
- app.account.loadingSlow();assert.match(app.el('auth-status').textContent,/conexión/);assert.equal(app.el('auth-retry').hidden,false);
+ app.account.loadingSlow('session');assert.match(app.el('auth-status').textContent,/sesión guardada/);assert.equal(app.el('auth-retry').hidden,false);
  app.el('auth-retry').events.click();assert.equal(app.reloads(),1);
  app.state.firebase={};app.account.observe(app.state.firebase,null);
  assert.equal(app.el('account-google').disabled,false);assert.equal(app.el('account-apple').disabled,false);assert.equal(app.el('auth-retry').hidden,true);assert.equal(app.el('auth-status').textContent,'');

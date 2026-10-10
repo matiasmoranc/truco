@@ -97,6 +97,7 @@ export function installAccount({ services, getState, rememberName, document, sto
   }
   function errorText(error) {
     switch(error?.code){
+      case 'auth/startup-timeout':return 'No pudimos restaurar tu sesión guardada. Volvé a intentar.';
       case 'auth/popup-closed-by-user':return 'Cerraste la ventana. Elegí una opción para volver a intentar.';
       case 'auth/cancelled-popup-request':return 'Ya hay una ventana de acceso abierta.';
       case 'auth/popup-blocked':return 'Permití las ventanas emergentes y volvé a intentar.';
@@ -124,8 +125,8 @@ export function installAccount({ services, getState, rememberName, document, sto
     const user=fb.auth.currentUser;
     try{
       // Preserve old anonymous seats when an existing installation first links Google.
-      if(user?.isAnonymous)await fb.authSdk.linkWithPopup(user,provider);
-      else await fb.authSdk.signInWithPopup(fb.auth,provider);
+      if(user?.isAnonymous)await fb.authSdk.linkWithPopup(user,provider,fb.authSdk.browserPopupRedirectResolver);
+      else await fb.authSdk.signInWithPopup(fb.auth,provider,fb.authSdk.browserPopupRedirectResolver);
     }catch(error){
       if(!['auth/credential-already-in-use','auth/email-already-in-use'].includes(error.code))throw error;
       const credential=fb.authSdk.GoogleAuthProvider.credentialFromError(error);
@@ -143,7 +144,7 @@ export function installAccount({ services, getState, rememberName, document, sto
       provider.setCustomParameters({locale:'es'});
       // Apple authenticates separately. Never silently link a private relay
       // identity with an existing Google account.
-      await fb.authSdk.signInWithPopup(fb.auth,provider);
+      await fb.authSdk.signInWithPopup(fb.auth,provider,fb.authSdk.browserPopupRedirectResolver);
       await observe(fb,fb.auth.currentUser);
     },{allowRegistration:true});
   });
@@ -224,7 +225,7 @@ export function installAccount({ services, getState, rememberName, document, sto
   el('account-panel').addEventListener('click',()=>{});
   el('account-panel').addEventListener('cancel',()=>el('account-open').focus());
   message('Preparando el inicio de sesión…');render();
-  return {observe,isReady:()=>ready,loadingSlow:()=>{if(ready)return;slowLoading=true;message('La conexión está demorando. Esperá unos segundos o volvé a intentar.');render();},failed:error=>{slowLoading=true;message(errorText(error));render();}};
+  return {observe,isReady:()=>ready,loadingSlow:stage=>{if(ready)return;slowLoading=true;message(stage==='session'?'Estamos restaurando tu sesión guardada. Si no avanza, volvé a intentar.':stage==='modules'?'El servicio de inicio de sesión todavía no terminó de cargar. Podés volver a intentar.':'Estamos preparando el acceso. Podés volver a intentar.');render();},failed:error=>{slowLoading=true;message(errorText(error));render();}};
 }
 
 
