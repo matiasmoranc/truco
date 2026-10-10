@@ -42,6 +42,20 @@ function tableOperation(ledger,{code,uid,command,requestId,expectedMatchId,prese
  m.requests??={};
  if(expectedMatchId&&expectedMatchId!==m.id)fail('La partida cambió. Esperá la actualización.');
  if(requestId&&Object.hasOwn(m.requests||{},requestId))return next;
+ if(command.kind==='abandon'){
+  if(m.status==='settled'||m.status==='refunded')return next;
+  if(m.status!=='reserved'||!m.session)fail('La partida no está en juego.');
+  const room=m.session.room;
+  if(room.status==='complete'||Math.max(...Object.values(room.scores||{}))>=m.targetPoints){createReferee(m.session,{now}).advance();return finishAccounting(next,m,now);}
+  if(room.status==='drawing'){
+   room.status='closed';room.closeReason='draw-left';room.closedAt=now;
+  }else{
+   const winner=player==='player1'?'player2':'player1';
+   Object.assign(room,{status:'complete',scores:{...room.scores,[winner]:m.targetPoints},matchResult:{winner,loser:player,reason:'abandon'},endReveal:{done:true},turn:null,turnClock:null,turnTimeout:null,pendingBet:null,pendingNextHand:null,resolvingTrick:false,resolutionEndsAt:null,rematch:null});
+  }
+  m.revision++;if(requestId)m.requests[requestId]=true;
+  return finishAccounting(next,m,now);
+ }
  if(command.kind==='cancel'){
   if(m.status==='waiting'){if(player!=='player1')fail('No podés cerrar esta mesa.');cancelWaiting(next,m,now);return next;}
   if(m.status==='settled'||m.status==='refunded'){m.closedAt=now;if(m.session)m.session.room.status='closed';m.revision++;return next;}

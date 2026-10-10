@@ -1457,3 +1457,5 @@ body { min-height:100dvh; }
 #join-credit-submit{border:1px solid #e8c983;border-radius:12px;min-height:52px;padding:12px 20px;font:inherit;font-weight:700;cursor:pointer;touch-action:manipulation}#join-credit-submit:disabled{opacity:.55;cursor:wait}#join-credit-error{font-size:14px;color:#ff8f86}#join-credit-error:empty{display:none}
 
 .invite-whatsapp .whatsapp-brand-icon{width:28px;height:28px;flex-shrink:0}
+
+.abandon-actions{display:flex;gap:12px;margin-top:20px}.abandon-actions .button{flex:1;border:1px solid #e8c983;border-radius:12px;padding:12px;font:inherit;font-weight:700;background:transparent;color:#e8c983}.abandon-actions .primary{background:#e8c983;color:#143326}.abandon-actions button:disabled{opacity:.5}#abandon-error{color:#ff8f86}#abandon-error:empty{display:none}

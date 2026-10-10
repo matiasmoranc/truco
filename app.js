@@ -774,7 +774,7 @@ function watchRoom() {
     state.room = incoming;
     if(incoming.status==='complete'||state.persistedRoomCreatedAt!==incoming.createdAt)rememberRoomSeat();
     syncRoomPresence();
-    if(state.room.status==='closed'||roomExpired(state.room)){if(roomExpired(state.room))closeExpiredRoom(state.roomCode);if(state.unsubscribe){state.unsubscribe();state.unsubscribe=null;}const reason=state.room.closeReason;returnToLobby(reason==='match-left'?'La mesa terminó. Volviste al lobby.':reason==='draw-timeout'?'Se acabó el tiempo para elegir carta. La partida no comenzó.':reason==='draw-left'?'Un participante salió del sorteo. La partida no comenzó.':'La mesa cerró por inactividad.');return;}
+    if(state.room.status==='closed'||roomExpired(state.room)){if(roomExpired(state.room))closeExpiredRoom(state.roomCode);if(state.unsubscribe){state.unsubscribe();state.unsubscribe=null;}const reason=state.room.closeReason;returnToLobby(reason==='match-left'?'La mesa terminó. Volviste al lobby.':reason==='draw-timeout'?'Se acabó el tiempo para elegir carta. La partida no comenzó.':['draw-left','draw-cancel'].includes(reason)?'Un participante salió del sorteo. La partida no comenzó.':'La mesa cerró por inactividad.');return;}
     if(isCoordinator()&&state.room.status==='started'&&!state.room.resolvingTrick&&state.room.trickCards?.length===2&&(state.room.tricks||[]).length>0)recoverLegacyTrick(state.room);
     if(isCoordinator()&&state.room.status==='complete'&&!state.room.endReveal&&(Object.keys(state.room.flors||{}).length||state.room.envidoAudit)){
       const key=`${state.roomCode}:${state.room.handNumber}`;
@@ -1940,7 +1940,7 @@ function renderGame() {
   if(mobileMarker.parentElement!==felt)felt.append(mobileMarker);
   const drawing=room.status==='drawing';
   $('game-view').classList.toggle('drawing-mode',drawing);
-  $('game-home').setAttribute('aria-label',drawing?'Volver al lobby':'Volver a la mesa');
+  $('game-home').setAttribute('aria-label','Abandonar la partida');
   mobileMarker.classList.toggle('hidden',drawing);
   $('opening-draw').classList.toggle('hidden',!drawing);
   if(drawing){
@@ -2116,7 +2116,7 @@ function renderMatchEnd(){
   $('match-end-score').innerHTML=['player1','player2'].map(player=>`<div class="${player===winner?'match-score-winner':''}"><strong>${capScores(room,room.scores)[player]||0}</strong><span>${escapeHtml(room.players?.[player]?.name||'Jugador')}</span></div>`).join('<b aria-hidden="true">–</b>');
   const request=room.rematch,player=state.playerId,isPlayer=['player1','player2'].includes(player);
   const pending=request?.status==='pending',incoming=pending&&request.requester!==player;
-  $('match-end-message').textContent=pending?(incoming?(room.players?.[request.requester]?.name||'Tu rival')+' quiere jugar la revancha.':'Revancha enviada. Esperando al rival…'):request?.status==='declined'?'La revancha no fue aceptada.':room.matchResult?.reason==='inactivity'?'Victoria por inactividad.':room.matchResult?.reason==='disconnect'?'Victoria por desconexión.':'Partida terminada';
+  $('match-end-message').textContent=pending?(incoming?(room.players?.[request.requester]?.name||'Tu rival')+' quiere jugar la revancha.':'Revancha enviada. Esperando al rival…'):request?.status==='declined'?'La revancha no fue aceptada.':room.matchResult?.reason==='inactivity'?'Victoria por inactividad.':room.matchResult?.reason==='disconnect'?'Victoria por desconexión.':room.matchResult?.reason==='abandon'?'El rival abandonó la partida.':'Partida terminada';
 
   $('request-rematch').classList.toggle('hidden',!isPlayer||pending);
   $('accept-rematch').classList.toggle('hidden',!isPlayer||!incoming);
@@ -2739,7 +2739,36 @@ $('back-home').addEventListener('click',()=>{showView('welcome-view');openLobby(
 $('fold-hand').addEventListener('click',event=>runLiveAction(event.currentTarget,foldHand));
 $('enter-room').addEventListener('click',enterRoom);
 $('leave-room').addEventListener('click',async()=>{if(state.room?.managedCredits){try{await creditCommand({kind:'cancel'});}catch{return;}return;}stopRoomPresence();stopBot();state.roomWatchVersion=(state.roomWatchVersion||0)+1;state.navigationEpoch=(state.navigationEpoch||0)+1;forgetRoomSeat();if(state.unsubscribe)state.unsubscribe();if(state.privateUnsubscribe)state.privateUnsubscribe();state.privateUnsubscribe=null;state.privateHandKey=null;state.room=null;state.localGame=false;showView('welcome-view');openLobby();});
-$('game-home').addEventListener('click',()=>{if(state.room?.status==='drawing'){closeOpeningDraw('draw-left');return;}if(state.localGame){stopBot();state.localGame=false;showView('welcome-view');openLobby();return;}showView('waiting-view');});
+$('game-home').addEventListener('click',()=>{
+  if(!state.room){returnToLobby();return;}
+  if(matchFinished(state.room)){closeFinishedRoom();return;}
+  pauseLearning();$('abandon-error').textContent='';$('abandon-dialog').showModal();
+});
+let abandoningMatch=false;
+$('abandon-cancel').addEventListener('click',()=>{if(!abandoningMatch)$('abandon-dialog').close();});
+$('abandon-dialog').addEventListener('cancel',event=>{if(abandoningMatch)event.preventDefault();});
+$('abandon-dialog').addEventListener('close',resumeLearning);
+$('abandon-accept').addEventListener('click',async()=>{
+  if(abandoningMatch||!state.room)return;
+  abandoningMatch=true;$('abandon-accept').disabled=true;$('abandon-cancel').disabled=true;$('abandon-accept').textContent='Saliendo…';
+  const code=state.roomCode,player=state.playerId,uid=state.uid,matchNumber=Number(state.room.matchNumber||1);
+  try{
+    if(state.room.managedCredits)await creditCommand({kind:'abandon'});
+    else if(!state.localGame){
+      const fb=state.firebase;
+      const result=await fb.runTransaction(fb.ref(fb.db,`rooms/${code}/public`),room=>{
+        if(room===null)return null;
+        if(room.players?.[player]?.uid!==uid||Number(room.matchNumber||1)!==matchNumber||room.status==='closed'||matchFinished(room))return;
+        if(room.status==='drawing')return {...room,status:'closed',closedAt:gameTime(),closeReason:'draw-left'};
+        const winner=otherPlayer(player),message=(room.players[player].name||'El jugador')+' abandonó la partida.';
+        return {...room,status:'complete',scores:{...room.scores,[winner]:targetPoints(room)},matchResult:{winner,loser:player,reason:'abandon',message},endReveal:{done:true},turn:null,turnClock:null,pendingBet:null,pendingNextHand:null,resolvingTrick:false,resolutionEndsAt:null,rematch:null,feed:topFeed(room,message)};
+      },{applyLocally:false});
+      if(!result.committed)throw new Error('La partida cambió. Volvé a intentarlo.');
+    }
+    $('abandon-dialog').close();if(state.roomCode===code)returnToLobby();
+  }catch(error){$('abandon-error').textContent=firebaseError(error);}
+  finally{abandoningMatch=false;$('abandon-accept').disabled=false;$('abandon-cancel').disabled=false;$('abandon-accept').textContent='Aceptar';}
+});
 function limitMuestraOffset(x,y){
   const distance=Math.hypot(x,y),scale=distance>15?15/distance:1;
   return {x:x*scale,y:y*scale};

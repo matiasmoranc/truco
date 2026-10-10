@@ -30,3 +30,21 @@ test('Falta envido checks real totals, reveals cards and ends the hand without t
 test('Real envido chain cannot accept flor responses and declined stakes reflect accepted calls',()=>{const s=fixture();createReferee(s,{now:200}).action('player1',{kind:'call',value:'envido'});assert.throws(()=>createReferee(s,{now:250}).action('player2',{kind:'call',value:'raise-conflor'}));createReferee(s,{now:300}).action('player2',{kind:'call',value:'raise-real'});assert.equal(s.room.pendingBet.stake,5);createReferee(s,{now:400}).action('player1',{kind:'call',value:'no'});assert.equal(s.room.scores.player2,2);assert.equal(s.room.pendingBet,null);});
 test('Flor, con flor envido and contra flor al resto use the real three-card values',()=>{const s=fixture();s.hands={player1:[card('♠',2),card('♠',5),card('♥',6)],player2:[card('♥',3),card('♥',6),card('♥',7)]};s.originals=structuredClone(s.hands);createReferee(s,{now:200}).action('player1',{kind:'call',value:'flor'});createReferee(s,{now:300}).action('player2',{kind:'call',value:'raise-conflor'});assert.equal(s.room.pendingBet.stake,5);createReferee(s,{now:400}).action('player1',{kind:'call',value:'raise-faltaflor'});createReferee(s,{now:500}).action('player2',{kind:'call',value:'yes'});assert.equal(s.room.flors.player1,44);assert.equal(s.room.flors.player2,36);assert.equal(s.room.scores.player1,10);assert.equal(s.room.status,'revealing');});
 test('Three server inactivity strikes end a match and do not leave the timer stuck',()=>{const s=fixture();s.room.timeoutCounts={player1:2};createReferee(s,{now:200}).advance();createReferee(s,{now:45200}).advance();assert.equal(s.room.status,'complete');assert.equal(s.room.matchResult.reason,'inactivity');assert.equal(s.room.scores.player2,10);assert.equal(s.room.turnClock,null);});
+
+test('Abandoning the opening draw refunds both stakes and is idempotent',()=>{
+ const ledger=join(create());const canceled=op(ledger,'a',{kind:'abandon'},300);
+ assert.equal(canceled.matches.game1.status,'refunded');assert.equal(publicTable(canceled.matches.game1).status,'closed');
+ assert.equal(canceled.wallets.a.balance,12);assert.equal(canceled.wallets.b.balance,7);assert.equal(canceled.wallets.a.locked,0);assert.equal(canceled.wallets.b.locked,0);
+ assert.deepEqual(op(canceled,'a',{kind:'abandon'},400),canceled);
+});
+test('Abandoning an active match awards the rival the target and whole pot exactly once',()=>{
+ const ledger=begin(join(create()));const ended=op(ledger,'a',{kind:'abandon'},2500);
+ assert.equal(ended.matches.game1.status,'settled');assert.equal(ended.matches.game1.session.room.matchResult.winner,'player2');assert.equal(ended.matches.game1.session.room.scores.player2,10);
+ assert.equal(ended.wallets.a.balance,7);assert.equal(ended.wallets.b.balance,12);assert.equal(ended.wallets.a.locked,0);assert.equal(ended.wallets.b.locked,0);
+ assert.deepEqual(op(ended,'a',{kind:'abandon'},2600),ended);assert.throws(()=>op(ledger,'c',{kind:'abandon'}));
+});
+
+test('Leaving during winner evidence cannot reverse an already decided match',()=>{
+ const ledger=begin(join(create()));const room=ledger.matches.game1.session.room;room.status='complete';room.scores={player1:10,player2:0};room.endReveal={done:true};room.matchResult={winner:'player1'};
+ const ended=op(ledger,'a',{kind:'abandon'},2500);assert.equal(ended.matches.game1.winner,'a');assert.equal(ended.wallets.a.balance,17);
+});
