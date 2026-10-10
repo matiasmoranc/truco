@@ -1,4 +1,4 @@
-import { installCredits } from './credits.js?v=20261010-lobby25';
+import { installCredits } from './credits.js?v=20261010-cards26';
 import { installAccount } from './account.js?v=20261009-apple-login10';
 const FIREBASE_VERSION = '12.4.0';
 const $ = (id) => document.getElementById(id);
@@ -726,7 +726,11 @@ function renderLobby(rooms) {
     const available = seats.filter(([, , person]) => !person);
     const actions=[];
     if(!players.player1||!players.player2)actions.push(['player','Entrar']);
-    return `<article class="lobby-card"><div class="lobby-card-top"><div><h3>${escapeHtml(title)}</h3><div class="lobby-details"><div><span>Partida a</span><strong>${targetPoints(room)} puntos</strong></div><div><span>Entrada</span><strong>${room.managedCredits?escapeHtml(String(room.creditMatch.stake))+' créditos':'Sin créditos'}</strong></div><div><span>Mesa</span><strong class="lobby-privacy">${room.managedCredits&&room.creditMatch.hasPassword?'Privada · Con clave':'Pública'}</strong></div></div></div><span class="lobby-count" aria-label="${available.length} lugares disponibles">${seats.length-available.length}/${seats.length}</span></div><div class="lobby-join-options">${actions.map(([key,label])=>`<button class="button lobby-player-button" data-room="${code}" data-seat="${key}" ${room.managedCredits&&!roomSeatForUid(room,state.uid)&&((credits.wallet()?.balance??0)<room.creditMatch.stake||(credits.wallet()?.locked??0)>0)?'disabled':''}>${label}</button>`).join('')}</div></article>`;
+    const privateTable=!!(room.managedCredits&&room.creditMatch.hasPassword);
+    const trophy='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3h8v5a4 4 0 0 1-8 0V3ZM8 5H4v2a4 4 0 0 0 5 4m7-6h4v2a4 4 0 0 1-5 4M12 12v6m-4 3h8m-6-3h4"/></svg>';
+    const coins='<svg viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v5c0 4 16 4 16 0V5M4 10v5c0 4 16 4 16 0v-5M4 15v4c0 4 16 4 16 0v-4"/></svg>';
+    const lock='<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="'+(privateTable?'M8 10V6a4 4 0 0 1 8 0v4':'M8 10V6a4 4 0 0 1 8 0')+'"/><path d="M12 14v3"/></svg>';
+    return `<article class="lobby-card compact-room"><div class="compact-room-owner"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21v-2a8 8 0 0 1 16 0v2"/></svg><h3>${escapeHtml(title)}</h3></div><div class="compact-room-stat">${trophy}<strong>${targetPoints(room)}</strong><span>puntos</span></div><div class="compact-room-stat">${coins}<strong>${room.managedCredits?escapeHtml(String(room.creditMatch.stake)):'0'}</strong><span>créditos</span></div><div class="compact-room-privacy ${privateTable?'is-private':'is-public'}">${lock}<strong>${privateTable?'Privada':'Pública'}</strong></div><div class="lobby-join-options">${actions.map(([key,label])=>`<button class="button lobby-player-button" data-room="${code}" data-seat="${key}" ${room.managedCredits&&!roomSeatForUid(room,state.uid)&&((credits.wallet()?.balance??0)<room.creditMatch.stake||(credits.wallet()?.locked??0)>0)?'disabled':''}>${label}</button>`).join('')}</div></article>`;
   }).join('');
 }
 function joinOpenRoom(code, seat) {
