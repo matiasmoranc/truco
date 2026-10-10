@@ -1387,3 +1387,30 @@ body { min-height:100dvh; }
 
 #welcome-view .credits-panel{background:radial-gradient(ellipse at top left,rgba(255,255,255,.12),rgba(255,255,255,.035) 35%,transparent 65%),#062d2255}
 #welcome-view #credits-status[hidden]{display:none!important}
+
+/* Compact lobby matching the supplied mobile reference. */
+#welcome-view{padding:24px 17px 22px;gap:32px;background:radial-gradient(ellipse at 50% 40%,#124c38 0,#073a2a 65%,#062f23 100%)}
+#welcome-view .home-topbar{border:0;background:transparent;padding:0;gap:32px;min-height:70px}
+#welcome-view .home-topbar .brand-lockup{flex-basis:94px}
+#welcome-view .home-topbar .truco-logo{width:94px;height:60px}
+#welcome-view .home-topbar .brand-lockup .home-edition{font-size:15px;font-weight:700;margin-top:-3px;color:#bdd4c9}
+.home-player-wallet{padding:10px;gap:12px;border-radius:20px;background:#001e1625}
+#welcome-view .home-topbar .account-entry{font-size:16px;gap:8px}
+#welcome-view .account-user-icon{width:28px;height:28px;flex-basis:28px}
+.home-wallet-summary{padding-left:10px;gap:8px;font-size:14px}
+.home-wallet-summary .credit-coin-icon{display:none}
+.home-wallet-summary strong{font-size:26px}
+#credits-open{width:40px;height:44px;border-radius:12px;font-size:30px}
+#welcome-view .home-intro{gap:24px}
+#welcome-view .home-actions{gap:16px}
+#welcome-view .home-actions #create-room,#welcome-view .home-actions #learn-game{height:64px;min-height:64px;padding:0 24px;gap:22px;font-size:23px;border-radius:12px}
+.home-action-icon{width:34px;height:34px}
+.home-action-chevron{font-size:34px}
+#welcome-view .home-content{gap:28px}
+#welcome-view .home-section-title h2{font-size:29px;line-height:1.2}
+#welcome-view .open-room-list{margin-top:18px}
+#welcome-view .empty-lobby{min-height:182px;box-sizing:border-box;gap:22px;padding:24px;border-radius:24px;border-color:#b5d0be40}
+#welcome-view .empty-lobby strong{font-size:18px}
+.empty-table-icon{width:64px;height:64px}
+@media(max-width:500px){#welcome-view .home-topbar{gap:24px}#welcome-view .home-topbar .brand-lockup{flex-basis:103px}#welcome-view .home-topbar .truco-logo{width:80px;height:57px}.home-player-wallet{padding:10px;gap:8px}#welcome-view .home-topbar .account-entry{font-size:16px;gap:7px}.home-wallet-summary{font-size:14px;gap:7px;padding-left:10px}#credits-open{width:39px;height:44px;font-size:30px}#welcome-view .home-actions #create-room,#welcome-view .home-actions #learn-game{font-size:23px;padding:0 24px;gap:22px}}
+@media(max-width:370px){#welcome-view .home-topbar{gap:10px}#welcome-view .home-topbar .brand-lockup{flex-basis:78px}#welcome-view .home-topbar .account-entry{font-size:14px}#welcome-view .home-actions #create-room,#welcome-view .home-actions #learn-game{font-size:20px;padding:0 18px;gap:16px}.home-wallet-summary{font-size:12px;padding-left:7px}#credits-open{width:34px}}
