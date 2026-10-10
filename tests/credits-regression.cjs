@@ -77,10 +77,10 @@ function harness(m,initial=null) {
 }
 test('The UI claims once, waits for confirmation and resets on account change',async()=>{
  const m=await modulePromise,h=harness(m);await h.api.start();assert.equal(h.elements['credits-balance'].textContent,'0');
- await Promise.all([h.api.claim(),h.api.claim()]);assert.equal(h.writes.length,1);assert.equal(h.writes[0].options.applyLocally,false);assert.equal(h.elements['credits-balance'].textContent,'2');
+ await Promise.all([h.api.claim(),h.api.claim()]);assert.equal(h.writes.length,1);assert.equal(h.writes[0].options.applyLocally,false);assert.equal(h.elements['credits-balance'].textContent,'2');assert.equal(h.elements['credits-panel'].hidden,true);
  h.api.stop();assert.equal(h.elements['credits-panel'].hidden,true);
  h.callbacks[0].onValue({val:()=>({balance:999})});assert.equal(h.elements['credits-panel'].hidden,true);
- h.state.uid='b';await h.api.start();assert.equal(h.elements['credits-panel'].hidden,false);
+ h.state.uid='b';await h.api.start();assert.equal(h.elements['credits-panel'].hidden,true);
 });
 test('Offline, unreadable or unconfirmed balances cannot trigger grants',async()=>{
  const m=await modulePromise,h=harness(m);await h.api.start();h.state.firebaseConnected=false;h.api.refresh();await h.api.claim();assert.equal(h.writes.length,0);

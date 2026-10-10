@@ -1,4 +1,4 @@
-import { installCredits } from './credits.js?v=20261010-lobby20';
+import { installCredits } from './credits.js?v=20261010-lobby21';
 import { installAccount } from './account.js?v=20261009-apple-login10';
 const FIREBASE_VERSION = '12.4.0';
 const $ = (id) => document.getElementById(id);

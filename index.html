@@ -11,7 +11,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="./style.css?v=20261010-lobby20" />
+    <link rel="stylesheet" href="./style.css?v=20261010-lobby21" />
   </head>
   <body>
     <section id="startup-loading" class="startup-loading" role="status" aria-live="polite"><img class="truco-logo" src="assets/truco-v3.png" alt="Truco Uruguayo" width="1536" height="1024"><p>Preparando las mesas</p></section>
@@ -27,8 +27,8 @@
     <main id="app" class="app-shell" inert>
       <section class="welcome view active" id="welcome-view">
         <header class="home-topbar">
-          <div class="brand-lockup"><img class="truco-logo" src="assets/truco-v3.png" alt="Truco Uruguayo" width="1536" height="1024"></div>
-          <div class="home-player-wallet"><button class="account-entry" id="account-open" type="button" aria-label="Abrir Mi cuenta"><span class="home-user-copy"><span id="account-username"></span><span class="home-edition">Uruguayo</span></span><svg class="account-user-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="8.5" r="3"/><path d="M5.5 19c.4-3.4 2.6-5 6.5-5s6.1 1.6 6.5 5"/></svg></button><div class="home-wallet-summary"><svg class="credit-coin-icon" viewBox="0 0 48 48" aria-hidden="true"><ellipse cx="24" cy="12" rx="15" ry="6"/><path d="M9 12v8c0 8 30 8 30 0v-8M9 20v8c0 8 30 8 30 0v-8M9 28v8c0 8 30 8 30 0v-8"/></svg><span>Créditos<strong id="credits-header-balance">—</strong></span><button id="credits-open" type="button" aria-label="Ver y reclamar créditos">+</button></div></div>
+          <div class="brand-lockup"><img class="truco-logo" src="assets/truco-v3.png" alt="Truco Uruguayo" width="1536" height="1024"><span class="home-edition">Uruguayo</span></div>
+          <div class="home-player-wallet"><button class="account-entry" id="account-open" type="button" aria-label="Abrir Mi cuenta"><span class="home-user-copy"><span id="account-username"></span></span><svg class="account-user-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="8.5" r="3"/><path d="M5.5 19c.4-3.4 2.6-5 6.5-5s6.1 1.6 6.5 5"/></svg></button><div class="home-wallet-summary"><svg class="credit-coin-icon" viewBox="0 0 48 48" aria-hidden="true"><ellipse cx="24" cy="12" rx="15" ry="6"/><path d="M9 12v8c0 8 30 8 30 0v-8M9 20v8c0 8 30 8 30 0v-8M9 28v8c0 8 30 8 30 0v-8"/></svg><span>Créditos<strong id="credits-header-balance">—</strong></span><button id="credits-open" type="button" aria-label="Ver y reclamar créditos">+</button></div></div>
         </header>
         <div class="home-content">
           <section class="home-intro">
@@ -205,7 +205,7 @@
     </main>
     <dialog id="score-details" class="score-details" aria-labelledby="score-details-title"><div class="score-details-panel"><header class="score-details-header"><h2 id="score-details-title">Historial de manos</h2><button id="close-score-details" type="button" aria-label="Cerrar detalle"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button></header><p id="score-session-score" class="session-score"></p><div id="score-details-content"></div><button id="dismiss-score-details" class="score-details-dismiss" type="button">Cerrar</button></div></dialog>
     <dialog id="account-panel" class="account-overlay" aria-labelledby="account-title"><div class="account-card"><button id="account-close" class="account-close" type="button" aria-label="Cerrar cuenta">×</button><h2 id="account-title">Mi cuenta</h2><div id="account-menu"><button id="account-change-name" class="button secondary" type="button">Cambiar nombre de usuario</button><button id="account-logout" class="button secondary" type="button">Cerrar sesión</button></div><form id="account-edit" hidden><label for="account-name">Nombre de usuario</label><input id="account-name" maxlength="18" pattern="[A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9._\-]{1,18}" title="Letras, números, guion, guion bajo o punto. Sin espacios." autocomplete="nickname" required><button id="account-save" class="button primary" type="submit">Guardar nombre de usuario</button><button id="account-edit-back" class="button secondary" type="button">Volver</button></form><p id="account-status" role="status" aria-live="polite"></p></div></dialog>
-    <script type="module" src="./app.js?v=20261010-lobby20"></script>
+    <script type="module" src="./app.js?v=20261010-lobby21"></script>
   <dialog id="join-credit-dialog" class="credit-join-dialog"><form id="join-credit-form"><button id="join-credit-close" type="button" class="icon-button" aria-label="Cerrar">×</button><h2>Entrar a la mesa</h2><p id="join-credit-description"></p><label id="join-credit-password-row" hidden>Clave de la mesa<input id="join-credit-password" type="password" maxlength="64" autocomplete="off" /></label><p id="join-credit-error" role="alert"></p><button id="join-credit-submit" type="submit" class="button primary">Apostar y entrar</button></form></dialog>
 </body>
 </html>

@@ -23,11 +23,12 @@ export function dailyCreditChanges(wallet,timestamp) {
 
 export function installCredits({services,getState,document,now=()=>Date.now(),setTimer=setTimeout,clearTimer=clearTimeout,onChange=()=>{}}) {
   const el=id=>document.getElementById(id);
-  let uid=null,generation=0,unsubscribe=null,timer=null,wallet,busy=false,error='',available=false;
+  let uid=null,generation=0,unsubscribe=null,timer=null,wallet,busy=false,error='',available=false,detailsOpen=false;
   const clock=()=>now()+(Number(getState().serverTimeOffset)||0);
   function render() {
-    const panel=el('credits-panel');panel.hidden=!uid;
+    const panel=el('credits-panel');
     const eligibility=creditEligibility(wallet,clock());
+    panel.hidden=!uid||(!detailsOpen&&['balance','claimed'].includes(eligibility));
     el('credits-balance').textContent=wallet===undefined?'—':String(wallet?.balance??0);
     const headerBalance=el('credits-header-balance');if(headerBalance)headerBalance.textContent=el('credits-balance').textContent;
     const messages={loading:'Cargando tus créditos…',invalid:'No pudimos verificar tu saldo.',balance:'Podés reclamar 2 créditos diarios cuando tu saldo llegue a 0.',locked:'Tenés créditos reservados en una partida.',claimed:'Ya recibiste tus 2 créditos de hoy. Podés volver a reclamar mañana si estás en 0.',available:'Podés reclamar 2 créditos gratuitos hoy.'};
@@ -40,7 +41,7 @@ export function installCredits({services,getState,document,now=()=>Date.now(),se
   }
   function stop() {
     ++generation;unsubscribe?.();unsubscribe=null;clearTimer(timer);timer=null;
-    uid=null;wallet=undefined;busy=false;error='';available=false;render();
+    uid=null;wallet=undefined;busy=false;error='';available=false;detailsOpen=false;render();
   }
   async function start() {
     const user=getState().uid;if(!user){stop();return;}
@@ -73,7 +74,7 @@ export function installCredits({services,getState,document,now=()=>Date.now(),se
         return dailyCreditChanges(current,grantTime);
       },{applyLocally:false});
       if(epoch!==generation)return;
-      wallet=result.snapshot.val();error=result.committed?'':'Tu saldo cambió. Revisá los créditos disponibles.';
+      wallet=result.snapshot.val();if(result.committed)detailsOpen=false;error=result.committed?'':'Tu saldo cambió. Revisá los créditos disponibles.';
     }catch {
       if(epoch!==generation)return;
       // A concurrent claim can be rejected by the rules before the transaction
@@ -86,7 +87,8 @@ export function installCredits({services,getState,document,now=()=>Date.now(),se
     }finally {if(epoch===generation){busy=false;render();}}
   }
   el('credits-open')?.addEventListener('click',()=>{
-    const panel=el('credits-panel');if(panel.hidden)return;
+    if(!uid)return;detailsOpen=true;render();
+    const panel=el('credits-panel');
     panel.scrollIntoView({behavior:'smooth',block:'center'});
     el('credits-claim').focus({preventScroll:true});
     panel.classList.remove('credits-highlight');void panel.offsetWidth;panel.classList.add('credits-highlight');
