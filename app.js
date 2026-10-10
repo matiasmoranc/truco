@@ -244,9 +244,9 @@ function renderPointsPicker(){
     select.value=option.dataset.points;renderPointsPicker();menu.classList.add('hidden');$('points-picker-trigger').setAttribute('aria-expanded','false');
   }));
 }
-function toast(message, global = false) {
+function toast(message, global = false, duration = 2400) {
   const el = $(global ? 'global-toast' : 'toast'); el.textContent = message; el.classList.add('show');
-  clearTimeout(el._timer); el._timer = setTimeout(() => el.classList.remove('show'), 2400);
+  clearTimeout(el._timer); el._timer = setTimeout(() => el.classList.remove('show'), duration);
 }
 function makeCode() { return Array.from({length:5}, () => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random()*32)]).join(''); }
 const callSeen=new Map();
@@ -433,7 +433,7 @@ function loadConfig() {
 let firebaseReadyPromise=null;
 const activity=installActivity({send:data=>creditApi('playerActivity',data),getUid:()=>state.uid,document});
 const account=installAccount({services:firebaseServices,getState:()=>state,rememberName:rememberPlayerName,document,onReady:async()=>{activity.start();await openInitialRoom();credits.start();},onIdentityChange:resetAccountRoom,onNameChanged:()=>showView('welcome-view'),inRoom:()=>!!state.room&&!$('welcome-view').classList.contains('active')});
-const credits=installCredits({services:firebaseServices,getState:()=>state,document,notify:message=>toast(message),onChange:()=>{if(state.lobbyRooms)renderLobby(state.lobbyRooms);
+const credits=installCredits({services:firebaseServices,getState:()=>state,document,notify:message=>toast(message,true,2000),onChange:()=>{if(state.lobbyRooms)renderLobby(state.lobbyRooms);
   if(state.room)renderMatchEnd();$('table-stake-available').textContent=String(credits.wallet()?.balance??'—');updateStakeControl();}});
 function resetAccountRoom(){
   activity.stop();
