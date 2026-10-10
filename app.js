@@ -1,4 +1,4 @@
-import { installCredits } from './credits.js?v=20261010-icons27';
+import { installCredits } from './credits.js?v=20261010-direct28';
 import { installAccount } from './account.js?v=20261009-apple-login10';
 const FIREBASE_VERSION = '12.4.0';
 const $ = (id) => document.getElementById(id);
@@ -611,7 +611,7 @@ async function enterRoom() {
       let room=snap.val(),seat=roomSeatForUid(room,state.uid);
       if(room.status==='closed'||roomExpired(room)){toast('La mesa ya está cerrada.',true);await openLobby();return;}
       if(room.managedCredits){
-        if(!seat&&!state.joinConfirmed){openCreditJoin(code,room);return;}
+        if(!seat&&room.creditMatch.hasPassword&&!state.joinConfirmed){openCreditJoin(code,room);return;}
         const result=await creditApi('creditJoinTable',{code,password:state.joinPassword||''});
         room=result.room;seat=roomSeatForUid(room,state.uid);state.joinPassword='';state.joinConfirmed=false;
         if(!seat)throw new Error('La mesa ya no tiene lugares disponibles.');
