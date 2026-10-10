@@ -1,4 +1,4 @@
-import { installCredits } from './credits.js?v=20261010-lobby21';
+import { installCredits } from './credits.js?v=20261010-setup22';
 import { installAccount } from './account.js?v=20261009-apple-login10';
 const FIREBASE_VERSION = '12.4.0';
 const $ = (id) => document.getElementById(id);
@@ -430,7 +430,7 @@ function loadConfig() {
 }
 let firebaseReadyPromise=null;
 const account=installAccount({services:firebaseServices,getState:()=>state,rememberName:rememberPlayerName,document,onReady:async()=>{await openInitialRoom();credits.start();},onIdentityChange:resetAccountRoom,onNameChanged:()=>showView('welcome-view'),inRoom:()=>!!state.room&&!$('welcome-view').classList.contains('active')});
-const credits=installCredits({services:firebaseServices,getState:()=>state,document,onChange:()=>{if(state.lobbyRooms)renderLobby(state.lobbyRooms);$('table-stake-available').textContent='Disponibles: '+(credits.wallet()?.balance??'—')+' créditos';}});
+const credits=installCredits({services:firebaseServices,getState:()=>state,document,onChange:()=>{if(state.lobbyRooms)renderLobby(state.lobbyRooms);$('table-stake-available').textContent=String(credits.wallet()?.balance??'—');}});
 function resetAccountRoom(){
   credits.stop();
   stopRoomPresence();stopBot();forgetRoomSeat();
@@ -2256,7 +2256,7 @@ function updateBotSetup(){
   $('bot-levels').classList.toggle('hidden',!enabled);
   $('credit-table-settings').classList.toggle('hidden',enabled);
   $('enter-room').textContent=enabled?'Jugar contra Bot':'Crear mesa';
-  $('table-stake-available').textContent='Disponibles: '+(credits.wallet()?.balance??'—')+' créditos';
+  $('table-stake-available').textContent=String(credits.wallet()?.balance??'—');
 }
 function stopBot(){clearTimeout(state.learning?.transition?.timer);$('learning-hint')?.close();state.learning=null;$('learning-toolbar')?.classList.add('hidden');$('game-view').classList.remove('learning-mode');clearTimeout(state.botTimer);state.botTimer=null;state.bot=false;state.botMemory=null;}
 async function startBotGame(name){
