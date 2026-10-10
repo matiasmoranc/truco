@@ -4,12 +4,12 @@ const vm=require('node:vm');
 const fs=require('node:fs');
 const path=require('node:path');
 const source=fs.readFileSync(path.join(__dirname,'../account.js'),'utf8').replaceAll('export function','function');
-function setup(platform){
+function setup(platform,userAgent=platform,origin='https://matiasmoranc.github.io'){
  const elements=new Map();const document={getElementById(id){if(!elements.has(id))elements.set(id,{hidden:false,disabled:false,textContent:'',value:'',events:{},addEventListener(event,handler){this.events[event]=handler;},close(){},focus(){}});return elements.get(id);}};
  let reloads=0;const state={firebase:null};
- const context={document,navigator:{platform,userAgent:platform},state,localStorage:{getItem(){return null;}},location:{reload(){reloads++;}},setTimeout,clearTimeout};
+ const context={document,navigator:{platform,userAgent},state,localStorage:{getItem(){return null;}},URL,history:{replaceState(){}},location:{origin,href:origin+'/',assign(url){this.destination=url;},reload(){reloads++;}},setTimeout,clearTimeout};
  vm.createContext(context);vm.runInContext(source+';globalThis.account=installAccount({services:async()=>state.firebase,getState:()=>state,rememberName:()=>{},document});',context);
- return {account:context.account,state,el:id=>document.getElementById(id),reloads:()=>reloads};
+ return {account:context.account,state,el:id=>document.getElementById(id),reloads:()=>reloads,location:context.location};
 }
 test('Slow iPhone startup shows Apple immediately and offers retry without enabling unready providers',()=>{
  const app=setup('iPhone');assert.equal(app.el('account-apple').hidden,false);assert.equal(app.el('account-google').disabled,true);
@@ -35,4 +35,16 @@ test('Apple rejection shows the actual Firebase error and allows another attempt
  app.state.firebase={auth:{currentUser:null},authSdk:{OAuthProvider,async signInWithPopup(){throw {code:'auth/account-exists-with-different-credential'};}}};
  await app.el('account-apple').events.click();
  assert.equal(app.account.isReady(),false);assert.match(app.el('auth-status').textContent,/auth\/account-exists-with-different-credential/);assert.equal(app.el('account-apple').disabled,false);
+});
+
+test('Chrome iPhone leaves the cross-origin popup flow for Firebase Hosting',async()=>{
+ const app=setup('iPhone','iPhone CriOS/140');class OAuthProvider{addScope(){}setCustomParameters(){}}
+ app.state.firebase={auth:{app:{options:{authDomain:'truco-6553d.firebaseapp.com'}}},authSdk:{OAuthProvider,signInWithPopup(){throw Error('Must not open popup');}}};
+ await app.el('account-apple').events.click();
+ assert.equal(app.location.destination,'https://truco-6553d.firebaseapp.com/?appleLogin=1&v=apple45');
+});
+test('Chrome iPhone on Firebase uses redirect on the same origin',async()=>{
+ const app=setup('iPhone','iPhone CriOS/140','https://truco-6553d.firebaseapp.com');let calls=0;class OAuthProvider{addScope(){}setCustomParameters(){}}
+ app.state.firebase={auth:{app:{options:{authDomain:'truco-6553d.firebaseapp.com'}}},authSdk:{OAuthProvider,browserPopupRedirectResolver:'resolver',async signInWithRedirect(auth,provider,resolver){calls++;assert.equal(resolver,'resolver');}}};
+ await app.el('account-apple').events.click();assert.equal(calls,1);assert.equal(app.location.destination,undefined);
 });

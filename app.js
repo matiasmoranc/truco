@@ -1,7 +1,7 @@
 import { installActivity } from './activity.js?v=20261010-adminstats32';
 import { installCredits } from './credits.js?v=20261010-adminstats32';
-import { installAccount } from './account.js?v=20261010-appleresult44';
-import { initializeGameAuth } from './auth-init.js?v=20261010-authinit43';
+import { installAccount } from './account.js?v=20261010-appleredirect45';
+import { initializeGameAuth } from './auth-init.js?v=20261010-authredirect45';
 const FIREBASE_VERSION = '12.4.0';
 const $ = (id) => document.getElementById(id);
 const views = ['welcome-view', 'invite-view', 'setup-view', 'waiting-view', 'game-view', 'config-view', 'learn-view'];
@@ -3365,6 +3365,7 @@ async function initializePage(){
     }catch{ /* Optional during initial setup. */ }
     const fb=await firebaseServices();
     await account.observe(fb,fb.auth.currentUser);
+    await account.startRequestedAppleLogin();
     // Loading card artwork never blocks the sign-in screen.
     preloadCardImages().catch(error=>console.error('[truco:startup-cards]',error));
   }catch(error){console.error('[truco:startup]',error);account.failed(error);}

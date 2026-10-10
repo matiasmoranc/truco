@@ -145,6 +145,19 @@ export function installAccount({ services, getState, rememberName, document, sto
       const provider=new fb.authSdk.OAuthProvider('apple.com');
       provider.addScope('email');provider.addScope('name');
       provider.setCustomParameters({locale:'es'});
+      // Chrome on iOS loses Apple's native popup return. Keep redirect auth
+      // and its storage on Firebase's own origin instead of GitHub Pages.
+      if(/CriOS\//.test(navigator.userAgent||'')) {
+        const target=new URL('https://'+fb.auth.app.options.authDomain+'/');
+        if(globalThis.location.origin!==target.origin) {
+          target.searchParams.set('appleLogin','1');
+          target.searchParams.set('v','apple45');
+          globalThis.location.assign(target.href);
+          return;
+        }
+        await fb.authSdk.signInWithRedirect(fb.auth,provider,fb.authSdk.browserPopupRedirectResolver);
+        return;
+      }
       // Apple authenticates separately. Never silently link a private relay
       // identity with an existing Google account.
       const result=await fb.authSdk.signInWithPopup(fb.auth,provider,fb.authSdk.browserPopupRedirectResolver);
@@ -233,7 +246,13 @@ export function installAccount({ services, getState, rememberName, document, sto
   el('account-panel').addEventListener('click',()=>{});
   el('account-panel').addEventListener('cancel',()=>el('account-open').focus());
   message('Preparando el inicio de sesión…');render();
-  return {observe,isReady:()=>ready,loadingSlow:stage=>{if(ready)return;slowLoading=true;message(stage==='session'?'Estamos restaurando tu sesión guardada. Si no avanza, volvé a intentar.':stage==='modules'?'El servicio de inicio de sesión todavía no terminó de cargar. Podés volver a intentar.':'Estamos preparando el acceso. Podés volver a intentar.');render();},failed:error=>{slowLoading=true;message(errorText(error));render();}};
+  return {observe,startRequestedAppleLogin:()=>{
+    const url=new URL(globalThis.location.href);
+    if(url.searchParams.get('appleLogin')!=='1')return;
+    url.searchParams.delete('appleLogin');
+    globalThis.history.replaceState(null,'',url.href);
+    if(!registered(currentUser))return el('account-apple').click();
+  },isReady:()=>ready,loadingSlow:stage=>{if(ready)return;slowLoading=true;message(stage==='session'?'Estamos restaurando tu sesión guardada. Si no avanza, volvé a intentar.':stage==='modules'?'El servicio de inicio de sesión todavía no terminó de cargar. Podés volver a intentar.':'Estamos preparando el acceso. Podés volver a intentar.');render();},failed:error=>{slowLoading=true;message(errorText(error));render();}};
 }
 
 

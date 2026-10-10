@@ -20,3 +20,11 @@ test('Repeated initialization reuses Auth and unrelated setup failures are prese
  assert.equal(await initializeGameAuth({initializeAuth(){throw {code:'auth/already-initialized'};},getAuth(){return auth;}},{}),auth);
  await assert.rejects(initializeGameAuth({initializeAuth(){throw {code:'auth/invalid-api-key'};}},{}),e=>e.code==='auth/invalid-api-key');
 });
+
+test('Firebase Hosting processes the redirect before exposing the restored session',async()=>{
+ const {initializeGameAuth}=await modulePromise;const auth={authStateReady:async()=>{}};const sdk=sdkFor(auth);let processed=false;
+ sdk.browserPopupRedirectResolver='resolver';sdk.getRedirectResult=async(a,r)=>{assert.equal(a,auth);assert.equal(r,'resolver');processed=true;auth.currentUser={uid:'apple'};};
+ globalThis.location={hostname:'truco-6553d.firebaseapp.com'};
+ try{await initializeGameAuth(sdk,{options:{authDomain:'truco-6553d.firebaseapp.com'}});assert.equal(processed,true);assert.equal(auth.currentUser.uid,'apple');assert.equal(sdk.options.popupRedirectResolver,'resolver');}
+ finally{delete globalThis.location;}
+});
