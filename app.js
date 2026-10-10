@@ -1,6 +1,6 @@
 import { installActivity } from './activity.js?v=20261010-adminstats32';
 import { installCredits } from './credits.js?v=20261010-adminstats32';
-import { installAccount } from './account.js?v=20261010-authinit43';
+import { installAccount } from './account.js?v=20261010-appleresult44';
 import { initializeGameAuth } from './auth-init.js?v=20261010-authinit43';
 const FIREBASE_VERSION = '12.4.0';
 const $ = (id) => document.getElementById(id);

@@ -23,3 +23,16 @@ test('Windows does not show Apple and failed startup provides a recovery control
  const app=setup('Win32');assert.equal(app.el('account-apple').hidden,true);
  app.account.failed(new Error('network'));assert.equal(app.el('auth-retry').hidden,false);
 });
+test('Apple uses the confirmed result even before currentUser is updated',async()=>{
+ const app=setup('iPhone');const user={uid:'apple-user',isAnonymous:false,providerData:[{providerId:'apple.com'}]};
+ class OAuthProvider{addScope(){}setCustomParameters(){}}
+ app.state.firebase={auth:{currentUser:null},authSdk:{OAuthProvider,browserPopupRedirectResolver:'resolver',async signInWithPopup(auth,provider,resolver){assert.equal(resolver,'resolver');return {user};}},ref:()=>({}),get:async()=>({val:()=>({name:'ApplePlayer'})})};
+ await app.el('account-apple').events.click();
+ assert.equal(app.account.isReady(),true);assert.equal(app.el('account-username').textContent,'ApplePlayer');assert.equal(app.el('auth-gate').hidden,true);
+});
+test('Apple rejection shows the actual Firebase error and allows another attempt',async()=>{
+ const app=setup('iPhone');class OAuthProvider{addScope(){}setCustomParameters(){}}
+ app.state.firebase={auth:{currentUser:null},authSdk:{OAuthProvider,async signInWithPopup(){throw {code:'auth/account-exists-with-different-credential'};}}};
+ await app.el('account-apple').events.click();
+ assert.equal(app.account.isReady(),false);assert.match(app.el('auth-status').textContent,/auth\/account-exists-with-different-credential/);assert.equal(app.el('account-apple').disabled,false);
+});

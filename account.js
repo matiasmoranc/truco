@@ -103,8 +103,11 @@ export function installAccount({ services, getState, rememberName, document, sto
       case 'auth/popup-blocked':return 'Permití las ventanas emergentes y volvé a intentar.';
       case 'auth/operation-not-allowed':return 'Falta configurar el acceso con '+loginProvider+' en Firebase.';
       case 'auth/unauthorized-domain':return 'Falta autorizar el dominio de esta página en Firebase.';
-      case 'auth/account-exists-with-different-credential':return 'Este correo ya tiene otra forma de acceso. Usá el proveedor original para vincular Google.';
-      default:return 'No pudimos conectar tu cuenta. Revisá tu conexión y volvé a intentar.';
+      case 'auth/account-exists-with-different-credential':return 'Este correo ya está registrado con otra forma de acceso. Entrá con Google para usar tu cuenta existente. (auth/account-exists-with-different-credential)';
+      case 'auth/invalid-credential':return 'Firebase no pudo validar la respuesta de '+loginProvider+'. Hay que revisar la configuración de ese acceso. (auth/invalid-credential)';
+      case 'auth/invalid-oauth-response':return 'No recibimos una respuesta válida de '+loginProvider+'. (auth/invalid-oauth-response)';
+      case 'auth/apple-session-missing':return 'Apple confirmó el acceso, pero no recibimos tu sesión en el juego. Volvé a intentar. (auth/apple-session-missing)';
+      default:return 'No pudimos completar el acceso con '+loginProvider+'. Volvé a intentar.'+(typeof error?.code==='string'?' ('+error.code+')':'');
     }
   }
   async function action(task,{allowRegistration=false}={}) {
@@ -144,8 +147,13 @@ export function installAccount({ services, getState, rememberName, document, sto
       provider.setCustomParameters({locale:'es'});
       // Apple authenticates separately. Never silently link a private relay
       // identity with an existing Google account.
-      await fb.authSdk.signInWithPopup(fb.auth,provider,fb.authSdk.browserPopupRedirectResolver);
-      await observe(fb,fb.auth.currentUser);
+      const result=await fb.authSdk.signInWithPopup(fb.auth,provider,fb.authSdk.browserPopupRedirectResolver);
+      // Use the confirmed Firebase result, rather than a separately observed
+      // currentUser value which may still be updating when the popup closes.
+      const user=result?.user;
+      if(!user){const error=new Error('Missing Apple session');error.code='auth/apple-session-missing';throw error;}
+      message('Apple confirmó el acceso. Cargando tu cuenta…');
+      await observe(fb,user);
     },{allowRegistration:true});
   });
   async function save(fb,input,registration) {
