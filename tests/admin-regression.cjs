@@ -40,3 +40,25 @@ test('Closing a waiting table returns only the host stake',()=>{
  const result=adminLedgerChange(ledger,{...args,action:'close-table',code:'ABCDE'});
  assert.equal(result.wallets.a.balance,10);assert.equal(result.wallets.b.balance,10);assert.equal(result.matches.m1.status,'refunded');
 });
+const {prepareUserDeletion,finishUserDeletion}=require('../functions/admin-service.cjs');
+const deletionRoot=()=>({profiles:{a:{name:'Mati'},b:{name:'Ricky'}},usernames:{mati:'a',ricky:'b'},creditEconomy:base()});
+const deletion={...args,uid:'a',confirmName:'Mati'};
+test('Deletion blocks access and reservations before removing Auth and preserves financial history',()=>{
+ const root=deletionRoot();root.creditEconomy.matches={past:{player1:'a',player2:'b',status:'settled'}};
+ const prepared=prepareUserDeletion(root,deletion);assert.equal(prepared.userAccess.a.blocked,true);assert.equal(prepared.creditEconomy.wallets.a.deleting,true);
+ assert.throws(()=>createTable(prepared.creditEconomy,{code:'ABCDE',id:'new',uid:'a',name:'A',stake:1,targetPoints:10,now:101}));
+ const result=finishUserDeletion(prepared,{uid:'a',requestId:args.requestId,now:102});
+ assert.equal(result.profiles.a,undefined);assert.equal(result.usernames.mati,undefined);assert.equal(result.profiles.b.name,'Ricky');assert.equal(result.creditEconomy.wallets.a.balance,0);assert.equal(result.creditEconomy.matches.past.status,'settled');
+ assert.equal(result.adminUserAudit.receipt1.status,'complete');assert.deepEqual(finishUserDeletion(result,{uid:'a',requestId:args.requestId,now:103}),result);
+});
+test('Deletion rejects administrators, wrong confirmation and users with reserved credits',()=>{
+ assert.throws(()=>prepareUserDeletion(deletionRoot(),{...deletion,actor:'a'}));
+ const admin=deletionRoot();admin.administrators={a:true};assert.throws(()=>prepareUserDeletion(admin,deletion));
+ assert.throws(()=>prepareUserDeletion(deletionRoot(),{...deletion,confirmName:'mati'}));
+ const reserved=deletionRoot();reserved.creditEconomy.wallets.a.locked=1;assert.throws(()=>prepareUserDeletion(reserved,deletion));
+});
+test('Repeated deletion preparation is idempotent and cannot be reassigned',()=>{
+ const root=prepareUserDeletion(deletionRoot(),deletion);assert.deepEqual(prepareUserDeletion(root,deletion),root);
+ assert.throws(()=>prepareUserDeletion(root,{...deletion,uid:'b'}));
+ assert.throws(()=>adminLedgerChange(root.creditEconomy,{...args,requestId:'credit2',action:'credits',uid:'a',balance:50,expectedBalance:10}));
+});

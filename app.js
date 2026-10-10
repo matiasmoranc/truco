@@ -1,4 +1,5 @@
-import { installCredits } from './credits.js?v=20261010-practice31';
+import { installActivity } from './activity.js?v=20261010-adminstats32';
+import { installCredits } from './credits.js?v=20261010-adminstats32';
 import { installAccount } from './account.js?v=20261009-apple-login10';
 const FIREBASE_VERSION = '12.4.0';
 const $ = (id) => document.getElementById(id);
@@ -430,10 +431,12 @@ function loadConfig() {
   try { return JSON.parse(localStorage.getItem(storageKey) || 'null'); } catch { return null; }
 }
 let firebaseReadyPromise=null;
-const account=installAccount({services:firebaseServices,getState:()=>state,rememberName:rememberPlayerName,document,onReady:async()=>{await openInitialRoom();credits.start();},onIdentityChange:resetAccountRoom,onNameChanged:()=>showView('welcome-view'),inRoom:()=>!!state.room&&!$('welcome-view').classList.contains('active')});
+const activity=installActivity({send:data=>creditApi('playerActivity',data),getUid:()=>state.uid,document});
+const account=installAccount({services:firebaseServices,getState:()=>state,rememberName:rememberPlayerName,document,onReady:async()=>{activity.start();await openInitialRoom();credits.start();},onIdentityChange:resetAccountRoom,onNameChanged:()=>showView('welcome-view'),inRoom:()=>!!state.room&&!$('welcome-view').classList.contains('active')});
 const credits=installCredits({services:firebaseServices,getState:()=>state,document,notify:message=>toast(message),onChange:()=>{if(state.lobbyRooms)renderLobby(state.lobbyRooms);
   if(state.room)renderMatchEnd();$('table-stake-available').textContent=String(credits.wallet()?.balance??'—');}});
 function resetAccountRoom(){
+  activity.stop();
   credits.stop();
   stopRoomPresence();stopBot();forgetRoomSeat();
   state.roomWatchVersion=(state.roomWatchVersion||0)+1;

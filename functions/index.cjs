@@ -92,7 +92,7 @@ exports.creditExpireTables=onSchedule({schedule:'every 1 minutes',region:'us-cen
 
 // Admin permissions are server-only. Clients cannot write administrators.
 const {getAuth}=require('firebase-admin/auth');
-const {requireAdmin,adminLedgerChange,validKey}=require('./admin-service.cjs');
+const {requireAdmin,adminLedgerChange,validKey,prepareUserDeletion,finishUserDeletion}=require('./admin-service.cjs');
 async function adminIdentity(request){
  const uid=request.auth?.uid;
  if(!uid)throw new HttpsError('unauthenticated','Iniciá sesión primero.');
@@ -102,6 +102,25 @@ async function adminIdentity(request){
 }
 exports.adminConsole=onCall(options,async request=>{
  const actor=await adminIdentity(request),data=request.data||{},action=data.action;
+ if(action==='metrics'){
+  const registeredUids=[];let token;
+  do{const page=await getAuth().listUsers(1000,token);registeredUids.push(...page.users.filter(u=>u.providerData.some(p=>['google.com','apple.com'].includes(p.providerId))).map(u=>u.uid));token=page.pageToken;}while(token);
+  const now=Date.now(),cutoff=uruguayDate(now-29*86400000).day;
+  const [days,presence,start]=await Promise.all([db.ref('adminMetrics/days').orderByKey().startAt(cutoff).get(),db.ref('adminMetrics/presence').get(),db.ref('adminMetrics/startedAt').get()]);
+  return activitySummary({registeredUids,now,metrics:{days:days.val()||{},presence:presence.val()||{},startedAt:start.val()}});
+ }
+ if(action==='delete'){
+  let failure;
+  const prepared=await db.ref().transaction(root=>{
+   failure=null;if(!root)return null;try{return prepareUserDeletion(root,{...data,actor,now:Date.now()});}catch(e){failure=e.message;return undefined;}
+  });
+  if(!prepared.committed)throw new HttpsError('failed-precondition',failure||'No se pudo preparar la eliminación.');
+  try{await getAuth().deleteUser(data.uid);}catch(e){if(e.code!=='auth/user-not-found')throw new HttpsError('internal','No se pudo eliminar la cuenta. Reintentá el mismo cambio.');}
+  const done=await db.ref().transaction(root=>{
+   failure=null;if(!root)return null;try{return finishUserDeletion(root,{uid:data.uid,requestId:data.requestId,now:Date.now()});}catch(e){failure=e.message;return undefined;}
+  });
+  if(!done.committed)throw new HttpsError('internal','La cuenta fue eliminada pero falta limpiar el perfil. Reintentá el mismo cambio.');return {ok:true};
+ }
  if(action==='users'){
   const page=await getAuth().listUsers(100,data.pageToken||undefined);
   const users=await Promise.all(page.users.filter(u=>!u.providerData.every(p=>!['google.com','apple.com'].includes(p.providerId))).map(async u=>{
@@ -124,13 +143,14 @@ exports.adminConsole=onCall(options,async request=>{
  }
  if(action==='rename'){
   if(!validKey(data.uid)||!validKey(data.requestId)||typeof data.name!=='string'||!/^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9._-]{1,18}$/.test(data.name)||typeof data.reason!=='string'||data.reason.trim().length<3||data.reason.length>200)throw new HttpsError('invalid-argument','Nombre o motivo inválido.');
-  await getAuth().getUser(data.uid);let failure;
+  if((await db.ref('userAccess/'+data.uid).get()).val()?.deleting)throw new HttpsError('failed-precondition','La cuenta está siendo eliminada.');await getAuth().getUser(data.uid);let failure;
   const r=await db.ref().transaction(root=>{
    failure=null;if(!root)return null;
    const receipt=root.adminUserAudit?.[data.requestId];
    if(receipt){if(receipt.actor!==actor||receipt.uid!==data.uid||receipt.after!==data.name)failure='Solicitud reutilizada.';return failure?undefined:root;}
    const key=data.name.toLowerCase().replaceAll('.','%2E'),owner=root.usernames?.[key];
    if(owner&&owner!==data.uid){failure='Ese nombre ya está en uso.';return undefined;}
+   if(root.userAccess?.[data.uid]?.deleting||root.userAccess?.[data.uid]?.deletedAt){failure='La cuenta está siendo eliminada.';return undefined;}
    const old=root.profiles?.[data.uid]?.name;
    root.profiles??={};root.profiles[data.uid]={name:data.name};root.usernames??={};root.usernames[key]=data.uid;
    if(old){const oldKey=old.toLowerCase().replaceAll('.','%2E');if(oldKey!==key&&root.usernames[oldKey]===data.uid)delete root.usernames[oldKey];}
@@ -141,11 +161,35 @@ exports.adminConsole=onCall(options,async request=>{
  if(action==='block'){
   if(!validKey(data.uid)||typeof data.disabled!=='boolean'||typeof data.reason!=='string'||data.reason.trim().length<3||data.reason.length>200||!validKey(data.requestId))throw new HttpsError('invalid-argument','Usuario o motivo inválido.');
   if(data.uid===actor||(await db.ref('administrators/'+data.uid).get()).val()===true)throw new HttpsError('failed-precondition','No podés bloquear una cuenta administradora.');
-  if(data.disabled)await db.ref('userAccess/'+data.uid).set({blocked:true});
+  if((await db.ref('userAccess/'+data.uid).get()).val()?.deleting)throw new HttpsError('failed-precondition','La cuenta está siendo eliminada.');
+  const updateAccess=async blocked=>{const changed=await db.ref('userAccess/'+data.uid).transaction(current=>current?.deleting||current?.deletedAt?undefined:{...current,blocked});if(!changed.committed)throw new HttpsError('failed-precondition','La cuenta está siendo eliminada.');};
+  if(data.disabled)await updateAccess(true);
   await getAuth().updateUser(data.uid,{disabled:data.disabled});
-  if(!data.disabled)await db.ref('userAccess/'+data.uid).set({blocked:false});
+  if(!data.disabled)await updateAccess(false);
   if(data.disabled)await getAuth().revokeRefreshTokens(data.uid);
   await db.ref('adminUserAudit/'+data.requestId).set({actor,uid:data.uid,action:'block',after:data.disabled,reason:data.reason,at:Date.now()});return {ok:true};
  }
  throw new HttpsError('invalid-argument','Acción inválida.');
+});
+
+const {uruguayDate,activityUpdates,activitySummary}=require('./activity-service.cjs');
+exports.playerActivity=onCall({...options,maxInstances:3},async request=>{
+ const user=await identity(request);await rateLimit(user.uid,10,'activity');
+ const now=Date.now();let updates;
+ try{updates=activityUpdates({uid:user.uid,sessionId:request.data?.sessionId,visible:request.data?.visible,now});}catch(e){throw new HttpsError('invalid-argument',e.message);}
+ await db.ref('adminMetrics').update(updates);
+ await db.ref('adminMetrics/startedAt').transaction(current=>current||now);
+ return {ok:true};
+});
+exports.activityCleanup=onSchedule({schedule:'every day 04:00',timeZone:'America/Montevideo',region:'us-central1',maxInstances:1},async()=>{
+ const now=Date.now(),cutoff=uruguayDate(now-29*86400000).day;
+ await db.ref('adminMetrics').transaction(metrics=>{
+  if(!metrics)return null;
+  for(const day of Object.keys(metrics.days||{}))if(day<cutoff)delete metrics.days[day];
+  for(const [uid,sessions] of Object.entries(metrics.presence||{})){
+   for(const [id,session] of Object.entries(sessions))if(now-session.at>=90000)delete sessions[id];
+   if(!Object.keys(sessions).length)delete metrics.presence[uid];
+  }
+  return metrics;
+ });
 });

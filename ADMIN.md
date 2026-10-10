@@ -24,5 +24,10 @@ Para revocar permisos, eliminá ese UID de administrators. Los permisos se compr
 
 Si el saldo cambia mientras editabas, actualizá antes de guardar.
 Los nombres se reflejan al recargar el juego; no cambian nombres históricos de partidas.
-No elimina cuentas ni historiales contables para conservar registros de las apuestas.
+Permite eliminar cuentas sin mesas activas ni créditos reservados, con confirmación del nombre. Elimina Firebase Auth y perfil, libera el nombre y pone el saldo en cero. Conserva historiales de partidas y registros contables. Una nueva inscripción crea otra cuenta.
 No incluyas claves de servicio en el repositorio ni en admin.html.
+
+## Estadísticas
+Usuarios totales Google/Apple, activos ahora y usuarios únicos diarios. Activos significa juego visible con una señal recibida en los últimos 90 segundos; varias pestañas cuentan como un solo usuario. Horario de Uruguay. Datos por día y hora durante los últimos 30 días, registrados a partir de esta actualización. Los visitantes sin sesión no se cuentan. El panel refresca métricas cada minuto.
+
+Volvé a descargar el proyecto y desplegá functions,database para habilitar playerActivity y activityCleanup. Ninguna estadística histórica anterior se puede reconstruir con precisión.
