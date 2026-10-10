@@ -24,14 +24,14 @@ test('Windows does not show Apple and failed startup provides a recovery control
  app.account.failed(new Error('network'));assert.equal(app.el('auth-retry').hidden,false);
 });
 test('Apple uses the confirmed result even before currentUser is updated',async()=>{
- const app=setup('iPhone');const user={uid:'apple-user',isAnonymous:false,providerData:[{providerId:'apple.com'}]};
+ const app=setup('MacIntel');const user={uid:'apple-user',isAnonymous:false,providerData:[{providerId:'apple.com'}]};
  class OAuthProvider{addScope(){}setCustomParameters(){}}
  app.state.firebase={auth:{currentUser:null},authSdk:{OAuthProvider,browserPopupRedirectResolver:'resolver',async signInWithPopup(auth,provider,resolver){assert.equal(resolver,'resolver');return {user};}},ref:()=>({}),get:async()=>({val:()=>({name:'ApplePlayer'})})};
  await app.el('account-apple').events.click();
  assert.equal(app.account.isReady(),true);assert.equal(app.el('account-username').textContent,'ApplePlayer');assert.equal(app.el('auth-gate').hidden,true);
 });
 test('Apple rejection shows the actual Firebase error and allows another attempt',async()=>{
- const app=setup('iPhone');class OAuthProvider{addScope(){}setCustomParameters(){}}
+ const app=setup('MacIntel');class OAuthProvider{addScope(){}setCustomParameters(){}}
  app.state.firebase={auth:{currentUser:null},authSdk:{OAuthProvider,async signInWithPopup(){throw {code:'auth/account-exists-with-different-credential'};}}};
  await app.el('account-apple').events.click();
  assert.equal(app.account.isReady(),false);assert.match(app.el('auth-status').textContent,/auth\/account-exists-with-different-credential/);assert.equal(app.el('account-apple').disabled,false);
@@ -41,10 +41,19 @@ test('Chrome iPhone leaves the cross-origin popup flow for Firebase Hosting',asy
  const app=setup('iPhone','iPhone CriOS/140');class OAuthProvider{addScope(){}setCustomParameters(){}}
  app.state.firebase={auth:{app:{options:{authDomain:'truco-6553d.firebaseapp.com'}}},authSdk:{OAuthProvider,signInWithPopup(){throw Error('Must not open popup');}}};
  await app.el('account-apple').events.click();
- assert.equal(app.location.destination,'https://truco-6553d.firebaseapp.com/?appleLogin=1&v=apple45');
+ assert.equal(app.location.destination,'https://truco-6553d.firebaseapp.com/?appleLogin=1&v=apple46');
 });
 test('Chrome iPhone on Firebase uses redirect on the same origin',async()=>{
  const app=setup('iPhone','iPhone CriOS/140','https://truco-6553d.firebaseapp.com');let calls=0;class OAuthProvider{addScope(){}setCustomParameters(){}}
  app.state.firebase={auth:{app:{options:{authDomain:'truco-6553d.firebaseapp.com'}}},authSdk:{OAuthProvider,browserPopupRedirectResolver:'resolver',async signInWithRedirect(auth,provider,resolver){calls++;assert.equal(resolver,'resolver');}}};
  await app.el('account-apple').events.click();assert.equal(calls,1);assert.equal(app.location.destination,undefined);
 });
+
+for(const ua of ['iPhone Version/26 Mobile Safari/605','iPad Version/26 Mobile Safari/605']) {
+ test('Safari '+ua.split(' ')[0]+' starts Apple without a popup',async()=>{
+  const app=setup('iPhone',ua);class OAuthProvider{addScope(){}setCustomParameters(){}}
+  app.state.firebase={auth:{app:{options:{authDomain:'truco-6553d.firebaseapp.com'}}},authSdk:{OAuthProvider,signInWithPopup(){throw Error('Popup should not be used on iOS');}}};
+  await app.el('account-apple').events.click();
+  assert.equal(app.location.destination,'https://truco-6553d.firebaseapp.com/?appleLogin=1&v=apple46');
+ });
+}

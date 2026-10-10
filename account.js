@@ -145,13 +145,14 @@ export function installAccount({ services, getState, rememberName, document, sto
       const provider=new fb.authSdk.OAuthProvider('apple.com');
       provider.addScope('email');provider.addScope('name');
       provider.setCustomParameters({locale:'es'});
-      // Chrome on iOS loses Apple's native popup return. Keep redirect auth
+      // iOS browsers can block the first popup or lose Apple's native return.
+      // Keep redirect auth
       // and its storage on Firebase's own origin instead of GitHub Pages.
-      if(/CriOS\//.test(navigator.userAgent||'')) {
+      if(/iPhone|iPad|iPod/i.test(navigator.userAgent||navigator.platform||'')||(/Mac/i.test(navigator.platform||'')&&navigator.maxTouchPoints>1)) {
         const target=new URL('https://'+fb.auth.app.options.authDomain+'/');
         if(globalThis.location.origin!==target.origin) {
           target.searchParams.set('appleLogin','1');
-          target.searchParams.set('v','apple45');
+          target.searchParams.set('v','apple46');
           globalThis.location.assign(target.href);
           return;
         }
