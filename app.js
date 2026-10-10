@@ -1,4 +1,4 @@
-import { installCredits } from './credits.js?v=20261010-cards26';
+import { installCredits } from './credits.js?v=20261010-icons27';
 import { installAccount } from './account.js?v=20261009-apple-login10';
 const FIREBASE_VERSION = '12.4.0';
 const $ = (id) => document.getElementById(id);
@@ -430,7 +430,7 @@ function loadConfig() {
 }
 let firebaseReadyPromise=null;
 const account=installAccount({services:firebaseServices,getState:()=>state,rememberName:rememberPlayerName,document,onReady:async()=>{await openInitialRoom();credits.start();},onIdentityChange:resetAccountRoom,onNameChanged:()=>showView('welcome-view'),inRoom:()=>!!state.room&&!$('welcome-view').classList.contains('active')});
-const credits=installCredits({services:firebaseServices,getState:()=>state,document,onChange:()=>{if(state.lobbyRooms)renderLobby(state.lobbyRooms);$('table-stake-available').textContent=String(credits.wallet()?.balance??'—');}});
+const credits=installCredits({services:firebaseServices,getState:()=>state,document,notify:message=>toast(message),onChange:()=>{if(state.lobbyRooms)renderLobby(state.lobbyRooms);$('table-stake-available').textContent=String(credits.wallet()?.balance??'—');}});
 function resetAccountRoom(){
   credits.stop();
   stopRoomPresence();stopBot();forgetRoomSeat();
@@ -727,10 +727,10 @@ function renderLobby(rooms) {
     const actions=[];
     if(!players.player1||!players.player2)actions.push(['player','Entrar']);
     const privateTable=!!(room.managedCredits&&room.creditMatch.hasPassword);
-    const trophy='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3h8v5a4 4 0 0 1-8 0V3ZM8 5H4v2a4 4 0 0 0 5 4m7-6h4v2a4 4 0 0 1-5 4M12 12v6m-4 3h8m-6-3h4"/></svg>';
+    const trophy='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3 4 21M3 5l18-1M20 3l-1 18M3 20l18-1M3 22 22 2"/></svg>';
     const coins='<svg viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v5c0 4 16 4 16 0V5M4 10v5c0 4 16 4 16 0v-5M4 15v4c0 4 16 4 16 0v-4"/></svg>';
     const lock='<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="'+(privateTable?'M8 10V6a4 4 0 0 1 8 0v4':'M8 10V6a4 4 0 0 1 8 0')+'"/><path d="M12 14v3"/></svg>';
-    return `<article class="lobby-card compact-room"><div class="compact-room-owner"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21v-2a8 8 0 0 1 16 0v2"/></svg><h3>${escapeHtml(title)}</h3></div><div class="compact-room-stat">${trophy}<strong>${targetPoints(room)}</strong><span>puntos</span></div><div class="compact-room-stat">${coins}<strong>${room.managedCredits?escapeHtml(String(room.creditMatch.stake)):'0'}</strong><span>créditos</span></div><div class="compact-room-privacy ${privateTable?'is-private':'is-public'}">${lock}<strong>${privateTable?'Privada':'Pública'}</strong></div><div class="lobby-join-options">${actions.map(([key,label])=>`<button class="button lobby-player-button" data-room="${code}" data-seat="${key}" ${room.managedCredits&&!roomSeatForUid(room,state.uid)&&((credits.wallet()?.balance??0)<room.creditMatch.stake||(credits.wallet()?.locked??0)>0)?'disabled':''}>${label}</button>`).join('')}</div></article>`;
+    return `<article class="lobby-card compact-room"><div class="compact-room-owner"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21v-2a8 8 0 0 1 16 0v2"/></svg><h3>${escapeHtml(title)}</h3></div><div class="compact-room-stat">${trophy}<strong>${targetPoints(room)}</strong><span>puntos</span></div><div class="compact-room-stat">${coins}<strong>${room.managedCredits?escapeHtml(String(room.creditMatch.stake)):'0'}</strong></div><div class="compact-room-privacy ${privateTable?'is-private':'is-public'}">${lock}<strong>${privateTable?'Privada':'Pública'}</strong></div><div class="lobby-join-options">${actions.map(([key,label])=>`<button class="button lobby-player-button" data-room="${code}" data-seat="${key}" ${room.managedCredits&&!roomSeatForUid(room,state.uid)&&((credits.wallet()?.balance??0)<room.creditMatch.stake||(credits.wallet()?.locked??0)>0)?'disabled':''}>${label}</button>`).join('')}</div></article>`;
   }).join('');
 }
 function joinOpenRoom(code, seat) {

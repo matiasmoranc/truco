@@ -21,7 +21,7 @@ export function dailyCreditChanges(wallet,timestamp) {
   return {...wallet,balance:2,locked:0,lastGrantAt:timestamp};
 }
 
-export function installCredits({services,getState,document,now=()=>Date.now(),setTimer=setTimeout,clearTimer=clearTimeout,onChange=()=>{}}) {
+export function installCredits({services,getState,document,now=()=>Date.now(),setTimer=setTimeout,clearTimer=clearTimeout,onChange=()=>{},notify=()=>{}}) {
   const el=id=>document.getElementById(id);
   let uid=null,generation=0,unsubscribe=null,timer=null,wallet,busy=false,error='',available=false,detailsOpen=false;
   const clock=()=>now()+(Number(getState().serverTimeOffset)||0);
@@ -89,7 +89,9 @@ export function installCredits({services,getState,document,now=()=>Date.now(),se
     }finally {if(epoch===generation){busy=false;render();}}
   }
   el('credits-open')?.addEventListener('click',()=>{
-    if(!uid)return;detailsOpen=true;render();
+    if(!uid)return;
+    if((wallet?.balance??0)>0){detailsOpen=false;render();notify('Ya tenés créditos disponibles.');return;}
+    detailsOpen=true;render();
     const panel=el('credits-panel');
     panel.scrollIntoView({behavior:'smooth',block:'center'});
     el('credits-claim').focus({preventScroll:true});
