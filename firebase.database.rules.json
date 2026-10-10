@@ -7,7 +7,25 @@
       "$room": {
         "public": {
           ".read": "auth != null",
-          ".write": "auth != null"
+          ".write": "auth != null && data.child('managedCredits').val() != true && newData.child('managedCredits').val() != true",
+          "connectionPresence": {
+            "$player": {
+              ".write": "auth != null && ($player == 'player1' || $player == 'player2') && root.child('rooms').child($room).child('public').child('players').child($player).child('uid').val() == auth.uid && newData.child('uid').val() == auth.uid && newData.child('matchNumber').val() == root.child('rooms').child($room).child('public').child('matchNumber').val()",
+              ".validate": "newData.hasChildren(['uid','matchNumber','session','online'])",
+              "online": {
+                ".validate": "newData.isBoolean()"
+              },
+              "session": {
+                ".validate": "newData.isString()"
+              },
+              "disconnectedAt": {
+                ".validate": "newData.isNumber() && newData.val() == now"
+              },
+              "$other": {
+                ".validate": "$other == 'uid' || $other == 'matchNumber'"
+              }
+            }
+          }
         }
       }
     },
@@ -15,7 +33,7 @@
       "$room": {
         "$uid": {
           ".read": "auth != null && auth.uid == $uid",
-          ".write": "auth != null && (auth.uid == $uid || auth.uid == root.child('rooms').child($room).child('public').child('table').child('uid').val())"
+          ".write": "auth != null && root.child('rooms').child($room).child('public').child('managedCredits').val() != true && (auth.uid == $uid || auth.uid == root.child('rooms').child($room).child('public').child('table').child('uid').val())"
         }
       }
     },
@@ -65,6 +83,10 @@
         }
       },
       "matches": {
+        ".read": false,
+        ".write": false
+      },
+      "tables": {
         ".read": false,
         ".write": false
       }

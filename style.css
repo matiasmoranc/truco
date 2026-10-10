@@ -1323,3 +1323,15 @@ body { min-height:100dvh; }
 .credits-panel .button{margin-top:10px;min-height:40px;width:100%;padding:9px 12px;font-size:14px;background:transparent;color:#e8c983;border:1px solid #e8c983}
 .credits-panel .button[hidden]{display:none!important}
 .credits-panel .button:disabled{opacity:.6;cursor:default}
+
+/* Credit tables: scoped controls match the existing green/gold palette. */
+.credit-table-settings {display:grid;gap:10px;margin:14px 0;text-align:left;}
+.credit-table-settings p {margin:0;font-size:13px;color:var(--muted,#bbcec0);}
+.credit-table-settings input,.credit-table-settings select,.credit-join-dialog input {box-sizing:border-box;width:100%;padding:12px;border:1px solid #d9bd79;border-radius:10px;background:#103b2c;color:#f1e9d7;font:inherit;}
+.credit-table-settings [hidden],.credit-join-dialog [hidden] {display:none;}
+.credit-join-dialog {width:min(420px,calc(100% - 40px));box-sizing:border-box;padding:22px;border:1px solid #d9bd79;border-radius:20px;background:#143d2e;color:#f1e9d7;}
+.credit-join-dialog::backdrop {background:#001b1390;backdrop-filter:blur(5px);}
+.credit-join-dialog form {display:grid;gap:14px;}.credit-join-dialog h2,.credit-join-dialog p {margin:0;}
+#join-credit-close {justify-self:end;}#join-credit-submit {background:#e8c97f;color:#143326;}#join-credit-error {color:#f0a9a0;}
+
+.credit-table-settings.hidden{display:none!important;}

@@ -1,56 +1,53 @@
-# Créditos gratuitos — primera etapa
+# Mesas con créditos gratuitos
 
-Los créditos son virtuales: no representan pesos, dinero ni premios canjeables.
+Los créditos son virtuales, sin dinero ni premios canjeables. No hay compras ni publicidad.
 
-## Implementado
+## Funcionamiento
 
-- Saldo por cuenta de Google o Apple, persistido en Realtime Database.
-- Reclamo manual de exactamente 2 créditos, una vez por día de Uruguay (UTC−3).
-- Sólo se permite cuando el saldo es 0; tener 1 del día anterior no permite recibir más.
-- No se acumulan reclamos de días anteriores.
-- Hora validada por Firebase, no por el teléfono. Se rechazan cambios de saldo, timestamps falsos y borrados de la billetera.
-- Las transacciones esperan confirmación remota, evitan doble toque y se actualizan entre dispositivos.
-- Créditos reservados también bloquean el reclamo: no cuentan como quedarse sin créditos.
-- Motor de contabilidad del servidor probado para reservar ambos aportes, entregar el pozo íntegro al ganador, reintegros y revanchas sin cobros o pagos duplicados.
+- Reclamo manual de 2 créditos por día de Uruguay (UTC−3), sólo con saldo 0 y sin créditos reservados. Tener 1 crédito no permite reclamar otros 2.
+- El creador elige una apuesta entera de 1 o más, dentro de su saldo disponible, y una mesa pública o con clave de 4 a 64 caracteres.
+- La apuesta del creador se reserva al crear la mesa. El rival debe tener al menos ese monto disponible y aporta exactamente lo mismo. Sus saldos totales pueden ser diferentes.
+- El ganador recibe ambas apuestas, sin descuento. La revancha necesita saldo suficiente de ambos y usa un recibo nuevo.
+- Cancelar la espera devuelve la apuesta. Una mesa sin rival vence a los 10 minutos. Si no se completa el sorteo en 30 segundos, se devuelven ambos aportes.
+- Durante el partido, el árbitro aplica los tiempos de inactividad y la desconexión con 45 segundos de gracia. El cierre de la pantalla de resultado envía a ambos al lobby.
+- Bot y aprendizaje siguen sin usar créditos.
 
-## Activar el saldo y el reclamo
+## Activar las mesas
 
-Publicar el archivo completo `firebase.database.rules.json` en Firebase Console → Realtime Database → Rules. No reemplazarlo por sólo la sección de créditos: el archivo conserva las reglas de perfiles, nombres y partidas existentes.
+Publicar las reglas habilita el saldo y el reclamo diario, pero las apuestas necesitan además las funciones del servidor. Firebase requiere el plan Blaze para desplegar Cloud Functions. La cuenta de Firebase usada por la CLI debe tener permiso para desplegar en `truco-6553d`.
 
-También se puede usar:
+Desde una copia actualizada del repositorio, con Node.js 22:
 
 ```sh
-firebase deploy --only database --project truco-6553d
+npm ci --prefix functions
+npx firebase-tools login
+npx firebase-tools deploy --only functions,database --project truco-6553d
 ```
 
-Después recargar el juego. No se necesitan Cloud Functions ni cambiar de plan de Firebase para el reclamo diario: lo protege la regla de la base con `now` y `serverTimestamp()`.
+Esto publica el archivo completo `firebase.database.rules.json` y estas funciones en `us-central1`:
 
-Sin las reglas publicadas, el lobby indica que los créditos aún no están habilitados; no inventa un saldo ni bloquea las partidas actuales.
+- `creditCreateTable`: valida el saldo y reserva la apuesta del creador.
+- `creditJoinTable`: verifica clave, lugar y saldo; reserva el aporte del rival.
+- `creditTableAction`: aplica jugadas, cantos, mensajes, tiempos y revanchas desde el servidor.
+- `creditExpireTables`: avanza tiempos y devuelve reservas aunque ningún navegador siga abierto.
 
-## Antes de activar partidas con créditos
+El código de GitHub Pages se publica por separado mediante el flujo existente. Si las funciones no están desplegadas, el navegador no inventa una reserva ni una acreditación.
 
-La lógica actual de Truco calcula resultados desde los dispositivos y permite escribir `rooms/public`. No puede usarse como autorización para entregar créditos al ganador: un cliente podría falsear el resultado.
+## Autoridad y privacidad
 
-El módulo `server/credit-ledger.cjs` se debe ejecutar únicamente mediante Firebase Admin SDK en un servidor confiable. `commitCreditOperation` cambia las dos billeteras y el recibo de la partida en una sola transacción. No hay un endpoint público que permita declarar un ganador ni un import del módulo en el navegador.
+`functions/game-referee.cjs` ejecuta en el servidor las mismas reglas probadas del juego. `scripts/build-credit-referee.cjs` lo genera desde las funciones compartidas de `app.js` y los archivos `functions/referee-*.cjs`. Regenerarlo después de cambiar esas reglas.
 
-Hace falta integrar un árbitro de partidas del lado del servidor que controle reparto, jugadas, cantos, puntaje, abandono y desconexión. Sólo ese árbitro puede reservar y liquidar los aportes. Cada partida y revancha usa un identificador nuevo; reintentar una operación usa el mismo identificador. Un fallo previo al inicio debe reintegrar ambos aportes.
+`creditEconomy` conserva recibos y partidas privadas. Las billeteras y el recibo cambian juntos mediante una transacción. Repetir una entrada, jugada o resultado no duplica cargos ni pagos. El navegador no puede escribir ganadores, cambiar cartas privadas ni quitar `managedCredits`. Sólo puede actualizar su propia presencia y reclamar el aporte diario protegido por las reglas.
 
-Por eso esta primera etapa todavía no cobra créditos al crear mesa, no limita las partidas actuales por saldo y no reparte créditos a partir de los resultados del navegador. Tampoco incluye publicidad ni compras.
+La clave se guarda únicamente como hash con sal aleatoria. La lista pública contiene el monto y la indicación «Con clave», nunca la clave, el hash, el mazo ni las manos privadas. Cada jugador sólo lee sus propias cartas hasta que se revelan al final de la mano.
 
 ## Validación
 
 ```sh
 node --test tests/*.cjs
+node scripts/build-credit-referee.cjs
+npm ci --prefix functions
+npx firebase-tools@13 emulators:exec --only database --project demo-truco --config firebase.emulators.json "node scripts/test-credit-rules.cjs && node scripts/test-credit-functions.cjs"
 ```
 
-`credits-regression.cjs` prueba el cliente y las expresiones reales del archivo de reglas (reclamos repetidos, saldo 1, medianoche de Uruguay, privacidad y manipulación). `credit-ledger-regression.cjs` verifica reservas, insuficiencia de saldo, pagos, reintegros y revanchas idempotentes.
-
-Las reglas también se compilaron y probaron con el emulador oficial de Firebase: reclamos repetidos y simultáneos, saldo 1, intentos de cambiar el importe, timestamps falsos, borrados, privacidad, cuentas Apple, créditos reservados y escritura de un ganador desde el navegador.
-
-Para repetir esa comprobación aislada (requiere Node y Java 17):
-
-```sh
-npx --yes firebase-tools@13 emulators:exec --only database --project demo-truco --config firebase.emulators.json "node scripts/test-credit-rules.cjs"
-```
-
-Usar siempre el proyecto `demo-truco`; el script rechaza endpoints que no sean del emulador local.
+Los tests verifican saldos insuficientes, claves incorrectas, entradas simultáneas, reintegros, pagos únicos, revanchas, cartas falsas, turnos, truco no querido, empate de envido, desconexiones y privacidad. Las últimas dos suites usan exclusivamente un proyecto `demo-` aislado en el emulador; nunca modifican producción.

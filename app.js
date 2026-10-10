@@ -1,4 +1,4 @@
-import { installCredits } from './credits.js?v=20261010-free-credits18';
+import { installCredits } from './credits.js?v=20261010-credit-tables19';
 import { installAccount } from './account.js?v=20261009-apple-login10';
 const FIREBASE_VERSION = '12.4.0';
 const $ = (id) => document.getElementById(id);
@@ -55,6 +55,7 @@ async function publishChatMute(){
   const key=chatContextKey(),desired=chatMuted,player=state.playerId,uid=state.uid,matchNumber=Number(state.room.matchNumber||1),fb=state.firebase;
   publishingChatMute=true;
   try{
+    if(state.room?.managedCredits){await creditCommand({kind:'mute',value:desired});return;}
     const result=await fb.runTransaction(fb.ref(fb.db,`rooms/${state.roomCode}/public`),room=>{
       if(!room||room.status==='closed'||Number(room.matchNumber||1)!==matchNumber||room.players?.[player]?.uid!==uid)return;
       return {...room,chatPreferences:{...(room.chatPreferences||{}),[player]:{uid,muted:desired}}};
@@ -146,6 +147,7 @@ async function sendMatchChat(event){
   const code=state.roomCode,key=chatContextKey(),sender=state.playerId,uid=state.uid,matchNumber=Number(state.room.matchNumber||1);
   matchChat.sending=true;$('chat-send').disabled=true;$('chat-error').classList.add('hidden');
   try{
+    if(state.room?.managedCredits){await creditCommand({kind:'chat',text});if(input.value===draft){input.value='';$('chat-count').textContent='0/40';}return;}
     const fb=state.firebase,messageRef=fb.push(fb.ref(fb.db,`rooms/${code}/public/chatMessages`));
     const result=await fb.runTransaction(fb.ref(fb.db,`rooms/${code}/public`),room=>{
       if(!room||room.status==='closed'||Number(room.matchNumber||1)!==matchNumber||room.players?.[sender]?.uid!==uid||!room.players?.[otherPlayer(sender)]||peerChatMuted(room))return;
@@ -414,7 +416,7 @@ $('player-name').addEventListener('input', event => {
   rememberPlayerName(cleanName(event.target.value, ''));
 });
 
-function isCoordinator() { return state.room?.table?.uid === state.uid; }
+function isCoordinator() { return !state.room?.managedCredits && state.room?.table?.uid === state.uid; }
 function configureSetup() {
   state.navigationEpoch=(state.navigationEpoch||0)+1;
   state.invitationEntry=false;
@@ -428,7 +430,7 @@ function loadConfig() {
 }
 let firebaseReadyPromise=null;
 const account=installAccount({services:firebaseServices,getState:()=>state,rememberName:rememberPlayerName,document,onReady:async()=>{await openInitialRoom();credits.start();},onIdentityChange:resetAccountRoom,onNameChanged:()=>showView('welcome-view'),inRoom:()=>!!state.room&&!$('welcome-view').classList.contains('active')});
-const credits=installCredits({services:firebaseServices,getState:()=>state,document});
+const credits=installCredits({services:firebaseServices,getState:()=>state,document,onChange:()=>{if(state.lobbyRooms)renderLobby(state.lobbyRooms);$('table-stake-available').textContent='Disponibles: '+(credits.wallet()?.balance??'—')+' créditos';}});
 function resetAccountRoom(){
   credits.stop();
   stopRoomPresence();stopBot();forgetRoomSeat();
@@ -579,6 +581,12 @@ async function openInitialRoom(){
 async function enterRoom() {
   if(!account.isReady())return;
   if(state.enteringRoom)return;
+  if(!state.joining&&!$('play-bot').checked){
+    const wallet=credits.wallet(),stake=Number($('table-stake').value);
+    if(!wallet){toast('Esperá a que carguen tus créditos.',true);return;}
+    if(wallet.locked>0){toast('Ya tenés una apuesta reservada. Volvé a tu mesa.',true);return;}
+    if(!Number.isSafeInteger(stake)||stake<1||stake>wallet.balance){toast('Elegí una apuesta entera dentro de tus créditos disponibles.',true);return;}
+  }
   const entryEpoch=state.navigationEpoch;
   state.enteringRoom=true;$('enter-room').disabled=true;
   const cardsReady=await prepareCardImages();
@@ -602,6 +610,12 @@ async function enterRoom() {
       if(!snap.exists()){toast('La invitación ya no está disponible.',true);await openLobby();return;}
       let room=snap.val(),seat=roomSeatForUid(room,state.uid);
       if(room.status==='closed'||roomExpired(room)){toast('La mesa ya está cerrada.',true);await openLobby();return;}
+      if(room.managedCredits){
+        if(!seat&&!state.joinConfirmed){openCreditJoin(code,room);return;}
+        const result=await creditApi('creditJoinTable',{code,password:state.joinPassword||''});
+        room=result.room;seat=roomSeatForUid(room,state.uid);state.joinPassword='';state.joinConfirmed=false;
+        if(!seat)throw new Error('La mesa ya no tiene lugares disponibles.');
+      }
       // Existing players may reconnect even after the automatic start.
       if(!seat){
         if(room.status!=='waiting'){toast('La partida ya empezó y no tenés un lugar en esta mesa.',true);await openLobby();return;}
@@ -615,17 +629,9 @@ async function enterRoom() {
       }
       state.roomCode=code;state.playerId=seat;joinedRoom=room;
     }else{
-      const code=makeCode(),deviceMode='two';
-      const role='player1';
-      const person={uid:state.uid,name,online:true};
-      const targetPoints=normalizeTargetPoints($('target-points').value);
-      joinedRoom={deviceMode,status:'waiting',createdAt:Date.now(),targetPoints,
-        table:person,
-        players:{player1:person,player2:null},
-        scores:{player1:0,player2:0},handNumber:1,deckCount:40,trickCards:[],
-        feed:[{text:`${name} abrió una mesa a ${targetPoints}. Faltan los demás.`,time:Date.now()}]};
-      await fb.set(fb.ref(fb.db,`rooms/${code}/public`),joinedRoom);
-      state.roomCode=code;state.playerId=role;
+      const stake=Number($('table-stake').value),visibility=$('table-visibility').value;
+      const result=await creditApi('creditCreateTable',{stake,targetPoints:normalizeTargetPoints($('target-points').value),visibility,password:visibility==='password'?$('table-password').value:''});
+      joinedRoom=result.room;state.roomCode=result.code;state.playerId='player1';
     }
     rememberPlayerName(name);
     attachLiveRoom(state.roomCode,state.playerId,joinedRoom);
@@ -699,6 +705,7 @@ function roomExpired(room,now=Date.now()){
 }
 const closingRooms=new Set();
 async function closeExpiredRoom(code){
+  if(state.lobbyRooms?.[code]?.public?.managedCredits||state.room?.managedCredits&&state.roomCode===code)return;
   if(!state.firebase||closingRooms.has(code))return;
   closingRooms.add(code);
   try {const fb=state.firebase;await fb.runTransaction(fb.ref(fb.db,`rooms/${code}/public`),room=>roomExpired(room)?{...room,status:'closed',closedAt:Date.now()}:undefined);}
@@ -719,7 +726,7 @@ function renderLobby(rooms) {
     const available = seats.filter(([, , person]) => !person);
     const actions=[];
     if(!players.player1||!players.player2)actions.push(['player','Entrar']);
-    return `<article class="lobby-card"><div class="lobby-card-top"><div><h3>${escapeHtml(title)}</h3><p class="lobby-meta">${targetPoints(room)} puntos</p></div><span class="lobby-count" aria-label="${available.length} lugares disponibles">${seats.length-available.length}/${seats.length}</span></div><div class="lobby-join-options">${actions.map(([key,label])=>`<button class="button lobby-player-button" data-room="${code}" data-seat="${key}">${label}</button>`).join('')}</div></article>`;
+    return `<article class="lobby-card"><div class="lobby-card-top"><div><h3>${escapeHtml(title)}</h3><p class="lobby-meta">${targetPoints(room)} puntos${room.managedCredits?' · '+room.creditMatch.stake+' créditos por jugador · '+(room.creditMatch.hasPassword?'Con clave':'Pública'):''}</p></div><span class="lobby-count" aria-label="${available.length} lugares disponibles">${seats.length-available.length}/${seats.length}</span></div><div class="lobby-join-options">${actions.map(([key,label])=>`<button class="button lobby-player-button" data-room="${code}" data-seat="${key}" ${room.managedCredits&&!roomSeatForUid(room,state.uid)&&((credits.wallet()?.balance??0)<room.creditMatch.stake||(credits.wallet()?.locked??0)>0)?'disabled':''}>${label}</button>`).join('')}</div></article>`;
   }).join('');
 }
 function joinOpenRoom(code, seat) {
@@ -732,6 +739,7 @@ function firebaseError(error) {
   if (error?.code === 'auth/operation-not-allowed') return 'Activá el inicio de sesión anónimo en Firebase y volvé a intentar.';
   if (error?.code?.includes('permission-denied')) return 'Firebase rechazó el acceso. Revisá las reglas de la base.';
   if (error?.message?.includes('Failed to fetch')) return 'No se pudo conectar con Firebase. Revisá la configuración y la conexión.';
+  if(error?.code?.startsWith('functions/'))return error.code==='functions/not-found'?'Falta habilitar el servidor de las mesas con créditos.':error.message||'No pudimos conectar con el servidor.';
   return 'No pudimos conectar la mesa. Revisá la configuración de Firebase.';
 }
 function watchRoom() {
@@ -766,6 +774,7 @@ function watchRoom() {
   },error=>{if(code!==state.roomCode||version!==state.roomWatchVersion)return;console.error('[truco:room] subscription failed',{code,error});toast(firebaseError(error),true);});
 }
 function privateHandMatchesRoom(deal,room){
+  if(room?.managedCredits&&deal?.creditMatchId!==room.creditMatch?.id)return false;
   if(!deal||!room||(deal.handNumber!=null&&Number(deal.handNumber)!==Number(room.handNumber||1)))return false;
   const expected=room.handCounts?.[state.playerId];
   return expected==null||(deal.hand||[]).length===Number(expected);
@@ -801,6 +810,7 @@ function renderWaiting() {
   $('seats').innerHTML = seatData.map(([key,label,value]) => `<div class="seat ${value?'seat-occupied':'seat-free'}"><span class="seat-icon" data-suit-icon="${key==='player1'?'espada':'copa'}"></span><span class="seat-name"><strong>${escapeHtml(value?.name || 'Lugar disponible')}</strong></span><span class="seat-state ${value?'ready':''}">${value?'Ocupado':'Libre'}</span></div>`).join('');setupSuitIcons($('seats'));
   if(ready&&isCoordinator())startGame().catch(error=>toast(firebaseError(error),true));
   $('waiting-hint').textContent = ready?'La partida está por comenzar.':'Invitá a un amigo para empezar a jugar.';
+  if(state.room.managedCredits)$('waiting-hint').textContent=state.room.creditMatch.stake+' créditos por jugador · '+(state.room.creditMatch.hasPassword?'Mesa con clave':'Mesa pública')+'. Invitá a un amigo o esperá que entre desde el lobby.';
   $('game-room-code').textContent = 'MESA ABIERTA';
 }
 function shuffleDeck() {
@@ -851,6 +861,7 @@ async function closeOpeningDraw(reason){
   if(closingOpeningDraw||state.room?.status!=='drawing')return;
   closingOpeningDraw=true;
   try{
+    if(state.room?.managedCredits){await creditCommand(reason==='draw-timeout'?{kind:'tick'}:{kind:'cancel',reason:'draw-cancel'});return;}
     if(state.localGame){returnToLobby(reason==='draw-timeout'?'Se acabó el tiempo para elegir carta. La partida no comenzó.':'Volviste al inicio.');return;}
     const fb=state.firebase,code=state.roomCode;
     await fb.runTransaction(fb.ref(fb.db,`rooms/${code}/public`),room=>{
@@ -896,6 +907,7 @@ async function drawOpeningCard(){
   if(drawInFlight||state.room?.status!=='drawing'||!['player1','player2'].includes(player)||state.room.openingDraw?.cards?.[player])return;
   drawInFlight=true;
   try{
+    if(state.room?.managedCredits){await creditCommand({kind:'draw'});return;}
     if(state.localGame){
       const opening=state.room.openingDraw||newOpeningDraw();
       if(openingDrawExpired(state.room)){await closeOpeningDraw('draw-timeout');return;}
@@ -1164,6 +1176,7 @@ function canCallFirstRoundEnvido(room,player,hand){
 }
 
 async function callBet(kind) {
+  if(state.room?.managedCredits)return creditCommand({kind:'call',value:kind});
   if(liveActionsBlocked())return;
   if(state.localGame){localCallAction(kind);return;}
   const room=state.room, caller=state.playerId, other=caller==='player1'?'player2':'player1', pending=room.pendingBet;
@@ -1211,6 +1224,7 @@ function canRaiseEnvido(bet){
 }
 
 async function answerBet(answer) {
+  if(state.room?.managedCredits)return creditCommand({kind:'call',value:answer});
   if(liveActionsBlocked())return;
   if(state.room?.turnClock?.key===turnClockKey()&&turnClockRemaining(state.room.turnClock).expired){renderTurnTimer();return;}
   const bet=state.room?.pendingBet;if(!bet||bet.responder!==state.playerId)return;
@@ -1253,6 +1267,7 @@ async function answerBet(answer) {
   await writeRoom({trucoLevel:bet.stake,pendingBet:null,feed:topFeed(state.room,`${state.room.players[state.playerId].name} dice QUIERO`) });
 }
 async function revealEnvido(good=false,declaredNumber=null) {
+  if(state.room?.managedCredits)return creditCommand({kind:'declare',good,value:Number(declaredNumber??$('envido-picker').dataset.value)});
   if(liveActionsBlocked())return;
   if(state.learning?.paused)return;
   if(state.room?.turnClock?.key===turnClockKey()&&turnClockRemaining(state.room.turnClock).expired){renderTurnTimer();return;}
@@ -1294,6 +1309,7 @@ async function verifyEnvido(scores){
   return result;
 }
 async function callFlor() {
+  if(state.room?.managedCredits)return creditCommand({kind:'call',value:'flor'});
   if(liveActionsBlocked())return;
   const room=state.room,player=state.playerId;if(!room||(room.playedCount||0)>0||room.flors?.[player]!=null||!roomHasFlor(room,state.hand)){toast('No tenés flor.');return;}
   const flors={...(room.flors||{}),[player]:florValue(state.hand,room.muestra)};
@@ -1502,6 +1518,7 @@ async function foldHand(){
   if(state.foldInFlight||state.playActionInFlight||!canFoldHand(state.room,state.playerId))return;
   state.foldInFlight=true;
   try{
+    if(state.room?.managedCredits){await creditCommand({kind:'fold'});return;}
     if(state.localGame){
       const room=state.room,changes=foldHandChanges(room,state.playerId),pending=changes.pendingNextHand;
       queueLearningAction('fold');Object.assign(room,changes);
@@ -1578,7 +1595,8 @@ async function playCard(card) {
     patches[`rooms/${state.roomCode}/public/playedCount`] = (state.room.playedCount||0)+1;
     patches[`rooms/${state.roomCode}/public/feed`] = topFeed(state.room,winner?`${state.room.players[winner].name} gana la ronda.`:'Ronda parda.');
   }
-  try{await fb.update(fb.ref(fb.db), patches);}catch(error){console.error(error);toast(firebaseError(error));}finally{state.playActionInFlight=false;state.pendingCardId=null;renderGame();syncLiveControls();}
+  try{
+    if(state.room?.managedCredits){await creditCommand({kind:'play',cardId:card.id});return;}await fb.update(fb.ref(fb.db), patches);}catch(error){console.error(error);toast(firebaseError(error));}finally{state.playActionInFlight=false;state.pendingCardId=null;renderGame();syncLiveControls();}
 }
 function cardImage(card){
   const rank=Number(card.rank);
@@ -1675,6 +1693,7 @@ function turnTimeoutChanges(room){
     endReveal:{done:true},feed:topFeed(room,message)};
 }
 async function expireTurnClock(clock){
+  if(state.room?.managedCredits)return creditCommand({kind:'tick'});
   const token=beginTurnClockWrite();if(!token)return;
   try{
     if(state.localGame){
@@ -1786,6 +1805,7 @@ function disconnectMatchChanges(room,loser){
     handComplete:false,trickCards:[],envidoAudit:null,endReveal:{done:true},feed:topFeed(room,message)};
 }
 async function expireDisconnectedPlayer(info){
+  if(state.room?.managedCredits)return creditCommand({kind:'tick'});
   if(state.firebaseConnected!==true||state.playerId===info.player)return;
   const code=state.roomCode,matchNumber=Number(state.room.matchNumber||1),key=[code,matchNumber,info.player,info.presence.session].join(':');
   if(disconnectExpiryPending===key)return;disconnectExpiryPending=key;
@@ -1845,7 +1865,7 @@ function renderTurnTimer(){
       // Keep a visible clock while the shared start is confirmed or retried.
       clock=turnClockDisplayCache.get(cacheKey)||{key,startedAt:gameTime()};
       turnClockDisplayCache.set(cacheKey,clock);
-      if(isCoordinator()||['player1','player2'].includes(state.playerId)){
+      if(!room.managedCredits&&(isCoordinator()||['player1','player2'].includes(state.playerId))){
         const token=beginTurnClockWrite();
         if(token){
           const fb=state.firebase,code=state.roomCode,matchNumber=Number(room.matchNumber||1);
@@ -2035,6 +2055,7 @@ async function respondRematch(action){
   const code=state.roomCode,player=state.playerId,matchNumber=Number(state.room?.matchNumber||1);
   const id=action==='request'?crypto.randomUUID():state.room?.rematch?.id;
   try{
+    if(state.room?.managedCredits){await creditCommand({kind:'rematch',value:action});return;}
     if(state.localGame){
       const changes=rematchChanges(state.room,player,action,id);
       if(changes){
@@ -2075,6 +2096,7 @@ function renderMatchEnd(){
   const request=room.rematch,player=state.playerId,isPlayer=['player1','player2'].includes(player);
   const pending=request?.status==='pending',incoming=pending&&request.requester!==player;
   $('match-end-message').textContent=pending?(incoming?(room.players?.[request.requester]?.name||'Tu rival')+' quiere jugar la revancha.':'Revancha enviada. Esperando al rival…'):request?.status==='declined'?'La revancha no fue aceptada.':room.matchResult?.reason==='inactivity'?'Victoria por inactividad.':room.matchResult?.reason==='disconnect'?'Victoria por desconexión.':'Partida terminada';
+  if(room.creditResult&&!pending)$('match-end-message').textContent+=' · '+(room.players?.[winner]?.name||'El ganador')+' recibió '+room.creditResult.pot+' créditos.';
   $('request-rematch').classList.toggle('hidden',!isPlayer||pending);
   $('accept-rematch').classList.toggle('hidden',!isPlayer||!incoming);
   $('decline-rematch').classList.toggle('hidden',!isPlayer||!incoming);
@@ -2096,6 +2118,7 @@ async function closeFinishedRoom(){
   if(liveActionsBlocked()){toast('Esperá a recuperar la conexión para salir de la mesa.');return;}
   rematchInFlight=true;$('close-match-end').disabled=true;
   try{
+    if(state.room?.managedCredits){await creditCommand({kind:'cancel'});return;}
     if(state.localGame){returnToLobby();return;}
     const fb=state.firebase;
     const result=await fb.runTransaction(fb.ref(fb.db,`rooms/${code}/public`),current=>{
@@ -2231,7 +2254,9 @@ function botLevelLabel(level){return {easy:'Fácil',normal:'Normal',hard:'Difíc
 function updateBotSetup(){
   const enabled=$('play-bot').checked;
   $('bot-levels').classList.toggle('hidden',!enabled);
+  $('credit-table-settings').classList.toggle('hidden',enabled);
   $('enter-room').textContent=enabled?'Jugar contra Bot':'Crear mesa';
+  $('table-stake-available').textContent='Disponibles: '+(credits.wallet()?.balance??'—')+' créditos';
 }
 function stopBot(){clearTimeout(state.learning?.transition?.timer);$('learning-hint')?.close();state.learning=null;$('learning-toolbar')?.classList.add('hidden');$('game-view').classList.remove('learning-mode');clearTimeout(state.botTimer);state.botTimer=null;state.bot=false;state.botMemory=null;}
 async function startBotGame(name){
@@ -2690,7 +2715,7 @@ $('open-room-list').addEventListener('click',(event)=>{const button=event.target
 $('back-home').addEventListener('click',()=>{showView('welcome-view');openLobby();});
 $('fold-hand').addEventListener('click',event=>runLiveAction(event.currentTarget,foldHand));
 $('enter-room').addEventListener('click',enterRoom);
-$('leave-room').addEventListener('click',()=>{stopRoomPresence();stopBot();state.roomWatchVersion=(state.roomWatchVersion||0)+1;state.navigationEpoch=(state.navigationEpoch||0)+1;forgetRoomSeat();if(state.unsubscribe)state.unsubscribe();if(state.privateUnsubscribe)state.privateUnsubscribe();state.privateUnsubscribe=null;state.privateHandKey=null;state.room=null;state.localGame=false;showView('welcome-view');openLobby();});
+$('leave-room').addEventListener('click',async()=>{if(state.room?.managedCredits){try{await creditCommand({kind:'cancel'});}catch{return;}return;}stopRoomPresence();stopBot();state.roomWatchVersion=(state.roomWatchVersion||0)+1;state.navigationEpoch=(state.navigationEpoch||0)+1;forgetRoomSeat();if(state.unsubscribe)state.unsubscribe();if(state.privateUnsubscribe)state.privateUnsubscribe();state.privateUnsubscribe=null;state.privateHandKey=null;state.room=null;state.localGame=false;showView('welcome-view');openLobby();});
 $('game-home').addEventListener('click',()=>{if(state.room?.status==='drawing'){closeOpeningDraw('draw-left');return;}if(state.localGame){stopBot();state.localGame=false;showView('welcome-view');openLobby();return;}showView('waiting-view');});
 function limitMuestraOffset(x,y){
   const distance=Math.hypot(x,y),scale=distance>15?15/distance:1;
@@ -3304,3 +3329,34 @@ await initializePage();
 
 
 
+
+let creditFunctionsPromise=null,creditTickPending=false;
+async function creditApi(name,data){
+  const fb=await firebaseServices();
+  creditFunctionsPromise??=import('https://www.gstatic.com/firebasejs/12.4.0/firebase-functions.js');
+  const {getFunctions,httpsCallable}=await creditFunctionsPromise;
+  return (await httpsCallable(getFunctions(fb.auth.app,'us-central1'),name)(data)).data;
+}
+async function creditCommand(command){
+  const code=state.roomCode,matchId=state.room?.creditMatch?.id;
+  if(!code||!matchId)return;
+  if(liveActionsBlocked()&&command.kind!=='tick')throw new Error('Esperá a recuperar la conexión.');
+  if(command.kind==='tick'&&creditTickPending)return;
+  if(command.kind==='tick')creditTickPending=true;
+  try{return await creditApi('creditTableAction',{code,command,expectedMatchId:matchId,requestId:crypto.randomUUID()});}
+  catch(error){if(command.kind!=='tick')toast(firebaseError(error),true);throw error;}
+  finally{if(command.kind==='tick')creditTickPending=false;}
+}
+function openCreditJoin(code,room){
+  state.joining=true;state.selectedRoom=code;state.joinConfirmed=false;
+  $('join-credit-description').textContent=`La apuesta es de ${room.creditMatch.stake} créditos por jugador. El ganador se lleva ${room.creditMatch.stake*2} créditos.`;
+  $('join-credit-password-row').hidden=!room.creditMatch.hasPassword;
+  $('join-credit-password').value='';$('join-credit-error').textContent='';
+  const wallet=credits.wallet();$('join-credit-submit').disabled=!wallet||(wallet.balance<room.creditMatch.stake)||wallet.locked>0;
+  if($('join-credit-submit').disabled)$('join-credit-error').textContent='No tenés créditos disponibles para esta apuesta.';
+  $('join-credit-dialog').showModal();
+}
+$('join-credit-form').addEventListener('submit',event=>{event.preventDefault();state.joinPassword=$('join-credit-password').value;state.joinConfirmed=true;$('join-credit-dialog').close();enterRoom();});
+$('join-credit-close').addEventListener('click',()=>{$('join-credit-dialog').close();state.joinPassword='';state.joinConfirmed=false;});
+$('table-visibility').addEventListener('change',()=>{$('table-password-row').hidden=$('table-visibility').value!=='password';});
+setInterval(()=>{if(state.room?.managedCredits&&state.firebaseConnected===true&&navigator.onLine!==false&&document.visibilityState==='visible'&&state.room.status!=='closed')creditCommand({kind:'tick'}).catch(()=>{});},2000);

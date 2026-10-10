@@ -17,6 +17,10 @@ jobs:
         run: |
           cp app.js /tmp/truco-app.mjs
           node --check /tmp/truco-app.mjs
+      - name: Verify shared server rules
+        run: |
+          node scripts/build-credit-referee.cjs
+          git diff --exit-code -- functions/game-referee.cjs
       - name: Play regression scenarios
         run: node --test tests/*.cjs
   credit-rules:
@@ -30,6 +34,8 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - name: Verify credit rules in isolated Firebase emulator
-        run: npx --yes firebase-tools@13 emulators:exec --only database --project demo-truco --config firebase.emulators.json "node scripts/test-credit-rules.cjs"
+      - name: Install server dependencies
+        run: npm ci --prefix functions
+      - name: Verify credit rules and server in isolated Firebase emulator
+        run: npx --yes firebase-tools@13 emulators:exec --only database --project demo-truco --config firebase.emulators.json "node scripts/test-credit-rules.cjs && node scripts/test-credit-functions.cjs"
 

@@ -21,7 +21,7 @@ export function dailyCreditChanges(wallet,timestamp) {
   return {...wallet,balance:2,locked:0,lastGrantAt:timestamp};
 }
 
-export function installCredits({services,getState,document,now=()=>Date.now(),setTimer=setTimeout,clearTimer=clearTimeout}) {
+export function installCredits({services,getState,document,now=()=>Date.now(),setTimer=setTimeout,clearTimer=clearTimeout,onChange=()=>{}}) {
   const el=id=>document.getElementById(id);
   let uid=null,generation=0,unsubscribe=null,timer=null,wallet,busy=false,error='',available=false;
   const clock=()=>now()+(Number(getState().serverTimeOffset)||0);
@@ -49,10 +49,10 @@ export function installCredits({services,getState,document,now=()=>Date.now(),se
       const fb=await services();if(epoch!==generation||getState().uid!==user)return;
       unsubscribe=fb.onValue(fb.ref(fb.db,'creditEconomy/wallets/'+user),snapshot=>{
         if(epoch!==generation)return;
-        wallet=snapshot.val();available=true;error='';render();
+        wallet=snapshot.val();available=true;error='';render();onChange();
       },()=>{
         if(epoch!==generation)return;
-        wallet=undefined;available=false;error='Los créditos todavía no están habilitados. Podés seguir jugando.';render();
+        wallet=undefined;available=false;error='Los créditos todavía no están habilitados. Podés jugar contra el bot o practicar.';render();
       });
     }catch {
       if(epoch!==generation)return;
@@ -85,5 +85,5 @@ export function installCredits({services,getState,document,now=()=>Date.now(),se
     }finally {if(epoch===generation){busy=false;render();}}
   }
   el('credits-claim').addEventListener('click',claim);
-  return {start,stop,refresh:render,claim};
+  return {start,stop,refresh:render,claim,wallet:()=>wallet};
 }
