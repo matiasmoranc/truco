@@ -98,3 +98,14 @@ test('Admin current tables exclude settled games, expired waiting tables and com
  assert.equal(adminTableCurrent({status:'reserved',session:{room:{status:'started'}}},now),true);
  assert.equal(adminTableCurrent({status:'reserved',closedAt:10},now),false);
 });
+
+test('Closing a legacy table waits for the initial empty Firebase transaction cache',()=>{
+ const source=require('node:fs').readFileSync(require('node:path').join(__dirname,'../functions/index.cjs'),'utf8');
+ const callback=source.split('let failure;const result=await db.ref().transaction(')[1].split(');\n')[0];
+ const context={closeLegacyTable,data:{...args,code:'LIVE'},actor:args.actor,failure:'previous'};
+ const transaction=require('node:vm').runInNewContext('('+callback+')',context);
+ assert.equal(transaction(null),null);assert.equal(context.failure,null);
+ const root=deletionRoot();root.rooms={LIVE:{public:{status:'started',players:{player1:{uid:'a'}}}}};
+ const closed=transaction(root);assert.equal(closed.rooms.LIVE.public.status,'closed');assert.equal(context.failure,null);
+ assert.equal(transaction(deletionRoot()),undefined);assert.match(context.failure,/mesa cambió/i);
+});
