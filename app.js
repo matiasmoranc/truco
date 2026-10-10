@@ -823,10 +823,8 @@ function renderWaiting() {
   const ready = !!(state.room.table && players.player1 && players.player2);
   $('room-status').textContent = ready?'Todo listo':'Esperando rival';
   const seatData = [['player1','JUGADOR 1',players.player1],['player2','JUGADOR 2',players.player2]];
-  $('seats').innerHTML = seatData.map(([key,label,value]) => `<div class="seat ${value?'seat-occupied':'seat-free'}"><span class="seat-icon" data-suit-icon="${key==='player1'?'espada':'copa'}"></span><span class="seat-name"><strong>${escapeHtml(value?.name || 'Lugar disponible')}</strong></span><span class="seat-state ${value?'ready':''}">${value?'Ocupado':'Libre'}</span></div>`).join('');setupSuitIcons($('seats'));
+  $('seats').innerHTML = seatData.map(([key,label,value]) => `<div class="seat ${value?'seat-occupied':'seat-free'}"><span class="seat-name"><strong>${escapeHtml(value?.name || 'Lugar disponible')}</strong></span><span class="seat-state ${value?'ready':''}">${value?'Listo':'Libre'}</span></div>`).join('');
   if(ready&&isCoordinator())startGame().catch(error=>toast(firebaseError(error),true));
-  $('waiting-hint').textContent = ready?'La partida está por comenzar.':'Invitá a un amigo para empezar a jugar.';
-  if(state.room.managedCredits)$('waiting-hint').textContent=state.room.creditMatch.stake+' créditos por jugador · '+(state.room.creditMatch.hasPassword?'Mesa con clave':'Mesa pública')+'. Invitá a un amigo o esperá que entre desde el lobby.';
   $('game-room-code').textContent = 'MESA ABIERTA';
 }
 function shuffleDeck() {

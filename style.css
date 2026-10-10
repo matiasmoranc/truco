@@ -1455,3 +1455,5 @@ body { min-height:100dvh; }
 #setup-view .stake-stepper{justify-content:center;gap:6px;width:fit-content;max-width:100%;margin:8px 0 22px}#setup-view .stake-amount{display:flex;align-items:center;gap:3px}#setup-view .stake-amount .credit-coin-icon{display:block;width:26px;height:26px}#setup-view .stake-stepper input{flex:none;width:2ch;padding:4px 0;font-size:24px}#setup-view .stake-stepper button{width:46px;flex-basis:46px;height:46px}@media(max-width:360px){#setup-view .stake-stepper input{font-size:20px}#setup-view .stake-stepper button{width:42px;flex-basis:42px;height:44px}}
 
 #join-credit-submit{border:1px solid #e8c983;border-radius:12px;min-height:52px;padding:12px 20px;font:inherit;font-weight:700;cursor:pointer;touch-action:manipulation}#join-credit-submit:disabled{opacity:.55;cursor:wait}#join-credit-error{font-size:14px;color:#ff8f86}#join-credit-error:empty{display:none}
+
+.invite-whatsapp .whatsapp-brand-icon{width:28px;height:28px;flex-shrink:0}
