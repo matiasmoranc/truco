@@ -62,3 +62,28 @@ test('Repeated deletion preparation is idempotent and cannot be reassigned',()=>
  assert.throws(()=>prepareUserDeletion(root,{...deletion,uid:'b'}));
  assert.throws(()=>adminLedgerChange(root.creditEconomy,{...args,requestId:'credit2',action:'credits',uid:'a',balance:50,expectedBalance:10}));
 });
+
+const {legacyTableActive,closeLegacyTable}=require('../functions/admin-service.cjs');
+test('Expired waiting and finished legacy rooms do not block deletion and are closed atomically',()=>{
+ const root=deletionRoot();root.rooms={old:{public:{status:'waiting',createdAt:1,players:{player1:{uid:'a'}}}},finished:{public:{status:'started',targetPoints:20,scores:{player1:20},players:{player1:{uid:'a'}}}}};
+ const updated=prepareUserDeletion(root,{...deletion,now:600001});
+ assert.equal(updated.rooms.old.public.status,'closed');assert.equal(updated.rooms.finished.public.status,'closed');
+ assert.equal(root.rooms.old.public.status,'waiting');
+});
+test('A real legacy game remains protected and can be explicitly closed by its code',()=>{
+ const root=deletionRoot();root.rooms={LIVE:{public:{status:'started',players:{player1:{uid:'a'},player2:{uid:'b'}}}}};
+ assert.equal(legacyTableActive(root.rooms.LIVE.public,100),true);
+ assert.throws(()=>prepareUserDeletion(root,deletion),/LIVE/);
+ const command={...args,code:'LIVE'};const closed=closeLegacyTable(root,command);
+ assert.equal(closed.rooms.LIVE.public.status,'closed');assert.deepEqual(closeLegacyTable(closed,command),closed);
+ assert.doesNotThrow(()=>prepareUserDeletion(closed,{...deletion,requestId:'delete2'}));
+ assert.equal(closed.creditEconomy.wallets.a.balance,10);
+ assert.throws(()=>closeLegacyTable(closed,{...command,code:'OTHER'}));
+});
+test('Legacy closure cannot bypass the credit ledger or treat a fresh waiting table as expired',()=>{
+ assert.equal(legacyTableActive({status:'waiting',createdAt:1,players:{player1:{uid:'a'}}},600000),true);
+ const root=deletionRoot();root.rooms={LIVE:{public:{status:'started',managedCredits:true}}};
+ assert.throws(()=>closeLegacyTable(root,{...args,code:'LIVE'}));
+ delete root.rooms.LIVE.public.managedCredits;root.creditEconomy.tables={LIVE:'m1'};
+ assert.throws(()=>closeLegacyTable(root,{...args,code:'LIVE'}));
+});

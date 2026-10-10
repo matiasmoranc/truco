@@ -27,6 +27,26 @@ function adminLedgerChange(ledger,{actor,action,uid,balance,expectedBalance,code
 }
 module.exports={requireAdmin,adminLedgerChange,validKey};
 
+function legacyTableActive(room,now){
+ if(!room||room.managedCredits||room.closedAt||!['waiting','drawing','started','revealing','timed-out'].includes(room.status))return false;
+ if(Number.isFinite(room.targetPoints)&&Object.values(room.scores||{}).some(score=>score>=room.targetPoints))return false;
+ if(room.status==='waiting'&&!(room.players?.player1&&room.players?.player2)&&Number.isFinite(room.createdAt)&&now-room.createdAt>=600000)return false;
+ return true;
+}
+function closeLegacyTable(root,{code,actor,requestId,reason,now}){
+ if(!validKey(code)||!validKey(actor)||!validKey(requestId)||typeof reason!=='string'||reason.trim().length<3||reason.length>200)throw new Error('Mesa o motivo inválido.');
+ const next=structuredClone(root||{});next.adminUserAudit??={};
+ const receipt=next.adminUserAudit[requestId];
+ if(receipt){if(receipt.actor!==actor||receipt.action!=='close-legacy-table'||receipt.code!==code||receipt.reason!==reason.trim())throw new Error('Solicitud reutilizada.');return next;}
+ const room=next.rooms?.[code]?.public;
+ if(!room||room.managedCredits||next.creditEconomy?.tables?.[code])throw new Error('La mesa cambió. Actualizá el panel.');
+ room.status='closed';room.closedAt=now;room.closeReason='admin';
+ next.adminUserAudit[requestId]={actor,action:'close-legacy-table',code,reason:reason.trim(),at:now};
+ return next;
+}
+module.exports.legacyTableActive=legacyTableActive;
+module.exports.closeLegacyTable=closeLegacyTable;
+
 function prepareUserDeletion(root,{uid,actor,requestId,confirmName,reason,now}){
  if(!validKey(uid)||!validKey(actor)||!validKey(requestId)||typeof reason!=='string'||reason.trim().length<3||reason.length>200)throw new Error('Usuario o motivo inválido.');
  const next=structuredClone(root||{});
@@ -40,7 +60,12 @@ function prepareUserDeletion(root,{uid,actor,requestId,confirmName,reason,now}){
   const m=next.creditEconomy.matches?.[id];
   if(m&&[m.player1,m.player2].includes(uid)&&!m.closedAt&&['waiting','reserved'].includes(m.status))throw new Error('El usuario tiene una mesa activa. Cerrala primero.');
  }
- for(const entry of Object.values(next.rooms||{})){const room=entry?.public;if(room&&!room.managedCredits&&['waiting','drawing','started','revealing','timed-out'].includes(room.status)&&Object.values(room.players||{}).some(p=>p?.uid===uid))throw new Error('El usuario tiene una mesa activa. Cerrala primero.');}
+ for(const [code,entry] of Object.entries(next.rooms||{})){
+  const room=entry?.public;
+  if(!room||room.managedCredits||!Object.values(room.players||{}).some(p=>p?.uid===uid))continue;
+  if(legacyTableActive(room,now))throw new Error('El usuario tiene la mesa '+code+' activa. Cerrala desde Mesas antes de eliminarlo.');
+  if(room.status!=='closed'){room.status='closed';room.closedAt=now;room.closeReason='user-deleted';}
+ }
  next.userAccess??={};next.userAccess[uid]={blocked:true,deleting:true};
  next.creditEconomy??={};next.creditEconomy.wallets??={};next.creditEconomy.wallets[uid]={...(next.creditEconomy.wallets[uid]||{balance:0,locked:0}),deleting:true};
  next.adminUserAudit??={};next.adminUserAudit[requestId]={actor,uid,action:'delete',confirmName,reason:reason.trim(),at:now,status:'pending',before:next.creditEconomy.wallets[uid].balance,after:0};

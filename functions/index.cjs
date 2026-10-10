@@ -92,7 +92,7 @@ exports.creditExpireTables=onSchedule({schedule:'every 1 minutes',region:'us-cen
 
 // Admin permissions are server-only. Clients cannot write administrators.
 const {getAuth}=require('firebase-admin/auth');
-const {requireAdmin,adminLedgerChange,validKey,prepareUserDeletion,finishUserDeletion}=require('./admin-service.cjs');
+const {requireAdmin,adminLedgerChange,validKey,prepareUserDeletion,finishUserDeletion,legacyTableActive,closeLegacyTable}=require('./admin-service.cjs');
 async function adminIdentity(request){
  const uid=request.auth?.uid;
  if(!uid)throw new HttpsError('unauthenticated','Iniciá sesión primero.');
@@ -144,8 +144,16 @@ exports.adminConsole=onCall(options,async request=>{
  if(action==='tables'){
   const ledger=(await db.ref('creditEconomy').get()).val()||{};
   const userAudit=(await db.ref('adminUserAudit').get()).val()||{};
-  return {tables:Object.entries(ledger.tables||{}).map(([code])=>{const m=tableFor(ledger,code);return {code,status:m.closedAt?'closed':m.status,stake:m.stake,targetPoints:m.targetPoints,players:Object.values(m.players||{}).map(p=>p.name)};}).filter(m=>['waiting','reserved','settled'].includes(m.status)),
+  const rooms=(await db.ref('rooms').get()).val()||{};
+  const legacy=Object.entries(rooms).filter(([code,entry])=>!ledger.tables?.[code]&&legacyTableActive(entry?.public,Date.now())).map(([code,{public:room}])=>({code,status:room.status,stake:0,targetPoints:room.targetPoints||30,players:Object.values(room.players||{}).map(p=>p.name||p.uid)}));
+  return {tables:[...legacy,...Object.entries(ledger.tables||{}).map(([code])=>{const m=tableFor(ledger,code);return {code,status:m.closedAt?'closed':m.status,stake:m.stake,targetPoints:m.targetPoints,players:Object.values(m.players||{}).map(p=>p.name)};}).filter(m=>['waiting','reserved','settled'].includes(m.status))],
    audit:[...Object.values(ledger.adminAudit||{}),...Object.values(userAudit)].sort((a,b)=>b.at-a.at).slice(0,100)};
+ }
+ if(action==='close-table'&&!validKey(data.code))throw new HttpsError('invalid-argument','Mesa inválida.');
+ if(action==='close-table'&&!(await db.ref('creditEconomy/tables/'+String(data.code)).get()).exists()){
+  let failure;const result=await db.ref().transaction(root=>{failure=null;try{return closeLegacyTable(root,{...data,actor,now:Date.now()});}catch(error){failure=error.message;return undefined;}});
+  if(!result.committed)throw new HttpsError('failed-precondition',failure||'No se pudo cerrar la mesa.');
+  return {ok:true};
  }
  if(['credits','close-table'].includes(action)){
   if(action==='credits'){if(!validKey(data.uid))throw new HttpsError('invalid-argument','Usuario inválido.');await getAuth().getUser(data.uid);}
