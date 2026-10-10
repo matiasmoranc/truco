@@ -33,6 +33,12 @@ function legacyTableActive(room,now){
  if(room.status==='waiting'&&!(room.players?.player1&&room.players?.player2)&&Number.isFinite(room.createdAt)&&now-room.createdAt>=600000)return false;
  return true;
 }
+function adminTableCurrent(match,now){
+ if(!match||match.closedAt)return false;
+ if(match.status==='waiting')return Number.isFinite(match.createdAt)&&now-match.createdAt<600000;
+ return match.status==='reserved'&&!['complete','closed'].includes(match.session?.room?.status);
+}
+module.exports.adminTableCurrent=adminTableCurrent;
 function closeLegacyTable(root,{code,actor,requestId,reason,now}){
  if(!validKey(code)||!validKey(actor)||!validKey(requestId)||typeof reason!=='string'||reason.trim().length<3||reason.length>200)throw new Error('Mesa o motivo inválido.');
  const next=structuredClone(root||{});next.adminUserAudit??={};

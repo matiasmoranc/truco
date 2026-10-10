@@ -43,10 +43,17 @@ async function refresh(more=false,preservePages=false){
   if(more)pagesLoaded++;else if(!preservePages)pagesLoaded=1;
   users=more?[...users,...result.users]:result.users;pageToken=result.pageToken;renderUsers();
   const data=(await call({action:'tables'})).data;if(generation!==epoch)return;
-  $('table-list').replaceChildren();for(const t of data.tables){
-   const card=node('article','','card');card.append(node('h3','Mesa '+t.code),node('p',t.players.join(' / ')),node('p',t.targetPoints+' puntos · '+t.stake+' créditos · '+t.status),button('Cerrar mesa',()=>openEdit('close-table',t)));$('table-list').append(card);
-  }
+  const tableCard=t=>{
+   const card=node('article','','card');card.append(node('h3','Mesa '+t.code),node('p',t.players.join(' / ')),node('p',t.targetPoints+' puntos · '+t.stake+' créditos · '+t.status),button('Cerrar mesa',()=>openEdit('close-table',t)));return card;
+  };
+  $('table-list').replaceChildren();for(const t of data.tables)$('table-list').append(tableCard(t));
   if(!data.tables.length)$('table-list').append(node('p','No hay mesas activas.'));
+  if(data.archivedTables?.length){
+   const saved=node('details','','card');saved.append(node('summary','Mesas anteriores ('+data.archivedTables.length+')'));
+   saved.append(node('p','Registros de partidas terminadas, mesas vencidas y del sistema anterior.'));
+   for(const t of data.archivedTables)saved.append(tableCard(t));
+   $('table-list').append(saved);
+  }
   $('audit-list').replaceChildren();for(const a of data.audit){
    const card=node('article','','card');card.append(node('h3',a.action),node('p',a.reason),node('p',a.uid||a.code||''),node('small',new Date(a.at).toLocaleString('es-UY')),node('small','Administrador: '+a.actor));
    if(a.before!==undefined)card.append(node('p',String(a.before)+' → '+String(a.after)));$('audit-list').append(card);

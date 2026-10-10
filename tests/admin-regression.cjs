@@ -87,3 +87,14 @@ test('Legacy closure cannot bypass the credit ledger or treat a fresh waiting ta
  delete root.rooms.LIVE.public.managedCredits;root.creditEconomy.tables={LIVE:'m1'};
  assert.throws(()=>closeLegacyTable(root,{...args,code:'LIVE'}));
 });
+
+const {adminTableCurrent}=require('../functions/admin-service.cjs');
+test('Admin current tables exclude settled games, expired waiting tables and completed rooms',()=>{
+ const now=600001;
+ assert.equal(adminTableCurrent({status:'settled'},now),false);
+ assert.equal(adminTableCurrent({status:'waiting',createdAt:1},now),false);
+ assert.equal(adminTableCurrent({status:'waiting',createdAt:2},now),true);
+ assert.equal(adminTableCurrent({status:'reserved',session:{room:{status:'complete'}}},now),false);
+ assert.equal(adminTableCurrent({status:'reserved',session:{room:{status:'started'}}},now),true);
+ assert.equal(adminTableCurrent({status:'reserved',closedAt:10},now),false);
+});

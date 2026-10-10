@@ -92,7 +92,7 @@ exports.creditExpireTables=onSchedule({schedule:'every 1 minutes',region:'us-cen
 
 // Admin permissions are server-only. Clients cannot write administrators.
 const {getAuth}=require('firebase-admin/auth');
-const {requireAdmin,adminLedgerChange,validKey,prepareUserDeletion,finishUserDeletion,legacyTableActive,closeLegacyTable}=require('./admin-service.cjs');
+const {requireAdmin,adminLedgerChange,validKey,prepareUserDeletion,finishUserDeletion,legacyTableActive,closeLegacyTable,adminTableCurrent}=require('./admin-service.cjs');
 async function adminIdentity(request){
  const uid=request.auth?.uid;
  if(!uid)throw new HttpsError('unauthenticated','Iniciá sesión primero.');
@@ -146,7 +146,14 @@ exports.adminConsole=onCall(options,async request=>{
   const userAudit=(await db.ref('adminUserAudit').get()).val()||{};
   const rooms=(await db.ref('rooms').get()).val()||{};
   const legacy=Object.entries(rooms).filter(([code,entry])=>!ledger.tables?.[code]&&legacyTableActive(entry?.public,Date.now())).map(([code,{public:room}])=>({code,status:room.status,stake:0,targetPoints:room.targetPoints||30,players:Object.values(room.players||{}).map(p=>p.name||p.uid)}));
-  return {tables:[...legacy,...Object.entries(ledger.tables||{}).map(([code])=>{const m=tableFor(ledger,code);return {code,status:m.closedAt?'closed':m.status,stake:m.stake,targetPoints:m.targetPoints,players:Object.values(m.players||{}).map(p=>p.name)};}).filter(m=>['waiting','reserved','settled'].includes(m.status))],
+  const now=Date.now(),tables=[],archivedTables=[...legacy.map(m=>({...m,status:'Sistema anterior'}))];
+  for(const code of Object.keys(ledger.tables||{})){
+   const m=tableFor(ledger,code);if(m.closedAt||m.status==='refunded')continue;
+   const entry={code,status:m.status,stake:m.stake,targetPoints:m.targetPoints,players:Object.values(m.players||{}).map(p=>p.name)};
+   if(adminTableCurrent(m,now))tables.push({...entry,status:m.status==='waiting'?'Esperando rival':'En juego'});
+   else archivedTables.push({...entry,status:m.status==='waiting'?'Vencida':m.status==='settled'?'Terminada':'Finalizando'});
+  }
+  return {tables,archivedTables,
    audit:[...Object.values(ledger.adminAudit||{}),...Object.values(userAudit)].sort((a,b)=>b.at-a.at).slice(0,100)};
  }
  if(action==='close-table'&&!validKey(data.code))throw new HttpsError('invalid-argument','Mesa inválida.');
