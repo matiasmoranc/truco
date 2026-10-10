@@ -60,3 +60,36 @@ test('Flor over envido cancels the bet and pays three without requiring TIENE, r
   assert.match(s.room.callNotice.spoken,/flor/i);
  }
 });
+
+test('Incorrect envido declarations forfeit envido and accepted truco; first fault loses if both err',()=>{
+ for(const [first,second,winner] of [[29,30,'player2'],[27,28,'player2'],[28,29,'player1'],[28,28,'player1']]){
+  const s=fixture();s.room.trucoLevel=3;
+  createReferee(s,{now:200}).action('player1',{kind:'call',value:'envido'});
+  createReferee(s,{now:300}).action('player2',{kind:'call',value:'yes'});
+  createReferee(s,{now:400}).action('player1',{kind:'declare',value:first});
+  createReferee(s,{now:500}).action('player2',{kind:'declare',value:second});
+  createReferee(s,{now:600}).action('player2',{kind:'fold'});
+  createReferee(s,{now:3600}).advance();
+  assert.equal(s.room.scores[winner],5);assert.equal(s.room.scores[winner==='player1'?'player2':'player1'],0);
+  assert.equal(s.room.endReveal.groups[0].envidoAward.points,2);assert.equal(s.room.endReveal.groups[0].envidoAward.player,winner);
+ }
+});
+test('Son buenas reveals only the player who declared a number',()=>{
+ const s=fixture();createReferee(s,{now:200}).action('player1',{kind:'call',value:'envido'});
+ createReferee(s,{now:300}).action('player2',{kind:'call',value:'yes'});
+ createReferee(s,{now:400}).action('player1',{kind:'declare',value:28});
+ createReferee(s,{now:500}).action('player2',{kind:'declare',good:true});
+ createReferee(s,{now:600}).action('player2',{kind:'fold'});createReferee(s,{now:3600}).advance();
+ assert.equal(s.room.endReveal.groups.length,1);assert.equal(s.room.endReveal.groups[0].player,'player1');
+});
+
+test('Incorrect falta envido forfeits the hand as well and caps the total at the match target',()=>{
+ const s=fixture();s.room.trucoLevel=3;
+ createReferee(s,{now:200}).action('player1',{kind:'call',value:'falta'});
+ createReferee(s,{now:300}).action('player2',{kind:'call',value:'yes'});
+ createReferee(s,{now:400}).action('player1',{kind:'declare',value:29});
+ createReferee(s,{now:500}).action('player2',{kind:'declare',good:true});
+ assert.equal(s.room.scores.player1,0);assert.equal(s.room.scores.player2,10);
+ assert.equal(s.room.endReveal.groups.length,1);assert.equal(s.room.endReveal.groups[0].player,'player1');
+ assert.equal(s.room.endReveal.groups[0].envidoAward.player,'player2');
+});

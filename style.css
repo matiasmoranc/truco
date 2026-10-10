@@ -1466,3 +1466,5 @@ body { min-height:100dvh; }
 
 /* One composited card remains visible until the confirmed table card is ready. */
 .launch-flight{position:fixed!important;z-index:10000!important;margin:0!important;pointer-events:none!important;animation:none!important;transition:none!important;translate:none!important;rotate:none!important;transform-origin:center!important;will-change:transform;backface-visibility:hidden}
+
+.end-envido-award{margin:0;text-align:center;color:var(--gold);font-size:clamp(20px,5vw,30px);line-height:1.25}

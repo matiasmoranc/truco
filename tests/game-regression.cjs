@@ -11,7 +11,7 @@ function extract(name){
  for(;depth&&end<source.length;end++){if(source[end]==='{')depth++;else if(source[end]==='}')depth--;}
  return source.slice(start,end);
 }
-const names=['queueLearningRoundResult','canRaiseEnvido','closeFinishedRoomChanges','pieceOrder','cardStrength','envidoValue','hasFlor','handEnvido','florValue','normalizeTargetPoints','targetPoints','capScores','faltanParaGanar','faltaEnvidoPoints','envidoBetPoints','florBetPoints','declinedFlorPoints','florAnswers','otherPlayer','settleHand','topFeed','matchWinner','matchFinished','sessionMatchResults','sessionWins','rematchRoom','rematchChanges','botDeck','botHandOutcome','rememberBotCards','botRiskAdjustment','assessBotHand','chooseBotDecision','disconnectedPlayer','disconnectMatchChanges','turnClockPlayer','turnClockRemaining','turnTimeoutChanges','declinedTrucoChanges','liveActionsBlocked','runLiveAction','privateHandMatchesRoom','roomHasFlor','canCallFirstRoundEnvido','enqueueLearningHelp','rememberLearningHelp','learningHelpTopic','localHand','localFeed','localCallAction','localAnswerAction','localPlay'];
+const names=['envidoAuditResult','settleAuditedHand','auditEnvidoScores','queueLearningRoundResult','canRaiseEnvido','closeFinishedRoomChanges','pieceOrder','cardStrength','envidoValue','hasFlor','handEnvido','florValue','normalizeTargetPoints','targetPoints','capScores','faltanParaGanar','faltaEnvidoPoints','envidoBetPoints','florBetPoints','declinedFlorPoints','florAnswers','otherPlayer','settleHand','topFeed','matchWinner','matchFinished','sessionMatchResults','sessionWins','rematchRoom','rematchChanges','botDeck','botHandOutcome','rememberBotCards','botRiskAdjustment','assessBotHand','chooseBotDecision','disconnectedPlayer','disconnectMatchChanges','turnClockPlayer','turnClockRemaining','turnTimeoutChanges','declinedTrucoChanges','liveActionsBlocked','runLiveAction','privateHandMatchesRoom','roomHasFlor','canCallFirstRoundEnvido','enqueueLearningHelp','rememberLearningHelp','learningHelpTopic','localHand','localFeed','localCallAction','localAnswerAction','localPlay'];
 function harness(){
  const context={account:{isReady:()=>true},console,Math:Object.create(Math),Date,crypto:require('node:crypto').webcrypto,structuredClone,Set,Map,navigator:{onLine:true},state:{},localStorage:{setItem(){}},learningSeen:new Set(),VALID_TARGET_POINTS:[10,20,30,40,50,60],RECONNECT_GRACE_MS:45000,gameTime:()=>100000,newOpeningDraw:()=>({cards:{}}),makeCallNotice:text=>({text}),renderGame(){},renderConnectionNotice(){},syncLiveControls(){},touchFeedback(){},toast(){},firebaseError:String,queueLearningAction(){},queueLearningTrucoCall(){},turnClockKey:()=>null,pauseMessage:()=>null,animatePlayedHandCard(){},shakeTurnBadge(){},scheduleLocalNextHand(){},scheduleLocalTransition(room,fn){context.transition=fn;},localFinishHand(winner,points){context.finished={winner,points};},localScore(player,points){context.state.room.scores[player]=Math.min(20,context.state.room.scores[player]+points);},localResolveFlor(){},revealEnvido(){}};
  vm.createContext(context);vm.runInContext(names.map(extract).join('\n'),context);return context;
@@ -91,4 +91,17 @@ test('Practice round help reports win, loss and tie in either play order and can
   }
  }
  const c=harness();c.queueLearningRoundResult('player1',[]);assert.equal(c.state.learning,undefined);
+});
+
+test('First incorrect declaration is determined by order, including mano player2 and old hands',()=>{
+ const c=harness(),r=room();r.mano='player2';r.envidoAudit={reveals:{player1:30,player2:29},winner:'player1',stake:2};
+ assert.equal(c.envidoAuditResult(r,{player1:28,player2:28}).winner,'player1');
+ r.envidoAudit.declarationOrder=['player1','player2'];assert.equal(c.envidoAuditResult(r,{player1:28,player2:28}).winner,'player2');
+});
+
+test('Envido reveal heading names the winner and the awarded points',()=>{
+ const c=harness(),element={classList:{toggle(){}},innerHTML:''};c.$=()=>element;c.escapeHtml=String;c.cardImageStyle=()=>'';c.cardAccessibleName=()=>'';
+ vm.runInContext(extract('renderEndEvidence'),c);
+ c.renderEndEvidence({status:'revealing',players:{player1:{name:'Matias'}},endReveal:{groups:[{player:'player1',label:'Envido · 28 tantos',cards:[],envidoAward:{player:'player1',points:2}}]}},true);
+ assert.match(element.innerHTML,/2 puntos para Matias/);
 });
