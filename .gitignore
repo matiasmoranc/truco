@@ -1,0 +1,10 @@
+node_modules/
+functions/node_modules/
+.mobile-web/
+www/
+android/
+ios/
+*.p8
+*.keystore
+*.jks
+.env*

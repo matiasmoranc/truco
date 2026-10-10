@@ -1,0 +1,21 @@
+{
+  "appId": "com.matiasmoranc.truco",
+  "appName": "Truco Uruguayo",
+  "webDir": "www",
+  "backgroundColor": "#103d2e",
+  "plugins": {
+    "FirebaseAuthentication": {
+      "skipNativeAuth": true,
+      "providers": ["google.com", "apple.com"]
+    }
+  },
+  "experimental": {
+    "ios": {
+      "spm": {
+        "swiftToolsVersion": "6.1",
+        "packageTraits": {"@capacitor-firebase/authentication": ["Google"]},
+        "packageOptions": {"@capacitor-firebase/authentication": {"symlink": true}}
+      }
+    }
+  }
+}

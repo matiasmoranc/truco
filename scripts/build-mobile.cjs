@@ -1,0 +1,25 @@
+const fs = require('node:fs/promises');
+const path = require('node:path');
+const root = path.resolve(__dirname, '..');
+(async () => {
+  const stage = path.join(root, '.mobile-web');
+  await fs.rm(stage, { recursive: true, force: true });
+  await fs.mkdir(stage, { recursive: true });
+  for (const file of ['index.html','style.css','app.js','account.js','auth-init.js','activity.js','credits.js','firebase-config.js','favicon.svg']) {
+    let content = await fs.readFile(path.join(root, file), 'utf8');
+    if (file === 'index.html') content = content.replace(/src="\.\/app\.js[^" ]*"/, 'src="./mobile/entry.js"');
+    if (file === 'app.js') {
+      content = content.replace(/import\(`https:\/\/www\.gstatic\.com\/firebasejs\/\$\{FIREBASE_VERSION\}\/firebase-(app|database|auth)\.js`\)/g, (_, sdk) => `Promise.resolve(globalThis.trucoNative.sdk.${sdk})`);
+      content = content.replace("import('https://www.gstatic.com/firebasejs/12.4.0/firebase-functions.js')", 'Promise.resolve(globalThis.trucoNative.sdk.functions)');
+      if (content.includes('import(`https://www.gstatic.com') || content.includes("import('https://www.gstatic.com")) throw new Error('Una importación Firebase no está empaquetada.');
+    }
+    await fs.writeFile(path.join(stage, file), content);
+  }
+  await fs.cp(path.join(root,'mobile'), path.join(stage,'mobile'), { recursive: true });
+  await fs.cp(path.join(root,'assets'), path.join(stage,'assets'), { recursive: true });
+  const { build } = await import('vite');
+  await build({ root: stage, base: './', publicDir: false, build: { outDir: path.join(root,'www'), emptyOutDir: true, target: 'es2022', assetsInlineLimit: 0, copyPublicDir: false } });
+  await fs.copyFile(path.join(root,'favicon.svg'), path.join(root,'www/favicon.svg'));
+  // CSS dynamically selects card images; retain their original bytes and paths.
+  await fs.cp(path.join(root,'assets'), path.join(root,'www/assets'), { recursive: true });
+})().catch(error => { console.error(error); process.exitCode = 1; });

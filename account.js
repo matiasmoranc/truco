@@ -25,7 +25,7 @@ export function installAccount({ services, getState, rememberName, document, sto
   function cacheName(uid,name) {
     try{storage?.setItem('truco-profile-name:'+uid,name);}catch{}
   }
-  const appleDevice=isAppleDevice(navigator);
+  const appleDevice=globalThis.trucoNative?.isNative ? globalThis.trucoNative.platform==='ios' : isAppleDevice(navigator);
   let loginProvider='Google';
   function render() {
     const google=registered(currentUser);
@@ -123,6 +123,7 @@ export function installAccount({ services, getState, rememberName, document, sto
   }
   el('account-google').addEventListener('click',()=>action(async fb=>{
     loginProvider='Google';message('Abriendo Google…');
+    if(globalThis.trucoNative?.isNative){const result=await globalThis.trucoNative.signIn(fb,'google.com');await observe(fb,result.user);return;}
     const provider=new fb.authSdk.GoogleAuthProvider();
     provider.setCustomParameters({prompt:'select_account'});
     const user=fb.auth.currentUser;
@@ -142,6 +143,7 @@ export function installAccount({ services, getState, rememberName, document, sto
     if(!appleDevice)return;
     return action(async fb=>{
       loginProvider='Apple';message('Abriendo Apple…');
+      if(globalThis.trucoNative?.isNative){const result=await globalThis.trucoNative.signIn(fb,'apple.com');await observe(fb,result.user);return;}
       const provider=new fb.authSdk.OAuthProvider('apple.com');
       provider.addScope('email');provider.addScope('name');
       provider.setCustomParameters({locale:'es'});

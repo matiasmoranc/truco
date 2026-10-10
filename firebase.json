@@ -13,7 +13,14 @@
       "tests/**",
       "scripts/**",
       "CREDITOS.md",
-      "firebase*.json"
+      "firebase*.json",
+      "android/**",
+      "ios/**",
+      "www/**",
+      "mobile/**",
+      "package*.json",
+      "capacitor.config.json",
+      "MOBILE.md"
     ]
   },
   "functions": {

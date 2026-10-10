@@ -1,6 +1,6 @@
 import { installActivity } from './activity.js?v=20261010-adminstats32';
 import { installCredits } from './credits.js?v=20261010-adminstats32';
-import { installAccount } from './account.js?v=20261010-appleios46';
+import { installAccount } from './account.js?v=20261010-mobile50';
 import { initializeGameAuth } from './auth-init.js?v=20261010-authredirect45';
 const FIREBASE_VERSION = '12.4.0';
 const $ = (id) => document.getElementById(id);
@@ -656,7 +656,7 @@ async function enterRoom() {
   }
 }
 function invitationLink(code){
-  const url=new URL(location.href);url.search='';url.hash='';url.searchParams.set('mesa',code);return url.href;
+  const url=new URL(globalThis.trucoNative?.isNative ? globalThis.trucoNative.publicUrl : location.href);url.search='';url.hash='';url.searchParams.set('mesa',code);return url.href;
 }
 function updateInvitation(){
   const link=$('invite-whatsapp');

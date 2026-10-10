@@ -1,0 +1,38 @@
+{
+  "name": "truco-uruguayo",
+  "version": "1.0.0",
+  "description": "Juego de Truco Uruguayo web y mobile",
+  "scripts": {
+    "mobile:build": "node scripts/build-mobile.cjs",
+    "mobile:add:android": "npm run mobile:build && cap add android",
+    "mobile:add:ios": "npm run mobile:build && cap add ios",
+    "mobile:sync": "npm run mobile:build && cap sync",
+    "mobile:open:android": "cap open android",
+    "mobile:open:ios": "cap open ios",
+    "test": "node --test tests/*.cjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/matiasmoranc/truco.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/matiasmoranc/truco/issues"
+  },
+  "homepage": "https://github.com/matiasmoranc/truco#readme",
+  "dependencies": {
+    "@capacitor-firebase/authentication": "8.5.2",
+    "@capacitor/android": "8.5.3",
+    "@capacitor/core": "8.5.3",
+    "@capacitor/ios": "8.5.3",
+    "firebase": "12.19.0"
+  },
+  "private": true,
+  "devDependencies": {
+    "@capacitor/cli": "8.5.3",
+    "vite": "7.3.7"
+  }
+}
