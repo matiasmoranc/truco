@@ -434,7 +434,7 @@ let firebaseReadyPromise=null;
 const activity=installActivity({send:data=>creditApi('playerActivity',data),getUid:()=>state.uid,document});
 const account=installAccount({services:firebaseServices,getState:()=>state,rememberName:rememberPlayerName,document,onReady:async()=>{activity.start();await openInitialRoom();credits.start();},onIdentityChange:resetAccountRoom,onNameChanged:()=>showView('welcome-view'),inRoom:()=>!!state.room&&!$('welcome-view').classList.contains('active')});
 const credits=installCredits({services:firebaseServices,getState:()=>state,document,notify:message=>toast(message),onChange:()=>{if(state.lobbyRooms)renderLobby(state.lobbyRooms);
-  if(state.room)renderMatchEnd();$('table-stake-available').textContent=String(credits.wallet()?.balance??'—');}});
+  if(state.room)renderMatchEnd();$('table-stake-available').textContent=String(credits.wallet()?.balance??'—');updateStakeControl();}});
 function resetAccountRoom(){
   activity.stop();
   credits.stop();
@@ -2273,6 +2273,7 @@ function updateBotSetup(){
   $('credit-table-settings').classList.toggle('hidden',enabled);
   $('enter-room').textContent=enabled?'Jugar contra Bot':'Crear mesa';
   $('table-stake-available').textContent=String(credits.wallet()?.balance??'—');
+  updateStakeControl();
 }
 function stopBot(){clearTimeout(state.learning?.transition?.timer);$('learning-hint')?.close();state.learning=null;$('learning-toolbar')?.classList.add('hidden');$('game-view').classList.remove('learning-mode');clearTimeout(state.botTimer);state.botTimer=null;state.bot=false;state.botMemory=null;}
 async function startBotGame(name){
@@ -3376,3 +3377,43 @@ $('join-credit-form').addEventListener('submit',event=>{event.preventDefault();s
 $('join-credit-close').addEventListener('click',()=>{$('join-credit-dialog').close();state.joinPassword='';state.joinConfirmed=false;});
 $('table-visibility').addEventListener('change',()=>{$('table-password-row').hidden=$('table-visibility').value!=='password';});
 setInterval(()=>{if(state.room?.managedCredits&&state.firebaseConnected===true&&navigator.onLine!==false&&document.visibilityState==='visible'&&state.room.status!=='closed')creditCommand({kind:'tick'}).catch(()=>{});},2000);
+
+function updateStakeControl(){
+  const wallet=credits.wallet(),maximum=Math.max(0,Math.floor(wallet?.balance||0));
+  const value=Math.max(1,Math.min(Math.max(1,maximum),Number($('table-stake').value)||1));
+  $('table-stake').value=String(value);$('table-stake').max=String(maximum);
+  const unavailable=!wallet||wallet.locked>0;
+  $('stake-minus').disabled=unavailable||value<=1;
+  $('stake-plus').disabled=unavailable||value>=maximum;
+}
+function installStakeStepper(){
+  let timer=null,started=0,holding=null;
+  const stop=()=>{clearTimeout(timer);timer=null;holding=null;};
+  const step=(direction)=>{
+    updateStakeControl();
+    if($(direction>0?'stake-plus':'stake-minus').disabled)return false;
+    $('table-stake').value=String(Number($('table-stake').value)+direction);
+    updateStakeControl();return true;
+  };
+  for(const [id,direction] of [['stake-minus',-1],['stake-plus',1]]){
+    const button=$(id);
+    button.addEventListener('pointerdown',event=>{
+      if(event.button!==0||holding!==null)return;
+      event.preventDefault();stop();holding=event.pointerId;started=performance.now();
+      button.setPointerCapture(event.pointerId);step(direction);
+      const repeat=()=>{
+        if(holding===null||document.hidden||!$('setup-view').classList.contains('active')||!step(direction)){stop();return;}
+        const elapsed=performance.now()-started;
+        timer=setTimeout(repeat,elapsed<1200?250:elapsed<2500?130:elapsed<4000?80:45);
+      };
+      timer=setTimeout(repeat,450);
+    });
+    button.addEventListener('click',event=>{if(event.detail===0)step(direction);});
+    button.addEventListener('contextmenu',event=>event.preventDefault());
+    for(const event of ['pointerup','pointercancel','lostpointercapture'])button.addEventListener(event,stop);
+  }
+  window.addEventListener('blur',stop);
+  document.addEventListener('visibilitychange',()=>{if(document.hidden)stop();});
+  updateStakeControl();
+}
+installStakeStepper();
