@@ -3406,7 +3406,7 @@ function openCreditJoin(code,room){
   state.joining=true;state.selectedRoom=code;state.joinConfirmed=false;state.joinPassword='';
   $('join-credit-submit').textContent='Entrar';
   $('join-credit-password-row').hidden=!room.creditMatch.hasPassword;
-  $('join-credit-password').value='';$('join-credit-error').textContent='';
+  $('join-credit-password').value='';setPasswordVisible('join-credit-password',false);$('join-credit-error').textContent='';
   const wallet=credits.wallet();$('join-credit-submit').disabled=!wallet||(wallet.balance<room.creditMatch.stake)||wallet.locked>0;
   if($('join-credit-submit').disabled)$('join-credit-error').textContent='No tenés créditos disponibles para esta apuesta.';
   $('join-credit-dialog').showModal();
@@ -3470,3 +3470,15 @@ function installStakeStepper(){
   updateStakeControl();
 }
 installStakeStepper();
+
+function setPasswordVisible(id,visible){
+  const input=$(id),button=document.querySelector('[data-password-toggle="'+id+'"]');
+  input.type=visible?'text':'password';button.setAttribute('aria-pressed',String(visible));button.setAttribute('aria-label',visible?'Ocultar clave':'Mostrar clave');
+}
+for(const button of document.querySelectorAll('[data-password-toggle]')){
+  button.addEventListener('pointerdown',event=>event.preventDefault());
+  button.addEventListener('click',event=>{
+    event.preventDefault();const id=button.dataset.passwordToggle;if($(id).disabled)return;
+    setPasswordVisible(id,$(id).type==='password');
+  });
+}
