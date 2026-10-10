@@ -612,9 +612,9 @@ async function enterRoom() {
     if(request.joining){
       const code=request.code,roomRef=fb.ref(fb.db,`rooms/${code}/public`);
       const snap=await fb.get(roomRef);
-      if(!snap.exists()){toast('La invitación ya no está disponible.',true);await openLobby();return;}
+      if(!snap.exists()){if($('join-credit-dialog').open)throw new Error('La invitación ya no está disponible.');toast('La invitación ya no está disponible.',true);await openLobby();return;}
       let room=snap.val(),seat=roomSeatForUid(room,state.uid);
-      if(room.status==='closed'||roomExpired(room)){toast('La mesa ya está cerrada.',true);await openLobby();return;}
+      if(room.status==='closed'||roomExpired(room)){if($('join-credit-dialog').open)throw new Error('La mesa ya está cerrada.');toast('La mesa ya está cerrada.',true);await openLobby();return;}
       if(room.managedCredits){
         if(!seat&&room.creditMatch.hasPassword&&!state.joinConfirmed){openCreditJoin(code,room);return;}
         const result=await creditApi('creditJoinTable',{code,password:state.joinPassword||''});
@@ -638,12 +638,20 @@ async function enterRoom() {
       const result=await creditApi('creditCreateTable',{stake,targetPoints:normalizeTargetPoints($('target-points').value),visibility,password:visibility==='password'?$('table-password').value:''});
       joinedRoom=result.room;state.roomCode=result.code;state.playerId='player1';
     }
+    if($('join-credit-dialog').open)$('join-credit-dialog').close();
     rememberPlayerName(name);
     attachLiveRoom(state.roomCode,state.playerId,joinedRoom);
     console.info('[truco:join] seated',{code:state.roomCode,role:state.playerId,status:joinedRoom.status});
   }catch(error){
-    console.error('[truco:join] failed',error);toast(firebaseError(error),true);
-    if(state.invitationEntry)showInvitationForm();
+    console.error('[truco:join] failed',error);
+    state.joinPassword='';state.joinConfirmed=false;
+    if($('join-credit-dialog').open){
+      const message=firebaseError(error);
+      $('join-credit-error').textContent=/clave.*correcta/i.test(message)?'Clave incorrecta':message;
+    }else{
+      toast(firebaseError(error),true);
+      if(state.invitationEntry)showInvitationForm();
+    }
   }finally{
     state.enteringRoom=false;$('enter-room').disabled=false;
   }
@@ -3368,16 +3376,31 @@ async function creditCommand(command){
   finally{if(command.kind==='tick')creditTickPending=false;}
 }
 function openCreditJoin(code,room){
-  state.joining=true;state.selectedRoom=code;state.joinConfirmed=false;
-  $('join-credit-description').textContent=`La apuesta es de ${room.creditMatch.stake} créditos por jugador. El ganador se lleva ${room.creditMatch.stake*2} créditos.`;
+  state.joining=true;state.selectedRoom=code;state.joinConfirmed=false;state.joinPassword='';
+  $('join-credit-submit').textContent='Entrar';
   $('join-credit-password-row').hidden=!room.creditMatch.hasPassword;
   $('join-credit-password').value='';$('join-credit-error').textContent='';
   const wallet=credits.wallet();$('join-credit-submit').disabled=!wallet||(wallet.balance<room.creditMatch.stake)||wallet.locked>0;
   if($('join-credit-submit').disabled)$('join-credit-error').textContent='No tenés créditos disponibles para esta apuesta.';
   $('join-credit-dialog').showModal();
 }
-$('join-credit-form').addEventListener('submit',event=>{event.preventDefault();state.joinPassword=$('join-credit-password').value;state.joinConfirmed=true;$('join-credit-dialog').close();enterRoom();});
-$('join-credit-close').addEventListener('click',()=>{$('join-credit-dialog').close();state.joinPassword='';state.joinConfirmed=false;});
+$('join-credit-form').addEventListener('submit',async event=>{
+  event.preventDefault();if(state.joinSubmitting||state.enteringRoom||$('join-credit-submit').disabled)return;
+  state.joinSubmitting=true;state.joinPassword=$('join-credit-password').value;state.joinConfirmed=true;
+  $('join-credit-error').textContent='';$('join-credit-submit').disabled=true;$('join-credit-submit').textContent='Entrando…';
+  $('join-credit-close').disabled=true;$('join-credit-password').disabled=true;$('join-credit-form').setAttribute('aria-busy','true');
+  try{await enterRoom();}
+  finally{
+    state.joinSubmitting=false;state.joinPassword='';state.joinConfirmed=false;
+    $('join-credit-submit').disabled=false;$('join-credit-submit').textContent='Entrar';
+    $('join-credit-close').disabled=false;$('join-credit-password').disabled=false;$('join-credit-form').removeAttribute('aria-busy');
+    if($('join-credit-dialog').open)$('join-credit-password').focus();
+  }
+});
+$('join-credit-close').addEventListener('click',()=>{if(!state.joinSubmitting)$('join-credit-dialog').close();});
+$('join-credit-dialog').addEventListener('cancel',event=>{if(state.joinSubmitting)event.preventDefault();});
+$('join-credit-dialog').addEventListener('close',()=>{state.joinPassword='';state.joinConfirmed=false;});
+$('join-credit-password').addEventListener('input',()=>{$('join-credit-error').textContent='';});
 $('table-visibility').addEventListener('change',()=>{$('table-password-row').hidden=$('table-visibility').value!=='password';});
 setInterval(()=>{if(state.room?.managedCredits&&state.firebaseConnected===true&&navigator.onLine!==false&&document.visibilityState==='visible'&&state.room.status!=='closed')creditCommand({kind:'tick'}).catch(()=>{});},2000);
 
