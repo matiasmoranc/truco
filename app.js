@@ -855,6 +855,7 @@ function openingDrawExpired(room,now=gameTime()){
   return room?.status==='drawing'&&Number.isFinite(draw?.endsAt)&&now>=draw.endsAt&&!(draw.cards?.player1&&draw.cards?.player2);
 }
 function returnToLobby(message=''){
+  removeCardFlight();
   stopRoomPresence();
   stopBot();
   clearTimeout(openingTimerHandle);openingTimerHandle=null;
@@ -1609,7 +1610,7 @@ async function playCard(card) {
     patches[`rooms/${state.roomCode}/public/feed`] = topFeed(state.room,winner?`${state.room.players[winner].name} gana la ronda.`:'Ronda parda.');
   }
   try{
-    if(state.room?.managedCredits){await creditCommand({kind:'play',cardId:card.id});return;}await fb.update(fb.ref(fb.db), patches);}catch(error){console.error(error);toast(firebaseError(error));}finally{state.playActionInFlight=false;state.pendingCardId=null;renderGame();syncLiveControls();}
+    if(state.room?.managedCredits){await creditCommand({kind:'play',cardId:card.id});return;}await fb.update(fb.ref(fb.db), patches);}catch(error){removeCardFlight();console.error(error);toast(firebaseError(error));}finally{state.playActionInFlight=false;state.pendingCardId=null;renderGame();syncLiveControls();}
 }
 function cardImage(card){
   const rank=Number(card.rank);
@@ -1969,7 +1970,7 @@ function renderGame() {
   if(!state.handGestureActive)$('hand').innerHTML=visibleHand.map((card) => `<button class="hand-card sprite-card ${card.red?'card-red':''} ${state.launchingCardId===card.id?'launching-card':''} ${state.pendingCardId===card.id?'card-pending':''}" style="${cardImageStyle(card)}" aria-label="${cardAccessibleName(card)}" aria-disabled="${!myTurn}" data-card="${card.id}"><span class="sr-only">${cardAccessibleName(card)}</span></button>`).join('');
   animateFoldedHand();
 
-  $('trick-cards').innerHTML=sharedTable?(room.trickCards||[]).filter(({card,playerId})=>!(state.launchingCardId===card.id&&playerId===state.playerId)).map(({card,playerId})=>`<div class="played-card played-card-${playerId||'player1'} sprite-card ${card.red?'card-red':''}" style="${cardImageStyle(card)}" role="img" aria-label="${cardAccessibleName(card)}"><span class="sr-only">${cardAccessibleName(card)}</span></div>`).join(''):'';
+  renderPlayedCards(room);
   const sample=room.muestra;
   $('muestra-card').classList.toggle('hidden',!sharedTable||!sample);
   $('muestra-card').classList.toggle('sprite-card',!!(sharedTable&&sample));
@@ -2601,34 +2602,70 @@ function localDealAfterHand(){
 }
 
 
+let activeCardFlight=null;
+function removeCardFlight(){
+  const flight=activeCardFlight;
+  if(!flight)return;
+  activeCardFlight=null;state.launchingCardId=null;
+  flight.animation?.cancel();flight.node.remove();
+  $('hand').querySelector('[data-card="'+CSS.escape(flight.cardId)+'"]')?.classList.remove('launching-card');
+}
+function createPlayedCard(card,playerId){
+  const node=document.createElement('div');
+  node.className=`played-card played-card-${playerId||'player1'} sprite-card ${card.red?'card-red':''}`;
+  node.style.cssText=cardImageStyle(card);
+  node.setAttribute('role','img');node.setAttribute('aria-label',cardAccessibleName(card));
+  node.dataset.playedKey=playerId+':'+card.id;
+  return node;
+}
+function renderPlayedCards(room){
+  const container=$('trick-cards'),cards=room.trickCards||[];
+  if(activeCardFlight&&(activeCardFlight.room!==state.roomCode||activeCardFlight.hand!==room.handNumber||!['started'].includes(room.status)))removeCardFlight();
+  const existing=new Map([...container.children].map(node=>[node.dataset.playedKey,node]));
+  for(const {card,playerId} of cards){
+    const key=playerId+':'+card.id;
+    let node=existing.get(key);
+    if(!node){node=createPlayedCard(card,playerId);container.append(node);}
+    existing.delete(key);
+    const flying=activeCardFlight?.cardId===card.id&&activeCardFlight.playerId===playerId;
+    if(flying&&activeCardFlight.finished)removeCardFlight();
+    node.style.visibility=flying&&activeCardFlight?'hidden':'';
+  }
+  for(const node of existing.values())node.remove();
+}
 function animatePlayedHandCard(card,origin=null){
   const source=$('hand').querySelector('[data-card="'+CSS.escape(card.id)+'"]');
   if(!source)return;
+  removeCardFlight();
   const rect=origin?.cardId===card.id?origin.rect:source.getBoundingClientRect();
-  const flight=source.cloneNode(true);
-  flight.classList.remove('dragging','launching-card');
-  flight.classList.add('card-flight');
-  const twoDevice=$('game-view').classList.contains('two-device-mode');
-  if(twoDevice){
-    flight.classList.add('two-device-flight');
-    const tableRect=$('trick-cards').getBoundingClientRect();
-    const targetX=tableRect.left+tableRect.width*(state.playerId==='player1'?.2:.4);
-    const targetY=tableRect.top+tableRect.height*.5;
-    flight.style.setProperty('--flight-x',(targetX-(rect.left+rect.width/2))+'px');
-    flight.style.setProperty('--flight-y',(targetY-(rect.top+rect.height/2))+'px');
-    flight.style.setProperty('--flight-scale',String(Math.min(62/rect.width,90/rect.height)));
-  }else flight.style.setProperty('--flight-y',-(rect.bottom+80)+'px');
-  flight.removeAttribute('data-card');flight.removeAttribute('aria-disabled');
-  flight.setAttribute('aria-hidden','true');flight.tabIndex=-1;
-  flight.style.left=rect.left+'px';flight.style.top=rect.top+'px';
-  flight.style.width=rect.width+'px';flight.style.height=rect.height+'px';
+  const width=source.offsetWidth,height=source.offsetHeight;
+  const transform=getComputedStyle(source).transform;
+  const matrix=transform==='none'?null:new DOMMatrixReadOnly(transform);
+  const startAngle=matrix?Math.atan2(matrix.b,matrix.a)*180/Math.PI:0;
+  const target=createPlayedCard(card,state.playerId);
+  target.style.visibility='hidden';$('trick-cards').append(target);
+  const targetRect=target.getBoundingClientRect(),targetWidth=target.offsetWidth,targetHeight=target.offsetHeight;
+  target.remove();
+  const flight=createPlayedCard(card,state.playerId);
+  flight.className='sprite-card played-card launch-flight';
+  Object.assign(flight.style,{left:(rect.left+rect.width/2-width/2)+'px',top:(rect.top+rect.height/2-height/2)+'px',width:width+'px',height:height+'px'});
+  flight.setAttribute('aria-hidden','true');
+  const dx=targetRect.left+targetRect.width/2-(rect.left+rect.width/2);
+  const dy=targetRect.top+targetRect.height/2-(rect.top+rect.height/2);
+  const endAngle=state.playerId==='player2'?6:-6;
   state.launchingCardId=card.id;source.classList.add('launching-card');
-  document.body.appendChild(flight);
-  setTimeout(()=>{
-    flight.remove();
-    if(state.launchingCardId===card.id){state.launchingCardId=null;renderGame();}
-    $('hand').querySelector('[data-card="'+CSS.escape(card.id)+'"]')?.classList.remove('launching-card');
-  },430);
+  document.body.append(flight);
+  const context={node:flight,cardId:card.id,playerId:state.playerId,room:state.roomCode,hand:state.room?.handNumber,finished:false};
+  activeCardFlight=context;
+  context.animation=flight.animate([
+    {transform:`translate3d(0,0,0) rotate(${startAngle}deg) scale(1)`},
+    {transform:`translate3d(${dx}px,${dy}px,0) rotate(${endAngle}deg) scale(${targetWidth/width},${targetHeight/height})`}
+  ],{duration:matchMedia('(prefers-reduced-motion: reduce)').matches?100:420,easing:'cubic-bezier(.22,.61,.36,1)',fill:'forwards'});
+  context.animation.finished.then(()=>{
+    if(activeCardFlight!==context)return;
+    context.finished=true;
+    if(state.room)renderPlayedCards(state.room);else removeCardFlight();
+  }).catch(()=>{});
 }
 let handGesture=null,ignoreHandClickUntil=0;
 const handSurface=$('hand');
