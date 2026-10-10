@@ -3381,7 +3381,7 @@ setInterval(()=>{if(state.room?.managedCredits&&state.firebaseConnected===true&&
 function updateStakeControl(){
   const wallet=credits.wallet(),maximum=Math.max(0,Math.floor(wallet?.balance||0));
   const value=Math.max(1,Math.min(Math.max(1,maximum),Number($('table-stake').value)||1));
-  $('table-stake').value=String(value);$('table-stake').max=String(maximum);
+  $('table-stake').value=String(value);$('table-stake').max=String(maximum);$('table-stake').style.width=Math.max(2,String(value).length)+'ch';
   const unavailable=!wallet||wallet.locked>0;
   $('stake-minus').disabled=unavailable||value<=1;
   $('stake-plus').disabled=unavailable||value>=maximum;
