@@ -32,12 +32,12 @@ export function installCredits({services,getState,document,now=()=>Date.now(),se
     el('credits-balance').textContent=wallet===undefined?'—':String(wallet?.balance??0);
     const setupBalance=el('table-stake-available');if(setupBalance)setupBalance.textContent=el('credits-balance').textContent;
     const headerBalance=el('credits-header-balance');if(headerBalance)headerBalance.textContent=el('credits-balance').textContent;
-    const messages={loading:'Cargando tus créditos…',invalid:'No pudimos verificar tu saldo.',balance:'Podés reclamar 5 créditos diarios cuando tu saldo llegue a 0.',locked:'Tenés créditos reservados en una partida.',claimed:'Ya recibiste tus 5 créditos de hoy. Podés volver a reclamar mañana si estás en 0.',available:''};
+    const messages={loading:'Cargando tus créditos…',invalid:'No pudimos verificar tu saldo.',balance:'Podés reclamar 5 créditos diarios cuando tu saldo llegue a 0.',locked:'Tenés créditos reservados en una partida.',claimed:'',available:''};
     el('credits-status').textContent=error||messages[eligibility];
     el('credits-status').hidden=!el('credits-status').textContent;
     const button=el('credits-claim');button.hidden=!!error||!available||!['available','claimed'].includes(eligibility);
     button.disabled=busy||eligibility!=='available'||getState().firebaseConnected!==true;
-    button.textContent=busy?'Reclamando…':eligibility==='claimed'?'Disponibles mañana':'Reclamar 5 créditos';
+    button.textContent=busy?'Reclamando…':eligibility==='claimed'?'5 créditos disponibles mañana':'Reclamar 5 créditos';
     clearTimer(timer);
     if(uid)timer=setTimer(render,Math.min(60000,Math.max(50,creditDayStart(clock())+CREDIT_DAY_MS-clock()+50)));
   }
