@@ -29,7 +29,8 @@ export function installCredits({services,getState,document,now=()=>Date.now(),se
     const panel=el('credits-panel');panel.hidden=!uid;
     const eligibility=creditEligibility(wallet,clock());
     el('credits-balance').textContent=wallet===undefined?'—':String(wallet?.balance??0);
-    const messages={loading:'Cargando tus créditos…',invalid:'No pudimos verificar tu saldo.',balance:'Podés reclamar 2 créditos diarios cuando tu saldo llegue a 0.',locked:'Tenés créditos reservados en una partida.',claimed:'Ya recibiste tus 2 créditos de hoy. Podés volver a reclamar mañana si estás en 0.',available:'Estás en 0. Podés reclamar 2 créditos gratuitos hoy.'};
+    const headerBalance=el('credits-header-balance');if(headerBalance)headerBalance.textContent=el('credits-balance').textContent;
+    const messages={loading:'Cargando tus créditos…',invalid:'No pudimos verificar tu saldo.',balance:'Podés reclamar 2 créditos diarios cuando tu saldo llegue a 0.',locked:'Tenés créditos reservados en una partida.',claimed:'Ya recibiste tus 2 créditos de hoy. Podés volver a reclamar mañana si estás en 0.',available:'Podés reclamar 2 créditos gratuitos hoy.'};
     el('credits-status').textContent=error||messages[eligibility];
     const button=el('credits-claim');button.hidden=!!error||!available||!['available','claimed'].includes(eligibility);
     button.disabled=busy||eligibility!=='available'||getState().firebaseConnected!==true;
@@ -84,6 +85,12 @@ export function installCredits({services,getState,document,now=()=>Date.now(),se
       }catch {if(epoch===generation)error='No pudimos confirmar los créditos. Revisá la conexión.';}
     }finally {if(epoch===generation){busy=false;render();}}
   }
+  el('credits-open')?.addEventListener('click',()=>{
+    const panel=el('credits-panel');if(panel.hidden)return;
+    panel.scrollIntoView({behavior:'smooth',block:'center'});
+    el('credits-claim').focus({preventScroll:true});
+    panel.classList.remove('credits-highlight');void panel.offsetWidth;panel.classList.add('credits-highlight');
+  });
   el('credits-claim').addEventListener('click',claim);
   return {start,stop,refresh:render,claim,wallet:()=>wallet};
 }
