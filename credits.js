@@ -32,8 +32,9 @@ export function installCredits({services,getState,document,now=()=>Date.now(),se
     el('credits-balance').textContent=wallet===undefined?'—':String(wallet?.balance??0);
     const setupBalance=el('table-stake-available');if(setupBalance)setupBalance.textContent=el('credits-balance').textContent;
     const headerBalance=el('credits-header-balance');if(headerBalance)headerBalance.textContent=el('credits-balance').textContent;
-    const messages={loading:'Cargando tus créditos…',invalid:'No pudimos verificar tu saldo.',balance:'Podés reclamar 2 créditos diarios cuando tu saldo llegue a 0.',locked:'Tenés créditos reservados en una partida.',claimed:'Ya recibiste tus 2 créditos de hoy. Podés volver a reclamar mañana si estás en 0.',available:'Podés reclamar 2 créditos gratuitos hoy.'};
+    const messages={loading:'Cargando tus créditos…',invalid:'No pudimos verificar tu saldo.',balance:'Podés reclamar 2 créditos diarios cuando tu saldo llegue a 0.',locked:'Tenés créditos reservados en una partida.',claimed:'Ya recibiste tus 2 créditos de hoy. Podés volver a reclamar mañana si estás en 0.',available:''};
     el('credits-status').textContent=error||messages[eligibility];
+    el('credits-status').hidden=!el('credits-status').textContent;
     const button=el('credits-claim');button.hidden=!!error||!available||!['available','claimed'].includes(eligibility);
     button.disabled=busy||eligibility!=='available'||getState().firebaseConnected!==true;
     button.textContent=busy?'Reclamando…':eligibility==='claimed'?'Disponibles mañana':'Reclamar 2 créditos';

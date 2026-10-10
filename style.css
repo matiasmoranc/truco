@@ -1384,3 +1384,6 @@ body { min-height:100dvh; }
 #setup-view .setup-wallet strong{font-size:24px}
 #setup-view .setup-wallet .credit-coin-icon{width:30px;height:30px}
 @media(max-width:400px){#setup-view .setup-wallet{padding:6px 8px;gap:5px;font-size:11px}#setup-view .setup-wallet .credit-coin-icon{width:24px;height:24px}}
+
+#welcome-view .credits-panel{background:radial-gradient(ellipse at top left,rgba(255,255,255,.12),rgba(255,255,255,.035) 35%,transparent 65%),#062d2255}
+#welcome-view #credits-status[hidden]{display:none!important}
