@@ -1313,3 +1313,13 @@ body { min-height:100dvh; }
 /* Keep voice controls transparent and spoken calls on their gold panel. */
 #game-view #player-sound-toggle,#game-view #sound-toggle{background:transparent}
 #game-view #call-notice,#learning-hint #learning-call-notice{background:#ead7a5;color:#15251b;border-color:#d8b875}
+
+/* Free virtual credits; hidden until a registered account is ready. */
+.credits-panel[hidden]{display:none!important}
+.credits-panel{margin:0;padding:14px 16px;border:1px solid rgba(232,201,131,.45);border-radius:12px;background:rgba(8,30,22,.3);color:#e8c983}
+.credits-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;font-weight:600}
+.credits-heading strong{font-size:24px;line-height:1}
+.credits-panel p{margin:8px 0 0;color:#c5d3c9;font-size:13px;line-height:1.45}
+.credits-panel .button{margin-top:10px;min-height:40px;width:100%;padding:9px 12px;font-size:14px;background:transparent;color:#e8c983;border:1px solid #e8c983}
+.credits-panel .button[hidden]{display:none!important}
+.credits-panel .button:disabled{opacity:.6;cursor:default}

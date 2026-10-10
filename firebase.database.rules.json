@@ -41,6 +41,33 @@
     "usernameIndexReady": {
       ".read": "auth != null",
       ".write": false
+    },
+    "creditEconomy": {
+      ".read": false,
+      ".write": false,
+      "wallets": {
+        "$uid": {
+          ".read": "auth != null && auth.uid == $uid",
+          ".write": "auth != null && auth.uid == $uid && (auth.token.firebase.sign_in_provider == 'google.com' || auth.token.firebase.sign_in_provider == 'apple.com') && root.child('profiles').child($uid).child('name').isString() && newData.exists() && ((!data.exists()) || (data.child('balance').val() == 0 && data.child('locked').val() == 0 && data.child('lastGrantAt').val() < now - ((now - 10800000) % 86400000))) && newData.child('balance').val() == 2 && newData.child('locked').val() == 0 && newData.child('lastGrantAt').val() == now",
+          ".validate": "newData.hasChildren(['balance', 'locked', 'lastGrantAt'])",
+          "balance": {
+            ".validate": "newData.isNumber() && newData.val() == 2"
+          },
+          "locked": {
+            ".validate": "newData.isNumber() && newData.val() == 0"
+          },
+          "lastGrantAt": {
+            ".validate": "newData.isNumber() && newData.val() == now"
+          },
+          "$other": {
+            ".validate": false
+          }
+        }
+      },
+      "matches": {
+        ".read": false,
+        ".write": false
+      }
     }
   }
 }

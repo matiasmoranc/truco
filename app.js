@@ -1,3 +1,4 @@
+import { installCredits } from './credits.js?v=20261010-free-credits18';
 import { installAccount } from './account.js?v=20261009-apple-login10';
 const FIREBASE_VERSION = '12.4.0';
 const $ = (id) => document.getElementById(id);
@@ -426,8 +427,10 @@ function loadConfig() {
   try { return JSON.parse(localStorage.getItem(storageKey) || 'null'); } catch { return null; }
 }
 let firebaseReadyPromise=null;
-const account=installAccount({services:firebaseServices,getState:()=>state,rememberName:rememberPlayerName,document,onReady:openInitialRoom,onIdentityChange:resetAccountRoom,onNameChanged:()=>showView('welcome-view'),inRoom:()=>!!state.room&&!$('welcome-view').classList.contains('active')});
+const account=installAccount({services:firebaseServices,getState:()=>state,rememberName:rememberPlayerName,document,onReady:async()=>{await openInitialRoom();credits.start();},onIdentityChange:resetAccountRoom,onNameChanged:()=>showView('welcome-view'),inRoom:()=>!!state.room&&!$('welcome-view').classList.contains('active')});
+const credits=installCredits({services:firebaseServices,getState:()=>state,document});
 function resetAccountRoom(){
+  credits.stop();
   stopRoomPresence();stopBot();forgetRoomSeat();
   state.roomWatchVersion=(state.roomWatchVersion||0)+1;
   state.navigationEpoch=(state.navigationEpoch||0)+1;
@@ -461,6 +464,7 @@ async function firebaseServices() {
     dbSdk.onValue(dbSdk.ref(state.firebase.db,'.info/serverTimeOffset'),snapshot=>{state.serverTimeOffset=Number(snapshot.val())||0;},error=>console.error('[truco:clock]',error));
     dbSdk.onValue(dbSdk.ref(state.firebase.db,'.info/connected'),snapshot=>{
       state.firebaseConnected=snapshot.val()===true;
+      credits.refresh();
       state.connectionEpoch=(state.connectionEpoch||0)+1;state.connectionReady=false;
       if(state.firebaseConnected){roomPresenceContext=null;presenceWriteSerial++;syncRoomPresence();retryRoomRestore();refreshLiveConnection();}
       if(state.room)renderTurnTimer();
