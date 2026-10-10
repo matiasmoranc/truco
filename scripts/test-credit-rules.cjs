@@ -14,12 +14,18 @@ async function request(path,method,value,token='owner'){
  const response=await fetch(url,{method,headers:{...(token==='owner'?{Authorization:'Bearer owner'}:{}),'Content-Type':'application/json'},...(value===undefined?{}:{body:JSON.stringify(value)})});
  const body=await response.json();return {status:response.status,body};
 }
-const grant=()=>({balance:2,locked:0,lastGrantAt:{'.sv':'timestamp'}});
+const grant=()=>({balance:5,locked:0,lastGrantAt:{'.sv':'timestamp'}});
 const wallet='creditEconomy/wallets/a';
 (async()=>{
  await request('','PUT',{profiles:{a:{name:'Mati'},b:{name:'Ricky'}}});
  const token=jwt('a');
- const first=await request(wallet,'PUT',grant(),token);assert.equal(first.status,200,JSON.stringify(first));assert.equal(first.body.balance,2);assert.equal(typeof first.body.lastGrantAt,'number');
+ assert.equal((await request('administrators/a','PUT',true,token)).status,401,'clients cannot grant admin access');
+ await request('administrators/a','PUT',true);
+ assert.equal((await request('administrators/a','GET',undefined,jwt('b'))).status,401,'admin roster is private');
+ await request('userAccess/a','PUT',{blocked:true});
+ assert.equal((await request(wallet,'PUT',grant(),token)).status,401,'blocked accounts cannot claim');
+ await request('userAccess/a','DELETE');
+ const first=await request(wallet,'PUT',grant(),token);assert.equal(first.status,200,JSON.stringify(first));assert.equal(first.body.balance,5);assert.equal(typeof first.body.lastGrantAt,'number');
  assert.equal((await request(wallet,'PUT',grant(),token)).status,401,'no second grant while funded');
  await request(wallet+'/balance','PUT',0);
  assert.equal((await request(wallet,'PUT',grant(),token)).status,401,'no second grant after spending on same day');

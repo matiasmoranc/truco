@@ -3,14 +3,14 @@
     ".read": false,
     ".write": false,
     "rooms": {
-      ".read": "auth != null",
+      ".read": "(auth != null && root.child('userAccess').child(auth.uid).child('blocked').val() != true)",
       "$room": {
         "public": {
-          ".read": "auth != null",
-          ".write": "auth != null && data.child('managedCredits').val() != true && newData.child('managedCredits').val() != true",
+          ".read": "(auth != null && root.child('userAccess').child(auth.uid).child('blocked').val() != true)",
+          ".write": "(auth != null && root.child('userAccess').child(auth.uid).child('blocked').val() != true) && data.child('managedCredits').val() != true && newData.child('managedCredits').val() != true",
           "connectionPresence": {
             "$player": {
-              ".write": "auth != null && ($player == 'player1' || $player == 'player2') && root.child('rooms').child($room).child('public').child('players').child($player).child('uid').val() == auth.uid && newData.child('uid').val() == auth.uid && newData.child('matchNumber').val() == root.child('rooms').child($room).child('public').child('matchNumber').val()",
+              ".write": "(auth != null && root.child('userAccess').child(auth.uid).child('blocked').val() != true) && ($player == 'player1' || $player == 'player2') && root.child('rooms').child($room).child('public').child('players').child($player).child('uid').val() == auth.uid && newData.child('uid').val() == auth.uid && newData.child('matchNumber').val() == root.child('rooms').child($room).child('public').child('matchNumber').val()",
               ".validate": "newData.hasChildren(['uid','matchNumber','session','online'])",
               "online": {
                 ".validate": "newData.isBoolean()"
@@ -32,17 +32,17 @@
     "hands": {
       "$room": {
         "$uid": {
-          ".read": "auth != null && auth.uid == $uid",
-          ".write": "auth != null && root.child('rooms').child($room).child('public').child('managedCredits').val() != true && (auth.uid == $uid || auth.uid == root.child('rooms').child($room).child('public').child('table').child('uid').val())"
+          ".read": "(auth != null && root.child('userAccess').child(auth.uid).child('blocked').val() != true) && auth.uid == $uid",
+          ".write": "(auth != null && root.child('userAccess').child(auth.uid).child('blocked').val() != true) && root.child('rooms').child($room).child('public').child('managedCredits').val() != true && (auth.uid == $uid || auth.uid == root.child('rooms').child($room).child('public').child('table').child('uid').val())"
         }
       }
     },
     "profiles": {
       "$uid": {
-        ".read": "auth != null && auth.uid == $uid",
-        ".write": "auth != null && auth.uid == $uid && root.child('usernameIndexReady').val() == true",
+        ".read": "(auth != null && root.child('userAccess').child(auth.uid).child('blocked').val() != true) && auth.uid == $uid",
+        ".write": "(auth != null && root.child('userAccess').child(auth.uid).child('blocked').val() != true) && auth.uid == $uid && root.child('usernameIndexReady').val() == true",
         "name": {
-          ".validate": "newData.isString() && newData.val().matches(/^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9._-]{1,18}$/) && newData.parent().parent().parent().child('usernames').child(newData.val().toLowerCase().replace('.', '%2E')).val() == auth.uid"
+          ".validate": "newData.isString() && newData.val().matches(/^[A-Za-z\u00c1\u00c9\u00cd\u00d3\u00da\u00dc\u00d1\u00e1\u00e9\u00ed\u00f3\u00fa\u00fc\u00f10-9._-]{1,18}$/) && newData.parent().parent().parent().child('usernames').child(newData.val().toLowerCase().replace('.', '%2E')).val() == auth.uid"
         },
         "$other": {
           ".validate": false
@@ -51,13 +51,13 @@
     },
     "usernames": {
       "$key": {
-        ".read": "auth != null",
-        ".write": "root.child('usernameIndexReady').val() == true && (auth != null && ((!data.exists() && newData.val() == auth.uid) || (data.val() == auth.uid && (newData.val() == auth.uid || (!newData.exists() && newData.parent().parent().child('profiles').child(auth.uid).child('name').val().toLowerCase().replace('.', '%2E') != $key)))))",
+        ".read": "(auth != null && root.child('userAccess').child(auth.uid).child('blocked').val() != true)",
+        ".write": "root.child('usernameIndexReady').val() == true && ((auth != null && root.child('userAccess').child(auth.uid).child('blocked').val() != true) && ((!data.exists() && newData.val() == auth.uid) || (data.val() == auth.uid && (newData.val() == auth.uid || (!newData.exists() && newData.parent().parent().child('profiles').child(auth.uid).child('name').val().toLowerCase().replace('.', '%2E') != $key)))))",
         ".validate": "newData.isString() && newData.val() == auth.uid && newData.parent().parent().child('profiles').child(auth.uid).child('name').val().toLowerCase().replace('.', '%2E') == $key"
       }
     },
     "usernameIndexReady": {
-      ".read": "auth != null",
+      ".read": "(auth != null && root.child('userAccess').child(auth.uid).child('blocked').val() != true)",
       ".write": false
     },
     "creditEconomy": {
@@ -65,8 +65,8 @@
       ".write": false,
       "wallets": {
         "$uid": {
-          ".read": "auth != null && auth.uid == $uid",
-          ".write": "auth != null && auth.uid == $uid && (auth.token.firebase.sign_in_provider == 'google.com' || auth.token.firebase.sign_in_provider == 'apple.com') && root.child('profiles').child($uid).child('name').isString() && newData.exists() && ((!data.exists()) || (data.child('balance').val() == 0 && data.child('locked').val() == 0 && data.child('lastGrantAt').val() < now - ((now - 10800000) % 86400000))) && newData.child('balance').val() == 5 && newData.child('locked').val() == 0 && newData.child('lastGrantAt').val() == now",
+          ".read": "(auth != null && root.child('userAccess').child(auth.uid).child('blocked').val() != true) && auth.uid == $uid",
+          ".write": "(auth != null && root.child('userAccess').child(auth.uid).child('blocked').val() != true) && auth.uid == $uid && (auth.token.firebase.sign_in_provider == 'google.com' || auth.token.firebase.sign_in_provider == 'apple.com') && root.child('profiles').child($uid).child('name').isString() && newData.exists() && ((!data.exists()) || (data.child('balance').val() == 0 && data.child('locked').val() == 0 && data.child('lastGrantAt').val() < now - ((now - 10800000) % 86400000))) && newData.child('balance').val() == 5 && newData.child('locked').val() == 0 && newData.child('lastGrantAt').val() == now",
           ".validate": "newData.hasChildren(['balance', 'locked', 'lastGrantAt'])",
           "balance": {
             ".validate": "newData.isNumber() && newData.val() == 5"
@@ -88,6 +88,12 @@
       },
       "tables": {
         ".read": false,
+        ".write": false
+      }
+    },
+    "administrators": {
+      "$uid": {
+        ".read": "auth != null && auth.uid == $uid",
         ".write": false
       }
     }

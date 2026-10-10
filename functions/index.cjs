@@ -10,15 +10,16 @@ const options={region:'us-central1',maxInstances:5,timeoutSeconds:30};
 async function identity(request){
  const auth=request.auth,provider=auth?.token?.firebase?.sign_in_provider;
  if(!auth||!['google.com','apple.com'].includes(provider))throw new HttpsError('unauthenticated','Iniciá sesión con Google o Apple.');
+ if((await db.ref('userAccess/'+auth.uid+'/blocked').get()).val()===true)throw new HttpsError('permission-denied','Tu cuenta está bloqueada.');
  const snap=await db.ref('profiles/'+auth.uid+'/name').get();const name=snap.val();
  if(typeof name!=='string'||!name)throw new HttpsError('failed-precondition','Guardá tu nombre de usuario primero.');return {uid:auth.uid,name};
 }
 async function rateLimit(uid,limit=15,bucket='tables'){const now=Date.now();const r=await db.ref('creditRateLimits/'+uid+'/'+bucket).transaction(current=>{if(!current||now-current.start>=60000)return {start:now,count:1};if(current.count>=limit)return undefined;return {...current,count:current.count+1};});if(!r.committed)throw new HttpsError('resource-exhausted','Esperá un minuto antes de volver a intentar.');}
-async function mutate(update){
+async function mutate(update,allowEmpty=false){
  let failure=null;
  try{
   const result=await db.ref('creditEconomy').transaction(current=>{
-   failure=null;if(current===null)return null;
+   failure=null;if(current===null&&!allowEmpty)return null;
    try{return update(current);}catch(error){failure=error;return undefined;}
   });
   if(!result.committed||!result.snapshot.val())throw failure||new Error('No hay créditos disponibles.');
@@ -87,4 +88,64 @@ exports.creditExpireTables=onSchedule({schedule:'every 1 minutes',region:'us-cen
   }return next;
  });
  if(r.committed&&r.snapshot.val())await Promise.all(changed.map(code=>publish(r.snapshot.val(),code)));
+});
+
+// Admin permissions are server-only. Clients cannot write administrators.
+const {getAuth}=require('firebase-admin/auth');
+const {requireAdmin,adminLedgerChange,validKey}=require('./admin-service.cjs');
+async function adminIdentity(request){
+ const uid=request.auth?.uid;
+ if(!uid)throw new HttpsError('unauthenticated','Iniciá sesión primero.');
+ const [role,user]=await Promise.all([db.ref('administrators/'+uid).get(),getAuth().getUser(uid)]);
+ try{requireAdmin(request.auth,role.val()===true&&!user.disabled);}catch{throw new HttpsError('permission-denied','Tu cuenta no tiene acceso de administrador.');}
+ await rateLimit(uid,60,'admin');return uid;
+}
+exports.adminConsole=onCall(options,async request=>{
+ const actor=await adminIdentity(request),data=request.data||{},action=data.action;
+ if(action==='users'){
+  const page=await getAuth().listUsers(100,data.pageToken||undefined);
+  const users=await Promise.all(page.users.filter(u=>!u.providerData.every(p=>!['google.com','apple.com'].includes(p.providerId))).map(async u=>{
+   const [profile,wallet]=await Promise.all([db.ref('profiles/'+u.uid).get(),db.ref('creditEconomy/wallets/'+u.uid).get()]);
+   return {uid:u.uid,email:u.email||'',name:profile.val()?.name||'',disabled:u.disabled,createdAt:u.metadata.creationTime,balance:wallet.val()?.balance??0,locked:wallet.val()?.locked??0};
+  }));
+  return {users,pageToken:page.pageToken||null};
+ }
+ if(action==='tables'){
+  const ledger=(await db.ref('creditEconomy').get()).val()||{};
+  const userAudit=(await db.ref('adminUserAudit').get()).val()||{};
+  return {tables:Object.entries(ledger.tables||{}).map(([code])=>{const m=tableFor(ledger,code);return {code,status:m.closedAt?'closed':m.status,stake:m.stake,targetPoints:m.targetPoints,players:Object.values(m.players||{}).map(p=>p.name)};}).filter(m=>['waiting','reserved','settled'].includes(m.status)),
+   audit:[...Object.values(ledger.adminAudit||{}),...Object.values(userAudit)].sort((a,b)=>b.at-a.at).slice(0,100)};
+ }
+ if(['credits','close-table'].includes(action)){
+  if(action==='credits'){if(!validKey(data.uid))throw new HttpsError('invalid-argument','Usuario inválido.');await getAuth().getUser(data.uid);}
+  const ledger=await mutate(current=>adminLedgerChange(current,{...data,actor,now:Date.now()}),true);
+  if(action==='close-table')await publish(ledger,data.code);
+  return {ok:true};
+ }
+ if(action==='rename'){
+  if(!validKey(data.uid)||!validKey(data.requestId)||typeof data.name!=='string'||!/^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9._-]{1,18}$/.test(data.name)||typeof data.reason!=='string'||data.reason.trim().length<3||data.reason.length>200)throw new HttpsError('invalid-argument','Nombre o motivo inválido.');
+  await getAuth().getUser(data.uid);let failure;
+  const r=await db.ref().transaction(root=>{
+   failure=null;if(!root)return null;
+   const receipt=root.adminUserAudit?.[data.requestId];
+   if(receipt){if(receipt.actor!==actor||receipt.uid!==data.uid||receipt.after!==data.name)failure='Solicitud reutilizada.';return failure?undefined:root;}
+   const key=data.name.toLowerCase().replaceAll('.','%2E'),owner=root.usernames?.[key];
+   if(owner&&owner!==data.uid){failure='Ese nombre ya está en uso.';return undefined;}
+   const old=root.profiles?.[data.uid]?.name;
+   root.profiles??={};root.profiles[data.uid]={name:data.name};root.usernames??={};root.usernames[key]=data.uid;
+   if(old){const oldKey=old.toLowerCase().replaceAll('.','%2E');if(oldKey!==key&&root.usernames[oldKey]===data.uid)delete root.usernames[oldKey];}
+   root.adminUserAudit??={};root.adminUserAudit[data.requestId]={actor,uid:data.uid,action:'rename',before:old||null,after:data.name,reason:data.reason,at:Date.now()};return root;
+  });
+  if(!r.committed)throw new HttpsError('failed-precondition',failure||'No se pudo cambiar el nombre.');return {ok:true};
+ }
+ if(action==='block'){
+  if(!validKey(data.uid)||typeof data.disabled!=='boolean'||typeof data.reason!=='string'||data.reason.trim().length<3||data.reason.length>200||!validKey(data.requestId))throw new HttpsError('invalid-argument','Usuario o motivo inválido.');
+  if(data.uid===actor||(await db.ref('administrators/'+data.uid).get()).val()===true)throw new HttpsError('failed-precondition','No podés bloquear una cuenta administradora.');
+  if(data.disabled)await db.ref('userAccess/'+data.uid).set({blocked:true});
+  await getAuth().updateUser(data.uid,{disabled:data.disabled});
+  if(!data.disabled)await db.ref('userAccess/'+data.uid).set({blocked:false});
+  if(data.disabled)await getAuth().revokeRefreshTokens(data.uid);
+  await db.ref('adminUserAudit/'+data.requestId).set({actor,uid:data.uid,action:'block',after:data.disabled,reason:data.reason,at:Date.now()});return {ok:true};
+ }
+ throw new HttpsError('invalid-argument','Acción inválida.');
 });

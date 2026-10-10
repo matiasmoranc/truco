@@ -62,7 +62,7 @@ test('Reserved stakes cannot be used to appear broke and claim extra credits',as
  assert.equal(permitted(old,{balance:5,locked:0,lastGrantAt:today},today),false);
 });
 test('Wallets are private and the browser cannot write match accounting',()=>{
- const context={auth:{uid:'a'},$uid:'b'};assert.equal(run(creditRules['.read'],context),false);
+ const context={auth:{uid:'a'},$uid:'b',root:new Snapshot({})};assert.equal(run(creditRules['.read'],context),false);
  context.$uid='a';assert.equal(run(creditRules['.read'],context),true);
  assert.equal(rules.creditEconomy['.read'],false);assert.equal(rules.creditEconomy['.write'],false);
  assert.equal(rules.creditEconomy.matches['.write'],false);
@@ -95,4 +95,10 @@ test('Late confirmation from the previous account cannot overwrite the new accou
  h.fb.runTransaction=()=>new Promise(r=>resolve=r);const pending=h.api.claim();await Promise.resolve();
  h.api.stop();h.state.uid='b';await h.api.start();resolve({committed:true,snapshot:{val:()=>({balance:5,locked:0,lastGrantAt:today})}});await pending;
  assert.equal(h.elements['credits-balance'].textContent,'0');
+});
+
+test('Blocked accounts lose wallet access and administrator roles cannot be written by clients',()=>{
+ const context={auth:{uid:'a'},$uid:'a',root:new Snapshot({userAccess:{a:{blocked:true}}})};
+ assert.equal(run(creditRules['.read'],context),false);
+ assert.equal(rules.administrators.$uid['.write'],false);
 });
