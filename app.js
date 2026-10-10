@@ -1,4 +1,4 @@
-import { installCredits } from './credits.js?v=20261010-direct28';
+import { installCredits } from './credits.js?v=20261010-rematch29';
 import { installAccount } from './account.js?v=20261009-apple-login10';
 const FIREBASE_VERSION = '12.4.0';
 const $ = (id) => document.getElementById(id);
@@ -172,6 +172,7 @@ function syncLiveControls(){
   $('game-view').classList.toggle('connection-recovering',blocked);
   $('game-view').classList.toggle('action-sending',busy);
   for(const button of document.querySelectorAll('#player-actions button,#envido-picker button,#draw-deck,#request-rematch,#accept-rematch,#decline-rematch'))button.disabled=blocked||busy||rematchInFlight;
+  syncRematchCreditControls();
   $('fold-hand').disabled=blocked||busy||!canFoldHand(state.room,state.playerId);
   for(const card of $('hand').querySelectorAll('.hand-card'))card.disabled=blocked||busy;
 }
@@ -430,7 +431,8 @@ function loadConfig() {
 }
 let firebaseReadyPromise=null;
 const account=installAccount({services:firebaseServices,getState:()=>state,rememberName:rememberPlayerName,document,onReady:async()=>{await openInitialRoom();credits.start();},onIdentityChange:resetAccountRoom,onNameChanged:()=>showView('welcome-view'),inRoom:()=>!!state.room&&!$('welcome-view').classList.contains('active')});
-const credits=installCredits({services:firebaseServices,getState:()=>state,document,notify:message=>toast(message),onChange:()=>{if(state.lobbyRooms)renderLobby(state.lobbyRooms);$('table-stake-available').textContent=String(credits.wallet()?.balance??'—');}});
+const credits=installCredits({services:firebaseServices,getState:()=>state,document,notify:message=>toast(message),onChange:()=>{if(state.lobbyRooms)renderLobby(state.lobbyRooms);
+  if(state.room)renderMatchEnd();$('table-stake-available').textContent=String(credits.wallet()?.balance??'—');}});
 function resetAccountRoom(){
   credits.stop();
   stopRoomPresence();stopBot();forgetRoomSeat();
@@ -727,10 +729,9 @@ function renderLobby(rooms) {
     const actions=[];
     if(!players.player1||!players.player2)actions.push(['player','Entrar']);
     const privateTable=!!(room.managedCredits&&room.creditMatch.hasPassword);
-    const trophy='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3 4 21M3 5l18-1M20 3l-1 18M3 20l18-1M3 22 22 2"/></svg>';
     const coins='<svg viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v5c0 4 16 4 16 0V5M4 10v5c0 4 16 4 16 0v-5M4 15v4c0 4 16 4 16 0v-4"/></svg>';
     const lock='<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="'+(privateTable?'M8 10V6a4 4 0 0 1 8 0v4':'M8 10V6a4 4 0 0 1 8 0')+'"/><path d="M12 14v3"/></svg>';
-    return `<article class="lobby-card compact-room"><div class="compact-room-owner"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21v-2a8 8 0 0 1 16 0v2"/></svg><h3>${escapeHtml(title)}</h3></div><div class="compact-room-stat">${trophy}<strong>${targetPoints(room)}</strong><span>puntos</span></div><div class="compact-room-stat">${coins}<strong>${room.managedCredits?escapeHtml(String(room.creditMatch.stake)):'0'}</strong></div><div class="compact-room-privacy ${privateTable?'is-private':'is-public'}">${lock}<strong>${privateTable?'Privada':'Pública'}</strong></div><div class="lobby-join-options">${actions.map(([key,label])=>`<button class="button lobby-player-button" data-room="${code}" data-seat="${key}" ${room.managedCredits&&!roomSeatForUid(room,state.uid)&&((credits.wallet()?.balance??0)<room.creditMatch.stake||(credits.wallet()?.locked??0)>0)?'disabled':''}>${label}</button>`).join('')}</div></article>`;
+    return `<article class="lobby-card compact-room"><div class="compact-room-owner"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21v-2a8 8 0 0 1 16 0v2"/></svg><h3>${escapeHtml(title)}</h3></div><div class="compact-room-stat"><strong>${targetPoints(room)}</strong><span>puntos</span></div><div class="compact-room-stat">${coins}<strong>${room.managedCredits?escapeHtml(String(room.creditMatch.stake)):'0'}</strong></div><div class="compact-room-privacy ${privateTable?'is-private':'is-public'}">${lock}<strong>${privateTable?'Privada':'Pública'}</strong></div><div class="lobby-join-options">${actions.map(([key,label])=>`<button class="button lobby-player-button" data-room="${code}" data-seat="${key}" ${room.managedCredits&&!roomSeatForUid(room,state.uid)&&((credits.wallet()?.balance??0)<room.creditMatch.stake||(credits.wallet()?.locked??0)>0)?'disabled':''}>${label}</button>`).join('')}</div></article>`;
   }).join('');
 }
 function joinOpenRoom(code, seat) {
@@ -2088,6 +2089,13 @@ async function respondRematch(action){
   }catch(error){console.error('[truco:rematch]',error);toast(firebaseError(error));}
   finally{rematchInFlight=false;renderGame();}
 }
+function syncRematchCreditControls(){
+  const insufficient=!!state.room?.managedCredits&&((credits.wallet()?.balance??0)<state.room.creditMatch.stake||(credits.wallet()?.locked??0)>0);
+  for(const [id,label] of [['request-rematch','Revancha'],['accept-rematch','Aceptar']]){
+    $(id).textContent=insufficient?'Créditos insuficientes':label;
+    if(insufficient)$(id).disabled=true;
+  }
+}
 function renderMatchEnd(){
   const panel=$('match-end'),room=state.room,winner=room&&matchWinner(room);
   const visible=!state.learning&&matchFinished(room)&&!!winner&&state.dismissedMatchEnd!==matchEndKey(room);
@@ -2095,16 +2103,17 @@ function renderMatchEnd(){
   if(!visible)return;
   const name=room.players?.[winner]?.name||'Jugador';
   $('match-end-title').textContent='Ganó '+name;
-  $('match-session-score').textContent=sessionScoreText(room);
+  $('match-session-score').textContent='';
   $('match-end-score').innerHTML=['player1','player2'].map(player=>`<div class="${player===winner?'match-score-winner':''}"><strong>${capScores(room,room.scores)[player]||0}</strong><span>${escapeHtml(room.players?.[player]?.name||'Jugador')}</span></div>`).join('<b aria-hidden="true">–</b>');
   const request=room.rematch,player=state.playerId,isPlayer=['player1','player2'].includes(player);
   const pending=request?.status==='pending',incoming=pending&&request.requester!==player;
   $('match-end-message').textContent=pending?(incoming?(room.players?.[request.requester]?.name||'Tu rival')+' quiere jugar la revancha.':'Revancha enviada. Esperando al rival…'):request?.status==='declined'?'La revancha no fue aceptada.':room.matchResult?.reason==='inactivity'?'Victoria por inactividad.':room.matchResult?.reason==='disconnect'?'Victoria por desconexión.':'Partida terminada';
-  if(room.creditResult&&!pending)$('match-end-message').textContent+=' · '+(room.players?.[winner]?.name||'El ganador')+' recibió '+room.creditResult.pot+' créditos.';
+
   $('request-rematch').classList.toggle('hidden',!isPlayer||pending);
   $('accept-rematch').classList.toggle('hidden',!isPlayer||!incoming);
-  $('decline-rematch').classList.toggle('hidden',!isPlayer||!incoming);
-  for(const id of ['request-rematch','accept-rematch','decline-rematch'])$(id).disabled=rematchInFlight;
+  $('decline-rematch').classList.toggle('hidden',!isPlayer);
+  for(const id of ['request-rematch','accept-rematch','decline-rematch'])$(id).disabled=rematchInFlight||liveActionsBlocked();
+  syncRematchCreditControls();
   if(state.focusedMatchEnd!==matchEndKey(room)){
     state.focusedMatchEnd=matchEndKey(room);
     (isPlayer?(incoming?$('accept-rematch'):pending?$('close-match-end'):$('request-rematch')):$('close-match-end')).focus({preventScroll:true});
@@ -2137,7 +2146,7 @@ async function closeFinishedRoom(){
 $('close-match-end').addEventListener('click',()=>closeFinishedRoom());
 $('request-rematch').addEventListener('click',event=>runLiveAction(event.currentTarget,()=>respondRematch('request')));
 $('accept-rematch').addEventListener('click',event=>runLiveAction(event.currentTarget,()=>respondRematch('accept')));
-$('decline-rematch').addEventListener('click',event=>runLiveAction(event.currentTarget,()=>respondRematch('decline')));
+$('decline-rematch').addEventListener('click',()=>closeFinishedRoom());
 $('match-end').addEventListener('keydown',event=>{
   if(event.key==='Escape'){$('close-match-end').click();return;}
   if(event.key!=='Tab')return;

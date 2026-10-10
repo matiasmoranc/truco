@@ -30,28 +30,28 @@ test('Daily credits start at Uruguay midnight, not UTC midnight',async()=>{
  const m=await modulePromise;assert.equal(m.creditDayStart(Date.parse('2026-10-10T02:59:59Z')),Date.parse('2026-10-09T03:00:00Z'));
  assert.equal(m.creditDayStart(Date.parse('2026-10-10T03:00:00Z')),Date.parse('2026-10-10T03:00:00Z'));
 });
-test('A new account receives exactly two credits and cannot claim twice',()=>{
- const grant={balance:2,locked:0,lastGrantAt:today};assert.equal(permitted(null,grant,today),true);
+test('A new account receives exactly five credits and cannot claim twice',()=>{
+ const grant={balance:5,locked:0,lastGrantAt:today};assert.equal(permitted(null,grant,today),true);
  assert.equal(permitted(grant,{...grant,lastGrantAt:today+1},today+1),false);
  assert.equal(permitted({...grant,balance:0},{...grant,lastGrantAt:today+1},today+1),false);
 });
 test('Yesterday credits do not top up a remaining balance of one',async()=>{
  const m=await modulePromise,old={balance:1,locked:0,lastGrantAt:today-86400000};
  assert.equal(m.creditEligibility(old,today),'balance');assert.equal(m.dailyCreditChanges(old,today),undefined);
- assert.equal(permitted(old,{balance:2,locked:0,lastGrantAt:today},today),false);
+ assert.equal(permitted(old,{balance:5,locked:0,lastGrantAt:today},today),false);
 });
-test('A zero balance gets two the next Uruguay day, and grants never accumulate',async()=>{
+test('A zero balance gets five the next Uruguay day, and grants never accumulate',async()=>{
  const m=await modulePromise,old={balance:0,locked:0,lastGrantAt:today-86400000};
  assert.equal(m.creditEligibility(old,today),'available');assert.equal(permitted(old,m.dailyCreditChanges(old,today),today),true);
- for(const balance of [1,2,3,100])assert.equal(permitted({...old,balance},{balance:2,locked:0,lastGrantAt:today},today),false);
+ for(const balance of [1,2,3,100])assert.equal(permitted({...old,balance},{balance:5,locked:0,lastGrantAt:today},today),false);
 });
 test('The exact midnight boundary permits a new day only once',()=>{
  const last=Date.parse('2026-10-10T02:59:59.999Z'),next=last+1;
- assert.equal(permitted({balance:0,locked:0,lastGrantAt:last},{balance:2,locked:0,lastGrantAt:next},next),true);
- assert.equal(permitted({balance:0,locked:0,lastGrantAt:next},{balance:2,locked:0,lastGrantAt:next+1},next+1),false);
+ assert.equal(permitted({balance:0,locked:0,lastGrantAt:last},{balance:5,locked:0,lastGrantAt:next},next),true);
+ assert.equal(permitted({balance:0,locked:0,lastGrantAt:next},{balance:5,locked:0,lastGrantAt:next+1},next+1),false);
 });
 test('Forging amount, timestamp, identity, provider, fields or deleting the wallet is rejected',()=>{
- const grant={balance:2,locked:0,lastGrantAt:today};
+ const grant={balance:5,locked:0,lastGrantAt:today};
  for(const next of [{...grant,balance:100},{...grant,lastGrantAt:today-1},{...grant,locked:1},{...grant,bonus:100},null])assert.equal(permitted(null,next,today),false);
  for(const options of [{uid:null},{uid:'other'},{provider:'anonymous'},{profile:false}])assert.equal(permitted(null,grant,today,options),false);
  assert.equal(permitted(null,grant,today,{provider:'apple.com'}),true);
@@ -59,7 +59,7 @@ test('Forging amount, timestamp, identity, provider, fields or deleting the wall
 test('Reserved stakes cannot be used to appear broke and claim extra credits',async()=>{
  const m=await modulePromise,old={balance:0,locked:1,lastGrantAt:today-86400000};
  assert.equal(m.creditEligibility(old,today),'locked');assert.equal(m.dailyCreditChanges(old,today),undefined);
- assert.equal(permitted(old,{balance:2,locked:0,lastGrantAt:today},today),false);
+ assert.equal(permitted(old,{balance:5,locked:0,lastGrantAt:today},today),false);
 });
 test('Wallets are private and the browser cannot write match accounting',()=>{
  const context={auth:{uid:'a'},$uid:'b'};assert.equal(run(creditRules['.read'],context),false);
@@ -77,7 +77,7 @@ function harness(m,initial=null) {
 }
 test('The UI claims once, waits for confirmation and resets on account change',async()=>{
  const m=await modulePromise,h=harness(m);await h.api.start();assert.equal(h.elements['credits-balance'].textContent,'0');
- await Promise.all([h.api.claim(),h.api.claim()]);assert.equal(h.writes.length,1);assert.equal(h.writes[0].options.applyLocally,false);assert.equal(h.elements['credits-balance'].textContent,'2');assert.equal(h.elements['credits-panel'].hidden,true);
+ await Promise.all([h.api.claim(),h.api.claim()]);assert.equal(h.writes.length,1);assert.equal(h.writes[0].options.applyLocally,false);assert.equal(h.elements['credits-balance'].textContent,'5');assert.equal(h.elements['credits-panel'].hidden,true);
  h.api.stop();assert.equal(h.elements['credits-panel'].hidden,true);
  h.callbacks[0].onValue({val:()=>({balance:999})});assert.equal(h.elements['credits-panel'].hidden,true);
  h.state.uid='b';await h.api.start();assert.equal(h.elements['credits-panel'].hidden,true);
@@ -93,6 +93,6 @@ test('A transaction retry with a newly funded wallet cannot overwrite its balanc
 test('Late confirmation from the previous account cannot overwrite the new account',async()=>{
  const m=await modulePromise,h=harness(m);await h.api.start();let resolve;
  h.fb.runTransaction=()=>new Promise(r=>resolve=r);const pending=h.api.claim();await Promise.resolve();
- h.api.stop();h.state.uid='b';await h.api.start();resolve({committed:true,snapshot:{val:()=>({balance:2,locked:0,lastGrantAt:today})}});await pending;
+ h.api.stop();h.state.uid='b';await h.api.start();resolve({committed:true,snapshot:{val:()=>({balance:5,locked:0,lastGrantAt:today})}});await pending;
  assert.equal(h.elements['credits-balance'].textContent,'0');
 });

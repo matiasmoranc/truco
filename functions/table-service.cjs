@@ -68,7 +68,7 @@ function tableOperation(ledger,{code,uid,command,requestId,expectedMatchId,prese
  next=finishAccounting(next,m,now);m=tableFor(next,code);
  if(command.kind==='rematch'){
   if(m.status!=='settled')fail('Primero debe terminar la partida.');
-  const r=m.session.room;if(command.value==='request'&&!r.rematch){r.rematch={id:requestId,requester:player,status:'pending'};}
+  const r=m.session.room;if(['request','accept'].includes(command.value))checkWallet(next,uid,m.stake);if(command.value==='request'&&!r.rematch){r.rematch={id:requestId,requester:player,status:'pending'};}
   else if(r.rematch?.status==='pending'&&r.rematch.requester!==player&&['request','accept'].includes(command.value)){
    const newId=code+'_'+now+'_m'+(m.matchNumber+1),funded=reserveStakes(next,{id:newId,player1:m.player1,player2:m.player2,stake:m.stake,now});
    const record=funded.matches[newId];Object.assign(record,{id:newId,code,players:m.players,targetPoints:m.targetPoints,secret:m.secret,createdAt:now,revision:m.revision+1,requests:{},matchNumber:m.matchNumber+1});

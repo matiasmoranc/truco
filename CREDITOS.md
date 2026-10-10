@@ -4,7 +4,7 @@ Los créditos son virtuales, sin dinero ni premios canjeables. No hay compras ni
 
 ## Funcionamiento
 
-- Reclamo manual de 2 créditos por día de Uruguay (UTC−3), sólo con saldo 0 y sin créditos reservados. Tener 1 crédito no permite reclamar otros 2.
+- Reclamo manual de 5 créditos por día de Uruguay (UTC−3), sólo con saldo 0 y sin créditos reservados. Tener 1 crédito no permite reclamar otros 2.
 - El creador elige una apuesta entera de 1 o más, dentro de su saldo disponible, y una mesa pública o con clave de 4 a 64 caracteres.
 - La apuesta del creador se reserva al crear la mesa. El rival debe tener al menos ese monto disponible y aporta exactamente lo mismo. Sus saldos totales pueden ser diferentes.
 - El ganador recibe ambas apuestas, sin descuento. La revancha necesita saldo suficiente de ambos y usa un recibo nuevo.
