@@ -3260,6 +3260,8 @@ function indicateLearningMessageClose(event){
   if(event.clientX>=box.left&&event.clientX<=box.right&&event.clientY>=box.top&&event.clientY<=box.bottom)return;
   const button=dialog.querySelector('.learn-close');
   if(!button)return;
+  dialog._closeShake?.cancel();
+  dialog._closeShake=dialog.animate?.([{translate:'0 0'},{translate:'-5px 0'},{translate:'5px 0'},{translate:'-4px 0'},{translate:'4px 0'},{translate:'0 0'}],{duration:450,easing:'ease-out'});
   button.getAnimations?.().forEach(animation=>animation.cancel());
   clearTimeout(button._closeHintTimer);
   button.classList.add('close-required');
@@ -3268,6 +3270,7 @@ function indicateLearningMessageClose(event){
 }
 for(const dialog of document.querySelectorAll('.learning-message')){
   dialog.addEventListener('pointerdown',indicateLearningMessageClose);
+  dialog.addEventListener('close',()=>dialog._closeShake?.cancel());
 }
 $('learning-message-close').addEventListener('click',()=>$('learning-hint').close());
 $('learning-message-study').addEventListener('click',event=>{const kind=event.currentTarget.dataset.studyKind;if(kind==='envido'||kind==='flor')openStudy(kind);});
