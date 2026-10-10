@@ -8,6 +8,7 @@ export function isAppleDevice(navigator=globalThis.navigator) {
 
 export function installAccount({ services, getState, rememberName, document, storage=globalThis.localStorage, navigator=globalThis.navigator, onReady=()=>{}, onIdentityChange=()=>{}, onNameChanged=()=>{}, inRoom=()=>!!getState().room }) {
   const el=id=>document.getElementById(id);
+  let slowLoading=false;
   let busy=false, ready=false, profileKey=null, profilePromise=null, currentUser=null;
   let profileName='', readyUid=null, generation=0, loaded=false;
   const message=text=>{
@@ -37,7 +38,7 @@ export function installAccount({ services, getState, rememberName, document, sto
     el('account-apple').disabled=busy||!getState().firebase;
     el('auth-name-save').disabled=busy||!google||!loaded;
     for(const id of ['account-change-name','account-logout','account-save'])el(id).disabled=busy||!ready||inRoom();
-    el('auth-retry').hidden=!!getState().firebase&&(!google||loaded);
+    el('auth-retry').hidden=!slowLoading&&(!getState().firebase||(!google||loaded));
     el('auth-retry').disabled=busy;
   }
   function activate(user,name) {
@@ -51,6 +52,7 @@ export function installAccount({ services, getState, rememberName, document, sto
     }
   }
   function observe(fb,user,force=false) {
+    slowLoading=false;
     const key=user?user.uid+':'+registered(user):'signed-out';
     if(!force&&key===profileKey)return profilePromise||Promise.resolve();
     if(getState().uid&&getState().uid!==user?.uid)onIdentityChange();
@@ -192,7 +194,10 @@ export function installAccount({ services, getState, rememberName, document, sto
   el('account-edit').addEventListener('submit',event=>{
     event.preventDefault();return action(fb=>save(fb,el('account-name'),false));
   });
-  el('auth-retry').addEventListener('click',()=>action(async fb=>observe(fb,fb.auth.currentUser,true),{allowRegistration:true}));
+  el('auth-retry').addEventListener('click',()=>{
+    if(!getState().firebase){globalThis.location.reload();return;}
+    return action(async fb=>observe(fb,fb.auth.currentUser,true),{allowRegistration:true});
+  });
   el('account-logout').addEventListener('click',()=>action(async fb=>{
     await fb.authSdk.signOut(fb.auth);
     await observe(fb,null);
@@ -218,6 +223,8 @@ export function installAccount({ services, getState, rememberName, document, sto
   // focus changes can retarget a tap to the dialog background.
   el('account-panel').addEventListener('click',()=>{});
   el('account-panel').addEventListener('cancel',()=>el('account-open').focus());
-  return {observe,isReady:()=>ready,failed:error=>{message(errorText(error));render();}};
+  message('Preparando el inicio de sesión…');render();
+  return {observe,isReady:()=>ready,loadingSlow:()=>{if(ready)return;slowLoading=true;message('La conexión está demorando. Esperá unos segundos o volvé a intentar.');render();},failed:error=>{slowLoading=true;message(errorText(error));render();}};
 }
+
 

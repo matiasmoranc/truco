@@ -1,6 +1,6 @@
 import { installActivity } from './activity.js?v=20261010-adminstats32';
 import { installCredits } from './credits.js?v=20261010-adminstats32';
-import { installAccount } from './account.js?v=20261009-apple-login10';
+import { installAccount } from './account.js?v=20261010-authslow42';
 const FIREBASE_VERSION = '12.4.0';
 const $ = (id) => document.getElementById(id);
 const views = ['welcome-view', 'invite-view', 'setup-view', 'waiting-view', 'game-view', 'config-view', 'learn-view'];
@@ -25,7 +25,7 @@ async function prepareCardImages(){
   catch(error){console.error('[truco:cards]',error);toast('No se pudieron cargar las cartas. Volvé a intentar.',true);return false;}
 }
 // Keep the decoded originals in memory throughout the game.
-preloadCardImages().catch(()=>{});
+// Card images are warmed after authentication so slow connections prioritize sign-in.
 
 const CHAT_LIMIT=40,CHAT_NOTICE_MS=4000;
 let chatMuted=false;
@@ -3353,33 +3353,25 @@ $('learn-coach-previous').addEventListener('click',()=>{$('learn-coach-dialog').
 $('learn-coach-menu').addEventListener('click',openLearning);
 
 async function initializePage(){
-  try{
-    await Promise.all([
-      (async()=>{
-        try{
-          const bundled=await import('./firebase-config.js');
-          if(firebaseConfigValid(bundled.firebaseConfig))state.config=bundled.firebaseConfig;
-        }catch{ /* Optional during initial setup. */ }
-      })(),
-      preloadCardImages().catch(error=>console.error('[truco:startup-cards]',error))
-    ]);
-    // Restore the authenticated seat before treating a room URL as an invitation.
-    // Keep slow connections from blocking offline practice indefinitely.
-    let startupTimer;
-    try{
-      await Promise.race([
-        (async()=>{const fb=await firebaseServices();await account.observe(fb,fb.auth.currentUser);})(),
-        new Promise(resolve=>{startupTimer=setTimeout(resolve,12000);})
-      ]);
-    }finally{clearTimeout(startupTimer);}
-
-  }catch(error){console.error('[truco:startup]',error);account.failed(error);}
-  finally{
+  const releaseLoading=()=>{
     $('app').inert=!account.isReady();
     $('startup-loading').hidden=true;
     document.documentElement.classList.remove('page-loading');
-  }
+  };
+  const slowTimer=setTimeout(()=>{account.loadingSlow();releaseLoading();},12000);
+  try{
+    try{
+      const bundled=await import('./firebase-config.js');
+      if(firebaseConfigValid(bundled.firebaseConfig))state.config=bundled.firebaseConfig;
+    }catch{ /* Optional during initial setup. */ }
+    const fb=await firebaseServices();
+    await account.observe(fb,fb.auth.currentUser);
+    // Loading card artwork never blocks the sign-in screen.
+    preloadCardImages().catch(error=>console.error('[truco:startup-cards]',error));
+  }catch(error){console.error('[truco:startup]',error);account.failed(error);}
+  finally{clearTimeout(slowTimer);releaseLoading();}
 }
+
 await initializePage();
 
 
