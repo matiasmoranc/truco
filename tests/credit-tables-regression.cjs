@@ -48,3 +48,15 @@ test('Leaving during winner evidence cannot reverse an already decided match',()
  const ledger=begin(join(create()));const room=ledger.matches.game1.session.room;room.status='complete';room.scores={player1:10,player2:0};room.endReveal={done:true};room.matchResult={winner:'player1'};
  const ended=op(ledger,'a',{kind:'abandon'},2500);assert.equal(ended.matches.game1.winner,'a');assert.equal(ended.wallets.a.balance,17);
 });
+
+test('Flor over envido cancels the bet and pays three without requiring TIENE, restoring suspended truco',()=>{
+ for(const suspended of [false,true]){
+  const s=fixture();s.hands.player2=[card('♥',1),card('♥',3),card('♥',7)];s.originals=structuredClone(s.hands);
+  if(suspended)createReferee(s,{now:150}).action('player2',{kind:'call',value:'truco'});
+  createReferee(s,{now:200}).action('player1',{kind:'call',value:'envido'});
+  createReferee(s,{now:300}).action('player2',{kind:'call',value:'flor'});
+  assert.equal(s.room.scores.player2,3);assert.equal(s.room.scores.player1,0);assert.equal(s.room.florSettled,true);assert.equal(s.room.envidoClosed,true);
+  assert.equal(s.room.pendingBet?.type||null,suspended?'truco':null);
+  assert.match(s.room.callNotice.spoken,/flor/i);
+ }
+});

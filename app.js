@@ -1329,6 +1329,13 @@ async function callFlor() {
   const flors={...(room.flors||{}),[player]:florValue(state.hand,room.muestra)};
   const other=player==='player1'?'player2':'player1';
   const suspendedBet=room.pendingBet?.type==='truco'?room.pendingBet:(room.pendingBet?.suspendedBet||null);
+  if(room.pendingBet?.type==='envido'&&room.pendingBet.responder===player&&!flors[other]){
+    await writeRoom({flors,envidoClosed:true,florSettled:true,pendingBet:(Number(room.scores?.[player])||0)+3>=targetPoints(room)?null:suspendedBet,
+      status:(Number(room.scores?.[player])||0)+3>=targetPoints(room)?'complete':'started',
+      scores:capScores(room,{...room.scores,[player]:(Number(room.scores?.[player])||0)+3}),
+      feed:topFeed(room,`${room.players[player].name} canta flor. Suma 3 puntos; se cancela el envido.`)});
+    return;
+  }
   if(flors[other]){
     await writeRoom({flors,envidoClosed:true,pendingBet:{type:'flor',caller:player,responder:other,stake:3,accepted:0,called:'flor',suspendedBet},feed:topFeed(room,`${room.players[player].name} también canta flor. ¿La mía?`)});
   }else{
@@ -2537,10 +2544,16 @@ function localAction(action){
   if(action==='reveal')localAnswerAction('yes');
   else if(action==='flor'){
     const room=state.room,player=state.playerId;if(room.playedCount>0||room.flors?.[player]!=null||!roomHasFlor(room,localHand(player))){toast('No tenés flor.');return;}
+    const overEnvido=room.pendingBet?.type==='envido'&&room.pendingBet.responder===player;
     const other=otherPlayer(player);room.flors={...(room.flors||{}),[player]:florValue(localHand(player),room.muestra)};room.envidoClosed=true;
     const suspendedBet=room.pendingBet?.type==='truco'?room.pendingBet:(room.pendingBet?.suspendedBet||null);
     room.pendingBet={type:'flor',called:'flor',single:!room.flors[other],caller:player,responder:other,stake:3,accepted:0,suspendedBet};
-    queueLearningAction('flor');localFeed(`${room.players[player].name} canta flor.`);renderGame();
+    queueLearningAction('flor');localFeed(`${room.players[player].name} canta flor.`);
+    if(overEnvido&&!room.flors[other]){
+      room.florSettled=true;room.pendingBet=suspendedBet;
+      localScore(player,3,'gana la flor; se cancela el envido');
+    }
+    renderGame();
   } else if(['yes','no','raise'].includes(action)||action.startsWith('raise-'))localAnswerAction(action);
   else localCallAction(action);
 }
