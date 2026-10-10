@@ -2,7 +2,7 @@ import {initializeApp} from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-
 import {getAuth,onAuthStateChanged,GoogleAuthProvider,signInWithPopup,signOut,browserLocalPersistence,setPersistence} from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js';
 import {getFunctions,httpsCallable} from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-functions.js';
 const $=id=>document.getElementById(id);
-let auth,call,users=[],pageToken=null,selection=null,busy=false,epoch=0,metrics=null,metricsBusy=false,metricsTimer=null;
+let auth,call,users=[],pageToken=null,selection=null,busy=false,epoch=0,metrics=null,metricsBusy=false,metricsTimer=null,pagesLoaded=1;
 function say(message){$('status').textContent=message;}
 function errorText(e){return e.code==='functions/not-found'?'Falta publicar las funciones de administración en Firebase.':e.message||'No se pudo completar el cambio.';}
 function node(tag,text,className){const el=document.createElement(tag);el.textContent=text;if(className)el.className=className;return el;}
@@ -25,11 +25,19 @@ function renderUsers(){
  if(!$('user-list').children.length)$('user-list').append(node('p','No hay usuarios para mostrar.'));
  $('more').hidden=!pageToken;
 }
-async function refresh(more=false){
- if(busy)return;busy=true;const generation=epoch;$('refresh').disabled=true;$('more').disabled=true;say('Cargando…');
+async function refresh(more=false,preservePages=false){
+ if(busy)return;busy=true;const generation=epoch;$('more').disabled=true;say('Cargando…');
  try{
   const result=(await call({action:'users',...(more&&pageToken?{pageToken}:{})})).data;
+  if(preservePages&&!more){
+   let loaded=1;
+   while(result.pageToken&&loaded<pagesLoaded){
+    const page=(await call({action:'users',pageToken:result.pageToken})).data;
+    result.users.push(...page.users);result.pageToken=page.pageToken;loaded++;
+   }
+  }
   if(generation!==epoch)return;
+  if(more)pagesLoaded++;else if(!preservePages)pagesLoaded=1;
   users=more?[...users,...result.users]:result.users;pageToken=result.pageToken;renderUsers();
   const data=(await call({action:'tables'})).data;if(generation!==epoch)return;
   $('table-list').replaceChildren();for(const t of data.tables){
@@ -40,9 +48,9 @@ async function refresh(more=false){
    const card=node('article','','card');card.append(node('h3',a.action),node('p',a.reason),node('p',a.uid||a.code||''),node('small',new Date(a.at).toLocaleString('es-UY')),node('small','Administrador: '+a.actor));
    if(a.before!==undefined)card.append(node('p',String(a.before)+' → '+String(a.after)));$('audit-list').append(card);
   }await refreshMetrics();say('');
- }catch(e){if(generation===epoch)say(errorText(e));}finally{busy=false;$('refresh').disabled=false;$('more').disabled=false;}
+ }catch(e){if(generation===epoch)say(errorText(e));}finally{busy=false;$('more').disabled=false;}
 }
-$('search').addEventListener('input',renderUsers);$('refresh').onclick=()=>refresh();$('more').onclick=()=>refresh(true);
+$('search').addEventListener('input',renderUsers);$('more').onclick=()=>refresh(true);
 for(const b of document.querySelectorAll('[data-tab]'))b.onclick=()=>{for(const section of ['metrics','users','tables','audit'])$(section).hidden=section!==b.dataset.tab;for(const tab of document.querySelectorAll('[data-tab]'))tab.classList.toggle('active',tab===b);};
 for(const id of ['close','cancel'])$(id).onclick=()=>{if(!$('save').disabled)$('edit').close();};
 $('edit').addEventListener('cancel',e=>{if($('save').disabled)e.preventDefault();});
@@ -58,12 +66,21 @@ function renderHours(){
  $('hour-chart').replaceChildren();
  const day=metrics?.days.find(d=>d.day===$('metric-day').value),hours=day?.hours||Array.from({length:24},(_,hour)=>({hour,users:0}));
  const maximum=Math.max(1,...hours.map(h=>h.users));
- for(const h of hours){const wrap=node('div','','hour-bar'),bar=node('div','');bar.style.height=(h.users/maximum*100)+'px';wrap.append(node('span',h.users+' usuarios'),bar,node('span',String(h.hour).padStart(2,'0')+':00'));$('hour-chart').append(wrap);}
+ for(let start=0;start<24;start+=12){
+  const group=node('div','','hour-group');
+  const heading=node('div','','hour-row hour-heading');heading.append(node('span','Horario'),node('span','Actividad'),node('span','Usuarios'));group.append(heading);
+  for(const h of hours.slice(start,start+12)){
+   const row=node('div','','hour-row');
+   const time=String(h.hour).padStart(2,'0')+':00 – '+String((h.hour+1)%24).padStart(2,'0')+':00';
+   const track=node('div','','hour-track'),fill=node('div','','hour-fill');fill.style.width=(h.users/maximum*100)+'%';track.setAttribute('aria-hidden','true');track.append(fill);
+   row.append(node('span',time),track,node('strong',String(h.users)));group.append(row);
+  }
+  $('hour-chart').append(group);
+ }
 }
 function renderMetrics(){
  if(!metrics)return;
  $('metric-total').textContent=metrics.total;$('metric-active').textContent=metrics.active;$('metric-today').textContent=metrics.todayUsers;
- $('metric-note').textContent=metrics.startedAt?'Datos desde '+new Date(metrics.startedAt).toLocaleString('es-UY',{timeZone:'America/Montevideo'})+'. Última actualización: '+new Date(metrics.updatedAt).toLocaleTimeString('es-UY',{timeZone:'America/Montevideo'}):'Todavía no se registró actividad. Los datos aparecerán cuando los jugadores abran la versión nueva del juego.';
  const selected=$('metric-day').value;$('metric-day').replaceChildren();
  const days=[...new Set([metrics.today,...metrics.days.map(d=>d.day)])];
  for(const day of days){const option=node('option',day);option.value=day;$('metric-day').append(option);}
@@ -88,10 +105,10 @@ async function start(){
   $('login').onclick=async()=>{try{await signInWithPopup(auth,new GoogleAuthProvider());}catch(e){$('access-status').textContent=errorText(e);}};
   $('logout').onclick=()=>signOut(auth);
   onAuthStateChanged(auth,async user=>{
-   const generation=++epoch;clearInterval(metricsTimer);metricsTimer=null;metrics=null;users=[];pageToken=null;$('console').hidden=true;$('access').hidden=false;$('logout').hidden=!user;$('login').hidden=!!user;
+   const generation=++epoch;pagesLoaded=1;clearInterval(metricsTimer);metricsTimer=null;metrics=null;users=[];pageToken=null;$('console').hidden=true;$('access').hidden=false;$('logout').hidden=!user;$('login').hidden=!!user;
    $('identity').textContent=user?'Tu UID: '+user.uid:'';$('access-status').textContent=user?'Verificando permisos…':'Iniciá sesión con tu cuenta administradora.';
    if(!user)return;
-   try{const result=await call({action:'users'});if(generation!==epoch)return;users=result.data.users;pageToken=result.data.pageToken;$('access').hidden=true;$('console').hidden=false;renderUsers();await refresh();if(generation===epoch)metricsTimer=setInterval(()=>{if(!document.hidden)refreshMetrics();},60000);}
+   try{const result=await call({action:'users'});if(generation!==epoch)return;users=result.data.users;pageToken=result.data.pageToken;$('access').hidden=true;$('console').hidden=false;renderUsers();await refresh();if(generation===epoch)metricsTimer=setInterval(()=>{if(!document.hidden&&!$('edit').open)refresh(false,true);},60000);}
    catch(e){if(generation===epoch)$('access-status').textContent=errorText(e);}
   });
  }catch(e){$('access-status').textContent=errorText(e);}
