@@ -1510,3 +1510,5 @@ html,body,#app{touch-action:pan-x pan-y}
 #welcome-view .home-tools-row .home-action-icon{width:22px;height:22px;flex:0 0 22px}
 #welcome-view .home-tools-row .home-action-chevron{display:none}
 #welcome-view .home-tools-row button>span:not(.home-action-chevron){min-width:0;text-align:left;white-space:normal}
+
+#scorer-view #scorer-new{height:44px;min-height:44px;max-height:44px;padding:0 8px;display:flex;align-items:center;justify-content:center}
