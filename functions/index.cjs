@@ -145,11 +145,11 @@ exports.adminConsole=onCall(options,async request=>{
   const ledger=(await db.ref('creditEconomy').get()).val()||{};
   const userAudit=(await db.ref('adminUserAudit').get()).val()||{};
   const rooms=(await db.ref('rooms').get()).val()||{};
-  const legacy=Object.entries(rooms).filter(([code,entry])=>!ledger.tables?.[code]&&legacyTableActive(entry?.public,Date.now())).map(([code,{public:room}])=>({code,status:room.status,stake:0,targetPoints:room.targetPoints||30,players:Object.values(room.players||{}).map(p=>p.name||p.uid)}));
+  const legacy=Object.entries(rooms).filter(([code,entry])=>!ledger.tables?.[code]&&legacyTableActive(entry?.public,Date.now())).map(([code,{public:room}])=>({code,status:room.status,stake:0,targetPoints:room.targetPoints||30,players:Object.values(room.players||{}).map(p=>p.name||p.uid),createdAt:room.createdAt||null,finishedAt:room.matchResult?.at||null}));
   const now=Date.now(),tables=[],archivedTables=[...legacy.map(m=>({...m,status:'Sistema anterior'}))];
   for(const code of Object.keys(ledger.tables||{})){
    const m=tableFor(ledger,code);if(m.closedAt||m.status==='refunded')continue;
-   const entry={code,status:m.status,stake:m.stake,targetPoints:m.targetPoints,players:Object.values(m.players||{}).map(p=>p.name)};
+   const entry={code,status:m.status,stake:m.stake,targetPoints:m.targetPoints,players:Object.values(m.players||{}).map(p=>p.name),createdAt:m.createdAt||null,finishedAt:m.settledAt||null,scores:m.session?.room?.scores||null,winnerName:Object.values(m.players||{}).find(p=>p.uid===m.winner)?.name||null};
    if(adminTableCurrent(m,now))tables.push({...entry,status:m.status==='waiting'?'Esperando rival':'En juego'});
    else archivedTables.push({...entry,status:m.status==='waiting'?'Vencida':m.status==='settled'?'Terminada':'Finalizando'});
   }

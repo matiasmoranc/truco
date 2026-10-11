@@ -2,7 +2,7 @@ import {initializeApp} from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-
 import {getAuth,onAuthStateChanged,GoogleAuthProvider,signInWithPopup,signOut,browserLocalPersistence,setPersistence} from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js';
 import {getFunctions,httpsCallable} from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-functions.js';
 const $=id=>document.getElementById(id);
-let auth,call,users=[],pageToken=null,selection=null,busy=false,epoch=0,metrics=null,metricsBusy=false,metricsTimer=null,pagesLoaded=1,userScope='all';
+let auth,call,users=[],pageToken=null,selection=null,busy=false,epoch=0,metrics=null,metricsBusy=false,metricsTimer=null,pagesLoaded=1,userScope='all',tableData={tables:[],archivedTables:[]};
 function say(message){$('status').textContent=message;}
 function errorText(e){return e.code==='functions/not-found'?'Falta publicar las funciones de administración en Firebase.':e.message||'No se pudo completar el cambio.';}
 function node(tag,text,className){const el=document.createElement(tag);el.textContent=text;if(className)el.className=className;return el;}
@@ -43,23 +43,60 @@ async function refresh(more=false,preservePages=false){
   if(more)pagesLoaded++;else if(!preservePages)pagesLoaded=1;
   users=more?[...users,...result.users]:result.users;pageToken=result.pageToken;renderUsers();
   const data=(await call({action:'tables'})).data;if(generation!==epoch)return;
-  const tableCard=t=>{
-   const card=node('article','','card');card.append(node('h3','Mesa '+t.code),node('p',t.players.join(' / ')),node('p',t.targetPoints+' puntos · '+t.stake+' créditos · '+t.status),button('Cerrar mesa',()=>openEdit('close-table',t)));return card;
-  };
-  $('table-list').replaceChildren();for(const t of data.tables)$('table-list').append(tableCard(t));
-  if(!data.tables.length)$('table-list').append(node('p','No hay mesas activas.'));
-  if(data.archivedTables?.length){
-   const saved=node('details','','card');saved.append(node('summary','Mesas anteriores ('+data.archivedTables.length+')'));
-   saved.append(node('p','Registros de partidas terminadas, mesas vencidas y del sistema anterior.'));
-   for(const t of data.archivedTables)saved.append(tableCard(t));
-   $('table-list').append(saved);
-  }
+  tableData=data;renderTables();
   $('audit-list').replaceChildren();for(const a of data.audit){
    const card=node('article','','card');card.append(node('h3',a.action),node('p',a.reason),node('p',a.uid||a.code||''),node('small',new Date(a.at).toLocaleString('es-UY')),node('small','Administrador: '+a.actor));
    if(a.before!==undefined)card.append(node('p',String(a.before)+' → '+String(a.after)));$('audit-list').append(card);
   }await refreshMetrics();say('');
  }catch(e){if(generation===epoch)say(errorText(e));}finally{busy=false;$('more').disabled=false;$('user-scope').disabled=false;for(const b of document.querySelectorAll('[data-scope]'))b.disabled=false;}
 }
+function tableTime(table){return Number(table.finishedAt||table.createdAt)||0;}
+function formatTableTime(value){
+ if(!value)return 'Sin fecha registrada';
+ const date=new Date(value);
+ if(!Number.isFinite(date.getTime()))return 'Sin fecha registrada';
+ return new Intl.DateTimeFormat('es-UY',{timeZone:'America/Montevideo',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:false}).format(date);
+}
+function sortedTables(list){
+ const order=$('table-order').value;
+ return [...list].sort((a,b)=>{
+  const dateDifference=tableTime(b)-tableTime(a);
+  // Undated old records stay last in either chronological direction.
+  if(order==='oldest')return !tableTime(a)?(!tableTime(b)?0:1):!tableTime(b)?-1:-dateDifference;
+  if(order==='stake')return (Number(b.stake)||0)-(Number(a.stake)||0)||dateDifference;
+  if(order==='points')return (Number(b.targetPoints)||0)-(Number(a.targetPoints)||0)||dateDifference;
+  return dateDifference;
+ });
+}
+function renderTables(){
+ const scope=$('table-state').value;
+ const list=$('table-list');list.replaceChildren();
+ const tableCard=t=>{
+  const card=node('article','','card table-card');
+  const heading=node('div','','table-card-heading');heading.append(node('h3','Mesa '+t.code),node('span',t.status,'table-status'));card.append(heading);
+  card.append(node('p',t.players.join(' vs. '),'table-players'));
+  const facts=node('div','','table-facts');facts.append(node('span',t.targetPoints+' puntos'),node('span','Apuesta: '+t.stake+' créditos por jugador'));card.append(facts);
+  card.append(node('small','Creada: '+formatTableTime(t.createdAt)));
+  if(t.finishedAt)card.append(node('small','Finalizada: '+formatTableTime(t.finishedAt)));
+  if(t.scores){const score=node('p',t.players.map((name,i)=>name+': '+(t.scores['player'+(i+1)]||0)).join(' · '),'table-result');card.append(score);}
+  if(t.winnerName)card.append(node('p','Ganó '+t.winnerName,'table-winner'));
+  card.append(button('Cerrar mesa',()=>openEdit('close-table',t)));return card;
+ };
+ const current=scope==='previous'?[]:tableData.tables||[];
+ const previous=scope==='active'?[]:(tableData.archivedTables||[]).filter(t=>scope!=='finished'||t.status==='Terminada');
+ if(scope!=='previous'&&scope!=='finished'){
+  const group=node('section','','table-group');group.append(node('h3','Mesas activas ('+current.length+')'));
+  const cards=node('div','','cards');for(const t of sortedTables(current))cards.append(tableCard(t));
+  if(!current.length)cards.append(node('p','No hay mesas activas.'));group.append(cards);list.append(group);
+ }
+ if(scope!=='active'){
+  const group=node('section','','table-group');group.append(node('h3',(scope==='finished'?'Partidas terminadas':'Mesas anteriores')+' ('+previous.length+')'));
+  const cards=node('div','','cards');for(const t of sortedTables(previous))cards.append(tableCard(t));
+  if(!previous.length)cards.append(node('p','No hay mesas para este filtro.'));group.append(cards);list.append(group);
+ }
+}
+$('table-order').addEventListener('change',renderTables);
+$('table-state').addEventListener('change',renderTables);
 $('search').addEventListener('input',renderUsers);$('more').onclick=()=>refresh(true);
 function showTab(name){for(const section of ['metrics','users','tables','audit'])$(section).hidden=section!==name;for(const tab of document.querySelectorAll('[data-tab]'))tab.classList.toggle('active',tab.dataset.tab===name);}
 for(const b of document.querySelectorAll('[data-tab]'))b.onclick=()=>showTab(b.dataset.tab);
