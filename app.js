@@ -1,4 +1,4 @@
-import { installScorer } from './scorer.js?v=20261011-scorerawake52';
+import { installScorer } from './scorer.js?v=20261011-scorertaps53';
 import { installActivity } from './activity.js?v=20261010-adminstats32';
 import { installCredits } from './credits.js?v=20261010-adminstats32';
 import { installAccount } from './account.js?v=20261010-mobile50';
@@ -2852,6 +2852,7 @@ $('muestra-card').addEventListener('pointerup',endMuestraDrag);
 $('muestra-card').addEventListener('pointercancel',endMuestraDrag);
 let lastTouchEnd=0;
 document.addEventListener('touchend',(event)=>{
+  if(event.target.closest?.('#scorer-view')){lastTouchEnd=0;return;}
   const now=Date.now();
   if(now-lastTouchEnd<=320)event.preventDefault();
   lastTouchEnd=now;

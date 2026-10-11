@@ -9,11 +9,11 @@ export function installScorer({document,storage=globalThis.localStorage,showView
     const playing=!!match;
     $('scorer-setup').hidden=playing;$('scorer-board').hidden=!playing;
     $('scorer-new').hidden=!playing;
-    if(!playing){$('scorer-status').textContent='¿A cuántos puntos jugamos?';return;}
+    if(!playing){$('scorer-status').hidden=false;$('scorer-status').textContent='¿A cuántos puntos jugamos?';return;}
     const winner=match.scores.findIndex(n=>n===match.target);
-    $('scorer-status').textContent=winner<0?`Partida a ${match.target} puntos`:`Ganó ${winner===0?'Nosotros':'Ellos'}`;
+    $('scorer-status').hidden=winner<0;
+    $('scorer-status').textContent=winner<0?'':`Ganó ${winner===0?'Nosotros':'Ellos'}`;
     for(let team=0;team<2;team++){
-      $(`scorer-total-${team}`).textContent=match.scores[team];
       $(`scorer-tally-${team}`).innerHTML=renderTally(match.scores[team],match.target);
       $(`scorer-add-${team}`).disabled=winner>=0;
       $(`scorer-minus-${team}`).disabled=match.scores[team]===0;

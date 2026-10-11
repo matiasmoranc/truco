@@ -1496,3 +1496,8 @@ body { min-height:100dvh; }
 .scorer-minus:disabled{opacity:.35;cursor:default}
 @media(max-height:450px){.scorer-header h1{font-size:20px}#scorer-status{margin:5px}.scorer-total{font-size:26px}.scorer-team-name{font-size:18px}.scorer-tap{display:none}.scorer-minus{min-height:38px;padding:6px}}
 #scorer-view [hidden]{display:none!important}
+
+#scorer-view{touch-action:manipulation}
+#scorer-view .scorer-team-name{font-size:clamp(25px,6vw,38px);line-height:1.2}
+#scorer-view .scorer-minus{touch-action:manipulation}
+#scorer-view #scorer-board{margin-top:18px}
