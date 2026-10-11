@@ -1641,7 +1641,7 @@ function cardImage(card){
   const index=rank-1,group=Math.floor(index/4),column=index%4;
   const file=(suitGroups[card.suit]??6)+group+1;
   const imageUrl=new URL(`./assets/cards/${file}.jpg`,document.baseURI).href;
-  return {image:`url("${imageUrl}")`,position:`${column/3*100}% 0%`};
+  return {image:`url('${imageUrl}')`,position:`${column/3*100}% 0%`};
 }
 function cardImageStyle(card){
   const {image,position}=cardImage(card);
