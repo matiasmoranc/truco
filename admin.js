@@ -93,14 +93,6 @@ function renderTables(){
   if(t.rawStatus==='settled'&&!t.reason)contents.append(node('small','Motivo: alcanzó los puntos de la partida.'));
   if(t.id)contents.append(node('small','ID: '+t.id));
   if(t.reason)contents.append(node('small','Motivo: '+({abandon:'Abandono',disconnect:'Desconexión','waiting-canceled':'Cancelada sin rival','draw-left':'Abandono antes de empezar','draw-cancel':'Cancelación antes de empezar',points:'Puntos',timeout:'Inactividad',inactivity:'Inactividad',admin:'Cierre del administrador'}[t.reason]||t.reason)));
-  const detail=node('details');detail.append(node('summary','Ver movimientos y mensajes'));
-  for(const e of t.history||[]){
-   const row=node('div','','card');row.append(node('small',formatTableTime(e.at)+' · '+e.status));
-   for(const c of e.changes||[])row.append(node('p',(users.find(u=>u.uid===c.uid)?.name||c.uid)+': saldo '+c.before+' → '+c.after+'; reservados '+c.reservedBefore+' → '+c.reservedAfter));
-   for(const message of e.messages||[])row.append(node('p',message.text||''));detail.append(row);
-  }
-  if(!t.history?.length)detail.append(node('p','Registro anterior al historial detallado. Se muestran los datos conservados de la partida.'));
-  contents.append(detail);
   if(!t.closedAt&&['waiting','reserved'].includes(t.rawStatus))contents.append(button('Cerrar mesa',()=>openEdit('close-table',t)));return card;
  };
  const query=$('table-search').value.trim().toLowerCase();

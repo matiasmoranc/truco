@@ -2,6 +2,12 @@ const test=require('node:test');const assert=require('node:assert/strict');
 const {reservationAlerts,repairReservation,personalHistory}=require('../functions/player-service.cjs');
 const {createTable}=require('../functions/table-service.cjs');
 const {recordHistory}=require('../functions/history-service.cjs');
+test('Accounting history removes copied messages and keeps only credit changes',()=>{
+ const before={wallets:{a:{balance:5,locked:0}},history:{old:{noise:{at:1,changes:[],messages:[{text:'truco'}]},credit:{at:2,changes:[{uid:'a',before:4,after:5}],messages:[{text:'flor'}],trickCards:[{}]}}},matches:{}};
+ const result=recordHistory(before,before,3);
+ assert.equal(result.history.old.noise,undefined);assert.equal(result.history.old.credit.messages,undefined);assert.equal(result.history.old.credit.trickCards,undefined);assert.equal(result.history.old.credit.changes.length,1);
+ assert.equal(before.history.old.credit.messages.length,1);
+});
 function waiting(){return createTable({wallets:{a:{balance:5,locked:0}}},{code:'ABCDE',id:'match1',uid:'a',name:'Jona',stake:2,targetPoints:10,now:100});}
 test('A live reservation is not reported as stuck; expired waiting stake is refunded once',()=>{
  const a=waiting();assert.equal(reservationAlerts(a,200).length,0);assert.equal(reservationAlerts(a,600101)[0].repairable,true);
