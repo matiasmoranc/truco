@@ -77,21 +77,22 @@ function sortedTables(list){
 }
 function renderTables(){
  const scope=$('table-state').value;
- const list=$('table-list');list.replaceChildren();
+ const list=$('table-list');const expanded=new Set([...list.querySelectorAll('details.table-card[open]')].map(el=>el.dataset.match));list.replaceChildren();
  const tableCard=t=>{
-  const card=node('article','','card table-card');
-  const heading=node('div','','table-card-heading');heading.append(node('h3','Mesa '+t.code+' · Partida '+(t.matchNumber||1)),node('span',t.status,'table-status'));card.append(heading);
-  card.append(node('p',t.players.join(' vs. '),'table-players'));
-  const facts=node('div','','table-facts');facts.append(node('span',t.targetPoints+' puntos'),node('span','Apuesta: '+t.stake+' créditos por jugador'));card.append(facts);
-  card.append(node('small','Creada: '+formatTableTime(t.createdAt)));
-  if(t.finishedAt)card.append(node('small','Finalizada: '+formatTableTime(t.finishedAt)));
-  if(t.scores){const score=node('p',t.players.map((name,i)=>name+': '+(t.scores['player'+(i+1)]||0)).join(' · '),'table-result');card.append(score);}
-  if(t.winnerName)card.append(node('p','Ganó '+t.winnerName,'table-winner'));
-  if(t.rawStatus==='settled')card.append(node('p','El ganador recibe '+(2*t.stake)+' créditos; cada jugador apostó '+t.stake+'.'));
-  if(t.rawStatus==='refunded')card.append(node('p','La apuesta fue devuelta a los participantes.'));
-  if(t.rawStatus==='settled'&&!t.reason)card.append(node('small','Motivo: alcanzó los puntos de la partida.'));
-  if(t.id)card.append(node('small','ID: '+t.id));
-  if(t.reason)card.append(node('small','Motivo: '+({abandon:'Abandono',disconnect:'Desconexión','waiting-canceled':'Cancelada sin rival','draw-left':'Abandono antes de empezar','draw-cancel':'Cancelación antes de empezar',points:'Puntos',timeout:'Inactividad',inactivity:'Inactividad',admin:'Cierre del administrador'}[t.reason]||t.reason)));
+  const card=node('details','','card table-card');card.dataset.match=t.id||t.code;card.open=expanded.has(card.dataset.match);
+  const summary=node('summary','','table-summary');
+  const players=node('span',t.players[0]||'Sin creador','table-summary-players');players.append(node('small',t.players[1]?'vs. '+t.players[1]:'Esperando rival'));
+  summary.append(players,node('span',t.status,'table-status'),node('span',formatTableTime(t.createdAt),'table-summary-date'),node('span',t.stake+' créditos','table-summary-stake'));card.append(summary);
+  const contents=node('div','','table-expanded');card.append(contents);
+  contents.append(node('h3','Mesa '+t.code+' · Partida '+(t.matchNumber||1)),node('small','Partida a '+t.targetPoints+' puntos'),node('small','Creada: '+formatTableTime(t.createdAt)));
+  if(t.finishedAt)contents.append(node('small','Finalizada: '+formatTableTime(t.finishedAt)));
+  if(t.scores){const score=node('p',t.players.map((name,i)=>name+': '+(t.scores['player'+(i+1)]||0)).join(' · '),'table-result');contents.append(score);}
+  if(t.winnerName)contents.append(node('p','Ganó '+t.winnerName,'table-winner'));
+  if(t.rawStatus==='settled')contents.append(node('p','El ganador recibe '+(2*t.stake)+' créditos; cada jugador apostó '+t.stake+'.'));
+  if(t.rawStatus==='refunded')contents.append(node('p','La apuesta fue devuelta a los participantes.'));
+  if(t.rawStatus==='settled'&&!t.reason)contents.append(node('small','Motivo: alcanzó los puntos de la partida.'));
+  if(t.id)contents.append(node('small','ID: '+t.id));
+  if(t.reason)contents.append(node('small','Motivo: '+({abandon:'Abandono',disconnect:'Desconexión','waiting-canceled':'Cancelada sin rival','draw-left':'Abandono antes de empezar','draw-cancel':'Cancelación antes de empezar',points:'Puntos',timeout:'Inactividad',inactivity:'Inactividad',admin:'Cierre del administrador'}[t.reason]||t.reason)));
   const detail=node('details');detail.append(node('summary','Ver movimientos y mensajes'));
   for(const e of t.history||[]){
    const row=node('div','','card');row.append(node('small',formatTableTime(e.at)+' · '+e.status));
@@ -99,8 +100,8 @@ function renderTables(){
    for(const message of e.messages||[])row.append(node('p',message.text||''));detail.append(row);
   }
   if(!t.history?.length)detail.append(node('p','Registro anterior al historial detallado. Se muestran los datos conservados de la partida.'));
-  card.append(detail);
-  if(!t.closedAt&&['waiting','reserved'].includes(t.rawStatus))card.append(button('Cerrar mesa',()=>openEdit('close-table',t)));return card;
+  contents.append(detail);
+  if(!t.closedAt&&['waiting','reserved'].includes(t.rawStatus))contents.append(button('Cerrar mesa',()=>openEdit('close-table',t)));return card;
  };
  const query=$('table-search').value.trim().toLowerCase();
  const matches=t=>[...(t.players||[]),t.code,t.id].filter(Boolean).join(' ').toLowerCase().includes(query);
