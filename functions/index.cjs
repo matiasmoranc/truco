@@ -5,6 +5,7 @@ const {getDatabase}=require('firebase-admin/database');
 const {onCall,HttpsError}=require('firebase-functions/v2/https');
 const {onSchedule}=require('firebase-functions/v2/scheduler');
 const {createTable,joinTable,tableOperation,publicTable,passwordHash,tableFor}=require('./table-service.cjs');
+const {recordHistory}=require('./history-service.cjs');
 initializeApp();const db=getDatabase();
 const options={region:'us-central1',maxInstances:5,timeoutSeconds:30};
 async function identity(request){
@@ -20,7 +21,7 @@ async function mutate(update,allowEmpty=false){
  try{
   const result=await db.ref('creditEconomy').transaction(current=>{
    failure=null;if(current===null&&!allowEmpty)return null;
-   try{return update(current);}catch(error){failure=error;return undefined;}
+   try{return recordHistory(current,update(current),Date.now());}catch(error){failure=error;return undefined;}
   });
   if(!result.committed||!result.snapshot.val())throw failure||new Error('No hay créditos disponibles.');
   return result.snapshot.val();
@@ -85,7 +86,7 @@ exports.creditExpireTables=onSchedule({schedule:'every 1 minutes',region:'us-cen
   for(const code of Object.keys(current.tables||{})){
    const old=tableFor(next,code);if(!['waiting','reserved'].includes(old.status))continue;
    const before=JSON.stringify(old);next=tableOperation(next,{code,uid:old.player1,command:{kind:'tick'},presence:rooms[code]?.public?.connectionPresence,now});if(before!==JSON.stringify(tableFor(next,code)))changed.push(code);
-  }return next;
+  }return recordHistory(current,next,now);
  });
  if(r.committed&&r.snapshot.val())await Promise.all(changed.map(code=>publish(r.snapshot.val(),code)));
 });
@@ -147,11 +148,11 @@ exports.adminConsole=onCall(options,async request=>{
   const rooms=(await db.ref('rooms').get()).val()||{};
   const legacy=Object.entries(rooms).filter(([code,entry])=>!ledger.tables?.[code]&&legacyTableActive(entry?.public,Date.now())).map(([code,{public:room}])=>({code,status:room.status,stake:0,targetPoints:room.targetPoints||30,players:Object.values(room.players||{}).map(p=>p.name||p.uid),createdAt:room.createdAt||null,finishedAt:room.matchResult?.at||null}));
   const now=Date.now(),tables=[],archivedTables=[...legacy.map(m=>({...m,status:'Sistema anterior'}))];
-  for(const code of Object.keys(ledger.tables||{})){
-   const m=tableFor(ledger,code);if(m.closedAt||m.status==='refunded')continue;
-   const entry={code,status:m.status,stake:m.stake,targetPoints:m.targetPoints,players:Object.values(m.players||{}).map(p=>p.name),createdAt:m.createdAt||null,finishedAt:m.settledAt||null,scores:m.session?.room?.scores||null,winnerName:Object.values(m.players||{}).find(p=>p.uid===m.winner)?.name||null};
-   if(adminTableCurrent(m,now))tables.push({...entry,status:m.status==='waiting'?'Esperando rival':'En juego'});
-   else archivedTables.push({...entry,status:m.status==='waiting'?'Vencida':m.status==='settled'?'Terminada':'Finalizando'});
+  for(const [id,m] of Object.entries(ledger.matches||{})){
+   const code=m.code||Object.entries(ledger.tables||{}).find(([,value])=>value===id)?.[0]||id;
+   const entry={id,code,matchNumber:m.matchNumber||1,rawStatus:m.status,closedAt:m.closedAt||null,stake:m.stake,targetPoints:m.targetPoints,players:Object.values(m.players||{}).map(p=>p.name),createdAt:m.createdAt||null,finishedAt:m.settledAt||m.refundedAt||m.closedAt||null,scores:m.session?.room?.scores||null,winnerName:Object.values(m.players||{}).find(p=>p.uid===m.winner)?.name||null,reason:m.session?.room?.matchResult?.reason||m.closeReason||null,history:Object.values(ledger.history?.[id]||{}).sort((a,b)=>a.at-b.at)};
+   if(ledger.tables?.[code]===id&&adminTableCurrent(m,now))tables.push({...entry,status:m.status==='waiting'?'Esperando rival':'En juego'});
+   else archivedTables.push({...entry,status:m.status==='settled'?'Terminada':m.status==='refunded'?'Créditos devueltos':m.closedAt?'Cerrada':m.status==='waiting'?'Vencida':'Finalizando'});
   }
   return {tables,archivedTables,
    audit:[...Object.values(ledger.adminAudit||{}),...Object.values(userAudit)].sort((a,b)=>b.at-a.at).slice(0,100)};

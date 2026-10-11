@@ -73,14 +73,25 @@ function renderTables(){
  const list=$('table-list');list.replaceChildren();
  const tableCard=t=>{
   const card=node('article','','card table-card');
-  const heading=node('div','','table-card-heading');heading.append(node('h3','Mesa '+t.code),node('span',t.status,'table-status'));card.append(heading);
+  const heading=node('div','','table-card-heading');heading.append(node('h3','Mesa '+t.code+' · Partida '+(t.matchNumber||1)),node('span',t.status,'table-status'));card.append(heading);
   card.append(node('p',t.players.join(' vs. '),'table-players'));
   const facts=node('div','','table-facts');facts.append(node('span',t.targetPoints+' puntos'),node('span','Apuesta: '+t.stake+' créditos por jugador'));card.append(facts);
   card.append(node('small','Creada: '+formatTableTime(t.createdAt)));
   if(t.finishedAt)card.append(node('small','Finalizada: '+formatTableTime(t.finishedAt)));
   if(t.scores){const score=node('p',t.players.map((name,i)=>name+': '+(t.scores['player'+(i+1)]||0)).join(' · '),'table-result');card.append(score);}
   if(t.winnerName)card.append(node('p','Ganó '+t.winnerName,'table-winner'));
-  card.append(button('Cerrar mesa',()=>openEdit('close-table',t)));return card;
+  if(t.rawStatus==='settled')card.append(node('p','El ganador recibe '+(2*t.stake)+' créditos; cada jugador apostó '+t.stake+'.'));
+  if(t.rawStatus==='refunded')card.append(node('p','La apuesta fue devuelta a los participantes.'));
+  if(t.reason)card.append(node('small','Motivo: '+({abandon:'Abandono',disconnect:'Desconexión','waiting-canceled':'Cancelada sin rival','draw-left':'Abandono antes de empezar',admin:'Cierre del administrador'}[t.reason]||t.reason)));
+  const detail=node('details');detail.append(node('summary','Ver movimientos y mensajes'));
+  for(const e of t.history||[]){
+   const row=node('div','','card');row.append(node('small',formatTableTime(e.at)+' · '+e.status));
+   for(const c of e.changes||[])row.append(node('p',(users.find(u=>u.uid===c.uid)?.name||c.uid)+': saldo '+c.before+' → '+c.after+'; reservados '+c.reservedBefore+' → '+c.reservedAfter));
+   for(const message of e.messages||[])row.append(node('p',message.text||''));detail.append(row);
+  }
+  if(!t.history?.length)detail.append(node('p','Registro anterior al historial detallado. Se muestran los datos conservados de la partida.'));
+  card.append(detail);
+  if(!t.closedAt&&['waiting','reserved'].includes(t.rawStatus))card.append(button('Cerrar mesa',()=>openEdit('close-table',t)));return card;
  };
  const current=scope==='previous'?[]:tableData.tables||[];
  const previous=scope==='active'?[]:(tableData.archivedTables||[]).filter(t=>scope!=='finished'||t.status==='Terminada');
