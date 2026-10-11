@@ -7,6 +7,7 @@ const {onSchedule}=require('firebase-functions/v2/scheduler');
 const {createTable,joinTable,tableOperation,publicTable,passwordHash,tableFor}=require('./table-service.cjs');
 const {recordHistory}=require('./history-service.cjs');
 const {validateAccounting}=require('./accounting-guard.cjs');
+const {loadedTransaction}=require('./loaded-transaction.cjs');
 const {reservationAlerts,repairReservation,personalHistory}=require('./player-service.cjs');
 initializeApp();const db=getDatabase();
 const options={region:'us-central1',maxInstances:5,timeoutSeconds:30};
@@ -21,9 +22,7 @@ async function rateLimit(uid,limit=15,bucket='tables'){const now=Date.now();cons
 async function mutate(update,allowEmpty=false,context={}){
  let failure=null;
  try{
-  // Prime the local cache; an empty callback must ABORT, never propose deletion.
-  await db.ref('creditEconomy').get();
-  const result=await db.ref('creditEconomy').transaction(current=>{
+  const result=await loadedTransaction(db.ref('creditEconomy'),current=>{
    failure=null;if(current===null&&!allowEmpty)return undefined;
    try{return validateAccounting(current,recordHistory(current,update(current),Date.now()));}catch(error){failure=error;return undefined;}
   });
@@ -85,8 +84,7 @@ exports.creditTableAction=onCall(options,async request=>{
 exports.creditExpireTables=onSchedule({schedule:'every 1 minutes',region:'us-central1',maxInstances:1},async()=>{
  const now=Date.now();let changed=[];
  const rooms=(await db.ref('rooms').get()).val()||{};
- await db.ref('creditEconomy').get();
- const r=await db.ref('creditEconomy').transaction(current=>{
+ const r=await loadedTransaction(db.ref('creditEconomy'),current=>{
   if(!current)return undefined;let next=current;changed=[];
   for(const code of Object.keys(current.tables||{})){
    const old=tableFor(next,code);if(!['waiting','reserved'].includes(old.status))continue;
