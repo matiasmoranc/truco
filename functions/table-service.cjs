@@ -85,7 +85,7 @@ function tableOperation(ledger,{code,uid,command,requestId,expectedMatchId,prese
   const r=m.session.room;if(['request','accept'].includes(command.value))checkWallet(next,uid,m.stake);if(command.value==='request'&&!r.rematch){r.rematch={id:requestId,requester:player,status:'pending'};}
   else if(r.rematch?.status==='pending'&&r.rematch.requester!==player&&['request','accept'].includes(command.value)){
    const newId=code+'_'+now+'_m'+(m.matchNumber+1),funded=reserveStakes(next,{id:newId,player1:m.player1,player2:m.player2,stake:m.stake,now});
-   const record=funded.matches[newId];Object.assign(record,{id:newId,code,players:m.players,targetPoints:m.targetPoints,secret:m.secret,createdAt:now,revision:m.revision+1,requests:{},matchNumber:m.matchNumber+1});
+   const record=funded.matches[newId];Object.assign(record,{id:newId,code,players:m.players,targetPoints:m.targetPoints,secret:m.secret??null,createdAt:now,revision:m.revision+1,requests:{},matchNumber:m.matchNumber+1});
    record.session=newSession(code,m.players,m.targetPoints,{id:newId,stake:m.stake,pot:m.stake*2,hasPassword:!!m.secret,matchNumber:record.matchNumber},now);
    record.session.room.sessionResults={...(r.sessionResults||{}),[m.matchNumber]:{winner:r.matchResult?.winner||['player1','player2'].find(p=>r.scores[p]>=r.targetPoints),scores:r.scores}};
    funded.tables[code]=newId;return funded;

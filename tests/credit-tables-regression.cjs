@@ -6,6 +6,27 @@ const base=()=>({wallets:{a:{balance:12,locked:0,lastGrantAt:1},b:{balance:7,loc
 const create=(ledger=base(),extra={})=>createTable(ledger,{code:'ABCDE',id:'game1',uid:'a',name:'Mati',stake:5,targetPoints:10,now:100,...extra});
 const join=(ledger,extra={})=>joinTable(ledger,{code:'ABCDE',uid:'b',name:'Ricky',now:200,...extra});
 const op=(ledger,uid,command,now=300,extra={})=>tableOperation(ledger,{code:'ABCDE',uid,command,now,requestId:'req-'+now,...extra});
+test('Repeated public rematches survive Firebase null omission and preserve bystanders and receipts',()=>{
+ const {validateAccounting}=require('../functions/accounting-guard.cjs');
+ const {recordHistory}=require('../functions/history-service.cjs');
+ let ledger=join(create(base(),{stake:1}));
+ let now=1000;
+ for(let round=0;round<5;round++){
+  const id=ledger.tables.ABCDE,m=ledger.matches[id];
+  Object.assign(m.session.room,{status:'complete',scores:{player1:10,player2:0},endReveal:{done:true}});
+  ledger=op(ledger,'a',{kind:'tick'},now++);
+  // RTDB drops null properties (including public-table secret).
+  ledger=JSON.parse(JSON.stringify(ledger,(k,v)=>v===null?undefined:v));
+  ledger=op(ledger,'a',{kind:'rematch',value:'request'},now++);
+  const before=structuredClone(ledger);
+  ledger=recordHistory(before,op(ledger,'b',{kind:'rematch',value:'accept'},now++),now);
+  validateAccounting(before,ledger);
+  assert.equal(ledger.matches[ledger.tables.ABCDE].secret,null);
+  assert.deepEqual(ledger.wallets.c,base().wallets.c);
+  assert.equal(Object.keys(ledger.matches).length,round+2);
+  assert.equal(Object.values(ledger.wallets).reduce((n,w)=>n+w.balance+w.locked,0),31);
+ }
+});
 function begin(ledger){ledger=op(ledger,'a',{kind:'draw'},300);ledger=op(ledger,'b',{kind:'draw'},400);const m=ledger.matches.game1;m.session.room.openingDraw.cards.player1.rank=1;m.session.room.openingDraw.cards.player2.rank=7;return op(ledger,'a',{kind:'tick'},2400);}
 const card=(suit,rank)=>({id:suit+'-'+rank,suit,rank,label:String(rank)});
 function fixture(){const session=newSession('ABCDE',{player1:{uid:'a',name:'Mati'},player2:{uid:'b',name:'Ricky'}},10,{id:'game1',stake:1,matchNumber:1},100);Object.assign(session.room,{status:'started',turn:'player1',mano:'player1',muestra:card('♠',6),handNumber:1,deckCount:33});session.hands={player1:[card('♦',1),card('♦',7),card('♣',3)],player2:[card('♥',1),card('♥',7),card('♣',2)]};session.originals=structuredClone(session.hands);session.truth={player1:28,player2:28};return session;}

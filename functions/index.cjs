@@ -6,6 +6,7 @@ const {onCall,HttpsError}=require('firebase-functions/v2/https');
 const {onSchedule}=require('firebase-functions/v2/scheduler');
 const {createTable,joinTable,tableOperation,publicTable,passwordHash,tableFor}=require('./table-service.cjs');
 const {recordHistory}=require('./history-service.cjs');
+const {validateAccounting}=require('./accounting-guard.cjs');
 const {reservationAlerts,repairReservation,personalHistory}=require('./player-service.cjs');
 initializeApp();const db=getDatabase();
 const options={region:'us-central1',maxInstances:5,timeoutSeconds:30};
@@ -17,16 +18,18 @@ async function identity(request){
  if(typeof name!=='string'||!name)throw new HttpsError('failed-precondition','Guardá tu nombre de usuario primero.');return {uid:auth.uid,name};
 }
 async function rateLimit(uid,limit=15,bucket='tables'){const now=Date.now();const r=await db.ref('creditRateLimits/'+uid+'/'+bucket).transaction(current=>{if(!current||now-current.start>=60000)return {start:now,count:1};if(current.count>=limit)return undefined;return {...current,count:current.count+1};});if(!r.committed)throw new HttpsError('resource-exhausted','Esperá un minuto antes de volver a intentar.');}
-async function mutate(update,allowEmpty=false){
+async function mutate(update,allowEmpty=false,context={}){
  let failure=null;
  try{
+  // Prime the local cache; an empty callback must ABORT, never propose deletion.
+  await db.ref('creditEconomy').get();
   const result=await db.ref('creditEconomy').transaction(current=>{
-   failure=null;if(current===null&&!allowEmpty)return null;
-   try{return recordHistory(current,update(current),Date.now());}catch(error){failure=error;return undefined;}
+   failure=null;if(current===null&&!allowEmpty)return undefined;
+   try{return validateAccounting(current,recordHistory(current,update(current),Date.now()));}catch(error){failure=error;return undefined;}
   });
   if(!result.committed||!result.snapshot.val())throw failure||new Error('No hay créditos disponibles.');
   return result.snapshot.val();
- }catch(error){throw new HttpsError('failed-precondition',error.message||'La mesa cambió. Volvé a intentar.');}
+ }catch(error){console.error('Accounting operation rejected',{...context,error:error.message});throw new HttpsError('failed-precondition',error.message||'La mesa cambió. Volvé a intentar.');}
 }
 async function publish(ledger,code){
  const m=tableFor(ledger,code),room=publicTable(m);
@@ -77,17 +80,18 @@ exports.creditTableAction=onCall(options,async request=>{
   let m;try{m=tableFor(current,code);if(![m.player1,m.player2].includes(user.uid))throw new Error('No pertenecés a esta mesa.');}catch(e){throw new HttpsError('permission-denied',e.message);}
  }
  const now=Date.now();const presence=(await db.ref('rooms/'+code+'/public/connectionPresence').get()).val();
- const ledger=await mutate(current=>tableOperation(current,{code,uid:user.uid,command,requestId:command.kind==='tick'?null:requestId,expectedMatchId,presence,now}));return publish(ledger,code);
+ const ledger=await mutate(current=>tableOperation(current,{code,uid:user.uid,command,requestId:command.kind==='tick'?null:requestId,expectedMatchId,presence,now}),false,{code,uid:user.uid,kind:command.kind,requestId});return publish(ledger,code);
 });
 exports.creditExpireTables=onSchedule({schedule:'every 1 minutes',region:'us-central1',maxInstances:1},async()=>{
  const now=Date.now();let changed=[];
  const rooms=(await db.ref('rooms').get()).val()||{};
+ await db.ref('creditEconomy').get();
  const r=await db.ref('creditEconomy').transaction(current=>{
-  if(!current)return null;let next=current;changed=[];
+  if(!current)return undefined;let next=current;changed=[];
   for(const code of Object.keys(current.tables||{})){
    const old=tableFor(next,code);if(!['waiting','reserved'].includes(old.status))continue;
    const before=JSON.stringify(old);next=tableOperation(next,{code,uid:old.player1,command:{kind:'tick'},presence:rooms[code]?.public?.connectionPresence,now});if(before!==JSON.stringify(tableFor(next,code)))changed.push(code);
-  }return recordHistory(current,next,now);
+  }return validateAccounting(current,recordHistory(current,next,now));
  });
  if(r.committed&&r.snapshot.val())await Promise.all(changed.map(code=>publish(r.snapshot.val(),code)));
 });
@@ -120,13 +124,14 @@ exports.adminConsole=onCall(options,async request=>{
  }
  if(action==='delete'){
   let failure;
+  await db.ref().get();
   const prepared=await db.ref().transaction(root=>{
-   failure=null;if(!root)return null;try{return prepareUserDeletion(root,{...data,actor,now:Date.now()});}catch(e){failure=e.message;return undefined;}
+   failure=null;if(!root)return undefined;try{return prepareUserDeletion(root,{...data,actor,now:Date.now()});}catch(e){failure=e.message;return undefined;}
   });
   if(!prepared.committed)throw new HttpsError('failed-precondition',failure||'No se pudo preparar la eliminación.');
   try{await getAuth().deleteUser(data.uid);}catch(e){if(e.code!=='auth/user-not-found')throw new HttpsError('internal','No se pudo eliminar la cuenta. Reintentá el mismo cambio.');}
   const done=await db.ref().transaction(root=>{
-   failure=null;if(!root)return null;try{return finishUserDeletion(root,{uid:data.uid,requestId:data.requestId,now:Date.now()});}catch(e){failure=e.message;return undefined;}
+   failure=null;if(!root)return undefined;try{return finishUserDeletion(root,{uid:data.uid,requestId:data.requestId,now:Date.now()});}catch(e){failure=e.message;return undefined;}
   });
   if(!done.committed)throw new HttpsError('internal','La cuenta fue eliminada pero falta limpiar el perfil. Reintentá el mismo cambio.');return {ok:true};
  }
@@ -168,7 +173,8 @@ exports.adminConsole=onCall(options,async request=>{
  }
  if(action==='close-table'&&!validKey(data.code))throw new HttpsError('invalid-argument','Mesa inválida.');
  if(action==='close-table'&&!(await db.ref('creditEconomy/tables/'+String(data.code)).get()).exists()){
-  let failure;const result=await db.ref().transaction(root=>{failure=null;if(!root)return null;try{return closeLegacyTable(root,{...data,actor,now:Date.now()});}catch(error){failure=error.message;return undefined;}});
+  await db.ref().get();
+  let failure;const result=await db.ref().transaction(root=>{failure=null;if(!root)return undefined;try{return closeLegacyTable(root,{...data,actor,now:Date.now()});}catch(error){failure=error.message;return undefined;}});
   if(!result.committed)throw new HttpsError('failed-precondition',failure||'No se pudo cerrar la mesa.');
   return {ok:true};
  }
@@ -181,8 +187,9 @@ exports.adminConsole=onCall(options,async request=>{
  if(action==='rename'){
   if(!validKey(data.uid)||!validKey(data.requestId)||typeof data.name!=='string'||!/^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9._-]{1,18}$/.test(data.name)||typeof data.reason!=='string'||data.reason.trim().length<3||data.reason.length>200)throw new HttpsError('invalid-argument','Nombre o motivo inválido.');
   if((await db.ref('userAccess/'+data.uid).get()).val()?.deleting)throw new HttpsError('failed-precondition','La cuenta está siendo eliminada.');await getAuth().getUser(data.uid);let failure;
+  await db.ref().get();
   const r=await db.ref().transaction(root=>{
-   failure=null;if(!root)return null;
+   failure=null;if(!root)return undefined;
    const receipt=root.adminUserAudit?.[data.requestId];
    if(receipt){if(receipt.actor!==actor||receipt.uid!==data.uid||receipt.after!==data.name)failure='Solicitud reutilizada.';return failure?undefined:root;}
    const key=data.name.toLowerCase().replaceAll('.','%2E'),owner=root.usernames?.[key];
@@ -221,7 +228,7 @@ exports.playerActivity=onCall({...options,maxInstances:3},async request=>{
 exports.activityCleanup=onSchedule({schedule:'every day 04:00',timeZone:'America/Montevideo',region:'us-central1',maxInstances:1},async()=>{
  const now=Date.now(),cutoff=uruguayDate(now-29*86400000).day;
  await db.ref('adminMetrics').transaction(metrics=>{
-  if(!metrics)return null;
+  if(!metrics)return undefined;
   for(const day of Object.keys(metrics.days||{}))if(day<cutoff)delete metrics.days[day];
   for(const [uid,sessions] of Object.entries(metrics.presence||{})){
    for(const [id,session] of Object.entries(sessions))if(now-session.at>=90000)delete sessions[id];
@@ -251,6 +258,27 @@ exports.playerConsole=onCall(options,async request=>{
  throw new HttpsError('invalid-argument','Acción inválida.');
 });
 const {onValueWritten}=require('firebase-functions/v2/database');
+// Independent of creditEconomy: a deletion cannot erase its own evidence.
+exports.creditAccountingAudit=onValueWritten({ref:'/creditEconomy',region:'us-central1',maxInstances:2},async event=>{
+ const before=event.data.before.val()||{},after=event.data.after.val()||{};
+ const changes=[];
+ for(const uid of new Set([...Object.keys(before.wallets||{}),...Object.keys(after.wallets||{})])){
+  const a=before.wallets?.[uid]||null,b=after.wallets?.[uid]||null;
+  if(JSON.stringify(a)!==JSON.stringify(b))changes.push({uid,before:a,after:b});
+ }
+ const matches=[];
+ for(const id of new Set([...Object.keys(before.matches||{}),...Object.keys(after.matches||{})])){
+  const a=before.matches?.[id],b=after.matches?.[id];
+  if(a?.status!==b?.status||(!a)!==(!b))matches.push({id,code:b?.code||a?.code||null,before:a?.status||null,after:b?.status||null});
+ }
+ if(!changes.length&&!matches.length)return;
+ const deletedWallets=changes.filter(c=>c.before&&!c.after).length;
+ const deletedMatches=matches.filter(c=>c.before&&!c.after).length;
+ const entry={at:Date.parse(event.time)||Date.now(),changes,matches,deletedWallets,deletedMatches};
+ if(deletedWallets||deletedMatches)console.error('Accounting deletion detected',{eventId:event.id,deletedWallets,deletedMatches});
+ const key=crypto.createHash('sha256').update(event.id).digest('hex');
+ await db.ref('creditAccountingAudit/'+key).set(entry);
+});
 exports.creditWalletHistory=onValueWritten({ref:'/creditEconomy/wallets/{uid}',region:'us-central1',maxInstances:2},async event=>{
  const before=event.data.before.val(),after=event.data.after.val();if(!after)return;
  const uid=event.params.uid,at=Date.parse(event.time)||Date.now();
