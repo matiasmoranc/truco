@@ -1640,7 +1640,8 @@ function cardImage(card){
   const suitGroups={'♦':0,'♥':3,'♠':6,'♣':9};
   const index=rank-1,group=Math.floor(index/4),column=index%4;
   const file=(suitGroups[card.suit]??6)+group+1;
-  return {image:`url('./assets/cards/${file}.jpg')`,position:`${column/3*100}% 0%`};
+  const imageUrl=new URL(`./assets/cards/${file}.jpg`,document.baseURI).href;
+  return {image:`url("${imageUrl}")`,position:`${column/3*100}% 0%`};
 }
 function cardImageStyle(card){
   const {image,position}=cardImage(card);
