@@ -1,4 +1,4 @@
-import { installScorer } from './scorer.js?v=20261011-scorer51';
+import { installScorer } from './scorer.js?v=20261011-scorerawake52';
 import { installActivity } from './activity.js?v=20261010-adminstats32';
 import { installCredits } from './credits.js?v=20261010-adminstats32';
 import { installAccount } from './account.js?v=20261010-mobile50';
