@@ -1501,3 +1501,6 @@ body { min-height:100dvh; }
 #scorer-view .scorer-team-name{font-size:clamp(25px,6vw,38px);line-height:1.2}
 #scorer-view .scorer-minus{touch-action:manipulation}
 #scorer-view #scorer-board{margin-top:18px}
+
+/* Allow scrolling, but disable pinch and double-tap browser zoom. */
+html,body,#app{touch-action:pan-x pan-y}

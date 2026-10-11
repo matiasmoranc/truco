@@ -1,4 +1,4 @@
-import { installScorer } from './scorer.js?v=20261011-scorertaps53';
+import { installScorer } from './scorer.js?v=20261011-nozoom54';
 import { installActivity } from './activity.js?v=20261010-adminstats32';
 import { installCredits } from './credits.js?v=20261010-adminstats32';
 import { installAccount } from './account.js?v=20261010-mobile50';
@@ -2850,13 +2850,11 @@ $('muestra-card').addEventListener('pointermove',(event)=>{
 const endMuestraDrag=(event)=>{const card=$('muestra-card');if(card._drag?.pointerId===event.pointerId){card.releasePointerCapture?.(event.pointerId);card._drag=null;card.classList.remove('dragging');}};
 $('muestra-card').addEventListener('pointerup',endMuestraDrag);
 $('muestra-card').addEventListener('pointercancel',endMuestraDrag);
-let lastTouchEnd=0;
-document.addEventListener('touchend',(event)=>{
-  if(event.target.closest?.('#scorer-view')){lastTouchEnd=0;return;}
-  const now=Date.now();
-  if(now-lastTouchEnd<=320)event.preventDefault();
-  lastTouchEnd=now;
-},{passive:false});
+// Prevent browser zoom without discarding rapid button taps.
+for(const type of ['gesturestart','gesturechange','gestureend']){
+  document.addEventListener(type,event=>event.preventDefault(),{passive:false});
+}
+document.addEventListener('dblclick',event=>event.preventDefault());
 $('player-sound-toggle').addEventListener('click',()=>{
   soundEnabled=!soundEnabled;
   if(soundEnabled)unlockVoice();
