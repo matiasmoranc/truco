@@ -106,14 +106,15 @@ function renderTables(){
  const query=$('table-search').value.trim().toLowerCase();
  const matches=t=>[...(t.players||[]),t.code,t.id].filter(Boolean).join(' ').toLowerCase().includes(query);
  const current=scope==='previous'?[]:(tableData.tables||[]).filter(matches);
- const previous=scope==='active'?[]:(tableData.archivedTables||[]).filter(t=>matches(t)&&(scope!=='finished'||t.status==='Terminada'));
+ const cutoff=Date.now()-7*86400000;
+ const previous=scope==='active'?[]:(tableData.archivedTables||[]).filter(t=>tableTime(t)>=cutoff&&matches(t)&&(scope!=='finished'||t.status==='Terminada'));
  if(scope!=='previous'&&scope!=='finished'){
   const group=node('section','','table-group');group.append(node('h3','Mesas activas ('+current.length+')'));
   const cards=node('div','','cards');for(const t of sortedTables(current))cards.append(tableCard(t));
   if(!current.length)cards.append(node('p','No hay mesas activas.'));group.append(cards);list.append(group);
  }
  if(scope!=='active'){
-  const group=node('section','','table-group');group.append(node('h3',(scope==='finished'?'Partidas terminadas':'Mesas anteriores')+' ('+previous.length+')'));
+  const group=node('section','','table-group');group.append(node('h3',(scope==='finished'?'Partidas terminadas · últimos 7 días':'Mesas anteriores · últimos 7 días')+' ('+previous.length+')'));
   const cards=node('div','','cards');for(const t of sortedTables(previous))cards.append(tableCard(t));
   if(!previous.length)cards.append(node('p','No hay mesas para este filtro.'));group.append(cards);list.append(group);
  }
