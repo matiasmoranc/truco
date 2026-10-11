@@ -1,10 +1,11 @@
+import { installScorer } from './scorer.js?v=20261011-scorer51';
 import { installActivity } from './activity.js?v=20261010-adminstats32';
 import { installCredits } from './credits.js?v=20261010-adminstats32';
 import { installAccount } from './account.js?v=20261010-mobile50';
 import { initializeGameAuth } from './auth-init.js?v=20261010-authredirect45';
 const FIREBASE_VERSION = '12.4.0';
 const $ = (id) => document.getElementById(id);
-const views = ['welcome-view', 'invite-view', 'setup-view', 'waiting-view', 'game-view', 'config-view', 'learn-view'];
+const views = ['welcome-view', 'invite-view', 'setup-view', 'waiting-view', 'game-view', 'config-view', 'learn-view', 'scorer-view'];
 const storageKey = 'truco-firebase-config';
 let state = { joining: false, config: null, firebase: null, roomCode: null, selectedRoom: null, uid: null, playerId: null, unsubscribe: null, privateUnsubscribe: null, lobbyUnsubscribe: null, room: null, hand: [], handOrder: [], handOrderKey: null, localGame: false, localHands: {}, nextAction: null, resolutionTimer: null, resolutionTimerKey: null, playActionInFlight: false, legacyRepairKey: null, emptyHandRepairKey: null };
 
@@ -3537,3 +3538,5 @@ for(const button of document.querySelectorAll('[data-password-toggle]')){
     setPasswordVisible(id,$(id).type==='password');
   });
 }
+
+installScorer({document,showView,renderTally:renderCompactTally});
