@@ -1,0 +1,41 @@
+workflows:
+  ios-testflight:
+    name: Truco Uruguayo - iPhone TestFlight
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    integrations:
+      app_store_connect: truco-apple
+    environment:
+      node: 22
+      xcode: latest
+      groups:
+        - truco_ios
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.matiasmoranc.truco
+    scripts:
+      - name: Instalar dependencias
+        script: npm ci
+      - name: Preparar el juego y generar iOS
+        script: |
+          set -e
+          npm run mobile:build
+          npx cap add ios
+          npx cap sync ios
+      - name: Configurar Firebase, Google y Apple
+        script: python3 scripts/prepare-ios.py
+      - name: Aplicar certificados y perfiles
+        script: xcode-project use-profiles
+      - name: Compilar la version de prueba
+        script: |
+          set -e
+          cd ios/App
+          xcode-project build-ipa --project App.xcodeproj --scheme App
+    artifacts:
+      - ios/App/build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: false
+        submit_to_app_store: false

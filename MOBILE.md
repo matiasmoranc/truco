@@ -30,7 +30,7 @@ npm run mobile:open:android
 
 Probá en un dispositivo/emulador desde Android Studio. El proyecto Android se genera localmente; no se suben archivos de firma a GitHub.
 
-## iPhone (requiere una Mac con Xcode)
+## iPhone con Xcode local
 
 En Firebase agregá una app iOS con el mismo identificador. Descargá `GoogleService-Info.plist`.
 
@@ -44,6 +44,21 @@ npm run mobile:open:ios
 En Xcode agregá `GoogleService-Info.plist` al target App, seleccioná tu equipo de Apple para firmar y habilitá la capacidad **Sign in with Apple** en el identificador de Apple y en Signing & Capabilities. Para Google agregá en Info → URL Types el `REVERSED_CLIENT_ID` del plist. No reemplaces el Service ID del login web.
 
 Se usa Swift Package Manager con el proveedor Google; Apple usa el acceso nativo. La configuración `skipNativeAuth: true` entrega las credenciales a Firebase JavaScript para mantener una única sesión en el juego. No uses popup/redirect web dentro de la app.
+
+## iPhone sin Mac: Codemagic y TestFlight
+
+El archivo `codemagic.yaml` prepara el proyecto iOS desde cero en una Mac de Codemagic. No hay compilaciones automáticas por cada cambio: se inician manualmente. Requiere configurar estos datos antes de ejecutar **Truco Uruguayo - iPhone TestFlight**:
+
+1. Firebase → Configuración del proyecto → Tus apps → Agregar app iOS. Bundle ID: `com.matiasmoranc.truco`. Descargá `GoogleService-Info.plist` con Google habilitado.
+2. Convertí ese archivo a Base64 en PowerShell: `[Convert]::ToBase64String([IO.File]::ReadAllBytes("$env:USERPROFILE\Downloads\GoogleService-Info.plist"))`.
+3. En Codemagic → aplicación truco → Environment variables, agregá `GOOGLE_SERVICE_INFO_PLIST_BASE64`, pegá el Base64 como valor, marcá Secret y usá el grupo `truco_ios`.
+4. En Apple Developer registrá el identificador explícito `com.matiasmoranc.truco` y habilitá **Sign in with Apple**. Este identificador nativo es distinto del Service ID del login web.
+5. En App Store Connect creá la app para ese Bundle ID. Creá una clave API de App Store Connect con permisos para distribución. La clave de Sign in with Apple que usaste para Firebase no reemplaza esta clave.
+6. En la integración de Apple Developer Portal de Codemagic agregá esa clave API con el nombre `truco-apple`, Key ID e Issuer ID. Guardá el archivo `.p8` fuera de GitHub.
+7. En Code signing identities generá/agregá un certificado Apple Distribution y un perfil App Store para `com.matiasmoranc.truco` que incluya Sign in with Apple.
+8. Volvé a la aplicación → rama main → Check for configuration files. Iniciá el workflow cuando estén completos los pasos anteriores.
+
+El workflow sube el archivo firmado a App Store Connect; no solicita revisión pública ni revisión beta externa automáticamente. Tras procesarlo, se asigna a testers internos desde TestFlight. La primera compilación nativa todavía debe verificarse en Codemagic: desde Windows no se puede ejecutar Xcode. El número de build aumenta con `PROJECT_BUILD_NUMBER`; no reinicies su contador después de subir versiones.
 
 ## Generar un APK de prueba para Android
 
