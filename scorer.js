@@ -2,6 +2,10 @@
 export function installScorer({document,storage=globalThis.localStorage,showView,renderTally}) {
   const $=id=>document.getElementById(id),key='truco-manual-score-v1';
   const screen = installScorerScreen({document});
+  $('scorer-colors').addEventListener('click',()=>{
+    const inverted=$('scorer-view').classList.toggle('scorer-colors-inverted');
+    $('scorer-colors').setAttribute('aria-pressed',String(inverted));
+  });
   let match=null;
   try {const saved=JSON.parse(storage.getItem(key));if([10,20,30,40,50,60].includes(saved?.target)&&Array.isArray(saved.scores)&&saved.scores.length===2&&saved.scores.every(n=>Number.isInteger(n)&&n>=0&&n<=saved.target))match=saved;}catch{}
   const save=()=>{try{storage.setItem(key,JSON.stringify(match));}catch{}};
