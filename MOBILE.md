@@ -45,7 +45,22 @@ En Xcode agregá `GoogleService-Info.plist` al target App, seleccioná tu equipo
 
 Se usa Swift Package Manager con el proveedor Google; Apple usa el acceso nativo. La configuración `skipNativeAuth: true` entrega las credenciales a Firebase JavaScript para mantener una única sesión en el juego. No uses popup/redirect web dentro de la app.
 
-## Seguir mejorando el juego
+## Generar un APK de prueba para Android
+
+Con el proyecto Android que ya usaste en el emulador, ejecutá desde Visual Studio:
+
+```powershell
+git pull --ff-only
+npm run mobile:apk
+```
+
+El comando actualiza el juego, sincroniza Android y compila un APK de desarrollo firmado con el mismo certificado debug de tu computadora. Así mantiene las huellas de Google que ya registraste en Firebase. No borres ni cambies ese certificado.
+
+El archivo queda en `artifacts/truco-uruguayo-prueba.apk`. Pasalo a un Android por USB o Google Drive, abrilo y permití instalar desde esa fuente si Android lo solicita. Para actualizar, generá y enviá nuevamente el APK; se instala sobre la versión anterior si conserva la misma firma. Un APK no se puede instalar en iPhone.
+
+Esta versión usa las cuentas, mesas y créditos reales del Firebase actual. Distribuila inicialmente a tus testers. No es una publicación en Play Store ni una base de datos separada. Antes de compartirla, verificá el inicio de sesión, las cartas, la reconexión y los saldos tras partidas y revanchas.
+
+## Actualizar el código de la app
 
 Después de cambiar el código:
 

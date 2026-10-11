@@ -8,3 +8,4 @@ ios/
 *.keystore
 *.jks
 .env*
+artifacts/
