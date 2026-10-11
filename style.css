@@ -1512,3 +1512,10 @@ html,body,#app{touch-action:pan-x pan-y}
 #welcome-view .home-tools-row button>span:not(.home-action-chevron){min-width:0;text-align:left;white-space:normal}
 
 #scorer-view #scorer-new{height:44px;min-height:44px;max-height:44px;padding:0 8px;display:flex;align-items:center;justify-content:center}
+
+/* Equal inner widths keep both SVG score columns at the same scale. */
+#scorer-view #scorer-board{position:relative;gap:24px}
+#scorer-view #scorer-board::after{content:"";position:absolute;left:50%;top:0;bottom:0;width:1px;background:var(--line);pointer-events:none}
+#scorer-view .scorer-team+.scorer-team{border-left:0;padding-left:0}
+#scorer-view .scorer-tally{position:relative;flex:1;min-height:0}
+#scorer-view .scorer-tally svg{position:absolute;inset:0;width:100%;height:100%;max-width:100%}
