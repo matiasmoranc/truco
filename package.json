@@ -4,13 +4,14 @@
   "description": "Juego de Truco Uruguayo web y mobile",
   "scripts": {
     "mobile:build": "node scripts/build-mobile.cjs",
-    "mobile:add:android": "npm run mobile:build && cap add android",
-    "mobile:add:ios": "npm run mobile:build && cap add ios",
-    "mobile:sync": "npm run mobile:build && cap sync",
+    "mobile:apk": "node scripts/build-android-test.cjs",
+    "mobile:add:android": "npm run mobile:build && cap add android && npm run mobile:icons",
+    "mobile:add:ios": "npm run mobile:build && cap add ios && npm run mobile:icons",
+    "mobile:sync": "npm run mobile:build && cap sync && npm run mobile:icons",
     "mobile:open:android": "cap open android",
     "mobile:open:ios": "cap open ios",
     "test": "node --test tests/*.cjs",
-    "mobile:apk": "node scripts/build-android-test.cjs"
+    "mobile:icons": "node scripts/build-app-icons.cjs"
   },
   "repository": {
     "type": "git",
@@ -34,6 +35,7 @@
   "private": true,
   "devDependencies": {
     "@capacitor/cli": "8.5.3",
+    "sharp": "0.35.5",
     "vite": "7.3.7"
   }
 }

@@ -22,6 +22,7 @@ workflows:
           npm run mobile:build
           npx cap add ios
           npx cap sync ios
+          node scripts/build-app-icons.cjs
       - name: Configurar Firebase, Google y Apple
         script: python3 scripts/prepare-ios.py
       - name: Aplicar certificados y perfiles
