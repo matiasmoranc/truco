@@ -24,7 +24,14 @@ test('Repeated initialization reuses Auth and unrelated setup failures are prese
 test('Firebase Hosting processes the redirect before exposing the restored session',async()=>{
  const {initializeGameAuth}=await modulePromise;const auth={authStateReady:async()=>{}};const sdk=sdkFor(auth);let processed=false;
  sdk.browserPopupRedirectResolver='resolver';sdk.getRedirectResult=async(a,r)=>{assert.equal(a,auth);assert.equal(r,'resolver');processed=true;auth.currentUser={uid:'apple'};};
- globalThis.location={hostname:'truco-6553d.firebaseapp.com'};
- try{await initializeGameAuth(sdk,{options:{authDomain:'truco-6553d.firebaseapp.com'}});assert.equal(processed,true);assert.equal(auth.currentUser.uid,'apple');assert.equal(sdk.options.popupRedirectResolver,'resolver');}
- finally{delete globalThis.location;}
+ globalThis.location={hostname:'truco-6553d.firebaseapp.com'};globalThis.sessionStorage={getItem:()=> 'pending',removeItem(){}};
+ try{await initializeGameAuth(sdk,{options:{authDomain:'truco-6553d.firebaseapp.com'}});assert.equal(processed,true);assert.equal(auth.currentUser.uid,'apple');assert.equal('popupRedirectResolver' in sdk.options,false);}
+ finally{delete globalThis.location;delete globalThis.sessionStorage;}
+});
+
+test('An ordinary Firebase-hosted visit never waits for the redirect iframe',async()=>{
+ const {initializeGameAuth}=await modulePromise;const user={uid:'saved'},auth={currentUser:user,authStateReady:async()=>{}};const sdk=sdkFor(auth);
+ sdk.getRedirectResult=()=>{throw Error('Unnecessary redirect initialization');};
+ globalThis.location={hostname:'truco-6553d.firebaseapp.com'};globalThis.sessionStorage={getItem:()=>null};
+ try{assert.equal(await initializeGameAuth(sdk,{options:{authDomain:'truco-6553d.firebaseapp.com'}}),auth);assert.equal(auth.currentUser,user);assert.equal('popupRedirectResolver' in sdk.options,false);}finally{delete globalThis.location;delete globalThis.sessionStorage;}
 });

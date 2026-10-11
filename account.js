@@ -158,7 +158,8 @@ export function installAccount({ services, getState, rememberName, document, sto
           globalThis.location.assign(target.href);
           return;
         }
-        await fb.authSdk.signInWithRedirect(fb.auth,provider,fb.authSdk.browserPopupRedirectResolver);
+        try{globalThis.sessionStorage?.setItem('truco-apple-redirect-pending',String(Date.now()));}catch{}
+        try{await fb.authSdk.signInWithRedirect(fb.auth,provider,fb.authSdk.browserPopupRedirectResolver);}catch(error){try{globalThis.sessionStorage?.removeItem('truco-apple-redirect-pending');}catch{}throw error;}
         return;
       }
       // Apple authenticates separately. Never silently link a private relay
