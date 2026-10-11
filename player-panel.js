@@ -22,13 +22,13 @@ export function installPlayerPanel({document,api,getState}){
   }catch(e){if(token===generation)body.replaceChildren(node('p',e.message||'No pudimos cargar tus estadísticas.'));}
  }
  function report(fromMatch=false){
-  open('Reportar un problema');const state=getState(),matchId=fromMatch&&state.room?.managedCredits?state.room.creditMatch?.id:null;
+  const token=open('Reportar un problema');const state=getState(),matchId=fromMatch&&state.room?.managedCredits?state.room.creditMatch?.id:null;
   let localId=null;if(fromMatch&&state.localGame&&state.room){if(!localIds.has(state.room))localIds.set(state.room,'local_'+crypto.randomUUID());localId=localIds.get(state.room);}
   body.append(node('p',matchId||localId?'Se adjuntará el ID de esta partida.':'Contanos qué pasó para que podamos revisarlo.'));
   const form=document.createElement('form'),input=document.createElement('textarea');input.maxLength=1000;input.minLength=5;input.required=true;input.rows=5;input.placeholder='¿Qué pasó?';input.setAttribute('aria-label','Descripción del problema');
   const submit=node('button','Enviar reporte','button primary');submit.type='submit';const status=node('p','');status.setAttribute('role','status');form.append(input,submit,status);body.append(form);
   const requestId=crypto.randomUUID();let busy=false;
-  form.onsubmit=async event=>{event.preventDefault();if(busy)return;busy=true;submit.disabled=true;submit.textContent='Enviando…';try{await api('playerConsole',{action:'report',message:input.value,requestId,matchId,localId,mode:state.localGame?'bot':'general'});status.textContent='Reporte enviado. Gracias por avisarnos.';input.disabled=true;submit.hidden=true;}catch(e){status.textContent=e.message||'No pudimos enviar el reporte. Volvé a intentar.';submit.disabled=false;submit.textContent='Enviar reporte';}finally{busy=false;}};
+  form.onsubmit=async event=>{event.preventDefault();if(busy)return;busy=true;submit.disabled=true;submit.textContent='Enviando…';try{await api('playerConsole',{action:'report',message:input.value,requestId,matchId,localId,mode:state.localGame?'bot':'general'});if(token!==generation)return;status.textContent='Reporte enviado. Gracias por avisarnos.';input.disabled=true;submit.textContent='Reporte enviado';submit.style.display='none';setTimeout(()=>{if(token===generation&&dialog.open)dialog.close();},2000);}catch(e){status.textContent=e.message||'No pudimos enviar el reporte. Volvé a intentar.';submit.disabled=false;submit.textContent='Enviar reporte';}finally{busy=false;}};
  }
  $('player-history').onclick=history;
  for(const id of ['lobby-report','account-report'])$(id).onclick=()=>report();
