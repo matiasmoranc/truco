@@ -30,6 +30,7 @@ function joinTable(ledger,{code,uid,name,password='',now}){
 function cancelWaiting(ledger,m,now){const wallet=ledger.wallets[m.player1];if(wallet.locked!==m.stake)fail('La reserva cambió.');wallet.balance+=m.stake;wallet.locked=0;m.status='refunded';m.closedAt=now;m.closeReason='waiting-canceled';m.revision++;}
 function finishAccounting(ledger,m,now){
  const room=m.session.room;
+ if(!m.startedAt&&room.status==='started'&&Number(room.handNumber)>0)m.startedAt=now;
  if(room.status==='closed'&&m.status==='reserved'){const next=refundCanceledMatch(ledger,{id:m.id,now});next.matches[m.id].revision++;return next;}
  if(room.status==='complete'&&room.endReveal?.done&&m.status==='reserved'){
   const winner=room.matchResult?.winner||['player1','player2'].find(p=>room.scores[p]>=room.targetPoints);

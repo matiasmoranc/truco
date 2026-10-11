@@ -1,5 +1,6 @@
 'use strict';
 const {tableOperation}=require('./table-service.cjs');
+const {hasStartedMatch}=require('./match-start.cjs');
 function reservationAlerts(ledger,now){
  const alerts=[];
  for(const [uid,w] of Object.entries(ledger.wallets||{})){
@@ -26,7 +27,7 @@ function repairReservation(ledger,{uid,now}){
 function personalHistory(ledger,uid){
  const wallet=ledger.wallets?.[uid]||{balance:0,locked:0};
  let peak=Number(ledger.peaks?.[uid]?.balance)||0;
- const matches=Object.values(ledger.matches||{}).filter(m=>[m.player1,m.player2].includes(uid)).map(m=>{
+ const matches=Object.values(ledger.matches||{}).filter(m=>[m.player1,m.player2].includes(uid)&&hasStartedMatch(m)).map(m=>{
   const player=m.player1===uid?'player1':'player2';
   const history=Object.values(ledger.history?.[m.id]||{});
   for(const e of history)for(const c of e.changes||[])if(c.uid===uid)peak=Math.max(peak,c.before||0,c.after||0);

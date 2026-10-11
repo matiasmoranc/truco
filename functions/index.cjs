@@ -8,6 +8,7 @@ const {createTable,joinTable,tableOperation,publicTable,passwordHash,tableFor}=r
 const {recordHistory}=require('./history-service.cjs');
 const {validateAccounting}=require('./accounting-guard.cjs');
 const {loadedTransaction}=require('./loaded-transaction.cjs');
+const {hasStartedMatch}=require('./match-start.cjs');
 const {reservationAlerts,repairReservation,personalHistory}=require('./player-service.cjs');
 initializeApp();const db=getDatabase();
 const options={region:'us-central1',maxInstances:5,timeoutSeconds:30};
@@ -161,6 +162,7 @@ exports.adminConsole=onCall(options,async request=>{
   const legacy=Object.entries(rooms).filter(([code,entry])=>!ledger.tables?.[code]&&legacyTableActive(entry?.public,Date.now())).map(([code,{public:room}])=>({code,status:room.status,stake:0,targetPoints:room.targetPoints||30,players:Object.values(room.players||{}).map(p=>p.name||p.uid),createdAt:room.createdAt||null,finishedAt:room.matchResult?.at||null}));
   const now=Date.now(),tables=[],archivedTables=[...legacy.map(m=>({...m,status:'Sistema anterior'}))];
   for(const [id,m] of Object.entries(ledger.matches||{})){
+   if(!hasStartedMatch(m))continue;
    const code=m.code||Object.entries(ledger.tables||{}).find(([,value])=>value===id)?.[0]||id;
    const entry={id,code,matchNumber:m.matchNumber||1,rawStatus:m.status,closedAt:m.closedAt||null,stake:m.stake,targetPoints:m.targetPoints,players:Object.values(m.players||{}).map(p=>p.name),createdAt:m.createdAt||null,finishedAt:m.settledAt||m.refundedAt||m.closedAt||null,scores:m.session?.room?.scores||null,winnerName:Object.values(m.players||{}).find(p=>p.uid===m.winner)?.name||null,reason:m.session?.room?.matchResult?.reason||m.closeReason||null,history:Object.values(ledger.history?.[id]||{}).sort((a,b)=>a.at-b.at)};
    if(ledger.tables?.[code]===id&&adminTableCurrent(m,now))tables.push({...entry,status:m.status==='waiting'?'Esperando rival':'En juego'});
