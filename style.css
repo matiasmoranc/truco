@@ -1543,3 +1543,5 @@ html,body,#app{touch-action:pan-x pan-y}
 .player-history-item{padding:14px;border:1px solid var(--line);border-radius:14px}.player-history-item h3{margin:0 0 6px;color:var(--gold);font-size:17px}
 .player-panel-body summary{color:var(--gold);cursor:pointer;font-size:14px}.player-panel-body form{display:flex;flex-direction:column;gap:12px}.player-panel-body textarea{width:100%;box-sizing:border-box;border:1px solid var(--gold);border-radius:12px;background:#0c291f;color:var(--ink);padding:12px;font:inherit;font-size:16px}
 .player-panel-body .button.primary{background:var(--gold);color:#12382b;border:1px solid var(--gold);border-radius:12px;padding:12px 16px;min-height:46px;height:auto;font:inherit;font-weight:700;letter-spacing:0;text-transform:none}
+
+.player-summary-stats{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.player-summary-stats .player-stat{padding:20px 10px}.player-summary-stats .player-stat strong{font-size:32px}.player-summary-stats .player-stat small{margin-top:5px;font-size:13px}
