@@ -1,5 +1,5 @@
 // Standalone scorekeeper: never writes game state or credits to Firebase.
-export function installScorer({document,storage=globalThis.localStorage,showView,renderTally}) {
+export function installScorer({document,storage=globalThis.localStorage,showView,renderTally,now=()=>Date.now()}) {
   const $=id=>document.getElementById(id),key='truco-manual-score-v1';
   const screen = installScorerScreen({document});
   $('scorer-colors').addEventListener('click',()=>{
@@ -7,7 +7,7 @@ export function installScorer({document,storage=globalThis.localStorage,showView
     $('scorer-colors').setAttribute('aria-pressed',String(inverted));
   });
   let match=null;
-  try {const saved=JSON.parse(storage.getItem(key));if([10,20,30,40,50,60].includes(saved?.target)&&Array.isArray(saved.scores)&&saved.scores.length===2&&saved.scores.every(n=>Number.isInteger(n)&&n>=0&&n<=saved.target))match=saved;}catch{}
+  try {const saved=JSON.parse(storage.getItem(key));if(Number.isFinite(saved?.startedAt)&&now()-saved.startedAt>=0&&now()-saved.startedAt<86400000&&[10,20,30,40,50,60].includes(saved?.target)&&Array.isArray(saved.scores)&&saved.scores.length===2&&saved.scores.every(n=>Number.isInteger(n)&&n>=0&&n<=saved.target))match=saved;else storage.removeItem(key);}catch{}
   const save=()=>{try{storage.setItem(key,JSON.stringify(match));}catch{}};
   function render(){
     const playing=!!match;
@@ -24,10 +24,10 @@ export function installScorer({document,storage=globalThis.localStorage,showView
       $(`scorer-add-${team}`).classList.toggle('scorer-winner',winner===team);
     }
   }
-  $('open-scorer').addEventListener('click',()=>{render();showView('scorer-view');screen.setActive(true);});
+  $('open-scorer').addEventListener('click',()=>{if(match&&now()-match.startedAt>=86400000){match=null;save();}render();showView('scorer-view');screen.setActive(true);});
   $('scorer-back').addEventListener('click',()=>{screen.setActive(false);showView('welcome-view');});
   $('scorer-new').addEventListener('click',()=>{match=null;save();render();});
-  document.querySelectorAll('[data-scorer-target]').forEach(button=>button.addEventListener('click',()=>{match={target:Number(button.dataset.scorerTarget),scores:[0,0]};save();render();}));
+  document.querySelectorAll('[data-scorer-target]').forEach(button=>button.addEventListener('click',()=>{match={target:Number(button.dataset.scorerTarget),scores:[0,0],startedAt:now()};save();render();}));
   for(let team=0;team<2;team++){
     $(`scorer-add-${team}`).addEventListener('click',()=>{
       if(!match||match.scores.some(n=>n===match.target))return;

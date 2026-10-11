@@ -67,7 +67,7 @@ test('Wallets are private and the browser cannot write match accounting',()=>{
  assert.equal(rules.creditEconomy['.read'],false);assert.equal(rules.creditEconomy['.write'],false);
  assert.equal(rules.creditEconomy.matches['.write'],false);
 });
-function harness(m,initial=null) {
+function harness(m,initial={balance:0,locked:0,lastGrantAt:today-86400000}) {
  const elements={},listeners={},callbacks=[],writes=[];
  for(const id of ['credits-panel','credits-balance','credits-status','credits-claim'])elements[id]={hidden:false,disabled:false,textContent:'',addEventListener(name,fn){listeners[id+':'+name]=fn;}};
  const state={uid:'a',firebaseConnected:true,serverTimeOffset:0};let value=initial;
@@ -75,6 +75,23 @@ function harness(m,initial=null) {
  const api=m.installCredits({services:async()=>fb,getState:()=>state,document:{getElementById:id=>elements[id]},now:()=>today,setTimer:()=>1,clearTimer(){}});
  return {api,state,elements,callbacks,writes,fb};
 }
+test('A missing wallet gets the initial grant automatically exactly once',async()=>{
+ const m=await modulePromise,h=harness(m,null);await h.api.start();
+ for(let i=0;i<6;i++)await Promise.resolve();
+ assert.equal(h.writes.length,1);assert.equal(h.elements['credits-balance'].textContent,'5');
+ h.api.refresh();await h.api.claim();assert.equal(h.writes.length,1);
+});
+test('Initial grant cannot refill an existing wallet on transaction retry',async()=>{
+ const m=await modulePromise,h=harness(m,null);
+ h.fb.runTransaction=async(_ref,update)=>{const existing={balance:0,locked:0,lastGrantAt:today};assert.equal(update(existing),undefined);return {committed:false,snapshot:{val:()=>existing}};};
+ await h.api.start();for(let i=0;i<6;i++)await Promise.resolve();
+ assert.equal(h.elements['credits-balance'].textContent,'0');
+});
+test('Countdown uses Uruguay midnight and shows seconds',async()=>{
+ const m=await modulePromise;
+ assert.equal(m.creditCountdown(Date.parse('2026-10-11T02:59:58Z')),'00:00:02');
+ assert.equal(m.creditCountdown(Date.parse('2026-10-11T03:00:00Z')),'24:00:00');
+});
 test('The UI claims once, waits for confirmation and resets on account change',async()=>{
  const m=await modulePromise,h=harness(m);await h.api.start();assert.equal(h.elements['credits-balance'].textContent,'0');
  await Promise.all([h.api.claim(),h.api.claim()]);assert.equal(h.writes.length,1);assert.equal(h.writes[0].options.applyLocally,false);assert.equal(h.elements['credits-balance'].textContent,'5');assert.equal(h.elements['credits-panel'].hidden,true);

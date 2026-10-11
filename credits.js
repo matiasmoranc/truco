@@ -5,6 +5,10 @@ export const URUGUAY_OFFSET_MS=10800000;
 export function creditDayStart(now) {
   return Math.floor((now-URUGUAY_OFFSET_MS)/CREDIT_DAY_MS)*CREDIT_DAY_MS+URUGUAY_OFFSET_MS;
 }
+export function creditCountdown(now) {
+  const seconds=Math.max(0,Math.ceil((creditDayStart(now)+CREDIT_DAY_MS-now)/1000));
+  return [Math.floor(seconds/3600),Math.floor(seconds/60)%60,seconds%60].map(n=>String(n).padStart(2,'0')).join(':');
+}
 export function creditEligibility(wallet,now) {
   if(wallet===undefined)return 'loading';
   const balance=wallet?.balance??0,locked=wallet?.locked??0;
@@ -23,7 +27,7 @@ export function dailyCreditChanges(wallet,timestamp) {
 
 export function installCredits({services,getState,document,now=()=>Date.now(),setTimer=setTimeout,clearTimer=clearTimeout,onChange=()=>{},notify=()=>{}}) {
   const el=id=>document.getElementById(id);
-  let uid=null,generation=0,unsubscribe=null,timer=null,wallet,busy=false,error='',available=false,detailsOpen=false;
+  let uid=null,generation=0,unsubscribe=null,timer=null,wallet,busy=false,error='',available=false,detailsOpen=false,initialAttempted=false;
   const clock=()=>now()+(Number(getState().serverTimeOffset)||0);
   function render() {
     const panel=el('credits-panel');
@@ -37,13 +41,14 @@ export function installCredits({services,getState,document,now=()=>Date.now(),se
     el('credits-status').hidden=!el('credits-status').textContent;
     const button=el('credits-claim');button.hidden=!!error||!available||!['available','claimed'].includes(eligibility);
     button.disabled=busy||eligibility!=='available'||getState().firebaseConnected!==true;
-    button.textContent=busy?'Reclamando…':eligibility==='claimed'?'5 créditos disponibles mañana':'Reclamar 5 créditos';
+    button.textContent=busy?'Reclamando…':eligibility==='claimed'?`5 créditos disponibles en ${creditCountdown(clock())}`:'Reclamar 5 créditos';
     clearTimer(timer);
-    if(uid)timer=setTimer(render,Math.min(60000,Math.max(50,creditDayStart(clock())+CREDIT_DAY_MS-clock()+50)));
+    if(uid)timer=setTimer(render,Math.min(detailsOpen&&eligibility==='claimed'?1000:60000,Math.max(50,creditDayStart(clock())+CREDIT_DAY_MS-clock()+50)));
+    if(uid&&available&&wallet===null&&!busy&&!initialAttempted&&getState().firebaseConnected===true){initialAttempted=true;void claim(true);}
   }
   function stop() {
     ++generation;unsubscribe?.();unsubscribe=null;clearTimer(timer);timer=null;
-    uid=null;wallet=undefined;busy=false;error='';available=false;detailsOpen=false;render();
+    uid=null;wallet=undefined;busy=false;error='';available=false;detailsOpen=false;initialAttempted=false;render();
   }
   async function start() {
     const user=getState().uid;if(!user){stop();return;}
@@ -63,13 +68,14 @@ export function installCredits({services,getState,document,now=()=>Date.now(),se
       error='No pudimos cargar tus créditos. Revisá la conexión.';render();
     }
   }
-  async function claim() {
+  async function claim(initial=false) {
     if(busy||!uid||!available||getState().firebaseConnected!==true||creditEligibility(wallet,clock())!=='available')return;
     const user=uid,epoch=generation;busy=true;render();
     try {
       const fb=await services();if(epoch!==generation||getState().uid!==user)return;
       const grantTime=fb.serverTimestamp();
       const result=await fb.runTransaction(fb.ref(fb.db,'creditEconomy/wallets/'+user),current=>{
+        if(initial&&current!==null)return undefined;
         // Null can be an empty SDK cache. The rules still check the existing
         // server balance and daily timestamp before committing the transaction.
         if(current&&creditEligibility(current,clock())!=='available')return undefined;
@@ -97,6 +103,6 @@ export function installCredits({services,getState,document,now=()=>Date.now(),se
     el('credits-claim').focus({preventScroll:true});
     panel.classList.remove('credits-highlight');void panel.offsetWidth;panel.classList.add('credits-highlight');
   });
-  el('credits-claim').addEventListener('click',claim);
+  el('credits-claim').addEventListener('click',()=>claim());
   return {start,stop,refresh:render,claim,wallet:()=>wallet};
 }
