@@ -1504,3 +1504,9 @@ body { min-height:100dvh; }
 
 /* Allow scrolling, but disable pinch and double-tap browser zoom. */
 html,body,#app{touch-action:pan-x pan-y}
+
+#welcome-view .home-tools-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;width:100%}
+#welcome-view .home-tools-row #learn-game,#welcome-view .home-tools-row #open-scorer{width:100%;min-width:0;height:64px;min-height:64px;padding:12px;gap:9px;font-size:clamp(14px,3.5vw,20px);line-height:1.2;justify-content:flex-start}
+#welcome-view .home-tools-row .home-action-icon{width:22px;height:22px;flex:0 0 22px}
+#welcome-view .home-tools-row .home-action-chevron{display:none}
+#welcome-view .home-tools-row button>span:not(.home-action-chevron){min-width:0;text-align:left;white-space:normal}
