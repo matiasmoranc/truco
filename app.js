@@ -2034,6 +2034,17 @@ function renderGame() {
   const canAct=room.status==='started'&&!room.resolvingTrick&&!room.pendingNextHand;
   const availableButtons=canAct?buttons.filter(button=>button.includes('data-action=')):[];
   actions.innerHTML=availableButtons.length?'<div class="action-buttons compact-actions">'+availableButtons.join('')+'</div>':'';
+  const actionContainer=actions.querySelector('.compact-actions');
+  if(actionContainer&&pending?.responder===state.playerId){
+    const actionButtons=[...actionContainer.querySelectorAll('[data-action]')];
+    const answers=actionButtons.filter(button=>['yes','no'].includes(button.dataset.action));
+    if(answers.length){
+      const options=document.createElement('div');options.className='bet-options-row';
+      const response=document.createElement('div');response.className='bet-answers-row';
+      for(const button of actionButtons)(answers.includes(button)?response:options).append(button);
+      actionContainer.replaceChildren(...(options.children.length?[options]:[]),response);
+    }
+  }
   foldButton.classList.toggle('hidden',!!state.learning?.complete);
   renderEnvidoPicker(room);
   alignHandWithControls();
