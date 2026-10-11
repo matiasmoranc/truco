@@ -23,6 +23,8 @@ function renderUsers(){
   const card=node('details','', 'card user-card');card.dataset.uid=u.uid;card.open=expanded.has(u.uid);
   const summary=node('summary');summary.append(node('span',u.name||'Sin nombre'),node('strong',u.balance+' créditos'));card.append(summary);
   const detail=node('div','','user-detail');detail.append(node('p',u.email||'Sin correo'),node('small','UID: '+u.uid),node('small',u.locked+' reservados · '+(u.disabled?'Bloqueado':'Habilitado')+' · '+(metrics?.online.includes(u.uid)?'En línea':'Fuera de línea')),node('small','Registro: '+new Date(u.createdAt).toLocaleDateString('es-UY')));card.append(detail);
+  const movements=node('details');movements.append(node('summary','Movimientos de créditos'));
+  for(const e of Object.values(tableData.movements?.[u.uid]||{}).sort((a,b)=>b.at-a.at))movements.append(node('p',formatTableTime(e.at)+': saldo '+e.before+' → '+e.after+' · reservados '+e.reservedBefore+' → '+e.reservedAfter));detail.append(movements);
   const actions=node('div','','actions');actions.append(button('Editar créditos',()=>openEdit('credits',u)),button('Cambiar nombre',()=>openEdit('rename',u)),button(u.disabled?'Desbloquear':'Bloquear',()=>openEdit('block',u)),button('Eliminar usuario',()=>openEdit('delete',u)));detail.append(actions);$('user-list').append(card);
  }
  if(!$('user-list').children.length)$('user-list').append(node('p','No hay usuarios para mostrar.'));
@@ -43,7 +45,12 @@ async function refresh(more=false,preservePages=false){
   if(more)pagesLoaded++;else if(!preservePages)pagesLoaded=1;
   users=more?[...users,...result.users]:result.users;pageToken=result.pageToken;renderUsers();
   const data=(await call({action:'tables'})).data;if(generation!==epoch)return;
-  tableData=data;renderTables();
+  tableData=data;renderUsers();renderTables();
+  $('reservation-alerts').replaceChildren();
+  for(const a of data.alerts||[]){const card=node('article','','card');card.append(node('h3','Créditos reservados: '+(users.find(u=>u.uid===a.uid)?.name||a.uid)),node('p',a.locked+' créditos · '+a.reason));if(a.repairable)card.append(button('Resolver reserva',async()=>{try{await call({action:'repair-reservation',uid:a.uid});await refresh();}catch(e){say(errorText(e));}}));$('reservation-alerts').append(card);}
+  $('reports-list').replaceChildren();
+  for(const r of data.reports||[]){const card=node('article','','card');card.append(node('h3',r.name),node('small',formatTableTime(r.at)),node('p',r.message),node('small',r.matchId?'Mesa '+r.code+' · ID '+r.matchId:r.localId?'Partida contra el bot · ID '+r.localId:'Reporte general del juego'));card.append(node('small','Usuario: '+r.uid));if(r.matchId)card.append(button('Ver partida',()=>{showTab('tables');$('table-search').value=r.matchId;$('table-state').value='all';renderTables();}));$('reports-list').append(card);}
+  if(!data.reports?.length)$('reports-list').append(node('p','No hay problemas reportados.'));
   $('audit-list').replaceChildren();for(const a of data.audit){
    const card=node('article','','card');card.append(node('h3',a.action),node('p',a.reason),node('p',a.uid||a.code||''),node('small',new Date(a.at).toLocaleString('es-UY')),node('small','Administrador: '+a.actor));
    if(a.before!==undefined)card.append(node('p',String(a.before)+' → '+String(a.after)));$('audit-list').append(card);
@@ -82,7 +89,9 @@ function renderTables(){
   if(t.winnerName)card.append(node('p','Ganó '+t.winnerName,'table-winner'));
   if(t.rawStatus==='settled')card.append(node('p','El ganador recibe '+(2*t.stake)+' créditos; cada jugador apostó '+t.stake+'.'));
   if(t.rawStatus==='refunded')card.append(node('p','La apuesta fue devuelta a los participantes.'));
-  if(t.reason)card.append(node('small','Motivo: '+({abandon:'Abandono',disconnect:'Desconexión','waiting-canceled':'Cancelada sin rival','draw-left':'Abandono antes de empezar',admin:'Cierre del administrador'}[t.reason]||t.reason)));
+  if(t.rawStatus==='settled'&&!t.reason)card.append(node('small','Motivo: alcanzó los puntos de la partida.'));
+  if(t.id)card.append(node('small','ID: '+t.id));
+  if(t.reason)card.append(node('small','Motivo: '+({abandon:'Abandono',disconnect:'Desconexión','waiting-canceled':'Cancelada sin rival','draw-left':'Abandono antes de empezar','draw-cancel':'Cancelación antes de empezar',points:'Puntos',timeout:'Inactividad',inactivity:'Inactividad',admin:'Cierre del administrador'}[t.reason]||t.reason)));
   const detail=node('details');detail.append(node('summary','Ver movimientos y mensajes'));
   for(const e of t.history||[]){
    const row=node('div','','card');row.append(node('small',formatTableTime(e.at)+' · '+e.status));
@@ -93,8 +102,10 @@ function renderTables(){
   card.append(detail);
   if(!t.closedAt&&['waiting','reserved'].includes(t.rawStatus))card.append(button('Cerrar mesa',()=>openEdit('close-table',t)));return card;
  };
- const current=scope==='previous'?[]:tableData.tables||[];
- const previous=scope==='active'?[]:(tableData.archivedTables||[]).filter(t=>scope!=='finished'||t.status==='Terminada');
+ const query=$('table-search').value.trim().toLowerCase();
+ const matches=t=>[...(t.players||[]),t.code,t.id].filter(Boolean).join(' ').toLowerCase().includes(query);
+ const current=scope==='previous'?[]:(tableData.tables||[]).filter(matches);
+ const previous=scope==='active'?[]:(tableData.archivedTables||[]).filter(t=>matches(t)&&(scope!=='finished'||t.status==='Terminada'));
  if(scope!=='previous'&&scope!=='finished'){
   const group=node('section','','table-group');group.append(node('h3','Mesas activas ('+current.length+')'));
   const cards=node('div','','cards');for(const t of sortedTables(current))cards.append(tableCard(t));
@@ -106,10 +117,11 @@ function renderTables(){
   if(!previous.length)cards.append(node('p','No hay mesas para este filtro.'));group.append(cards);list.append(group);
  }
 }
+$('table-search').addEventListener('input',renderTables);
 $('table-order').addEventListener('change',renderTables);
 $('table-state').addEventListener('change',renderTables);
 $('search').addEventListener('input',renderUsers);$('more').onclick=()=>refresh(true);
-function showTab(name){for(const section of ['metrics','users','tables','audit'])$(section).hidden=section!==name;for(const tab of document.querySelectorAll('[data-tab]'))tab.classList.toggle('active',tab.dataset.tab===name);}
+function showTab(name){for(const section of ['metrics','users','tables','audit','reports'])$(section).hidden=section!==name;for(const tab of document.querySelectorAll('[data-tab]'))tab.classList.toggle('active',tab.dataset.tab===name);}
 for(const b of document.querySelectorAll('[data-tab]'))b.onclick=()=>showTab(b.dataset.tab);
 async function showUsers(scope){if(busy)return;userScope=scope;pagesLoaded=1;pageToken=null;users=[];$('search').value='';$('user-scope').value=scope;renderUsers();showTab('users');await refresh();}
 for(const b of document.querySelectorAll('[data-scope]'))b.onclick=()=>showUsers(b.dataset.scope);

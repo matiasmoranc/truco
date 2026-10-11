@@ -1,3 +1,4 @@
+import { installPlayerPanel } from './player-panel.js?v=20261011-playerpanel60';
 import { installScorer } from './scorer.js?v=20261011-scorercolors59';
 import { installActivity } from './activity.js?v=20261010-adminstats32';
 import { installCredits } from './credits.js?v=20261010-adminstats32';
@@ -3539,3 +3540,5 @@ for(const button of document.querySelectorAll('[data-password-toggle]')){
 }
 
 installScorer({document,showView,renderTally:renderCompactTally});
+
+installPlayerPanel({document,api:creditApi,getState:()=>state});

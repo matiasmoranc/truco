@@ -6,6 +6,7 @@ const {onCall,HttpsError}=require('firebase-functions/v2/https');
 const {onSchedule}=require('firebase-functions/v2/scheduler');
 const {createTable,joinTable,tableOperation,publicTable,passwordHash,tableFor}=require('./table-service.cjs');
 const {recordHistory}=require('./history-service.cjs');
+const {reservationAlerts,repairReservation,personalHistory}=require('./player-service.cjs');
 initializeApp();const db=getDatabase();
 const options={region:'us-central1',maxInstances:5,timeoutSeconds:30};
 async function identity(request){
@@ -103,6 +104,13 @@ async function adminIdentity(request){
 }
 exports.adminConsole=onCall(options,async request=>{
  const actor=await adminIdentity(request),data=request.data||{},action=data.action;
+ if(action==='repair-reservation'){
+  if(!validKey(data.uid))throw new HttpsError('invalid-argument','Usuario inválido.');
+  const repairId=crypto.randomUUID();
+  const ledger=await mutate(current=>{const now=Date.now(),next=repairReservation(current,{uid:data.uid,now});next.adminAudit??={};next.adminAudit[repairId]={actor,action:'repair-reservation',uid:data.uid,reason:'Resolver una reserva vencida o pendiente de liquidación',at:now};return next;});
+  for(const m of Object.values(ledger.matches||{}).filter(m=>[m.player1,m.player2].includes(data.uid)&&ledger.tables?.[m.code]===m.id))await publish(ledger,m.code);
+  return {ok:true};
+ }
  if(action==='metrics'){
   const registeredUids=[];let token;
   do{const page=await getAuth().listUsers(1000,token);registeredUids.push(...page.users.filter(u=>u.providerData.some(p=>['google.com','apple.com'].includes(p.providerId))).map(u=>u.uid));token=page.pageToken;}while(token);
@@ -145,6 +153,7 @@ exports.adminConsole=onCall(options,async request=>{
  if(action==='tables'){
   const ledger=(await db.ref('creditEconomy').get()).val()||{};
   const userAudit=(await db.ref('adminUserAudit').get()).val()||{};
+  const reports=(await db.ref('problemReports').get()).val()||{};
   const rooms=(await db.ref('rooms').get()).val()||{};
   const legacy=Object.entries(rooms).filter(([code,entry])=>!ledger.tables?.[code]&&legacyTableActive(entry?.public,Date.now())).map(([code,{public:room}])=>({code,status:room.status,stake:0,targetPoints:room.targetPoints||30,players:Object.values(room.players||{}).map(p=>p.name||p.uid),createdAt:room.createdAt||null,finishedAt:room.matchResult?.at||null}));
   const now=Date.now(),tables=[],archivedTables=[...legacy.map(m=>({...m,status:'Sistema anterior'}))];
@@ -154,7 +163,7 @@ exports.adminConsole=onCall(options,async request=>{
    if(ledger.tables?.[code]===id&&adminTableCurrent(m,now))tables.push({...entry,status:m.status==='waiting'?'Esperando rival':'En juego'});
    else archivedTables.push({...entry,status:m.status==='settled'?'Terminada':m.status==='refunded'?'Créditos devueltos':m.closedAt?'Cerrada':m.status==='waiting'?'Vencida':'Finalizando'});
   }
-  return {tables,archivedTables,
+  return {tables,archivedTables,movements:ledger.walletMovements||{},alerts:reservationAlerts(ledger,now),reports:Object.entries(reports).map(([id,r])=>({id,...r})).sort((a,b)=>b.at-a.at),
    audit:[...Object.values(ledger.adminAudit||{}),...Object.values(userAudit)].sort((a,b)=>b.at-a.at).slice(0,100)};
  }
  if(action==='close-table'&&!validKey(data.code))throw new HttpsError('invalid-argument','Mesa inválida.');
@@ -220,4 +229,34 @@ exports.activityCleanup=onSchedule({schedule:'every day 04:00',timeZone:'America
   }
   return metrics;
  });
+});
+
+exports.playerConsole=onCall(options,async request=>{
+ const user=await identity(request);await rateLimit(user.uid,20,'player-console');
+ const data=request.data||{};
+ if(data.action==='history')return personalHistory((await db.ref('creditEconomy').get()).val()||{},user.uid);
+ if(data.action==='report'){
+  if(typeof data.message!=='string'||data.message.trim().length<5||data.message.length>1000||!validKey(data.requestId))throw new HttpsError('invalid-argument','Escribí un mensaje de entre 5 y 1000 caracteres.');
+  let match=null;
+  if(data.matchId){
+   if(!validKey(data.matchId))throw new HttpsError('invalid-argument','Partida inválida.');
+   match=(await db.ref('creditEconomy/matches/'+data.matchId).get()).val();
+   if(!match||![match.player1,match.player2].includes(user.uid))throw new HttpsError('permission-denied','No pertenecés a esa partida.');
+  }
+  if(data.localId&&!validKey(data.localId))throw new HttpsError('invalid-argument','Identificador inválido.');
+  const report={uid:user.uid,name:user.name,message:data.message.trim(),matchId:match?.id||null,code:match?.code||null,localId:!match&&data.localId?data.localId:null,mode:match?'online':data.mode==='bot'?'bot':'general',at:Date.now()};
+  const r=await db.ref('problemReports/'+user.uid+'_'+data.requestId).transaction(old=>old||report);
+  return {ok:!!r.snapshot.val()};
+ }
+ throw new HttpsError('invalid-argument','Acción inválida.');
+});
+const {onValueWritten}=require('firebase-functions/v2/database');
+exports.creditWalletHistory=onValueWritten({ref:'/creditEconomy/wallets/{uid}',region:'us-central1',maxInstances:2},async event=>{
+ const before=event.data.before.val(),after=event.data.after.val();if(!after)return;
+ const uid=event.params.uid,at=Date.parse(event.time)||Date.now();
+ const balance=Math.max(Number(before?.balance)||0,Number(after.balance)||0);
+ await db.ref('creditEconomy/peaks/'+uid).transaction(old=>({balance:Math.max(old?.balance||0,balance),startedAt:Math.min(old?.startedAt||at,at)}));
+ if(before?.balance===after.balance&&before?.locked===after.locked)return;
+ const key=crypto.createHash('sha256').update(event.id).digest('hex');
+ await db.ref('creditEconomy/walletMovements/'+uid+'/'+key).set({at,before:before?.balance||0,after:after.balance,reservedBefore:before?.locked||0,reservedAfter:after.locked});
 });

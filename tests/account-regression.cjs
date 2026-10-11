@@ -153,8 +153,8 @@ test('Apple sign-in is visible only on Apple devices, including desktop-mode iPa
  const h=await harness(null,null,navigator);assert.equal(h.nodes['account-apple'].hidden,!visible);
  }
 });
-test('Apple OAuth requests the right provider and asks first-time users for a name',async()=>{
- const h=await harness(null,null,{platform:'iPhone',userAgent:'iPhone'});let used;
+test('Desktop Apple OAuth requests the right provider and asks first-time users for a name',async()=>{
+ const h=await harness(null,null,{platform:'MacIntel',userAgent:'Macintosh'});let used;
  const signIn=h.fb.authSdk.signInWithPopup;h.fb.authSdk.signInWithPopup=async(auth,provider)=>{used=provider;await signIn(auth,provider)};
  await h.click('account-apple');assert.equal(used.providerId,'apple.com');assert.deepEqual(used.scopes,['email','name']);assert.equal(used.params.locale,'es');
  assert.equal(h.account.isReady(),false);h.nodes['auth-name'].value='AppleUser';await h.submit('auth-register');
@@ -174,4 +174,15 @@ test('Unconfigured Apple sign-in reports Apple and never unlocks gameplay',async
 test('Hidden Apple action cannot start OAuth on Windows',async()=>{
  const h=await harness();let calls=0;h.fb.authSdk.signInWithPopup=async()=>{calls++};
  await h.click('account-apple');assert.equal(calls,0);
+});
+
+test('iPhone Apple access redirects to the Firebase origin, preserving the existing mobile flow',async()=>{
+ const h=await harness(null,null,{platform:'iPhone',userAgent:'iPhone'});h.fb.auth.app={options:{authDomain:'truco-6553d.firebaseapp.com'}};
+ const previous=globalThis.location;let assigned,provider;
+ try{
+  globalThis.location={origin:'https://matiasmoranc.github.io',assign:url=>assigned=url};await h.click('account-apple');
+  assert.equal(new URL(assigned).origin,'https://truco-6553d.firebaseapp.com');assert.equal(new URL(assigned).searchParams.get('appleLogin'),'1');
+  globalThis.location={origin:'https://truco-6553d.firebaseapp.com'};h.fb.authSdk.signInWithRedirect=async(auth,p)=>provider=p;
+  await h.click('account-apple');assert.equal(provider.providerId,'apple.com');assert.deepEqual(provider.scopes,['email','name']);assert.equal(h.account.isReady(),false);
+ }finally{if(previous===undefined)delete globalThis.location;else globalThis.location=previous;}
 });
