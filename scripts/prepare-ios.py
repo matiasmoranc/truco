@@ -23,7 +23,14 @@ info["CFBundleURLTypes"] = [{"CFBundleURLSchemes": [firebase["REVERSED_CLIENT_ID
 info["CFBundleVersion"] = str(int(os.environ.get("PROJECT_BUILD_NUMBER", "1")))
 info["CFBundleShortVersionString"] = "1.0.0"
 info["UISupportedInterfaceOrientations"] = ["UIInterfaceOrientationPortrait"]
-info["UISupportedInterfaceOrientations~ipad"] = ["UIInterfaceOrientationPortrait"]
+# Apple requires all four orientations for iPad multitasking. iPhone remains
+# portrait-only; the separate iPad declaration does not rotate the phone UI.
+info["UISupportedInterfaceOrientations~ipad"] = [
+    "UIInterfaceOrientationPortrait",
+    "UIInterfaceOrientationPortraitUpsideDown",
+    "UIInterfaceOrientationLandscapeLeft",
+    "UIInterfaceOrientationLandscapeRight",
+]
 info_path.write_bytes(plistlib.dumps(info))
 (app / "App.entitlements").write_bytes(plistlib.dumps({"com.apple.developer.applesignin": ["Default"]}))
 
