@@ -9,10 +9,10 @@ async function harness(user=null,profile=null,navigator={platform:"Win32",userAg
  const nodes={},writes=[],cache=new Map();
  const document={getElementById(id){return nodes[id]??={value:'',hidden:false,disabled:false,textContent:'',handlers:{},addEventListener(type,fn){this.handlers[type]=fn},focus(){},showModal(){this.open=true},close(){this.open=false}}}};
  const fb={db:{},auth:{currentUser:user},authSdk:{OAuthProvider:class{constructor(id){this.providerId=id;this.scopes=[]}addScope(scope){this.scopes.push(scope)}setCustomParameters(params){this.params=params}},GoogleAuthProvider:class{setCustomParameters(){} static credentialFromError(e){return e.credential}},async linkWithPopup(u){fb.auth.currentUser=google(u.uid)},async signInWithPopup(auth,provider){fb.auth.currentUser=provider?.providerId==='apple.com'?{uid:'apple',isAnonymous:false,providerData:[{providerId:'apple.com'}]}:google('google')},async signInWithCredential(){fb.auth.currentUser=google('existing')},async signOut(){fb.auth.currentUser=null}},ref(db,path){return path},get:async(ref)=>({val:()=>ref==='usernameIndexReady'?true:ref?.startsWith('usernames/')?null:profile}),update:async(ref,value)=>{writes.push({ref,value})}};
- const state={firebase:fb,room:null,uid:user?.uid||null};let name='',starts=0,resets=0;
- const account=installAccount({services:async()=>fb,getState:()=>state,rememberName:v=>name=v,document,navigator,storage:{getItem:k=>cache.get(k),setItem:(k,v)=>cache.set(k,v)},onReady:()=>{starts++},onIdentityChange:()=>{resets++}});
+ const state={firebase:fb,room:null,uid:user?.uid||null};let name='',starts=0,resets=0,registrations=[];
+ const account=installAccount({services:async()=>fb,getState:()=>state,rememberName:v=>name=v,document,navigator,storage:{getItem:k=>cache.get(k),setItem:(k,v)=>cache.set(k,v)},onReady:()=>{starts++},onIdentityChange:()=>{resets++},onRegistered:uid=>registrations.push(uid)});
  await account.observe(fb,user);
- return {account,fb,state,nodes,writes,cache,name:()=>name,starts:()=>starts,resets:()=>resets,click:async id=>nodes[id].handlers.click(),submit:async id=>nodes[id].handlers.submit({preventDefault(){}})};
+ return {account,fb,state,nodes,writes,cache,registrations,name:()=>name,starts:()=>starts,resets:()=>resets,click:async id=>nodes[id].handlers.click(),submit:async id=>nodes[id].handlers.submit({preventDefault(){}})};
 }
 test('Logged-out and legacy anonymous users stay behind the Google gate',async()=>{
  for(const user of [null,{uid:'old',isAnonymous:true}]){
@@ -185,4 +185,13 @@ test('iPhone Apple access redirects to the Firebase origin, preserving the exist
   globalThis.location={origin:'https://truco-6553d.firebaseapp.com'};h.fb.authSdk.signInWithRedirect=async(auth,p)=>provider=p;
   await h.click('account-apple');assert.equal(provider.providerId,'apple.com');assert.deepEqual(provider.scopes,['email','name']);assert.equal(h.account.isReady(),false);
  }finally{if(previous===undefined)delete globalThis.location;else globalThis.location=previous;}
+});
+
+test('Welcome tour is requested only for a new profile, including recreated Google and Apple accounts',async()=>{
+ for(const provider of ['google.com','apple.com']){
+  const user={uid:'new-'+provider,isAnonymous:false,providerData:[{providerId:provider}]};
+  const h=await harness(user);h.nodes['auth-name'].value='Nuevo';await h.submit('auth-register');assert.deepEqual(h.registrations,[user.uid]);
+  const existing=await harness(user,{name:'Nuevo'});assert.deepEqual(existing.registrations,[]);
+  const recreated=await harness({...user,uid:'recreated-'+provider});recreated.nodes['auth-name'].value='Nuevo';await recreated.submit('auth-register');assert.deepEqual(recreated.registrations,['recreated-'+provider]);
+ }
 });

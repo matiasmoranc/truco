@@ -2,7 +2,7 @@ import { installPlayerPanel } from './player-panel.js?v=20261011-reportclose63';
 import { installScorer } from './scorer.js?v=20261011-scorercolors59';
 import { installActivity } from './activity.js?v=20261010-adminstats32';
 import { installCredits } from './credits.js?v=20261010-adminstats32';
-import { installAccount } from './account.js?v=20261011-authlazy62';
+import { installAccount } from './account.js?v=20261012-welcome64';
 import { initializeGameAuth } from './auth-init.js?v=20261011-authlazy62';
 const FIREBASE_VERSION = '12.4.0';
 const $ = (id) => document.getElementById(id);
@@ -167,7 +167,7 @@ async function sendMatchChat(event){
     if(key===chatContextKey()){$('chat-error').textContent='No se pudo enviar. Volvé a intentar.';$('chat-error').classList.remove('hidden');}
   }finally{if(key===chatContextKey()){matchChat.sending=false;renderChatComposer();}}
 }
-function showView(id) { document.documentElement.classList.remove('opening-invitation'); views.forEach((name) => $(name).classList.toggle('active', name === id)); if(id!=='game-view')closeMatchChat(true); }
+function showView(id) { document.documentElement.classList.remove('opening-invitation'); views.forEach((name) => $(name).classList.toggle('active', name === id)); if(id!=='game-view')closeMatchChat(true); if(id==='welcome-view')requestAnimationFrame(showLobbyOnboarding); }
 function liveActionsBlocked(){
   return !!(state.room&&!state.localGame&&(navigator.onLine===false||state.firebaseConnected!==true||state.connectionReady!==true));
 }
@@ -434,9 +434,49 @@ function loadConfig() {
 }
 let firebaseReadyPromise=null;
 const activity=installActivity({send:data=>creditApi('playerActivity',data),getUid:()=>state.uid,document});
-const account=installAccount({services:firebaseServices,getState:()=>state,rememberName:rememberPlayerName,document,onReady:async()=>{activity.start();await openInitialRoom();credits.start();},onIdentityChange:resetAccountRoom,onNameChanged:()=>showView('welcome-view'),inRoom:()=>!!state.room&&!$('welcome-view').classList.contains('active')});
-const credits=installCredits({services:firebaseServices,getState:()=>state,document,notify:message=>toast(message,true,2000),onChange:()=>{if(state.lobbyRooms)renderLobby(state.lobbyRooms);
+const account=installAccount({services:firebaseServices,getState:()=>state,rememberName:rememberPlayerName,document,onReady:async()=>{activity.start();await openInitialRoom();credits.start();showLobbyOnboarding();},onIdentityChange:resetAccountRoom,onNameChanged:()=>showView('welcome-view'),onRegistered:uid=>{state.lobbyOnboardingUid=uid;requestAnimationFrame(showLobbyOnboarding);},inRoom:()=>!!state.room&&!$('welcome-view').classList.contains('active')});
+const credits=installCredits({services:firebaseServices,getState:()=>state,document,notify:message=>toast(message,true,2000),onChange:()=>{showLobbyOnboarding();if(state.lobbyRooms)renderLobby(state.lobbyRooms);
   if(state.room)renderMatchEnd();$('table-stake-available').textContent=String(credits.wallet()?.balance??'—');updateStakeControl();}});
+let lobbyWelcomeDialog=null,lobbyWelcomeStep=0,lobbyWelcomeTarget=null;
+const lobbyWelcomeSteps=[
+ {target:'credits-open',title:'Tus créditos',text:'Tenés 5 créditos disponibles por día. Los créditos se utilizan para apostar contra otras personas. Podés jugar contra un bot sin créditos.'},
+ {target:'open-scorer',title:'Anotador',text:'Si vas a jugar con cartas reales y necesitás un anotador, acá tenés uno. Mientras lo tengas abierto, tu pantalla no se bloqueará.'},
+ {target:'learn-game',title:'Aprendé a jugar',text:'¿No sabés jugar al truco? Acá te enseñamos de una manera divertida.'}
+];
+function positionLobbyWelcomeArrow(){
+ if(!lobbyWelcomeDialog?.open||!lobbyWelcomeTarget)return;
+ const box=lobbyWelcomeDialog.getBoundingClientRect(),target=lobbyWelcomeTarget.getBoundingClientRect();
+ const up=target.top+target.height/2<box.top+box.height/2,x1=box.left+box.width/2,y1=up?box.top-2:box.bottom+2;
+ const x2=target.left+target.width/2,y2=up?target.bottom+8:target.top-8,bend=Math.max(24,Math.min(80,Math.abs(y2-y1)*.35));
+ const svg=lobbyWelcomeDialog.querySelector('svg');svg.setAttribute('viewBox','0 0 '+innerWidth+' '+innerHeight);
+ svg.querySelector('.lobby-welcome-path').setAttribute('d','M '+x1+' '+y1+' C '+x1+' '+(y1+(up?-bend:bend))+' '+x2+' '+(y2+(up?bend:-bend))+' '+x2+' '+y2);
+}
+function showLobbyOnboarding(){
+ if(!state.lobbyOnboardingUid||state.lobbyOnboardingUid!==state.uid||!account.isReady()||!$('welcome-view').classList.contains('active')||state.room||typeof credits.wallet()?.balance!=='number')return;
+ if(lobbyWelcomeDialog?.open)return;
+ if(!lobbyWelcomeDialog){
+  lobbyWelcomeDialog=document.createElement('dialog');lobbyWelcomeDialog.className='lobby-welcome-dialog';lobbyWelcomeDialog.setAttribute('aria-labelledby','lobby-welcome-title');
+  lobbyWelcomeDialog.innerHTML='<svg class="lobby-welcome-arrow" aria-hidden="true"><defs><marker id="lobby-welcome-tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0 L10 5 L0 10 Z" fill="#ead39b"/></marker></defs><path class="lobby-welcome-path" fill="none" stroke="#ead39b" stroke-width="3" marker-end="url(#lobby-welcome-tip)"/></svg><button type="button" class="learn-close" aria-label="Cerrar aviso">×</button><h2 id="lobby-welcome-title"></h2><div class="lobby-welcome-copy"></div><p class="lobby-welcome-step"></p>';
+  document.body.append(lobbyWelcomeDialog);
+  lobbyWelcomeDialog.querySelector('button').onclick=advanceLobbyWelcome;
+  lobbyWelcomeDialog.addEventListener('cancel',event=>{event.preventDefault();advanceLobbyWelcome();});
+  window.addEventListener('resize',positionLobbyWelcomeArrow);window.addEventListener('scroll',positionLobbyWelcomeArrow,true);
+ }
+ lobbyWelcomeStep=0;renderLobbyWelcomeStep();lobbyWelcomeDialog.showModal();requestAnimationFrame(positionLobbyWelcomeArrow);
+}
+function renderLobbyWelcomeStep(){
+ lobbyWelcomeTarget?.classList.remove('lobby-welcome-highlight');
+ const step=lobbyWelcomeSteps[lobbyWelcomeStep];lobbyWelcomeTarget=step.target==='credits-open'?document.querySelector('.home-wallet-summary'):$(step.target);
+ lobbyWelcomeTarget.classList.add('lobby-welcome-highlight');
+ lobbyWelcomeDialog.querySelector('h2').textContent=step.title;
+ const copy=lobbyWelcomeDialog.querySelector('.lobby-welcome-copy');copy.replaceChildren();
+ step.text.split(/(?<=\.)\s+/).forEach(text=>{const p=document.createElement('p');p.textContent=text;copy.append(p);});
+ lobbyWelcomeDialog.querySelector('.lobby-welcome-step').textContent=(lobbyWelcomeStep+1)+' / 3';requestAnimationFrame(positionLobbyWelcomeArrow);
+}
+function advanceLobbyWelcome(){
+ if(++lobbyWelcomeStep<lobbyWelcomeSteps.length){renderLobbyWelcomeStep();return;}
+ lobbyWelcomeTarget?.classList.remove('lobby-welcome-highlight');lobbyWelcomeTarget=null;state.lobbyOnboardingUid=null;lobbyWelcomeDialog.close();
+}
 function resetAccountRoom(){
   activity.stop();
   credits.stop();

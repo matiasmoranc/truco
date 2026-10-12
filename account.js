@@ -6,7 +6,7 @@ export function isAppleDevice(navigator=globalThis.navigator) {
   return /Mac|iPhone|iPad|iPod/i.test(platform)||/iPhone|iPad|iPod|Macintosh/i.test(ua);
 }
 
-export function installAccount({ services, getState, rememberName, document, storage=globalThis.localStorage, navigator=globalThis.navigator, onReady=()=>{}, onIdentityChange=()=>{}, onNameChanged=()=>{}, inRoom=()=>!!getState().room }) {
+export function installAccount({ services, getState, rememberName, document, storage=globalThis.localStorage, navigator=globalThis.navigator, onReady=()=>{}, onIdentityChange=()=>{}, onNameChanged=()=>{}, onRegistered=()=>{}, inRoom=()=>!!getState().room }) {
   const el=id=>document.getElementById(id);
   let slowLoading=false;
   let busy=false, ready=false, profileKey=null, profilePromise=null, currentUser=null;
@@ -198,6 +198,7 @@ export function installAccount({ services, getState, rememberName, document, sto
       await fb.update(fb.ref(fb.db),changes);
       if(fb.auth.currentUser?.uid!==user.uid)return;
       loaded=true;activate(user,name);
+      if(registration&&!previous)onRegistered(user.uid);
       message(registration?'':'Nombre de usuario cambiado correctamente.');
       if(!registration){
         el('account-edit').hidden=true;el('account-menu').hidden=true;

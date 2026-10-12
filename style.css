@@ -1558,3 +1558,11 @@ html,body,#app{touch-action:pan-x pan-y}
 .end-evidence-penalty{max-width:420px;margin:0;color:#f0eee2;text-align:center;font-size:14px;line-height:1.4}
 .reveal-mode .multiple-evidence .end-reveal-card{width:clamp(56px,15vw,100px)}
 .reveal-mode .multiple-evidence{gap:12px}
+
+.lobby-welcome-dialog{position:fixed;inset:0;margin:auto;width:min(420px,calc(100vw - 32px));height:fit-content;max-height:60dvh;overflow:visible;box-sizing:border-box;background:#123b2d;color:#f0eee2;border:1px solid #e8c983;border-radius:22px;padding:20px}
+.lobby-welcome-dialog::backdrop{background:#00160a66}
+.lobby-welcome-dialog h2{color:#e8c983;font-size:21px;margin:0 38px 14px 0}
+.lobby-welcome-copy p{font-size:15px;line-height:1.45;margin:8px 0}
+.lobby-welcome-step{color:#e8c983;text-align:center;font-size:12px;margin:12px 0 0}
+.lobby-welcome-arrow{position:fixed;inset:0;width:100vw;height:100dvh;pointer-events:none;overflow:visible}
+.lobby-welcome-highlight{outline:2px solid #ead39b;outline-offset:5px;border-radius:14px}
