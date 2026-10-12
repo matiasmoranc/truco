@@ -120,11 +120,11 @@ test('Unopened folds award two points from either seat; flor awards four and is 
  }
 });
 
-test('Envido lies reveal both hands and identify liar and recipient',()=>{
+test('Envido shows only incorrect declarations, or both if both lied',()=>{
  const c=harness(),r=room();r.envidoAudit={stake:2,reveals:{player1:33,player2:28},order:['player1','player2']};
  const hands={player1:[card('♥',1),card('♥',7),card('♣',3)],player2:[card('♦',1),card('♦',7),card('♣',3)]};
  vm.runInContext(['envidoEvidenceCards','buildEndEvidence'].map(extract).join('\n'),c);
- const groups=c.buildEndEvidence(r,hands);assert.equal(groups.length,2);assert.match(groups[0].label,/Mintió/);assert.equal(groups[0].envidoAward.player,'player2');assert.match(groups[0].envidoAward.penalty,/Mati mintió.*Ricky gana/);
+ const groups=c.buildEndEvidence(r,hands);assert.equal(groups.length,1);assert.equal(groups[0].player,'player1');assert.match(groups[0].label,/Mintió/);assert.equal(groups[0].envidoAward.player,'player2');assert.match(groups[0].envidoAward.penalty,/Mati mintió\.\nRicky gana/);r.envidoAudit.reveals.player2=27;assert.equal(c.buildEndEvidence(r,hands).length,2);
 });
 
 test('Truco explanations repeat with help enabled despite previous practice visits',()=>{

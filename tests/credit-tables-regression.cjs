@@ -111,7 +111,7 @@ test('Incorrect falta envido forfeits the hand as well and caps the total at the
  createReferee(s,{now:400}).action('player1',{kind:'declare',value:29});
  createReferee(s,{now:500}).action('player2',{kind:'declare',good:true});
  assert.equal(s.room.scores.player1,0);assert.equal(s.room.scores.player2,10);
- assert.equal(s.room.endReveal.groups.length,2);assert.equal(s.room.endReveal.groups[0].player,'player1');
+ assert.equal(s.room.endReveal.groups.length,1);assert.equal(s.room.endReveal.groups[0].player,'player1');
  assert.equal(s.room.endReveal.groups[0].envidoAward.player,'player2');
 });
 
