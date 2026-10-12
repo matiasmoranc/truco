@@ -38,7 +38,7 @@ test('Cancel or expire a waiting table refunds exactly once; other users cannot 
 test('Opening timeout refunds both stakes and no client can cancel an ongoing match',()=>{const timed=op(join(create()),'a',{kind:'tick'},30300);assert.equal(timed.wallets.a.balance,12);assert.equal(timed.wallets.b.balance,7);const live=begin(join(create()));assert.equal(live.matches.game1.session.room.status,'started');assert.throws(()=>op(live,'a',{kind:'cancel'},2500));});
 test('Server rejects forged cards, out-of-turn plays, wrong responder and outsiders',()=>{const s=fixture();assert.throws(()=>createReferee(s,{now:200}).action('player1',{kind:'play',cardId:'forged'}));assert.throws(()=>createReferee(s,{now:200}).action('player2',{kind:'play',cardId:s.hands.player2[0].id}));createReferee(s,{now:200}).action('player1',{kind:'call',value:'truco'});assert.throws(()=>createReferee(s,{now:201}).action('player1',{kind:'call',value:'yes'}));assert.throws(()=>op(join(create()),'c',{kind:'draw'}));});
 test('Rejected truco preserves NO QUIERO for three seconds before the server redeals',()=>{const s=fixture();createReferee(s,{now:200}).action('player1',{kind:'call',value:'truco'});createReferee(s,{now:300}).action('player2',{kind:'call',value:'no'});assert.equal(s.room.scores.player1,0);createReferee(s,{now:3299}).advance();assert.equal(s.room.handNumber,1);createReferee(s,{now:3300}).advance();assert.equal(s.room.scores.player1,1);assert.equal(s.room.handNumber,2);});
-test('A full server match pays the pot once; rematch reserves a new stake and close refunds no settled money',()=>{let ledger=begin(join(create())),now=3000;for(let n=0;n<10;n++){ledger=op(ledger,'b',{kind:'fold'},now);ledger=op(ledger,'a',{kind:'tick'},now+3000);const room=ledger.matches.game1.session.room;if(room.status==='revealing')ledger=op(ledger,'a',{kind:'tick'},now+8000);now+=10000;}
+test('A full server match pays the pot once; rematch reserves a new stake and close refunds no settled money',()=>{let ledger=begin(join(create())),now=3000;for(let n=0;n<10&&ledger.matches.game1.status!=='settled';n++){ledger=op(ledger,'b',{kind:'fold'},now);ledger=op(ledger,'a',{kind:'tick'},now+3000);const room=ledger.matches.game1.session.room;if(room.status==='revealing')ledger=op(ledger,'a',{kind:'tick'},now+8000);now+=10000;}
  assert.equal(ledger.matches.game1.status,'settled');assert.equal(ledger.wallets.a.balance,17);assert.equal(ledger.wallets.b.balance,2);assert.equal(ledger.wallets.a.locked,0);assert.equal(op(ledger,'a',{kind:'tick'},now).wallets.a.balance,17);
  const requested=op(ledger,'a',{kind:'rematch',value:'request'},now+1);assert.throws(()=>op(requested,'b',{kind:'rematch',value:'accept'},now+2));const funded=structuredClone(requested);funded.wallets.b.balance=5;const again=op(funded,'b',{kind:'rematch',value:'accept'},now+3);assert.equal(again.wallets.a.balance,12);assert.equal(again.wallets.b.balance,0);assert.equal(again.wallets.a.locked,5);assert.notEqual(again.tables.ABCDE,'game1');assert.equal(again.matches[again.tables.ABCDE].session.room.status,'drawing');assert.throws(()=>op(again,'a',{kind:'draw'},now+4,{expectedMatchId:'game1'}));
  const closed=op(ledger,'b',{kind:'cancel'},now+5);assert.equal(publicTable(closed.matches.game1).status,'closed');assert.equal(closed.wallets.a.balance,17);
@@ -113,4 +113,16 @@ test('Incorrect falta envido forfeits the hand as well and caps the total at the
  assert.equal(s.room.scores.player1,0);assert.equal(s.room.scores.player2,10);
  assert.equal(s.room.endReveal.groups.length,1);assert.equal(s.room.endReveal.groups[0].player,'player1');
  assert.equal(s.room.endReveal.groups[0].envidoAward.player,'player2');
+});
+
+test('Early server fold with undeclared flor awards four once and reveals winner cards',()=>{
+ for(const loser of ['player1','player2']){
+  const s=fixture(),winner=loser==='player1'?'player2':'player1';
+  s.hands[winner]=[card('♥',3),card('♥',6),card('♥',7)];s.originals=structuredClone(s.hands);
+  createReferee(s,{now:200}).action(loser,{kind:'fold'});
+  assert.equal(s.room.pendingNextHand.foldPoints,4);assert.equal(s.room.callNotice.spoken,'Flor');
+  createReferee(s,{now:3200}).advance();
+  assert.equal(s.room.scores[winner],4);assert.equal(s.room.status,'revealing');assert.equal(s.room.endReveal.groups[0].player,winner);assert.equal(s.room.endReveal.groups[0].cards.length,3);
+  createReferee(s,{now:3201}).advance();assert.equal(s.room.scores[winner],4);
+ }
 });

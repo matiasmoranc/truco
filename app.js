@@ -1517,9 +1517,13 @@ function canFoldHand(room,player){
   return !!room&&['player1','player2'].includes(player)&&room.status==='started'&&!room.resolvingTrick&&!room.pendingNextHand;
 }
 function foldHandChanges(room,loser){
-  const winner=otherPlayer(loser),points=Number(room.trucoLevel)||1;
-  const message=(room.players?.[loser]?.name||'El jugador')+' se fue al mazo. '+(room.players?.[winner]?.name||'El rival')+' gana la mano y suma '+points+' '+(points===1?'tanto.':'tantos.');
-  const bet=room.pendingBet,sideChanges={};
+  const winner=otherPlayer(loser);
+  const unopened=Number(room.playedCount||0)===0&&Number(room.trucoLevel||1)===1&&!room.pendingBet&&!room.envidoClosed&&!room.envidoAudit&&!Object.keys(room.flors||{}).length;
+  const winnerCards=state.localOriginalHands?.[winner]||[];
+  const earlyFlor=unopened&&room.practiceRules?.flor!==false&&hasFlor(winnerCards,room.muestra);
+  const points=unopened?(earlyFlor?4:2):Number(room.trucoLevel)||1;
+  const message=(room.players?.[loser]?.name||'El jugador')+' se fue al mazo. '+(room.players?.[winner]?.name||'El rival')+(earlyFlor?' canta FLOR y suma 4 puntos (3 de flor y 1 de la mano).':unopened?' suma 2 puntos por irse al mazo antes de jugar o cantar.':' gana la mano y suma '+points+' '+(points===1?'tanto.':'tantos.'));
+  const bet=room.pendingBet,sideChanges=earlyFlor?{flors:{[winner]:florValue(winnerCards,room.muestra)},florSettled:true,envidoClosed:true}:{};
   if(bet&&['envido','flor'].includes(bet.type)){
     const sidePoints=bet.revealMode?Number(bet.stake)||0:bet.type==='flor'?declinedFlorPoints(bet):Number(bet.accepted)||1;
     const scores={...room.scores};
@@ -1529,6 +1533,7 @@ function foldHandChanges(room,loser){
     if(bet.type==='flor')sideChanges.florSettled=true;
   }
   const notice={kind:'fold',id:crypto.randomUUID(),from:loser,to:winner,text:(room.players?.[loser]?.name||'El rival')+' se fue al mazo.',spoken:'Me voy al mazo',time:Date.now(),handNumber:room.handNumber||1};
+  if(earlyFlor)Object.assign(notice,{kind:'flor',from:winner,to:loser,text:(room.players?.[winner]?.name||'El rival')+' canta FLOR.',spoken:'Flor',selfVerb:'Cantaste'});
   return {...sideChanges,callNotice:notice,turn:null,turnClock:null,pendingBet:null,pendingNextHand:{id:'fold:'+crypto.randomUUID(),winner,foldPoints:points,message,endsAt:gameTime()+3000},feed:topFeed(room,message)};
 }
 function animateFoldedHand(){
