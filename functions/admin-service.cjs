@@ -57,10 +57,10 @@ function closeLegacyTable(root,{code,actor,requestId,reason,now}){
 module.exports.legacyTableActive=legacyTableActive;
 module.exports.closeLegacyTable=closeLegacyTable;
 
-function prepareUserDeletion(root,{uid,actor,requestId,confirmName,reason,now}){
+function prepareUserDeletion(root,{uid,actor,requestId,confirmName,reason,now,self=false}){
  if(!validKey(uid)||!validKey(actor)||!validKey(requestId)||typeof reason!=='string'||reason.trim().length<3||reason.length>200)throw new Error('Usuario o motivo inválido.');
  const next=structuredClone(root||{});
- if(uid===actor||next.administrators?.[uid]===true)throw new Error('No podés eliminar administradores.');
+ if(!self&&(uid===actor||next.administrators?.[uid]===true))throw new Error('No podés eliminar administradores.');
  const existing=next.adminUserAudit?.[requestId];
  if(existing){if(existing.action!=='delete'||existing.uid!==uid||existing.actor!==actor||existing.confirmName!==confirmName)throw new Error('Solicitud reutilizada.');return next;}
  const expected=next.profiles?.[uid]?.name||uid;

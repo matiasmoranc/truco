@@ -105,6 +105,40 @@ async function adminIdentity(request){
  try{requireAdmin(request.auth,role.val()===true&&!user.disabled);}catch{throw new HttpsError('permission-denied','Tu cuenta no tiene acceso de administrador.');}
  await rateLimit(uid,60,'admin');return uid;
 }
+const {prepareSelfDeletion,erasePlayerData}=require('./self-deletion.cjs');
+async function completeSelfDeletion(uid,job){
+ let failure;
+ const result=await loadedTransaction(db.ref(),root=>{
+  try{return erasePlayerData(root,{uid,anonymousId:job.anonymousId,now:Date.now()});}catch(e){failure=e;return undefined;}
+ });
+ if(!result.committed)throw failure||new Error('No se pudieron limpiar los datos.');
+ try{await getAuth().deleteUser(uid);}catch(e){if(e.code!=='auth/user-not-found')throw e;}
+ await db.ref('accountDeletionJobs/'+uid).remove();
+}
+exports.deleteMyAccount=onCall({...options,timeoutSeconds:120},async request=>{
+ const uid=request.auth?.uid,data=request.data||{};
+ if(!uid||!['google.com','apple.com'].includes(request.auth.token?.firebase?.sign_in_provider))throw new HttpsError('unauthenticated','Iniciá sesión con tu cuenta.');
+ if(!['check','delete'].includes(data.action))throw new HttpsError('invalid-argument','Acción inválida.');
+ const existing=(await db.ref('accountDeletionJobs/'+uid).get()).val();
+ if(existing){await completeSelfDeletion(uid,existing);return {ok:true};}
+ const requestId=crypto.randomUUID();
+ if(data.action==='check'){
+  try{prepareSelfDeletion((await db.ref().get()).val(),{uid,requestId,now:Date.now()});}catch(e){throw new HttpsError('failed-precondition',e.message);}
+  return {ok:true};
+ }
+ if(!Number.isFinite(Number(request.auth.token.auth_time))||Date.now()/1000-Number(request.auth.token.auth_time)>300)throw new HttpsError('unauthenticated','Verificá tu identidad nuevamente.');
+ const job={anonymousId:'deleted_'+crypto.randomUUID(),requestId,at:Date.now()};
+ let failure;
+ const prepared=await loadedTransaction(db.ref(),root=>{
+  try{const next=prepareSelfDeletion(root,{uid,requestId,now:job.at});next.accountDeletionJobs??={};next.accountDeletionJobs[uid]=job;return next;}catch(e){failure=e.message;return undefined;}
+ });
+ if(!prepared.committed)throw new HttpsError('failed-precondition',failure||'No se pudo preparar la eliminación.');
+ try{await completeSelfDeletion(uid,job);}catch(e){console.error('Account deletion pending',e.code||'internal');throw new HttpsError('internal','Tu eliminación está en proceso. La completaremos automáticamente.');}
+ return {ok:true};
+});
+exports.finishAccountDeletions=onSchedule({schedule:'every 5 minutes',region:'us-central1',timeoutSeconds:120,maxInstances:1},async()=>{
+ for(const [uid,job] of Object.entries((await db.ref('accountDeletionJobs').get()).val()||{}))await completeSelfDeletion(uid,job);
+});
 exports.adminConsole=onCall(options,async request=>{
  const actor=await adminIdentity(request),data=request.data||{},action=data.action;
  if(action==='repair-reservation'){
@@ -262,7 +296,7 @@ exports.creditAccountingAudit=onValueWritten({ref:'/creditEconomy',region:'us-ce
  const changes=[];
  for(const uid of new Set([...Object.keys(before.wallets||{}),...Object.keys(after.wallets||{})])){
   const a=before.wallets?.[uid]||null,b=after.wallets?.[uid]||null;
-  if(JSON.stringify(a)!==JSON.stringify(b))changes.push({uid,before:a,after:b});
+  if(JSON.stringify(a)!==JSON.stringify(b)&&!(await db.ref('userAccess/'+uid+'/deletedAt').get()).exists())changes.push({uid,before:a,after:b});
  }
  const matches=[];
  for(const id of new Set([...Object.keys(before.matches||{}),...Object.keys(after.matches||{})])){
@@ -280,6 +314,7 @@ exports.creditAccountingAudit=onValueWritten({ref:'/creditEconomy',region:'us-ce
 exports.creditWalletHistory=onValueWritten({ref:'/creditEconomy/wallets/{uid}',region:'us-central1',maxInstances:2},async event=>{
  const before=event.data.before.val(),after=event.data.after.val();if(!after)return;
  const uid=event.params.uid,at=Date.parse(event.time)||Date.now();
+ if((await db.ref('userAccess/'+uid).get()).val()?.deletedAt)return;
  const balance=Math.max(Number(before?.balance)||0,Number(after.balance)||0);
  await db.ref('creditEconomy/peaks/'+uid).transaction(old=>({balance:Math.max(old?.balance||0,balance),startedAt:Math.min(old?.startedAt||at,at)}));
  if(before?.balance===after.balance&&before?.locked===after.locked)return;

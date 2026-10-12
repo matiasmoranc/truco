@@ -27,7 +27,7 @@ let seq=0;
  await action('a',{kind:'draw'});await action(peer,{kind:'draw'});
  await db.ref('creditEconomy/matches/'+id+'/session/room/openingDraw').update({'cards/player1/rank':1,'cards/player2/rank':7,resolveAt:Date.now()-1});
  await action('a',{kind:'tick'});
- for(let n=0;n<10;n++){
+ for(let n=0;n<10&&(await db.ref('creditEconomy/matches/'+id+'/status').get()).val()!=='settled';n++){
   await action(peer,{kind:'fold'});
   await db.ref('creditEconomy/matches/'+id+'/session/room/pendingNextHand/endsAt').set(Date.now()-1);
   await action('a',{kind:'tick'});

@@ -11,6 +11,20 @@ globalThis.trucoNative = {
   platform: Capacitor.getPlatform(),
   publicUrl: 'https://matiasmoranc.github.io/truco/',
   sdk: { app: appSdk, database: dbSdk, auth: authSdk, functions: functionsSdk },
+  async reauthenticateForDeletion(fb, user, provider) {
+    const result=provider==='apple.com'?await FirebaseAuthentication.signInWithApple():await FirebaseAuthentication.signInWithGoogle();
+    const native=result.credential;
+    if(!native?.idToken)throw new Error('No recibimos la credencial de acceso.');
+    const credential=provider==='apple.com'
+      ?new fb.authSdk.OAuthProvider(provider).credential({idToken:native.idToken,rawNonce:native.nonce})
+      :fb.authSdk.GoogleAuthProvider.credential(native.idToken,native.accessToken);
+    await fb.authSdk.reauthenticateWithCredential(user,credential);
+    if(provider==='apple.com'){
+      const token=Capacitor.getPlatform()==='ios'?native.authorizationCode:native.accessToken;
+      if(!token)throw new Error('No recibimos la autorización de Apple. Volvé a intentar.');
+      await FirebaseAuthentication.revokeAccessToken({token});
+    }
+  },
   async signIn(fb, provider) {
     const result = provider === 'apple.com'
       ? await FirebaseAuthentication.signInWithApple()

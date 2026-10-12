@@ -434,7 +434,7 @@ function loadConfig() {
 }
 let firebaseReadyPromise=null;
 const activity=installActivity({send:data=>creditApi('playerActivity',data),getUid:()=>state.uid,document});
-const account=installAccount({services:firebaseServices,getState:()=>state,rememberName:rememberPlayerName,document,onReady:async()=>{activity.start();await openInitialRoom();credits.start();showLobbyOnboarding();},onIdentityChange:resetAccountRoom,onNameChanged:()=>showView('welcome-view'),onRegistered:uid=>{state.lobbyOnboardingUid=uid;requestAnimationFrame(showLobbyOnboarding);},inRoom:()=>!!state.room&&!$('welcome-view').classList.contains('active')});
+const account=installAccount({api:creditApi,services:firebaseServices,getState:()=>state,rememberName:rememberPlayerName,document,onReady:async()=>{activity.start();await openInitialRoom();credits.start();showLobbyOnboarding();},onIdentityChange:resetAccountRoom,onNameChanged:()=>showView('welcome-view'),onRegistered:uid=>{state.lobbyOnboardingUid=uid;requestAnimationFrame(showLobbyOnboarding);},inRoom:()=>!!state.room&&!$('welcome-view').classList.contains('active')});
 const credits=installCredits({services:firebaseServices,getState:()=>state,document,notify:message=>toast(message,true,2000),onChange:()=>{showLobbyOnboarding();if(state.lobbyRooms)renderLobby(state.lobbyRooms);
   if(state.room)renderMatchEnd();$('table-stake-available').textContent=String(credits.wallet()?.balance??'—');updateStakeControl();}});
 let lobbyWelcomeDialog=null,lobbyWelcomeStep=0,lobbyWelcomeTarget=null;
