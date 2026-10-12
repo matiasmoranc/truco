@@ -2926,7 +2926,7 @@ async function startLearning(stage=0){
   try{
     $('learn-coach-dialog').close();
     if(!await startLocalBotGame())return;
-    state.learning={stage,hints:true,pointsInfo:true,whoWins:true,roundMessages:[],paused:true,pausedAt:gameTime(),complete:false,scoreMessages:[],tutorialMessages:[{title:'Elegí una carta para empezar',text:'Seleccioná cualquier carta de tu mano para empezar a jugar.'},{title:'Guía de cartas',pointAtGuide:true,text:'Podés tocar este ícono cuando quieras para abrir la guía. Te ayuda a reconocer tus cartas y saber cuáles son más poderosas.'}]};
+    state.learning={stage,hints:true,pointsInfo:true,whoWins:true,roundMessages:[],paused:true,pausedAt:gameTime(),complete:false,scoreMessages:[],introAfterTutorial:stage>0,tutorialMessages:[{title:'Guía de cartas',pointAtGuide:true,text:'Podés tocar este ícono cuando quieras para abrir la guía. Te ayuda a reconocer tus cartas y saber cuáles son más poderosas.'},{title:'Ayudas',pointAtOptions:true,text:'Aquí podés deshabilitar las ayudas cuando vayas entendiendo.'},{title:'Elegí una carta para empezar',introLast:true,text:'Seleccioná cualquier carta de tu mano para empezar a jugar.'}]};
     state.bot=true;state.botDifficulty='normal';state.botMemory=null;
     state.room.players={player1:{name:cleanName($('player-name').value||savedPlayerName(),'Vos')},player2:{name:'Bot de práctica'}};
     Object.assign(state.room,{targetPoints:10,status:'started',openingDraw:null,createdAt:gameTime(),matchNumber:1,turnClock:null,practiceRules:{envido:stage>=1,flor:stage>=2}});
@@ -2937,7 +2937,7 @@ async function startLearning(stage=0){
     }
     state.hand=[...state.localHands.player1];
     state.dismissedMatchEnd=null;state.focusedMatchEnd=null;
-    renderGame();showView('game-view');openLearningHelp();
+    renderGame();showView('game-view');resumeLearning();
   }catch(error){console.error('[truco:learning]',error);toast('No se pudo iniciar la práctica. Volvé a intentar.');}
   finally{state.learningStarting=false;}
 }
@@ -3001,10 +3001,22 @@ function positionLearningScoreArrow(){
   if(tipActive)$('learning-score-arrow').classList.add('hidden');
   const dialog=tipActive?$('learning-points-tip'):$('learning-hint'),arrow=$(tipActive?'learning-points-arrow':'learning-score-arrow'),path=$(tipActive?'learning-points-arrow-path':'learning-score-arrow-path');
   const scoreActive=dialog.open&&state.learning?.activeScoreMessage,trucoActive=dialog.open&&state.learning?.activeTutorial?.pointAtTruco;
-  const active=tipActive||scoreActive||trucoActive;
+  const guideActive=dialog.open&&state.learning?.activeTutorial?.pointAtGuide,optionsActive=dialog.open&&state.learning?.activeTutorial?.pointAtOptions;
+  const active=tipActive||scoreActive||trucoActive||guideActive||optionsActive;
   arrow.classList.toggle('hidden',!active);
   document.querySelectorAll('.scoreboard,.mobile-score').forEach(marker=>marker.classList.toggle('learning-score-highlight',!!scoreActive));
   if(!active)return;
+  if(guideActive||optionsActive){
+    const targetElement=$(guideActive?'game-sheet':'learning-options');
+    const box=dialog.getBoundingClientRect(),target=targetElement.getBoundingClientRect();
+    if(!target.width||!target.height){arrow.classList.add('hidden');return;}
+    const x1=box.right-12,y1=guideActive?box.top:box.bottom;
+    const x2=guideActive?target.left+target.width/2:target.left-6,y2=guideActive?target.bottom+6:target.top+target.height/2;
+    const side=Math.min(window.innerWidth-8,Math.max(box.right,target.right)+8);
+    arrow.setAttribute('viewBox','0 0 '+window.innerWidth+' '+window.innerHeight);
+    path.setAttribute('d','M '+x1+' '+y1+' C '+side+' '+y1+' '+side+' '+y2+' '+x2+' '+y2);
+    return;
+  }
   if(trucoActive){
     const button=$('player-actions').querySelector('[data-action="truco"]');
     if(!button){arrow.classList.add('hidden');return;}
@@ -3370,7 +3382,7 @@ for(const dialog of document.querySelectorAll('.learning-message')){
 }
 $('learning-message-close').addEventListener('click',()=>$('learning-hint').close());
 $('learning-message-study').addEventListener('click',event=>{const kind=event.currentTarget.dataset.studyKind;if(kind==='envido'||kind==='flor')openStudy(kind);});
-$('learning-hint').addEventListener('close',()=>{if(state.learning){state.learning.acknowledgedMessage=state.learning.activeMessage;state.learning.activeMessage=null;state.learning.activeScoreMessage=false;state.learning.activeTutorial=null;}positionLearningScoreArrow();resumeLearning();});
+$('learning-hint').addEventListener('close',()=>{const showStageIntro=state.learning?.activeTutorial?.introLast&&state.learning?.introAfterTutorial;if(state.learning){state.learning.acknowledgedMessage=state.learning.activeMessage;state.learning.activeMessage=null;state.learning.activeScoreMessage=false;state.learning.activeTutorial=null;}positionLearningScoreArrow();if(showStageIntro){state.learning.introAfterTutorial=false;openLearningHelp();}else resumeLearning();});
 $('learn-menu').addEventListener('click',openLearning);
 $('game-sheet').addEventListener('click',()=>{if(state.learning)openStudySheet();});
 $('learn-sheet-menu').addEventListener('click',openStudySheet);
