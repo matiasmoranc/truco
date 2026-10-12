@@ -384,6 +384,7 @@ function localPlay(card,launchOrigin=null) {
   if(state.room.status!=='started')return;
   if(state.room.pendingBet){shakeTurnBadge();return;}
   if(state.room.turn!==player){shakeTurnBadge();return;}
+  if(state.learning){state.room.callNotice=null;receivedCallNotices.delete(`${state.roomCode}:player1`);receivedCallNotices.delete(`${state.roomCode}:player2`);}
   animatePlayedHandCard(card,launchOrigin);
   state.localHands[player]=(state.localHands[player]||[]).filter((item)=>item.id!==card.id);state.hand=[...state.localHands[player]];state.room.playedCount=(state.room.playedCount||0)+1;
   state.room.trickCards=[...(state.room.trickCards||[]),{playerId:player,name:state.room.players[player].name,card}];state.room.deckCount--;
@@ -403,7 +404,7 @@ function localFinishHand(winner,points,ending='rounds'){
   const room=state.room,before={...room,scores:{...room.scores}},groups=buildEndEvidence(room,state.localOriginalHands||{}),auditResult=envidoAuditResult(room,state.localTruth||{});
   room.scores=settleAuditedHand(room,room.scores,state.localTruth||{},winner,points);room.envidoAudit=null;
   room.scores=capScores(room,settleSingleFlor(room,room.scores));
-  const reason=auditResult.liars.length?`${room.players[auditResult.liars[0]].name} declaró mal${auditResult.liars.length>1?' primero':''}. ${room.players[auditResult.winner].name} gana el envido y la mano.`:ending==='falta'?'Falta envido: se verifican los tantos y se asignan los puntos en juego.':ending==='fold'?'Cuando te vas al mazo, el rival gana los puntos que estaban en juego hasta ese momento.':ending==='declined'?`${room.players[otherPlayer(winner)].name} dijo NO QUIERO. ${room.players[winner].name} gana ${points} ${points===1?'punto':'puntos'} por los puntos que estaban en juego hasta ese momento y se vuelve a repartir.`:`${room.players[winner].name} gana la mano (${points} puntos).`;
+  const reason=auditResult.liars.length?`${room.players[auditResult.liars[0]].name} declaró mal${auditResult.liars.length>1?' primero':''}. ${room.players[auditResult.winner].name} gana el envido y la mano.`:ending==='falta'?'Falta envido: se verifican los tantos y se asignan los puntos en juego.':ending==='fold'?'Cuando te vas al mazo, el rival gana los puntos que estaban en juego hasta ese momento.':ending==='declined'?`${({1:'Truco',2:'Retruco',3:'Vale cuatro'}[points]||'Truco')} no querido. Se vuelve a repartir.`:`${room.players[winner].name} gana la mano (${points} puntos).`;
   room.lastHandScore=buildHandSummary(before,room.scores,reason,state.localTruth||{});room.handScoreEntries=[];
   room.handScoreHistory=handScoreHistory(room,room.lastHandScore);
   queueLearningPoints(before,room.scores,room.lastHandScore.entries);
