@@ -3167,6 +3167,15 @@ function setLearningWhoWins(enabled){
   }
   renderLearning();
 }
+function learningResponseTitle(room,bet){
+ if(!bet)return 'Antes de responder';
+ if(bet.revealMode)return 'Declarar tus tantos de envido';
+ const name=room.players?.[bet.caller]?.name||'El rival';
+ if(bet.type==='truco')return name+' gritó '+({2:'TRUCO',3:'RETRUCO',4:'VALE 4'}[bet.stake]||'TRUCO');
+ if(bet.type==='flor')return name+' cantó '+betCallNames(bet).join(' + ').toUpperCase();
+ if(bet.type==='envido')return name+' dijo '+betCallNames(bet).join(' + ').toUpperCase();
+ return 'Antes de responder';
+}
 function showLearningMessage(){
   if(!state.learning||state.learning.paused||state.learning.complete||document.querySelector('.learn-coach-dialog[open]'))return;
   if(state.learning.pointsInfo===false)state.learning.scoreMessages=[];
@@ -3182,7 +3191,7 @@ function showLearningMessage(){
   if(!tutorial&&!scoreMessage&&(state.learning.acknowledgedMessage===key||(bet?.type!=='truco'&&learningSeen.has(learningHelpTopic(bet)))))return;
   if(!scoreMessage&&!roundMessage){const topic=tutorial?.topic||learningHelpTopic(bet);rememberLearningHelp(topic);}
   pauseLearning();state.learning.activeMessage=key;state.learning.activeScoreMessage=!!scoreMessage;state.learning.activeTutorial=tutorial||null;
-  $('learning-message-title').textContent=scoreMessage?'':tutorial?.title||'Antes de responder';
+  $('learning-message-title').textContent=scoreMessage?'':tutorial?.title||learningResponseTitle(room,bet);
   $('learning-message-title').classList.toggle('hidden',!!scoreMessage);
   $('learning-hint').classList.toggle('score-message',!!scoreMessage);
   if(scoreMessage){$('learning-hint').removeAttribute('aria-labelledby');$('learning-hint').setAttribute('aria-label','Puntos de la mano');}

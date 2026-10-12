@@ -150,3 +150,11 @@ test('Declined action help is replaced by scoring info, but stays available when
  const bet={type:'truco',stake:3};c.queueLearningAction('no',bet);assert.equal(c.state.learning.tutorialMessages.length,0);
  c.state.learning.pointsInfo=false;c.queueLearningAction('no',bet);assert.equal(c.state.learning.tutorialMessages.length,1);assert.match(c.state.learning.tutorialMessages[0].text,/2 puntos/);
 });
+
+test('Response help names the rival canto without relying on a separate yellow notice',()=>{
+ const c=harness();c.betCallNames=bet=>[bet.called||'flor'];vm.runInContext(extract('learningResponseTitle'),c);
+ const r=room();for(const [stake,name] of [[2,'TRUCO'],[3,'RETRUCO'],[4,'VALE 4']])assert.equal(c.learningResponseTitle(r,{type:'truco',caller:'player2',stake}),'Ricky gritó '+name);
+ assert.equal(c.learningResponseTitle(r,{type:'envido',caller:'player2',called:'real envido'}),'Ricky dijo REAL ENVIDO');
+ assert.equal(c.learningResponseTitle(r,{type:'flor',caller:'player2'}),'Ricky cantó FLOR');
+ assert.equal(c.learningResponseTitle(r,{type:'envido',revealMode:true}),'Declarar tus tantos de envido');
+});
