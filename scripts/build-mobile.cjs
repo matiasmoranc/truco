@@ -24,6 +24,8 @@ const root = path.resolve(__dirname, '..');
   await fs.cp(path.join(root,'assets'), path.join(stage,'assets'), { recursive: true });
   const { build } = await import('vite');
   await build({ root: stage, base: './', publicDir: false, build: { outDir: path.join(root,'www'), emptyOutDir: true, target: 'es2022', assetsInlineLimit: 0, copyPublicDir: false } });
+  const nativeHtml = path.join(root,'www/index.html');
+  await fs.writeFile(nativeHtml,(await fs.readFile(nativeHtml,'utf8')).replace('viewport-fit=cover','viewport-fit=auto'));
   await fs.copyFile(path.join(root,'favicon.svg'), path.join(root,'www/favicon.svg'));
   // CSS dynamically selects card images; retain their original bytes and paths.
   await fs.cp(path.join(root,'assets'), path.join(root,'www/assets'), { recursive: true });
