@@ -1583,3 +1583,6 @@ html,body,#app{touch-action:pan-x pan-y}
 .multiple-evidence>.end-envido-award,.multiple-evidence>.end-evidence-penalty{grid-column:1 / -1;justify-self:center}
 .reveal-mode .multiple-evidence .end-reveal-group{min-width:0}
 .reveal-mode .multiple-evidence .end-reveal-cards{gap:6px}
+
+#credits-claim{flex-direction:column;gap:6px}
+#credits-claim .credit-countdown{display:block;font-variant-numeric:tabular-nums;font-size:.9em}

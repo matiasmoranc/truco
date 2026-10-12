@@ -59,7 +59,7 @@ export function installCredits({services,getState,document,now=()=>Date.now(),se
     el('credits-status').hidden=!el('credits-status').textContent;
     const button=el('credits-claim');button.hidden=!!error||!available||!['available','claimed'].includes(eligibility);
     button.disabled=busy||eligibility!=='available'||getState().firebaseConnected!==true;
-    button.textContent=busy?'Reclamando…':eligibility==='claimed'?`5 créditos disponibles en ${creditCountdown(clock())}`:'Reclamar 5 créditos';
+    button.innerHTML=busy?'Reclamando…':eligibility==='claimed'?`<span>5 créditos disponibles mañana</span><span class="credit-countdown">${creditCountdown(clock())}</span>`:'Reclamar 5 créditos';
     clearTimer(timer);
     if(uid)timer=setTimer(render,Math.min(detailsOpen&&eligibility==='claimed'?1000:60000,Math.max(50,creditDayStart(clock())+CREDIT_DAY_MS-clock()+50)));
     if(uid&&available&&wallet===null&&!busy&&!initialAttempted&&getState().firebaseConnected===true){initialAttempted=true;void claim(true);}

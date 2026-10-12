@@ -1,7 +1,7 @@
 import { installPlayerPanel } from './player-panel.js?v=20261011-reportclose63';
 import { installScorer } from './scorer.js?v=20261011-scorercolors59';
 import { installActivity } from './activity.js?v=20261010-adminstats32';
-import { installCredits } from './credits.js?v=20261010-adminstats32';
+import { installCredits } from './credits.js?v=20261012-countdown';
 import { installAccount } from './account.js?v=20261012-welcome64';
 import { initializeGameAuth } from './auth-init.js?v=20261011-authlazy62';
 const FIREBASE_VERSION = '12.4.0';
@@ -395,8 +395,9 @@ function renderCallNotice(){
   const helpOpen=!!state.learning&&!!document.querySelector('.learn-coach-dialog[open]');
   const helpNotice=$('learning-call-notice');
   helpNotice.classList.add('hidden');helpNotice.innerHTML='';
-  el.classList.toggle('hidden',!visible||helpOpen);
-  el.innerHTML=visible&&!helpOpen?callNoticeHtml(notice):'';
+  const evidenceOpen=state.room?.status==='revealing'&&!!state.room.endReveal;
+  el.classList.toggle('hidden',!visible||helpOpen||evidenceOpen);
+  el.innerHTML=visible&&!helpOpen&&!evidenceOpen?callNoticeHtml(notice):'';
   if(!visible)return;
   if(!awaitingResponse&&!helpOpen)callNoticeTimer=setTimeout(()=>{callNoticeTimer=null;renderCallNotice();},Math.max(0,remaining));
   if(callSeen.get(key)!==notice.id){
@@ -1499,10 +1500,11 @@ function renderEndEvidence(room,sharedTable){
   el.classList.toggle('hidden',!active||!sharedTable);
   if(!active||!sharedTable){el.innerHTML='';return;}
   const award=room.endReveal.groups.find(group=>group.envidoAward)?.envidoAward;
-  const heading=award?`<h2 class="end-envido-award">${award.points} ${award.points===1?'punto':'puntos'} para ${escapeHtml(room.players[award.player]?.name||'Jugador')}</h2>`:'';
-  const penalty=award?.penalty?`<div class="end-evidence-penalty">${award.penalty.split(/\n|\. (?=[^ ]+ gana)/).map(text=>`<p>${escapeHtml(text)}</p>`).join('')}</div>`:'';
+  const incorrect=!!award?.liars?.length;
+  const heading=award&&!incorrect?`<h2 class="end-envido-award">${award.points} ${award.points===1?'punto':'puntos'} para ${escapeHtml(room.players[award.player]?.name||'Jugador')}</h2>`:'';
+  const penalty=award?.penalty&&!incorrect?`<div class="end-evidence-penalty">${award.penalty.split(/\n|\. (?=[^ ]+ gana)/).map(text=>`<p>${escapeHtml(text)}</p>`).join('')}</div>`:'';
   el.classList.toggle('multiple-evidence',room.endReveal.groups.length>1);
-  el.innerHTML=heading+penalty+room.endReveal.groups.map(group=>`<section class="end-reveal-group"><h3>${escapeHtml(room.players[group.player]?.name||'Jugador')}<span>${escapeHtml(group.label)}</span></h3><div class="end-reveal-cards">${group.cards.map(card=>`<div class="end-reveal-card sprite-card" style="${cardImageStyle(card)}" role="img" aria-label="${cardAccessibleName(card)}"></div>`).join('')}</div></section>`).join('');
+  el.innerHTML=heading+penalty+room.endReveal.groups.map(group=>`<section class="end-reveal-group"><h3>${escapeHtml((room.players[group.player]?.name||'Jugador')+(award?.liars?.includes(group.player)?' MINTIÓ':''))}<span>${escapeHtml(award?.liars?.includes(group.player)?group.label.replace(/^Mintió: dijo /,'Dijo ').replace(/ tantos$/,''):group.label)}</span></h3><div class="end-reveal-cards">${group.cards.map(card=>`<div class="end-reveal-card sprite-card" style="${cardImageStyle(card)}" role="img" aria-label="${cardAccessibleName(card)}"></div>`).join('')}</div></section>`).join('');
 }
 
 function scheduleTableResolution() {
