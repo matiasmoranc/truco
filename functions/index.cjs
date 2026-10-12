@@ -123,13 +123,12 @@ exports.adminConsole=onCall(options,async request=>{
  }
  if(action==='delete'){
   let failure;
-  await db.ref().get();
-  const prepared=await db.ref().transaction(root=>{
+  const prepared=await loadedTransaction(db.ref(),root=>{
    failure=null;if(!root)return undefined;try{return prepareUserDeletion(root,{...data,actor,now:Date.now()});}catch(e){failure=e.message;return undefined;}
   });
   if(!prepared.committed)throw new HttpsError('failed-precondition',failure||'No se pudo preparar la eliminación.');
   try{await getAuth().deleteUser(data.uid);}catch(e){if(e.code!=='auth/user-not-found')throw new HttpsError('internal','No se pudo eliminar la cuenta. Reintentá el mismo cambio.');}
-  const done=await db.ref().transaction(root=>{
+  const done=await loadedTransaction(db.ref(),root=>{
    failure=null;if(!root)return undefined;try{return finishUserDeletion(root,{uid:data.uid,requestId:data.requestId,now:Date.now()});}catch(e){failure=e.message;return undefined;}
   });
   if(!done.committed)throw new HttpsError('internal','La cuenta fue eliminada pero falta limpiar el perfil. Reintentá el mismo cambio.');return {ok:true};
