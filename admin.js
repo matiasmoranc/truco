@@ -93,7 +93,7 @@ function renderTables(){
   if(t.rawStatus==='settled'&&!t.reason)contents.append(node('small','Motivo: alcanzó los puntos de la partida.'));
   if(t.id)contents.append(node('small','ID: '+t.id));
   if(t.reason)contents.append(node('small','Motivo: '+({abandon:'Abandono',disconnect:'Desconexión','waiting-canceled':'Cancelada sin rival','draw-left':'Abandono antes de empezar','draw-cancel':'Cancelación antes de empezar',points:'Puntos',timeout:'Inactividad',inactivity:'Inactividad',admin:'Cierre del administrador'}[t.reason]||t.reason)));
-  if(!t.closedAt&&['waiting','reserved'].includes(t.rawStatus))contents.append(button('Cerrar mesa',()=>openEdit('close-table',t)));return card;
+  if(!t.closedAt&&(['waiting','reserved'].includes(t.rawStatus)||t.status==='Sistema anterior'))contents.append(button('Cerrar mesa',()=>openEdit('close-table',t)));return card;
  };
  const query=$('table-search').value.trim().toLowerCase();
  const matches=t=>[...(t.players||[]),t.code,t.id].filter(Boolean).join(' ').toLowerCase().includes(query);

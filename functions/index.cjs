@@ -172,8 +172,7 @@ exports.adminConsole=onCall(options,async request=>{
  }
  if(action==='close-table'&&!validKey(data.code))throw new HttpsError('invalid-argument','Mesa inválida.');
  if(action==='close-table'&&!(await db.ref('creditEconomy/tables/'+String(data.code)).get()).exists()){
-  await db.ref().get();
-  let failure;const result=await db.ref().transaction(root=>{failure=null;if(!root)return undefined;try{return closeLegacyTable(root,{...data,actor,now:Date.now()});}catch(error){failure=error.message;return undefined;}});
+  let failure;const result=await loadedTransaction(db.ref(),root=>{failure=null;if(!root)return undefined;try{return closeLegacyTable(root,{...data,actor,now:Date.now()});}catch(error){failure=error.message;return undefined;}});
   if(!result.committed)throw new HttpsError('failed-precondition',failure||'No se pudo cerrar la mesa.');
   return {ok:true};
  }
