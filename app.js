@@ -3015,11 +3015,14 @@ function positionLearningScoreArrow(){
     const targetElement=$(guideActive?'game-sheet':'learning-options');
     const box=dialog.getBoundingClientRect(),target=targetElement.getBoundingClientRect();
     if(!target.width||!target.height){arrow.classList.add('hidden');return;}
-    const x1=box.right-12,y1=guideActive?box.top:box.bottom;
-    const x2=guideActive?target.left+target.width/2:target.left-6,y2=guideActive?target.bottom+6:target.top+target.height/2;
-    const side=Math.min(window.innerWidth-8,Math.max(box.right,target.right)+8);
+    const x1=box.left+box.width/2,y1=guideActive?box.top-2:box.bottom+2;
+    const x2=guideActive?target.left+target.width/2:target.left-8,y2=guideActive?target.bottom+8:target.top+target.height/2;
+    const bend=Math.max(24,Math.min(80,Math.abs(y2-y1)*.35));
     arrow.setAttribute('viewBox','0 0 '+window.innerWidth+' '+window.innerHeight);
-    path.setAttribute('d','M '+x1+' '+y1+' C '+side+' '+y1+' '+side+' '+y2+' '+x2+' '+y2);
+    // The final tangent points up at the book or right into the help controls.
+    path.setAttribute('d',guideActive
+      ?'M '+x1+' '+y1+' C '+x1+' '+(y1-bend)+' '+x2+' '+(y2+bend)+' '+x2+' '+y2
+      :'M '+x1+' '+y1+' C '+x1+' '+(y1+bend)+' '+(x2-40)+' '+y2+' '+x2+' '+y2);
     return;
   }
   if(trucoActive){
