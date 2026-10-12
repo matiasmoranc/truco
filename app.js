@@ -392,14 +392,13 @@ function renderCallNotice(){
   if(awaitingResponse&&received)received.pinned=true;
   const foldVisible=notice?.kind==='fold'&&remaining>0;
   const visible=addressed&&(foldVisible||(notice?.kind!=='fold'&&(awaitingResponse||(!received?.pinned&&remaining>0))));
-  const teachingNotice=$('learning-hint').open&&(visible||addressed&&state.learning?.activeCallNotice?.id===notice?.id);
+  const helpOpen=!!state.learning&&!!document.querySelector('.learn-coach-dialog[open]');
   const helpNotice=$('learning-call-notice');
-  helpNotice.classList.toggle('hidden',!teachingNotice);
-  helpNotice.innerHTML=teachingNotice?callNoticeHtml(notice):'';
-  el.classList.toggle('hidden',!visible||teachingNotice);
-  el.innerHTML=visible?callNoticeHtml(notice):'';
-  if(!visible&&!teachingNotice)return;
-  if(!awaitingResponse&&!teachingNotice)callNoticeTimer=setTimeout(()=>{callNoticeTimer=null;renderCallNotice();},Math.max(0,remaining));
+  helpNotice.classList.add('hidden');helpNotice.innerHTML='';
+  el.classList.toggle('hidden',!visible||helpOpen);
+  el.innerHTML=visible&&!helpOpen?callNoticeHtml(notice):'';
+  if(!visible)return;
+  if(!awaitingResponse&&!helpOpen)callNoticeTimer=setTimeout(()=>{callNoticeTimer=null;renderCallNotice();},Math.max(0,remaining));
   if(callSeen.get(key)!==notice.id){
     callSeen.set(key,notice.id);
     speakCall(notice.spoken);
@@ -2656,6 +2655,7 @@ function localPlay(card,launchOrigin=null) {
   if(state.room.status!=='started')return;
   if(state.room.pendingBet){shakeTurnBadge();return;}
   if(state.room.turn!==player){shakeTurnBadge();return;}
+  if(state.learning){state.room.callNotice=null;receivedCallNotices.delete(`${state.roomCode}:player1`);receivedCallNotices.delete(`${state.roomCode}:player2`);}
   animatePlayedHandCard(card,launchOrigin);
   state.localHands[player]=(state.localHands[player]||[]).filter((item)=>item.id!==card.id);state.hand=[...state.localHands[player]];state.room.playedCount=(state.room.playedCount||0)+1;
   state.room.trickCards=[...(state.room.trickCards||[]),{playerId:player,name:state.room.players[player].name,card}];state.room.deckCount--;
@@ -3111,6 +3111,8 @@ function rememberLearningHelp(topic){
 function queueLearningAction(action,bet=state.room?.pendingBet){
   const learning=state.learning,room=state.room;
   if(!learning?.hints||state.playerId!=='player1'||!room)return;
+  // The score popup already explains a declined bet or folding.
+  if(learning.pointsInfo!==false&&(action==='no'||action==='fold'||(action==='yes'&&bet?.type==='flor')))return;
   const pointsText=value=>value+' '+(value===1?'punto':'puntos');
   const stake=Number(bet?.stake)||1;
   const declined=bet?.type==='truco'?Math.max(1,stake-1):bet?.type==='flor'?declinedFlorPoints(bet):Number(bet?.accepted)||1;
@@ -3193,7 +3195,6 @@ function showLearningMessage(){
   studyButton.textContent=kind==='flor'?'Cómo sumar mis puntos de flor':'Cómo sumar mis puntos de envido';
   $('learning-round-guide').classList.toggle('hidden',!roundMessage);
   $('learning-round-disable').classList.toggle('hidden',!roundMessage);
-  state.learning.activeCallNotice=state.room?.callNotice?{...state.room.callNotice}:null;
   $('learning-hint').showModal();
   renderCallNotice();
   requestAnimationFrame(positionLearningScoreArrow);
@@ -3444,7 +3445,7 @@ for(const dialog of document.querySelectorAll('.learning-message')){
 }
 $('learning-message-close').addEventListener('click',()=>$('learning-hint').close());
 $('learning-message-study').addEventListener('click',event=>{const kind=event.currentTarget.dataset.studyKind;if(kind==='envido'||kind==='flor')openStudy(kind);});
-$('learning-hint').addEventListener('close',()=>{const showStageIntro=state.learning?.activeTutorial?.introLast&&state.learning?.introAfterTutorial;if(state.learning){state.learning.acknowledgedMessage=state.learning.activeMessage;state.learning.activeMessage=null;state.learning.activeScoreMessage=false;state.learning.activeTutorial=null;state.learning.activeCallNotice=null;}positionLearningScoreArrow();if(showStageIntro){state.learning.introAfterTutorial=false;openLearningHelp();}else resumeLearning();});
+$('learning-hint').addEventListener('close',()=>{const showStageIntro=state.learning?.activeTutorial?.introLast&&state.learning?.introAfterTutorial;if(state.learning){state.learning.acknowledgedMessage=state.learning.activeMessage;state.learning.activeMessage=null;state.learning.activeScoreMessage=false;state.learning.activeTutorial=null;}positionLearningScoreArrow();if(showStageIntro){state.learning.introAfterTutorial=false;openLearningHelp();}else resumeLearning();});
 $('learn-menu').addEventListener('click',openLearning);
 $('game-sheet').addEventListener('click',()=>{if(state.learning)openStudySheet();});
 $('learn-sheet-menu').addEventListener('click',openStudySheet);
