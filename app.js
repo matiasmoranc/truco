@@ -1411,19 +1411,21 @@ function envidoEvidenceCards(hand,muestra){
 }
 function buildEndEvidence(room,originals){
   const groups=[];
-  for(const player of Object.keys(room.flors||{})){
-    const cards=originals[player]||[];
-    if(cards.length===3)groups.push({player,label:Object.keys(room.flors||{}).length>1?'Flor · '+florValue(cards,room.muestra)+' tantos':'Flor',cards});
+  const flowers=Object.keys(room.flors||{});
+  const florWinner=flowers.length===1?flowers[0]:flowers.length>1?(Number(room.flors.player1)===Number(room.flors.player2)?room.mano:Number(room.flors.player1)>Number(room.flors.player2)?'player1':'player2'):null;
+  if(florWinner){
+    const cards=originals[florWinner]||[];
+    if(cards.length===3)groups.push({player:florWinner,label:'Flor · '+florValue(cards,room.muestra)+' tantos',cards});
   }
   const audit=room.envidoAudit;
   if(audit){
     const truth={player1:handEnvido(originals.player1||[],room.muestra),player2:handEnvido(originals.player2||[],room.muestra)};
     const {liars,winner}=envidoAuditResult(room,truth);
-    for(const player of Object.keys(audit.reveals||{})){
+    for(const player of liars.length?['player1','player2']:[winner]){
       if(originals[player]?.length!==3)continue;
       const declared=audit.reveals?.[player];
-      const label=liars.includes(player)?`Envido · dijo ${declared}, tenía ${truth[player]}`:`Envido · ${truth[player]} tantos`;
-      groups.push({player,label,cards:envidoEvidenceCards(originals[player],room.muestra),envidoAward:{player:winner,points:Math.min(Number(audit.stake),Math.max(0,targetPoints(room)-Number(room.scores?.[winner]||0)))}});
+      const label=liars.includes(player)?`Mintió: dijo ${declared}, tenía ${truth[player]} tantos`:`Envido · ${truth[player]} tantos`;
+      groups.push({player,label,cards:envidoEvidenceCards(originals[player],room.muestra),envidoAward:{player:winner,points:Math.min(Number(audit.stake),Math.max(0,targetPoints(room)-Number(room.scores?.[winner]||0))),liars,penalty:liars.length?((room.players?.[liars[0]]?.name||'El jugador')+' mintió'+(liars.length>1?' primero':'')+'. '+(room.players?.[winner]?.name||'El rival')+' gana el envido y los puntos de la mano.'):''}});
     }
   }
   return groups;
@@ -1450,7 +1452,9 @@ function renderEndEvidence(room,sharedTable){
   if(!active||!sharedTable){el.innerHTML='';return;}
   const award=room.endReveal.groups.find(group=>group.envidoAward)?.envidoAward;
   const heading=award?`<h2 class="end-envido-award">${award.points} ${award.points===1?'punto':'puntos'} para ${escapeHtml(room.players[award.player]?.name||'Jugador')}</h2>`:'';
-  el.innerHTML=heading+room.endReveal.groups.map(group=>`<section class="end-reveal-group"><h3>${escapeHtml(room.players[group.player]?.name||'Jugador')}<span>${escapeHtml(group.label)}</span></h3><div class="end-reveal-cards">${group.cards.map(card=>`<div class="end-reveal-card sprite-card" style="${cardImageStyle(card)}" role="img" aria-label="${cardAccessibleName(card)}"></div>`).join('')}</div></section>`).join('');
+  const penalty=award?.penalty?`<p class="end-evidence-penalty">${escapeHtml(award.penalty)}</p>`:'';
+  el.classList.toggle('multiple-evidence',room.endReveal.groups.length>1);
+  el.innerHTML=heading+penalty+room.endReveal.groups.map(group=>`<section class="end-reveal-group"><h3>${escapeHtml(room.players[group.player]?.name||'Jugador')}<span>${escapeHtml(group.label)}</span></h3><div class="end-reveal-cards">${group.cards.map(card=>`<div class="end-reveal-card sprite-card" style="${cardImageStyle(card)}" role="img" aria-label="${cardAccessibleName(card)}"></div>`).join('')}</div></section>`).join('');
 }
 
 function scheduleTableResolution() {

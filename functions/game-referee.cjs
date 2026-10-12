@@ -205,19 +205,21 @@ function envidoEvidenceCards(hand,muestra){
 }
 function buildEndEvidence(room,originals){
   const groups=[];
-  for(const player of Object.keys(room.flors||{})){
-    const cards=originals[player]||[];
-    if(cards.length===3)groups.push({player,label:Object.keys(room.flors||{}).length>1?'Flor · '+florValue(cards,room.muestra)+' tantos':'Flor',cards});
+  const flowers=Object.keys(room.flors||{});
+  const florWinner=flowers.length===1?flowers[0]:flowers.length>1?(Number(room.flors.player1)===Number(room.flors.player2)?room.mano:Number(room.flors.player1)>Number(room.flors.player2)?'player1':'player2'):null;
+  if(florWinner){
+    const cards=originals[florWinner]||[];
+    if(cards.length===3)groups.push({player:florWinner,label:'Flor · '+florValue(cards,room.muestra)+' tantos',cards});
   }
   const audit=room.envidoAudit;
   if(audit){
     const truth={player1:handEnvido(originals.player1||[],room.muestra),player2:handEnvido(originals.player2||[],room.muestra)};
     const {liars,winner}=envidoAuditResult(room,truth);
-    for(const player of Object.keys(audit.reveals||{})){
+    for(const player of liars.length?['player1','player2']:[winner]){
       if(originals[player]?.length!==3)continue;
       const declared=audit.reveals?.[player];
-      const label=liars.includes(player)?`Envido · dijo ${declared}, tenía ${truth[player]}`:`Envido · ${truth[player]} tantos`;
-      groups.push({player,label,cards:envidoEvidenceCards(originals[player],room.muestra),envidoAward:{player:winner,points:Math.min(Number(audit.stake),Math.max(0,targetPoints(room)-Number(room.scores?.[winner]||0)))}});
+      const label=liars.includes(player)?`Mintió: dijo ${declared}, tenía ${truth[player]} tantos`:`Envido · ${truth[player]} tantos`;
+      groups.push({player,label,cards:envidoEvidenceCards(originals[player],room.muestra),envidoAward:{player:winner,points:Math.min(Number(audit.stake),Math.max(0,targetPoints(room)-Number(room.scores?.[winner]||0))),liars,penalty:liars.length?((room.players?.[liars[0]]?.name||'El jugador')+' mintió'+(liars.length>1?' primero':'')+'. '+(room.players?.[winner]?.name||'El rival')+' gana el envido y los puntos de la mano.'):''}});
     }
   }
   return groups;

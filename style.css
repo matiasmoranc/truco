@@ -1547,3 +1547,14 @@ html,body,#app{touch-action:pan-x pan-y}
 .player-panel-body .button.primary{background:var(--gold);color:#12382b;border:1px solid var(--gold);border-radius:12px;padding:12px 16px;min-height:46px;height:auto;font:inherit;font-weight:700;letter-spacing:0;text-transform:none}
 
 .player-summary-stats{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.player-summary-stats .player-stat{padding:20px 10px}.player-summary-stats .player-stat strong{font-size:32px}.player-summary-stats .player-stat small{margin-top:5px;font-size:13px}
+
+/* Evidence stays on the felt, with the deck and sample visible above it. */
+.reveal-mode .end-hand-reveal{inset:34% 3% 10%;background:transparent;gap:18px;padding:12px 8px;justify-content:center}
+.reveal-mode .end-reveal-group{gap:10px}
+.reveal-mode .end-reveal-cards{gap:12px;align-items:center}
+.reveal-mode .end-reveal-card{box-shadow:0 8px 18px #0005;transform:rotate(-4deg)}
+.reveal-mode .end-reveal-card:nth-child(2){transform:rotate(2deg)}
+.reveal-mode .end-reveal-card:nth-child(3){transform:rotate(5deg)}
+.end-evidence-penalty{max-width:420px;margin:0;color:#f0eee2;text-align:center;font-size:14px;line-height:1.4}
+.reveal-mode .multiple-evidence .end-reveal-card{width:clamp(56px,15vw,100px)}
+.reveal-mode .multiple-evidence{gap:12px}
