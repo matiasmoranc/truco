@@ -126,3 +126,13 @@ test('Envido lies reveal both hands and identify liar and recipient',()=>{
  vm.runInContext(['envidoEvidenceCards','buildEndEvidence'].map(extract).join('\n'),c);
  const groups=c.buildEndEvidence(r,hands);assert.equal(groups.length,2);assert.match(groups[0].label,/Mintió/);assert.equal(groups[0].envidoAward.player,'player2');assert.match(groups[0].envidoAward.penalty,/Mati mintió.*Ricky gana/);
 });
+
+test('Truco explanations repeat with help enabled despite previous practice visits',()=>{
+ const c=harness();c.state={learning:{hints:true,tutorialMessages:[]},playerId:'player1',room:room()};
+ vm.runInContext(extract('queueLearningTrucoCall'),c);
+ for(const stake of [2,3,4]){
+  c.learningSeen.add('truco-call:'+stake);c.queueLearningTrucoCall(stake,'player1');
+  const message=c.state.learning.tutorialMessages.shift();assert.ok(message);assert.match(message.text,new RegExp('por '+stake+' puntos'));
+ }
+ c.state.learning.hints=false;c.queueLearningTrucoCall(2,'player1');assert.equal(c.state.learning.tutorialMessages.length,0);
+});

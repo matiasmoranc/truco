@@ -392,14 +392,14 @@ function renderCallNotice(){
   if(awaitingResponse&&received)received.pinned=true;
   const foldVisible=notice?.kind==='fold'&&remaining>0;
   const visible=addressed&&(foldVisible||(notice?.kind!=='fold'&&(awaitingResponse||(!received?.pinned&&remaining>0))));
-  const teachingNotice=visible&&$('learning-hint').open;
+  const teachingNotice=$('learning-hint').open&&(visible||addressed&&state.learning?.activeCallNotice?.id===notice?.id);
   const helpNotice=$('learning-call-notice');
   helpNotice.classList.toggle('hidden',!teachingNotice);
   helpNotice.innerHTML=teachingNotice?callNoticeHtml(notice):'';
   el.classList.toggle('hidden',!visible||teachingNotice);
   el.innerHTML=visible?callNoticeHtml(notice):'';
-  if(!visible)return;
-  if(!awaitingResponse)callNoticeTimer=setTimeout(()=>{callNoticeTimer=null;renderCallNotice();},Math.max(0,remaining));
+  if(!visible&&!teachingNotice)return;
+  if(!awaitingResponse&&!teachingNotice)callNoticeTimer=setTimeout(()=>{callNoticeTimer=null;renderCallNotice();},Math.max(0,remaining));
   if(callSeen.get(key)!==notice.id){
     callSeen.set(key,notice.id);
     speakCall(notice.spoken);
@@ -2675,7 +2675,7 @@ function localFinishHand(winner,points,ending='rounds'){
   const room=state.room,before={...room,scores:{...room.scores}},groups=buildEndEvidence(room,state.localOriginalHands||{}),auditResult=envidoAuditResult(room,state.localTruth||{});
   room.scores=settleAuditedHand(room,room.scores,state.localTruth||{},winner,points);room.envidoAudit=null;
   room.scores=capScores(room,settleSingleFlor(room,room.scores));
-  const reason=auditResult.liars.length?`${room.players[auditResult.liars[0]].name} declaró mal${auditResult.liars.length>1?' primero':''}. ${room.players[auditResult.winner].name} gana el envido y la mano.`:ending==='falta'?'Falta envido: se verifican los tantos y se asignan los puntos en juego.':ending==='fold'?'Cuando te vas al mazo, el rival gana los puntos que estaban en juego hasta ese momento.':ending==='declined'?`${room.players[otherPlayer(winner)].name} dijo NO QUIERO. ${room.players[winner].name} gana ${points} ${points===1?'punto':'puntos'} por los puntos que estaban en juego hasta ese momento y se vuelve a repartir.`:`${room.players[winner].name} gana la mano (${points} puntos).`;
+  const reason=auditResult.liars.length?`${room.players[auditResult.liars[0]].name} declaró mal${auditResult.liars.length>1?' primero':''}. ${room.players[auditResult.winner].name} gana el envido y la mano.`:ending==='falta'?'Falta envido: se verifican los tantos y se asignan los puntos en juego.':ending==='fold'?'Cuando te vas al mazo, el rival gana los puntos que estaban en juego hasta ese momento.':ending==='declined'?`${({1:'Truco',2:'Retruco',3:'Vale cuatro'}[points]||'Truco')} no querido. Se vuelve a repartir.`:`${room.players[winner].name} gana la mano (${points} puntos).`;
   room.lastHandScore=buildHandSummary(before,room.scores,reason,state.localTruth||{});room.handScoreEntries=[];
   room.handScoreHistory=handScoreHistory(room,room.lastHandScore);
   queueLearningPoints(before,room.scores,room.lastHandScore.entries);
@@ -3097,9 +3097,9 @@ const learningSeen=new Set((()=>{try{return JSON.parse(localStorage.getItem('tru
 function learningHelpTopic(bet=state.room?.pendingBet){
   return ['response',bet?.type,bet?.called,bet?.stake,!!bet?.single,!!bet?.revealMode,!!bet?.suspendedBet].join(':');
 }
-function enqueueLearningHelp(message,topic){
+function enqueueLearningHelp(message,topic,repeat=false){
   const learning=state.learning;
-  if(!learning?.hints||learningSeen.has(topic))return;
+  if(!learning?.hints||(!repeat&&learningSeen.has(topic)))return;
   learning.tutorialMessages??=[];
   if(!learning.tutorialMessages.some(item=>item.topic===topic))learning.tutorialMessages.push({...message,topic});
 }
@@ -3139,7 +3139,7 @@ function queueLearningTrucoCall(stake,player){
   learning.hasCalledTruco=true;learning.trucoReminderPending=false;
   if(!learning.hints)return;
   const name={2:'TRUCO',3:'RETRUCO',4:'VALE 4'}[stake],declined=stake-1;
-  enqueueLearningHelp({title:'Dijiste '+name,text:'Si el rival acepta, juegan por '+stake+' puntos. Si el rival no acepta, ganás '+declined+' '+(declined===1?'punto':'puntos')+' y se vuelve a repartir.'},'truco-call:'+stake);
+  enqueueLearningHelp({title:'Dijiste '+name,text:'Si el rival acepta, juegan por '+stake+' puntos. Si el rival no acepta, ganás '+declined+' '+(declined===1?'punto':'puntos')+' y se vuelve a repartir.'},'truco-call:'+stake,true);
 }
 function queueLearningTrucoReminder(){
   const learning=state.learning,room=state.room;
@@ -3193,6 +3193,7 @@ function showLearningMessage(){
   studyButton.textContent=kind==='flor'?'Cómo sumar mis puntos de flor':'Cómo sumar mis puntos de envido';
   $('learning-round-guide').classList.toggle('hidden',!roundMessage);
   $('learning-round-disable').classList.toggle('hidden',!roundMessage);
+  state.learning.activeCallNotice=state.room?.callNotice?{...state.room.callNotice}:null;
   $('learning-hint').showModal();
   renderCallNotice();
   requestAnimationFrame(positionLearningScoreArrow);
@@ -3443,7 +3444,7 @@ for(const dialog of document.querySelectorAll('.learning-message')){
 }
 $('learning-message-close').addEventListener('click',()=>$('learning-hint').close());
 $('learning-message-study').addEventListener('click',event=>{const kind=event.currentTarget.dataset.studyKind;if(kind==='envido'||kind==='flor')openStudy(kind);});
-$('learning-hint').addEventListener('close',()=>{const showStageIntro=state.learning?.activeTutorial?.introLast&&state.learning?.introAfterTutorial;if(state.learning){state.learning.acknowledgedMessage=state.learning.activeMessage;state.learning.activeMessage=null;state.learning.activeScoreMessage=false;state.learning.activeTutorial=null;}positionLearningScoreArrow();if(showStageIntro){state.learning.introAfterTutorial=false;openLearningHelp();}else resumeLearning();});
+$('learning-hint').addEventListener('close',()=>{const showStageIntro=state.learning?.activeTutorial?.introLast&&state.learning?.introAfterTutorial;if(state.learning){state.learning.acknowledgedMessage=state.learning.activeMessage;state.learning.activeMessage=null;state.learning.activeScoreMessage=false;state.learning.activeTutorial=null;state.learning.activeCallNotice=null;}positionLearningScoreArrow();if(showStageIntro){state.learning.introAfterTutorial=false;openLearningHelp();}else resumeLearning();});
 $('learn-menu').addEventListener('click',openLearning);
 $('game-sheet').addEventListener('click',()=>{if(state.learning)openStudySheet();});
 $('learn-sheet-menu').addEventListener('click',openStudySheet);
