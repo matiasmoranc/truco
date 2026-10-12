@@ -119,3 +119,9 @@ test('Completed and stale legacy tables do not block deletion; recent activity s
  assert.equal(legacyTableActive({...base,turnClock:{startedAt:now-1000}},now),true);
  const root=deletionRoot();root.rooms={LIVE:{public:{...base,createdAt:now-1000}}};assert.throws(()=>prepareUserDeletion(root,{...deletion,now}),/LIVE/);
 });
+
+test('An hour-old abandoned legacy game cannot block deleting the user',()=>{
+ const now=7200000,root=deletionRoot();root.rooms={BN6QZ:{public:{status:'started',createdAt:1,feed:[{time:now-3600000}],players:{player1:{uid:'a',name:'Old nickname'},player2:{uid:'b',name:'Test'}}}}};
+ const changed=prepareUserDeletion(root,{...deletion,now});assert.equal(changed.rooms.BN6QZ.public.status,'closed');assert.equal(root.rooms.BN6QZ.public.status,'started');
+ root.rooms.BN6QZ.public.feed[0].time=now-1000;assert.throws(()=>prepareUserDeletion(root,{...deletion,now}),/BN6QZ/);
+});
