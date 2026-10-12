@@ -29,7 +29,11 @@ module.exports={requireAdmin,adminLedgerChange,validKey};
 
 function legacyTableActive(room,now){
  if(!room||room.managedCredits||room.closedAt||!['waiting','drawing','started','revealing','timed-out'].includes(room.status))return false;
- if(Number.isFinite(room.targetPoints)&&Object.values(room.scores||{}).some(score=>score>=room.targetPoints))return false;
+ const target=Number(room.targetPoints);
+ if(room.matchResult?.winner||Number.isFinite(target)&&target>0&&Object.values(room.scores||{}).some(score=>Number(score)>=target))return false;
+ // A stale legacy status is not proof that a game is still being played.
+ const activity=[room.createdAt,room.updatedAt,room.lastActivityAt,room.turnClock?.startedAt,room.resolutionEndsAt,room.pendingNextHand?.endsAt,room.endReveal?.endsAt,...Object.values(room.feed||{}).map(entry=>entry?.time||entry?.at),...Object.values(room.connectionPresence||{}).flatMap(entry=>[entry.connectedAt,entry.disconnectedAt,entry.lastSeenAt])].map(Number).filter(value=>Number.isFinite(value)&&value>0);
+ if(activity.length&&now-Math.max(...activity)>=7*86400000)return false;
  if(room.status==='waiting'&&!(room.players?.player1&&room.players?.player2)&&Number.isFinite(room.createdAt)&&now-room.createdAt>=600000)return false;
  return true;
 }

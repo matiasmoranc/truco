@@ -109,3 +109,13 @@ test('Closing a legacy table aborts rather than deleting an empty Firebase trans
  const closed=transaction(root);assert.equal(closed.rooms.LIVE.public.status,'closed');assert.equal(context.failure,null);
  assert.equal(transaction(deletionRoot()),undefined);assert.match(context.failure,/mesa cambió/i);
 });
+
+test('Completed and stale legacy tables do not block deletion; recent activity stays protected',()=>{
+ const now=10*86400000,base={status:'started',createdAt:1,players:{player1:{uid:'a'}}};
+ for(const room of [{...base},{...base,matchResult:{winner:'player1'}},{...base,targetPoints:'20',scores:{player1:'20'}},{...base,status:'complete'}]){
+  const root=deletionRoot();root.rooms={OLD:{public:room}};assert.doesNotThrow(()=>prepareUserDeletion(root,{...deletion,now}));
+ }
+ assert.equal(legacyTableActive({...base,feed:[{time:now-1000}]},now),true);
+ assert.equal(legacyTableActive({...base,turnClock:{startedAt:now-1000}},now),true);
+ const root=deletionRoot();root.rooms={LIVE:{public:{...base,createdAt:now-1000}}};assert.throws(()=>prepareUserDeletion(root,{...deletion,now}),/LIVE/);
+});
