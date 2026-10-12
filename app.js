@@ -775,7 +775,7 @@ function watchRoom() {
     state.room = incoming;
     if(incoming.status==='complete'||state.persistedRoomCreatedAt!==incoming.createdAt)rememberRoomSeat();
     syncRoomPresence();
-    if(state.room.status==='closed'||roomExpired(state.room)){if(roomExpired(state.room))closeExpiredRoom(state.roomCode);if(state.unsubscribe){state.unsubscribe();state.unsubscribe=null;}const reason=state.room.closeReason;returnToLobby(reason==='match-left'?'La mesa terminó. Volviste al lobby.':reason==='draw-timeout'?'Se acabó el tiempo para elegir carta. La partida no comenzó.':['draw-left','draw-cancel'].includes(reason)?'Un participante salió del sorteo. La partida no comenzó.':'La mesa cerró por inactividad.');return;}
+    if(state.room.status==='closed'||roomExpired(state.room)){if(roomExpired(state.room))closeExpiredRoom(state.roomCode);if(state.unsubscribe){state.unsubscribe();state.unsubscribe=null;}const reason=state.room.closeReason;returnToLobby(state.cancelingWaitingRoom===state.roomCode||reason==='waiting-canceled'?'':reason==='match-left'?'La mesa terminó. Volviste al lobby.':reason==='draw-timeout'?'Se acabó el tiempo para elegir carta. La partida no comenzó.':['draw-left','draw-cancel'].includes(reason)?'Un participante salió del sorteo. La partida no comenzó.':'La mesa cerró por inactividad.');return;}
     if(isCoordinator()&&state.room.status==='started'&&!state.room.resolvingTrick&&state.room.trickCards?.length===2&&(state.room.tricks||[]).length>0)recoverLegacyTrick(state.room);
     if(isCoordinator()&&state.room.status==='complete'&&!state.room.endReveal&&(Object.keys(state.room.flors||{}).length||state.room.envidoAudit)){
       const key=`${state.roomCode}:${state.room.handNumber}`;
@@ -857,6 +857,7 @@ function openingDrawExpired(room,now=gameTime()){
   return room?.status==='drawing'&&Number.isFinite(draw?.endsAt)&&now>=draw.endsAt&&!(draw.cards?.player1&&draw.cards?.player2);
 }
 function returnToLobby(message=''){
+  state.cancelingWaitingRoom=null;
   removeCardFlight();
   stopRoomPresence();
   stopBot();
@@ -2814,7 +2815,7 @@ $('open-room-list').addEventListener('click',(event)=>{const button=event.target
 $('back-home').addEventListener('click',()=>{showView('welcome-view');openLobby();});
 $('fold-hand').addEventListener('click',event=>runLiveAction(event.currentTarget,foldHand));
 $('enter-room').addEventListener('click',enterRoom);
-$('leave-room').addEventListener('click',async()=>{if(state.room?.managedCredits){try{await creditCommand({kind:'cancel'});}catch{return;}return;}stopRoomPresence();stopBot();state.roomWatchVersion=(state.roomWatchVersion||0)+1;state.navigationEpoch=(state.navigationEpoch||0)+1;forgetRoomSeat();if(state.unsubscribe)state.unsubscribe();if(state.privateUnsubscribe)state.privateUnsubscribe();state.privateUnsubscribe=null;state.privateHandKey=null;state.room=null;state.localGame=false;showView('welcome-view');openLobby();});
+$('leave-room').addEventListener('click',async()=>{if(state.room?.managedCredits){const waiting=state.room.status==='waiting';if(waiting)state.cancelingWaitingRoom=state.roomCode;try{await creditCommand({kind:'cancel'});if(waiting&&state.cancelingWaitingRoom)returnToLobby();}catch{state.cancelingWaitingRoom=null;return;}return;}stopRoomPresence();stopBot();state.roomWatchVersion=(state.roomWatchVersion||0)+1;state.navigationEpoch=(state.navigationEpoch||0)+1;forgetRoomSeat();if(state.unsubscribe)state.unsubscribe();if(state.privateUnsubscribe)state.privateUnsubscribe();state.privateUnsubscribe=null;state.privateHandKey=null;state.room=null;state.localGame=false;showView('welcome-view');openLobby();});
 $('game-home').addEventListener('click',()=>{
   if(!state.room){returnToLobby();return;}
   if(matchFinished(state.room)){closeFinishedRoom();return;}
