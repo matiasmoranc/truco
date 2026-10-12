@@ -297,7 +297,7 @@ function ownCallVerb(main,bet){
 function callNoticeHtml(notice,room=state.room){
   const main=notice.spoken||spokenCall(notice.text||'');
   if(!main)return escapeHtml(callNoticeText(notice.text||''));
-  if(!state.learning&&notice.from===state.playerId){
+  if(notice.from===state.playerId){
     return `${escapeHtml(notice.selfVerb||'Dijiste')} <strong>${escapeHtml(main.toLocaleUpperCase('es-UY'))}</strong>`;
   }
   const name=room?.players?.[notice.from]?.name||'Tu rival';
@@ -378,7 +378,7 @@ function renderCallNotice(){
   const el=$('call-notice');
   clearTimeout(callNoticeTimer);callNoticeTimer=null;
   const incoming=notice?.to===role;
-  const own=!state.learning&&notice?.from===role;
+  const own=notice?.from===role;
   const addressed=(incoming||own)&&(notice.kind==='fold'||!notice.handNumber||notice.handNumber===state.room?.handNumber);
   let received=receivedCallNotices.get(key);
   if(addressed&&received?.id!==notice.id){
@@ -392,12 +392,11 @@ function renderCallNotice(){
   if(awaitingResponse&&received)received.pinned=true;
   const foldVisible=notice?.kind==='fold'&&remaining>0;
   const visible=addressed&&(foldVisible||(notice?.kind!=='fold'&&(awaitingResponse||(!received?.pinned&&remaining>0))));
-  const tutorialOpen=$('learning-hint').open&&!!state.learning?.activeTutorial;
-  const teachingNotice=visible&&!tutorialOpen&&$('learning-hint').open&&!state.learning?.activeScoreMessage;
+  const teachingNotice=visible&&$('learning-hint').open;
   const helpNotice=$('learning-call-notice');
   helpNotice.classList.toggle('hidden',!teachingNotice);
   helpNotice.innerHTML=teachingNotice?callNoticeHtml(notice):'';
-  el.classList.toggle('hidden',!visible||teachingNotice||tutorialOpen);
+  el.classList.toggle('hidden',!visible||teachingNotice);
   el.innerHTML=visible?callNoticeHtml(notice):'';
   if(!visible)return;
   if(!awaitingResponse)callNoticeTimer=setTimeout(()=>{callNoticeTimer=null;renderCallNotice();},Math.max(0,remaining));
@@ -2996,29 +2995,10 @@ function positionLearningScoreArrow(){
   if(tipActive)$('learning-score-arrow').classList.add('hidden');
   const dialog=tipActive?$('learning-points-tip'):$('learning-hint'),arrow=$(tipActive?'learning-points-arrow':'learning-score-arrow'),path=$(tipActive?'learning-points-arrow-path':'learning-score-arrow-path');
   const scoreActive=dialog.open&&state.learning?.activeScoreMessage,trucoActive=dialog.open&&state.learning?.activeTutorial?.pointAtTruco;
-  const guideActive=dialog.open&&state.learning?.activeTutorial?.pointAtGuide;
-  const roundActive=dialog.open&&!!state.learning?.activeTutorial?.roundCards;
-  const active=tipActive||scoreActive||trucoActive||guideActive||roundActive;
+  const active=tipActive||scoreActive||trucoActive;
   arrow.classList.toggle('hidden',!active);
   document.querySelectorAll('.scoreboard,.mobile-score').forEach(marker=>marker.classList.toggle('learning-score-highlight',!!scoreActive));
   if(!active)return;
-  if(roundActive){
-    const target=$('learning-rounds').getBoundingClientRect(),box=dialog.getBoundingClientRect();
-    if(!target.width||!target.height){arrow.classList.add('hidden');return;}
-    const x2=target.left+target.width/2,y2=target.top-5;
-    const x1=Math.max(box.left+18,Math.min(box.right-18,x2)),y1=box.bottom-2;
-    arrow.setAttribute('viewBox','0 0 '+window.innerWidth+' '+window.innerHeight);
-    path.setAttribute('d','M '+x1+' '+y1+' C '+x1+' '+(y1+18)+' '+x2+' '+(y2-18)+' '+x2+' '+y2);
-    return;
-  }
-  if(guideActive){
-    const button=$('game-sheet'),target=button?.getBoundingClientRect();
-    if(!target?.width||!target.height){arrow.classList.add('hidden');return;}
-    const box=dialog.getBoundingClientRect(),x1=box.left+box.width*.65,y1=box.top-4,x2=target.left+target.width/2,y2=target.bottom+8;
-    arrow.setAttribute('viewBox','0 0 '+window.innerWidth+' '+window.innerHeight);
-    path.setAttribute('d','M '+x1+' '+y1+' C '+x1+' '+(y1-35)+' '+x2+' '+(y2+35)+' '+x2+' '+y2);
-    return;
-  }
   if(trucoActive){
     const button=$('player-actions').querySelector('[data-action="truco"]');
     if(!button){arrow.classList.add('hidden');return;}
