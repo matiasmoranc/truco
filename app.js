@@ -587,6 +587,7 @@ async function enterRoom() {
   if(!account.isReady())return;
   if(state.enteringRoom)return;
   if(!state.joining&&!$('play-bot').checked){
+    if(!await credits.sync()){toast('Esperá a confirmar tus créditos disponibles.',true);return;}
     const wallet=credits.wallet(),stake=Number($('table-stake').value);
     if(!wallet){toast('Esperá a que carguen tus créditos.',true);return;}
     if(wallet.locked>0){toast('Ya tenés una apuesta reservada. Volvé a tu mesa.',true);return;}
@@ -2807,7 +2808,7 @@ $('play-bot').addEventListener('change',updateBotSetup);
 $('points-picker-trigger').addEventListener('click',()=>{const menu=$('points-picker-menu'),opening=menu.classList.contains('hidden');menu.classList.toggle('hidden',!opening);$('points-picker-trigger').setAttribute('aria-expanded',String(opening));});
 document.addEventListener('click',event=>{if(!event.target.closest('.points-picker')){$('points-picker-menu').classList.add('hidden');$('points-picker-trigger').setAttribute('aria-expanded','false');}});
 document.addEventListener('keydown',event=>{if(event.key==='Escape'){$('points-picker-menu').classList.add('hidden');$('points-picker-trigger').setAttribute('aria-expanded','false');}});
-$('create-room').addEventListener('click',()=>configureSetup());
+$('create-room').addEventListener('click',()=>{configureSetup();void credits.sync();});
 $('open-room-list').addEventListener('click',(event)=>{const button=event.target.closest('[data-room][data-seat]');if(button)joinOpenRoom(button.dataset.room,button.dataset.seat);});
 
 $('back-home').addEventListener('click',()=>{showView('welcome-view');openLobby();});
@@ -3438,7 +3439,9 @@ async function creditApi(name,data){
   const fb=await firebaseServices();
   creditFunctionsPromise??=import('https://www.gstatic.com/firebasejs/12.4.0/firebase-functions.js');
   const {getFunctions,httpsCallable}=await creditFunctionsPromise;
-  return (await httpsCallable(getFunctions(fb.auth.app,'us-central1'),name)(data)).data;
+  const result=(await httpsCallable(getFunctions(fb.auth.app,'us-central1'),name)(data)).data;
+  if(['creditCreateTable','creditJoinTable','creditTableAction'].includes(name))await credits.sync();
+  return result;
 }
 async function creditCommand(command){
   const code=state.roomCode,matchId=state.room?.creditMatch?.id;

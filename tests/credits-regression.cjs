@@ -92,6 +92,13 @@ test('Countdown uses Uruguay midnight and shows seconds',async()=>{
  assert.equal(m.creditCountdown(Date.parse('2026-10-11T02:59:58Z')),'00:00:02');
  assert.equal(m.creditCountdown(Date.parse('2026-10-11T03:00:00Z')),'24:00:00');
 });
+test('Server refresh replaces a stale displayed balance with spendable credits',async()=>{
+ const m=await modulePromise,h=harness(m,{balance:5,locked:0,lastGrantAt:today});await h.api.start();
+ h.fb.get=async()=>({val:()=>({balance:4,locked:1,lastGrantAt:today})});
+ assert.equal(await h.api.sync(),true);assert.equal(h.elements['credits-balance'].textContent,'4');assert.equal(h.api.wallet().balance,4);
+ h.fb.get=async()=>{throw Error('network');};
+ assert.equal(await h.api.sync(),false);assert.equal(h.elements['credits-balance'].textContent,'—');assert.equal(h.api.wallet(),undefined);
+});
 test('The UI claims once, waits for confirmation and resets on account change',async()=>{
  const m=await modulePromise,h=harness(m);await h.api.start();assert.equal(h.elements['credits-balance'].textContent,'0');
  await Promise.all([h.api.claim(),h.api.claim()]);assert.equal(h.writes.length,1);assert.equal(h.writes[0].options.applyLocally,false);assert.equal(h.elements['credits-balance'].textContent,'5');assert.equal(h.elements['credits-panel'].hidden,true);

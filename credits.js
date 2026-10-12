@@ -29,6 +29,24 @@ export function installCredits({services,getState,document,now=()=>Date.now(),se
   const el=id=>document.getElementById(id);
   let uid=null,generation=0,unsubscribe=null,timer=null,wallet,busy=false,error='',available=false,detailsOpen=false,initialAttempted=false;
   const clock=()=>now()+(Number(getState().serverTimeOffset)||0);
+  let syncing=null;
+  async function sync() {
+    if(!uid||getState().firebaseConnected!==true)return false;
+    if(syncing)return syncing;
+    const user=uid,epoch=generation;
+    syncing=(async()=>{
+      try{
+        const fb=await services(),snapshot=await fb.get(fb.ref(fb.db,'creditEconomy/wallets/'+user));
+        if(epoch!==generation||getState().uid!==user)return false;
+        wallet=snapshot.val();available=true;error='';render();onChange();return true;
+      }catch{
+        if(epoch===generation){wallet=undefined;available=false;error='No pudimos confirmar tu saldo. Volvé a intentar.';render();onChange();}
+        return false;
+      }
+    })();
+    const pending=syncing;
+    try{return await pending;}finally{if(syncing===pending)syncing=null;}
+  }
   function render() {
     const panel=el('credits-panel');
     const eligibility=creditEligibility(wallet,clock());
@@ -48,7 +66,7 @@ export function installCredits({services,getState,document,now=()=>Date.now(),se
   }
   function stop() {
     ++generation;unsubscribe?.();unsubscribe=null;clearTimer(timer);timer=null;
-    uid=null;wallet=undefined;busy=false;error='';available=false;detailsOpen=false;initialAttempted=false;render();
+    uid=null;wallet=undefined;busy=false;error='';available=false;detailsOpen=false;initialAttempted=false;syncing=null;render();
   }
   async function start() {
     const user=getState().uid;if(!user){stop();return;}
@@ -104,5 +122,7 @@ export function installCredits({services,getState,document,now=()=>Date.now(),se
     panel.classList.remove('credits-highlight');void panel.offsetWidth;panel.classList.add('credits-highlight');
   });
   el('credits-claim').addEventListener('click',()=>claim());
-  return {start,stop,refresh:render,claim,wallet:()=>wallet};
+  document.addEventListener?.('visibilitychange',()=>{if(document.visibilityState==='visible')void sync();});
+  globalThis.addEventListener?.('pageshow',()=>{void sync();});
+  return {start,stop,refresh:render,sync,claim,wallet:()=>wallet};
 }
