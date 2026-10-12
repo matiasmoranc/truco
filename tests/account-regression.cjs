@@ -10,7 +10,7 @@ async function harness(user=null,profile=null,navigator={platform:"Win32",userAg
  const document={getElementById(id){return nodes[id]??={value:'',hidden:false,disabled:false,textContent:'',handlers:{},addEventListener(type,fn){this.handlers[type]=fn},focus(){},showModal(){this.open=true},close(){this.open=false}}}};
  const fb={db:{},auth:{currentUser:user},authSdk:{OAuthProvider:class{constructor(id){this.providerId=id;this.scopes=[]}addScope(scope){this.scopes.push(scope)}setCustomParameters(params){this.params=params}},GoogleAuthProvider:class{setCustomParameters(){} static credentialFromError(e){return e.credential}},async linkWithPopup(u){fb.auth.currentUser=google(u.uid)},async signInWithPopup(auth,provider){fb.auth.currentUser=provider?.providerId==='apple.com'?{uid:'apple',isAnonymous:false,providerData:[{providerId:'apple.com'}]}:google('google')},async signInWithCredential(){fb.auth.currentUser=google('existing')},async signOut(){fb.auth.currentUser=null}},ref(db,path){return path},get:async(ref)=>({val:()=>ref==='usernameIndexReady'?true:ref?.startsWith('usernames/')?null:profile}),update:async(ref,value)=>{writes.push({ref,value})}};
  const state={firebase:fb,room:null,uid:user?.uid||null};let name='',starts=0,resets=0,registrations=[];
- const account=installAccount({services:async()=>fb,getState:()=>state,rememberName:v=>name=v,document,navigator,storage:{getItem:k=>cache.get(k),setItem:(k,v)=>cache.set(k,v)},onReady:()=>{starts++},onIdentityChange:()=>{resets++},onRegistered:uid=>registrations.push(uid)});
+ const account=installAccount({api:async(name,data)=>fb.api?.(name,data),services:async()=>fb,getState:()=>state,rememberName:v=>name=v,document,navigator,storage:{getItem:k=>cache.get(k),setItem:(k,v)=>cache.set(k,v)},onReady:()=>{starts++},onIdentityChange:()=>{resets++},onRegistered:uid=>registrations.push(uid)});
  await account.observe(fb,user);
  return {account,fb,state,nodes,writes,cache,registrations,name:()=>name,starts:()=>starts,resets:()=>resets,click:async id=>nodes[id].handlers.click(),submit:async id=>nodes[id].handlers.submit({preventDefault(){}})};
 }
@@ -194,4 +194,24 @@ test('Welcome tour is requested only for a new profile, including recreated Goog
   const existing=await harness(user,{name:'Nuevo'});assert.deepEqual(existing.registrations,[]);
   const recreated=await harness({...user,uid:'recreated-'+provider});recreated.nodes['auth-name'].value='Nuevo';await recreated.submit('auth-register');assert.deepEqual(recreated.registrations,['recreated-'+provider]);
  }
+});
+
+test('Account deletion reauthenticates before server deletion and signs out on success',async()=>{
+ const h=await harness(google('known'),{name:'Mati'}),calls=[];
+ h.fb.api=async(name,data)=>calls.push(data.action);
+ h.fb.authSdk.reauthenticateWithPopup=async()=>calls.push('reauth');
+ h.fb.auth.currentUser.getIdToken=async()=>calls.push('refresh');
+ await h.click('account-delete');assert.equal(h.nodes['account-delete-confirm'].hidden,false);
+ await h.click('account-delete-submit');
+ assert.deepEqual(calls,['check','reauth','refresh','delete']);assert.equal(h.account.isReady(),false);
+ assert.equal(h.nodes['auth-status'].textContent,'Tu cuenta fue eliminada.');
+});
+test('Wrong identity or an active table prevents deletion',async()=>{
+ const h=await harness(google('known'),{name:'Mati'}),calls=[];
+ h.fb.api=async(name,data)=>calls.push(data.action);
+ h.fb.authSdk.reauthenticateWithPopup=async()=>{throw {code:'auth/user-mismatch'}};
+ await h.click('account-delete-submit');assert.deepEqual(calls,['check']);assert.equal(h.account.isReady(),true);
+ assert.match(h.nodes['account-status'].textContent,/misma cuenta/);
+ calls.length=0;h.fb.api=async()=>{throw new Error('Cerrá tu mesa')};
+ await h.click('account-delete-submit');assert.deepEqual(calls,[]);assert.match(h.nodes['account-status'].textContent,/Cerrá tu mesa/);
 });

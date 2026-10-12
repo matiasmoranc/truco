@@ -6,7 +6,7 @@ export function isAppleDevice(navigator=globalThis.navigator) {
   return /Mac|iPhone|iPad|iPod/i.test(platform)||/iPhone|iPad|iPod|Macintosh/i.test(ua);
 }
 
-export function installAccount({ services, getState, rememberName, document, storage=globalThis.localStorage, navigator=globalThis.navigator, onReady=()=>{}, onIdentityChange=()=>{}, onNameChanged=()=>{}, onRegistered=()=>{}, inRoom=()=>!!getState().room }) {
+export function installAccount({ api, services, getState, rememberName, document, storage=globalThis.localStorage, navigator=globalThis.navigator, onReady=()=>{}, onIdentityChange=()=>{}, onNameChanged=()=>{}, onRegistered=()=>{}, inRoom=()=>!!getState().room }) {
   const el=id=>document.getElementById(id);
   let slowLoading=false;
   let busy=false, ready=false, profileKey=null, profilePromise=null, currentUser=null;
@@ -37,7 +37,7 @@ export function installAccount({ services, getState, rememberName, document, sto
     el('account-apple').hidden=!appleDevice;
     el('account-apple').disabled=busy||!getState().firebase;
     el('auth-name-save').disabled=busy||!google||!loaded;
-    for(const id of ['account-change-name','account-logout','account-save'])el(id).disabled=busy||!ready||inRoom();
+    for(const id of ['account-change-name','account-logout','account-save','account-delete','account-delete-submit','account-delete-back'])el(id).disabled=busy||!ready||inRoom();
     el('auth-retry').hidden=!slowLoading&&(!getState().firebase||(!google||loaded));
     el('auth-retry').disabled=busy;
   }
@@ -225,6 +225,43 @@ export function installAccount({ services, getState, rememberName, document, sto
     if(!getState().firebase){globalThis.location.reload();return;}
     return action(async fb=>observe(fb,fb.auth.currentUser,true),{allowRegistration:true});
   });
+  el('account-delete').addEventListener('click',()=>{
+    if(busy||!ready)return;
+    el('account-menu').hidden=true;el('account-delete-confirm').hidden=false;message('');
+    el('account-delete-back').focus();
+  });
+  el('account-delete-back').addEventListener('click',()=>{
+    if(busy)return;
+    el('account-delete-confirm').hidden=true;el('account-menu').hidden=false;message('');
+  });
+  el('account-delete-submit').addEventListener('click',()=>action(async fb=>{
+    const user=fb.auth.currentUser,uid=user.uid;
+    try{
+      await api('deleteMyAccount',{action:'check'});
+      const apple=user.providerData.some(p=>p.providerId==='apple.com');
+      message('Verificá tu identidad para eliminar tu cuenta…');
+      if(globalThis.trucoNative?.isNative){
+        await globalThis.trucoNative.reauthenticateForDeletion(fb,user,apple?'apple.com':'google.com');
+      }else{
+        const provider=apple?new fb.authSdk.OAuthProvider('apple.com'):new fb.authSdk.GoogleAuthProvider();
+        if(apple){provider.addScope('email');provider.addScope('name');}
+        const result=await fb.authSdk.reauthenticateWithPopup(user,provider,fb.authSdk.browserPopupRedirectResolver);
+        if(apple){
+          const token=fb.authSdk.OAuthProvider.credentialFromResult(result)?.accessToken;
+          if(!token)throw new Error('No recibimos la autorización de Apple. Volvé a intentar.');
+          await fb.authSdk.revokeAccessToken(fb.auth,token);
+        }
+      }
+      await user.getIdToken(true);
+      message('Eliminando tu cuenta…');
+      await api('deleteMyAccount',{action:'delete'});
+      try{storage?.removeItem('truco-profile-name:'+uid);}catch{}
+      await fb.authSdk.signOut(fb.auth);await observe(fb,null);
+      message('Tu cuenta fue eliminada.');
+    }catch(error){
+      message(error?.code==='auth/user-mismatch'?'Usá la misma cuenta que querés eliminar.':error?.message||'No pudimos eliminar tu cuenta. Volvé a intentar.');
+    }
+  }));
   el('account-logout').addEventListener('click',()=>action(async fb=>{
     await fb.authSdk.signOut(fb.auth);
     await observe(fb,null);
@@ -241,7 +278,7 @@ export function installAccount({ services, getState, rememberName, document, sto
   });
   el('account-open').addEventListener('click',()=>{
     if(busy||!ready)return;
-    el('account-menu').hidden=false;el('account-edit').hidden=true;message('');render();
+    el('account-menu').hidden=false;el('account-edit').hidden=true;el('account-delete-confirm').hidden=true;message('');render();
     el('account-panel').showModal();el('account-close').focus();
   });
   function close(){el('account-panel').close();el('account-open').focus();}
