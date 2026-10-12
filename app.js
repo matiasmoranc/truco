@@ -445,7 +445,16 @@ const lobbyWelcomeSteps=[
 ];
 function positionLobbyWelcomeArrow(){
  if(!lobbyWelcomeDialog?.open||!lobbyWelcomeTarget)return;
- const box=lobbyWelcomeDialog.getBoundingClientRect(),target=lobbyWelcomeTarget.getBoundingClientRect();
+ const target=lobbyWelcomeTarget.getBoundingClientRect();
+ if(lobbyWelcomeStep>0){
+  const height=lobbyWelcomeDialog.getBoundingClientRect().height;
+  const top=Math.min(innerHeight-height-16,target.bottom+64);
+  lobbyWelcomeDialog.style.top=Math.max(16,top)+'px';
+  lobbyWelcomeDialog.style.bottom='auto';lobbyWelcomeDialog.style.margin='0 auto';
+ }else{
+  lobbyWelcomeDialog.style.removeProperty('top');lobbyWelcomeDialog.style.removeProperty('bottom');lobbyWelcomeDialog.style.removeProperty('margin');
+ }
+ const box=lobbyWelcomeDialog.getBoundingClientRect();
  const up=target.top+target.height/2<box.top+box.height/2,x1=box.left+box.width/2,y1=up?box.top-2:box.bottom+2;
  const x2=target.left+target.width/2,y2=up?target.bottom+8:target.top-8,bend=Math.max(24,Math.min(80,Math.abs(y2-y1)*.35));
  const svg=lobbyWelcomeDialog.querySelector('svg');svg.setAttribute('viewBox','0 0 '+innerWidth+' '+innerHeight);
