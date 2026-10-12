@@ -2984,7 +2984,7 @@ async function startLearning(stage=0){
   try{
     $('learn-coach-dialog').close();
     if(!await startLocalBotGame())return;
-    state.learning={stage,hints:true,pointsInfo:true,whoWins:true,roundMessages:[],paused:true,pausedAt:gameTime(),complete:false,scoreMessages:[],introAfterTutorial:stage>0,tutorialMessages:[{title:'Guía de cartas',pointAtGuide:true,text:'Podés tocar este ícono cuando quieras para abrir la guía. Te ayuda a reconocer tus cartas y saber cuáles son más poderosas.'},{title:'Ayudas',pointAtOptions:true,text:'Aquí podés deshabilitar las ayudas cuando vayas entendiendo.'},{title:'Elegí una carta para empezar',introLast:true,text:'Seleccioná cualquier carta de tu mano para empezar a jugar.'}]};
+    state.learning={stage,hints:true,pointsInfo:true,whoWins:true,roundMessages:[],paused:true,pausedAt:gameTime(),complete:false,scoreMessages:[],tutorialMessages:[{title:'Guía de cartas',pointAtGuide:true,text:'Podés tocar este ícono cuando quieras para abrir la guía. Te ayuda a reconocer tus cartas y saber cuáles son más poderosas.'},{title:'Ayudas',pointAtOptions:true,text:'Aquí podés deshabilitar las ayudas cuando vayas entendiendo.'},{title:'Elegí una carta para empezar',introLast:true,text:'Seleccioná cualquier carta de tu mano para empezar a jugar.'}]};
     state.bot=true;state.botDifficulty='normal';state.botMemory=null;
     state.room.players={player1:{name:cleanName($('player-name').value||savedPlayerName(),'Vos')},player2:{name:'Bot de práctica'}};
     Object.assign(state.room,{targetPoints:10,status:'started',openingDraw:null,createdAt:gameTime(),matchNumber:1,turnClock:null,practiceRules:{envido:stage>=1,flor:stage>=2}});
@@ -2995,7 +2995,7 @@ async function startLearning(stage=0){
     }
     state.hand=[...state.localHands.player1];
     state.dismissedMatchEnd=null;state.focusedMatchEnd=null;
-    renderGame();showView('game-view');resumeLearning();
+    renderGame();showView('game-view');if(stage>=1)openLearningHelp();else resumeLearning();
   }catch(error){console.error('[truco:learning]',error);toast('No se pudo iniciar la práctica. Volvé a intentar.');}
   finally{state.learningStarting=false;}
 }
@@ -3050,7 +3050,9 @@ function queueLearningPoints(before,after,entries){
     }).join('\n');
     const subject=player==='player1'?'Sumaste':(before.players?.[player]?.name||'El bot')+' sumó';
     state.learning.scoreMessages??=[];
-    state.learning.scoreMessages.push(subject+' '+points+' '+(points===1?'punto':'puntos')+'.\n'+(reason||'Por los puntos de esta mano.')+(after[player]>=targetPoints(before)?'\n'+(player==='player1'?'Llegaste':'Llegó')+' al límite de la partida: '+targetPoints(before)+' puntos.':''));
+    const terminal=Math.max(...Object.values(after))>=targetPoints(before);
+    const explanation=terminal?reason.replace(/Se vuelve a repartir\.?/gi,'').trim():reason;
+    state.learning.scoreMessages.push(subject+' '+points+' '+(points===1?'punto':'puntos')+'.\n'+(explanation||'Por los puntos de esta mano.')+(after[player]>=targetPoints(before)?'\n'+(player==='player1'?'Ganaste la partida.':(before.players?.[player]?.name||'El bot')+' ganó la partida.'):''));
   }
 }
 function positionLearningScoreArrow(){
@@ -3171,7 +3173,7 @@ function learningResponseTitle(room,bet){
  if(!bet)return 'Antes de responder';
  if(bet.revealMode)return 'Declarar tus tantos de envido';
  const name=room.players?.[bet.caller]?.name||'El rival';
- if(bet.type==='truco')return name+' gritó '+({2:'TRUCO',3:'RETRUCO',4:'VALE 4'}[bet.stake]||'TRUCO');
+ if(bet.type==='truco')return name+(Number(bet.stake)===2?' gritó ':' dice ')+({2:'TRUCO',3:'RETRUCO',4:'VALE 4'}[bet.stake]||'TRUCO');
  if(bet.type==='flor')return name+' cantó '+betCallNames(bet).join(' + ').toUpperCase();
  if(bet.type==='envido')return name+' dijo '+betCallNames(bet).join(' + ').toUpperCase();
  return 'Antes de responder';
@@ -3454,7 +3456,7 @@ for(const dialog of document.querySelectorAll('.learning-message')){
 }
 $('learning-message-close').addEventListener('click',()=>$('learning-hint').close());
 $('learning-message-study').addEventListener('click',event=>{const kind=event.currentTarget.dataset.studyKind;if(kind==='envido'||kind==='flor')openStudy(kind);});
-$('learning-hint').addEventListener('close',()=>{const showStageIntro=state.learning?.activeTutorial?.introLast&&state.learning?.introAfterTutorial;if(state.learning){state.learning.acknowledgedMessage=state.learning.activeMessage;state.learning.activeMessage=null;state.learning.activeScoreMessage=false;state.learning.activeTutorial=null;}positionLearningScoreArrow();if(showStageIntro){state.learning.introAfterTutorial=false;openLearningHelp();}else resumeLearning();});
+$('learning-hint').addEventListener('close',()=>{if(state.learning){state.learning.acknowledgedMessage=state.learning.activeMessage;state.learning.activeMessage=null;state.learning.activeScoreMessage=false;state.learning.activeTutorial=null;}positionLearningScoreArrow();resumeLearning();});
 $('learn-menu').addEventListener('click',openLearning);
 $('game-sheet').addEventListener('click',()=>{if(state.learning)openStudySheet();});
 $('learn-sheet-menu').addEventListener('click',openStudySheet);

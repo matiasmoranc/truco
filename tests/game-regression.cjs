@@ -153,8 +153,26 @@ test('Declined action help is replaced by scoring info, but stays available when
 
 test('Response help names the rival canto without relying on a separate yellow notice',()=>{
  const c=harness();c.betCallNames=bet=>[bet.called||'flor'];vm.runInContext(extract('learningResponseTitle'),c);
- const r=room();for(const [stake,name] of [[2,'TRUCO'],[3,'RETRUCO'],[4,'VALE 4']])assert.equal(c.learningResponseTitle(r,{type:'truco',caller:'player2',stake}),'Ricky gritó '+name);
+ const r=room();for(const [stake,name] of [[2,'TRUCO'],[3,'RETRUCO'],[4,'VALE 4']])assert.equal(c.learningResponseTitle(r,{type:'truco',caller:'player2',stake}),'Ricky'+(stake===2?' gritó ':' dice ')+name);
  assert.equal(c.learningResponseTitle(r,{type:'envido',caller:'player2',called:'real envido'}),'Ricky dijo REAL ENVIDO');
  assert.equal(c.learningResponseTitle(r,{type:'flor',caller:'player2'}),'Ricky cantó FLOR');
  assert.equal(c.learningResponseTitle(r,{type:'envido',revealMode:true}),'Declarar tus tantos de envido');
+});
+
+test('Final practice points announce victory without offering another deal',()=>{
+ const c=harness();c.state={learning:{pointsInfo:true,scoreMessages:[]}};vm.runInContext(extract('queueLearningPoints'),c);
+ const r=room();r.scores={player1:19,player2:3};
+ c.queueLearningPoints(r,{player1:20,player2:3},[{player:'player1',points:1,detail:'Truco no querido. Se vuelve a repartir.'}]);
+ assert.match(c.state.learning.scoreMessages[0],/Ganaste la partida/);assert.doesNotMatch(c.state.learning.scoreMessages[0],/repartir/);
+ c.state.learning.scoreMessages=[];r.scores.player1=18;c.queueLearningPoints(r,{player1:19,player2:3},[{player:'player1',points:1,detail:'Truco no querido. Se vuelve a repartir.'}]);assert.match(c.state.learning.scoreMessages[0],/Se vuelve a repartir/);
+});
+
+test('Stages two and three open study introduction before queued table guidance',async()=>{
+ for(const stage of [0,1,2]){
+  const c=harness(),r=room(),events=[];c.state={room:r,localHands:{player1:[card('♥',1),card('♥',7),card('♣',3)],player2:[card('♦',1),card('♦',7),card('♣',3)]}};
+  c.$=()=>({value:'Mati',close(){}});c.startLocalBotGame=async()=>true;c.cleanName=value=>value;c.savedPlayerName=()=>'';c.showView=()=>{};c.openLearningHelp=()=>events.push('study-intro');c.resumeLearning=()=>events.push('table-guidance');c.learningDeck=()=>[...c.state.localHands.player1,...c.state.localHands.player2,card('♠',6)];
+  vm.runInContext(extract('startLearning'),c);await c.startLearning(stage);
+  assert.deepEqual(events,[stage?'study-intro':'table-guidance']);
+  assert.equal(c.state.learning.tutorialMessages[0].pointAtGuide,true);assert.equal(c.state.learning.tutorialMessages[1].pointAtOptions,true);assert.match(c.state.learning.tutorialMessages[2].text,/Seleccioná/);
+ }
 });
