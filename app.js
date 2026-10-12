@@ -2323,15 +2323,20 @@ function enableMouseWheelDrag(wheel,stopHint,syncWheel){
   wheel.addEventListener('pointerleave',event=>{if(drag&&!drag.moved)drag=null;});
   wheel.addEventListener('click',event=>{if(suppressClick){event.preventDefault();event.stopImmediatePropagation();suppressClick=false;}},true);
 }
+function envidoPickerMinimum(room,player){
+  const opponent=otherPlayer(player),points=room.pendingBet?.reveals?.[opponent];
+  return points==null?0:Number(points)+(room.mano===player?0:1);
+}
 function renderEnvidoPicker(room){
   const el=$('envido-picker'),bet=room.pendingBet,active=bet?.revealMode&&bet.revealTurn===state.playerId;
   el.classList.toggle('hidden',!active);
   $('game-view').classList.toggle('declaring-envido',!!active);
   if(!active){el.stopWheelHint?.();el.dataset.key='';return;}
-  const first=room.mano,opponentPoints=bet.reveals?.[first],second=state.playerId!==first,min=second?Number(opponentPoints):0;
+  const opponentPoints=bet.reveals?.[otherPlayer(state.playerId)],second=opponentPoints!=null,min=envidoPickerMinimum(room,state.playerId);
   const key=`${room.handNumber}:${state.playerId}:${opponentPoints??'first'}`;
   if(el.dataset.key===key)return;el.stopWheelHint?.();el.dataset.key=key;const initial=Math.min(50,Math.max(20,min));el.dataset.value=String(initial);
-  el.innerHTML=`<p>Arrastra los números para seleccionar</p><div class="number-wheel" role="listbox" aria-label="Tantos del 0 al 50">${Array.from({length:51},(_,number)=>`<button role="option" aria-selected="${number===min}" ${number<min?'disabled':''} data-number="${number}">${number}</button>`).join('')}</div><div class="declaration-buttons">${min<=50?'<button id="declare-points" class="call-button">DECLARAR <span id="selected-points">'+min+'</span></button>':''}${second?'<button id="good-points" class="pass-button">SON BUENAS</button>':''}</div>`;
+  el.innerHTML=`<p>Arrastra los números para seleccionar</p><div class="number-wheel" role="listbox" aria-label="Tantos del 0 al 50">${Array.from({length:Math.max(0,51-min)},(_,index)=>{const number=min+index;return `<button role="option" aria-selected="${number===min}" ${number<min?'disabled':''} data-number="${number}">${number}</button>`;}).join('')}</div><div class="declaration-buttons">${min<=50?'<button id="declare-points" class="call-button">DECLARAR <span id="selected-points">'+min+'</span></button>':''}${second?'<button id="good-points" class="pass-button">SON BUENAS</button>':''}</div>`;
+  if(min>50){el.querySelector('.number-wheel').classList.add('hidden');el.querySelector('p').textContent='El rival declaró el máximo de tantos.';$('good-points')?.addEventListener('click',()=>runLiveAction($('good-points'),()=>revealEnvido(true)));return;}
   const wheel=el.querySelector('.number-wheel');
   const step=()=>wheel.querySelector('[data-number]').getBoundingClientRect().width;
   let hintRunning=false,hintFrame=null;
@@ -2340,7 +2345,7 @@ function renderEnvidoPicker(room){
   const stopHint=()=>{
     if(!hintRunning)return;
     hintRunning=false;cancelAnimationFrame(hintFrame);
-    wheel.style.scrollSnapType='';wheel.scrollLeft=initial*step();select(initial);syncWheel();
+    wheel.style.scrollSnapType='';wheel.scrollLeft=(initial-min)*step();select(initial);syncWheel();
   };
   el.stopWheelHint=stopHint;
   wheel.addEventListener('pointerdown',stopHint,{once:true,passive:true});
@@ -2348,8 +2353,8 @@ function renderEnvidoPicker(room){
   wheel.addEventListener('keydown',stopHint,{once:true});
   enableMouseWheelDrag(wheel,stopHint,syncWheel);
   wheel.addEventListener('scroll',syncWheel,{passive:true});
-  wheel.querySelectorAll('[data-number]').forEach(button=>button.addEventListener('click',()=>{stopHint();select(Number(button.dataset.number));wheel.scrollTo({left:Number(button.dataset.number)*step(),behavior:'smooth'});}));
-  wheel.scrollLeft=initial*step();select(initial);requestAnimationFrame(syncWheel);
+  wheel.querySelectorAll('[data-number]').forEach(button=>button.addEventListener('click',()=>{stopHint();select(Number(button.dataset.number));wheel.scrollTo({left:(Number(button.dataset.number)-min)*step(),behavior:'smooth'});}));
+  wheel.scrollLeft=(initial-min)*step();select(initial);requestAnimationFrame(syncWheel);
   if(!window.matchMedia('(prefers-reduced-motion: reduce)').matches){
     hintRunning=true;wheel.style.scrollSnapType='none';
     let started=null;
@@ -2358,7 +2363,7 @@ function renderEnvidoPicker(room){
       if(!active||el.dataset.key!==key){stopHint();return;}
       started??=now;
       const progress=Math.min(1,(now-started)/2400);
-      wheel.scrollLeft=(initial+2*Math.sin(progress*2*Math.PI))*step();syncWheel();
+      wheel.scrollLeft=Math.max(0,initial-min+2*Math.sin(progress*2*Math.PI))*step();syncWheel();
       if(progress<1)hintFrame=requestAnimationFrame(animate);else stopHint();
     };
     hintFrame=requestAnimationFrame(animate);
@@ -3171,7 +3176,8 @@ function setLearningWhoWins(enabled){
 }
 function learningResponseTitle(room,bet){
  if(!bet)return 'Antes de responder';
- if(bet.revealMode)return 'Declarar tus tantos de envido';
+ if(bet.revealMode&&bet.caller===state.playerId)return 'Declarar tus tantos de envido';
+ if(bet.revealMode&&bet.caller==null)return 'Declarar tus tantos de envido';
  const name=room.players?.[bet.caller]?.name||'El rival';
  if(bet.type==='truco')return name+(Number(bet.stake)===2?' gritó ':' dice ')+({2:'TRUCO',3:'RETRUCO',4:'VALE 4'}[bet.stake]||'TRUCO');
  if(bet.type==='flor')return name+' cantó '+betCallNames(bet).join(' + ').toUpperCase();

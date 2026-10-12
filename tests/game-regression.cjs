@@ -176,3 +176,21 @@ test('Stages two and three open study introduction before queued table guidance'
   assert.equal(c.state.learning.tutorialMessages[0].pointAtGuide,true);assert.equal(c.state.learning.tutorialMessages[1].pointAtOptions,true);assert.match(c.state.learning.tutorialMessages[2].text,/Seleccioná/);
  }
 });
+
+
+test('Envido picker starts above the rival declaration unless the player is mano',()=>{
+ const c=harness();vm.runInContext(extract('envidoPickerMinimum'),c);
+ const r=room();r.mano='player2';r.pendingBet={reveals:{player2:20}};
+ assert.equal(c.envidoPickerMinimum(r,'player1'),21);
+ r.mano='player1';assert.equal(c.envidoPickerMinimum(r,'player1'),20);
+ r.pendingBet.reveals.player2=0;r.mano='player2';assert.equal(c.envidoPickerMinimum(r,'player1'),1);
+ r.pendingBet.reveals.player2=50;assert.equal(c.envidoPickerMinimum(r,'player1'),51);
+ r.pendingBet.reveals={};assert.equal(c.envidoPickerMinimum(r,'player1'),0);
+});
+
+test('Practice declaration popup still identifies the bot envido call',()=>{
+ const c=harness();c.state.playerId='player1';c.betCallNames=bet=>[bet.called||'envido'];vm.runInContext(extract('learningResponseTitle'),c);
+ const r=room();r.players.player2.name='Bot de práctica';
+ assert.equal(c.learningResponseTitle(r,{type:'envido',caller:'player2',called:'envido',revealMode:true}),'Bot de práctica dijo ENVIDO');
+ assert.equal(c.learningResponseTitle(r,{type:'envido',caller:'player1',revealMode:true}),'Declarar tus tantos de envido');
+});
