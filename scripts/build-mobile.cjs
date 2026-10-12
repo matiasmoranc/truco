@@ -7,7 +7,12 @@ const root = path.resolve(__dirname, '..');
   await fs.mkdir(stage, { recursive: true });
   for (const file of ['index.html','style.css','app.js','account.js','auth-init.js','activity.js','credits.js','scorer.js','player-panel.js','firebase-config.js','favicon.svg']) {
     let content = await fs.readFile(path.join(root, file), 'utf8');
-    if (file === 'index.html') content = content.replace(/src="\.\/app\.js[^" ]*"/, 'src="./mobile/entry.js"');
+    if (file === 'index.html') {
+      content = content.replace(/src="\.\/app\.js[^" ]*"/, 'src="./mobile/entry.js"');
+      // Let the native WebView inset its viewport around the notch/status bar
+      // and home indicator, including fixed game controls and scorekeeper.
+      content = content.replace('viewport-fit=cover', 'viewport-fit=auto');
+    }
     if (file === 'app.js') {
       content = content.replace(/import\(`https:\/\/www\.gstatic\.com\/firebasejs\/\$\{FIREBASE_VERSION\}\/firebase-(app|database|auth)\.js`\)/g, (_, sdk) => `Promise.resolve(globalThis.trucoNative.sdk.${sdk})`);
       content = content.replace("import('https://www.gstatic.com/firebasejs/12.4.0/firebase-functions.js')", 'Promise.resolve(globalThis.trucoNative.sdk.functions)');

@@ -3,6 +3,10 @@
   "appName": "Truco Uruguayo",
   "webDir": "www",
   "backgroundColor": "#103d2e",
+  "ios": {
+    "contentInset": "always",
+    "backgroundColor": "#103d2e"
+  },
   "plugins": {
     "FirebaseAuthentication": {
       "skipNativeAuth": true,
