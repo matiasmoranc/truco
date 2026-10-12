@@ -171,7 +171,7 @@ test('Stages two and three open study introduction before queued table guidance'
  for(const stage of [0,1,2]){
   const c=harness(),r=room(),events=[];c.state={room:r,localHands:{player1:[card('♥',1),card('♥',7),card('♣',3)],player2:[card('♦',1),card('♦',7),card('♣',3)]}};
   c.$=()=>({value:'Mati',close(){}});c.startLocalBotGame=async()=>true;c.cleanName=value=>value;c.savedPlayerName=()=>'';c.showView=()=>{};c.openLearningHelp=()=>events.push('study-intro');c.resumeLearning=()=>events.push('table-guidance');c.learningDeck=()=>[...c.state.localHands.player1,...c.state.localHands.player2,card('♠',6)];
-  vm.runInContext(extract('startLearning'),c);await c.startLearning(stage);
+  vm.runInContext(['rememberLearningPractice','startLearning'].map(extract).join('\n'),c);await c.startLearning(stage);
   assert.deepEqual(events,[stage?'study-intro':'table-guidance']);
   assert.equal(c.state.learning.tutorialMessages[0].pointAtGuide,true);assert.equal(c.state.learning.tutorialMessages[1].pointAtOptions,true);assert.match(c.state.learning.tutorialMessages[2].text,/Seleccioná/);
  }
@@ -193,4 +193,23 @@ test('Practice declaration popup still identifies the bot envido call',()=>{
  const r=room();r.players.player2.name='Bot de práctica';
  assert.equal(c.learningResponseTitle(r,{type:'envido',caller:'player2',called:'envido',revealMode:true}),'Bot de práctica dijo ENVIDO');
  assert.equal(c.learningResponseTitle(r,{type:'envido',caller:'player1',revealMode:true}),'Declarar tus tantos de envido');
+});
+
+
+test('Envido scoring explains the award plainly and only details incorrect declarations',()=>{
+ const c=harness();vm.runInContext(['betCallNames','acceptedEnvidoExplanation','scoringEntries'].map(extract).join('\n'),c);
+ const r=room();r.scores={player1:0,player2:0};r.envidoAudit={stake:2,called:'envido',reveals:{player1:27,player2:31},winner:'player2',declarationOrder:['player1','player2']};
+ let entries=c.scoringEntries(r,{player1:0,player2:2},'',{player1:27,player2:31});
+ assert.equal(entries[0].detail,'Envido querido: son 2 puntos.');
+ entries=c.scoringEntries(r,{player1:3,player2:0},'Mano ganada.',{player1:27,player2:30});
+ assert.match(entries[0].detail,/Ricky declaró 31 y tenía 30/);assert.match(entries[0].detail,/incorrectos/);assert.doesNotMatch(entries[0].detail,/declaró 27/);
+ assert.equal(c.acceptedEnvidoExplanation({called:'real',calls:['envido','real'],stake:5}),'Envido + Real envido querido: son 5 puntos.');
+});
+
+test('Practice menu remembers the first start and shows three modes on later visits',()=>{
+ const c=harness(),saved=new Map(),classes={};c.localStorage={getItem:key=>saved.get(key),setItem:(key,value)=>saved.set(key,value)};
+ c.$=id=>({classList:{toggle:(name,on)=>classes[id]=on}});
+ vm.runInContext(['hasStartedLearningPractice','rememberLearningPractice','renderLearningMenu'].map(extract).join('\n'),c);
+ c.renderLearningMenu();assert.equal(classes['learn-free'],false);assert.equal(classes['learn-game-modes'],true);
+ c.rememberLearningPractice();c.state={};c.renderLearningMenu();assert.equal(classes['learn-free'],true);assert.equal(classes['learn-game-modes'],false);
 });

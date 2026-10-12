@@ -239,8 +239,8 @@ function acceptedEnvidoExplanation(audit){
   const values=kinds.map(kind=>kind==='envido'?2:kind==='real'?3:null);
   const sum=values.every(value=>value!==null)?values.reduce((total,value)=>total+value,0):null;
   const points=Number(audit.stake)||0;
-  const calculation=sum===points?values.join(' + ')+' = '+points+' puntos.':kinds.includes('falta')?'Se juega por '+points+' puntos de falta envido.':'Se juega por 2 puntos porque el canto supera lo que falta para ganar.';
-  return calls.join(' + ')+' querido. '+calculation;
+  const calculation=sum===points||kinds.includes('falta')?'son '+points+' puntos.':'son '+points+' puntos porque el canto supera lo que falta para ganar.';
+  return calls.join(' + ')+' querido: '+calculation;
 }
 function scoringEntries(room,scores,reason,truth=null){
   const entries=[...(room.handScoreEntries||[])];
@@ -249,10 +249,10 @@ function scoringEntries(room,scores,reason,truth=null){
   if(room.envidoAudit&&truth){
     const audit=room.envidoAudit,award=auditEnvidoScores(room,{player1:0,player2:0},truth);
     const names=p=>room.players?.[p]?.name||'Jugador';
-    const details=['player1','player2'].map(p=>audit.reveals?.[p]!=null?`${names(p)} declaró ${audit.reveals[p]} y tenía ${truth[p]}.`:`${names(p)} tenía ${truth[p]} tantos.`);
     const liars=Object.keys(audit.reveals||{}).filter(p=>Number(audit.reveals[p])!==Number(truth[p]));
+    const details=liars.map(p=>`${names(p)} declaró ${audit.reveals[p]} y tenía ${truth[p]}.`);
     const result=liars.length===2?`${names(envidoAuditResult(room,truth).liars[0])} declaró mal primero; el rival gana el envido y la mano.`:liars.length===1?`${names(liars[0])} declaró tantos incorrectos; el rival gana el envido y la mano.`:audit.reveals?.player1===audit.reveals?.player2&&audit.reveals?.player1!=null?'Empate: gana quien es mano.':'Gana el envido.';
-    const detail=acceptedEnvidoExplanation(audit)+' '+details.join(' ')+' '+result;
+    const detail=acceptedEnvidoExplanation(audit)+(liars.length?' '+details.join(' ')+' '+result:'');
     for(const p of ['player1','player2'])if(award[p]>0&&remaining[p]>=award[p])add(p,award[p],detail);
     if(!award.player1&&!award.player2)entries.push({player:room.mano||'player1',points:0,detail});
   }

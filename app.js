@@ -1149,8 +1149,8 @@ function acceptedEnvidoExplanation(audit){
   const values=kinds.map(kind=>kind==='envido'?2:kind==='real'?3:null);
   const sum=values.every(value=>value!==null)?values.reduce((total,value)=>total+value,0):null;
   const points=Number(audit.stake)||0;
-  const calculation=sum===points?values.join(' + ')+' = '+points+' puntos.':kinds.includes('falta')?'Se juega por '+points+' puntos de falta envido.':'Se juega por 2 puntos porque el canto supera lo que falta para ganar.';
-  return calls.join(' + ')+' querido. '+calculation;
+  const calculation=sum===points||kinds.includes('falta')?'son '+points+' puntos.':'son '+points+' puntos porque el canto supera lo que falta para ganar.';
+  return calls.join(' + ')+' querido: '+calculation;
 }
 
 function scoringEntries(room,scores,reason,truth=null){
@@ -1160,10 +1160,10 @@ function scoringEntries(room,scores,reason,truth=null){
   if(room.envidoAudit&&truth){
     const audit=room.envidoAudit,award=auditEnvidoScores(room,{player1:0,player2:0},truth);
     const names=p=>room.players?.[p]?.name||'Jugador';
-    const details=['player1','player2'].map(p=>audit.reveals?.[p]!=null?`${names(p)} declaró ${audit.reveals[p]} y tenía ${truth[p]}.`:`${names(p)} tenía ${truth[p]} tantos.`);
     const liars=Object.keys(audit.reveals||{}).filter(p=>Number(audit.reveals[p])!==Number(truth[p]));
+    const details=liars.map(p=>`${names(p)} declaró ${audit.reveals[p]} y tenía ${truth[p]}.`);
     const result=liars.length===2?`${names(envidoAuditResult(room,truth).liars[0])} declaró mal primero; el rival gana el envido y la mano.`:liars.length===1?`${names(liars[0])} declaró tantos incorrectos; el rival gana el envido y la mano.`:audit.reveals?.player1===audit.reveals?.player2&&audit.reveals?.player1!=null?'Empate: gana quien es mano.':'Gana el envido.';
-    const detail=acceptedEnvidoExplanation(audit)+' '+details.join(' ')+' '+result;
+    const detail=acceptedEnvidoExplanation(audit)+(liars.length?' '+details.join(' ')+' '+result:'');
     for(const p of ['player1','player2'])if(award[p]>0&&remaining[p]>=award[p])add(p,award[p],detail);
     if(!award.player1&&!award.player2)entries.push({player:room.mano||'player1',points:0,detail});
   }
@@ -2978,17 +2978,31 @@ function learningDeck(room){
   return deck;
 }
 function roomHasFlor(room,hand){return room?.practiceRules?.flor!==false&&hasFlor(hand,room?.muestra);}
+function hasStartedLearningPractice(){
+  if(state.learningPracticeStarted)return true;
+  try{return localStorage.getItem('truco-learning-started-v1')==='true';}catch{return false;}
+}
+function rememberLearningPractice(){
+  state.learningPracticeStarted=true;
+  try{localStorage.setItem('truco-learning-started-v1','true');}catch{}
+}
+function renderLearningMenu(){
+  const started=hasStartedLearningPractice();
+  $('learn-free').classList.toggle('hidden',started);
+  $('learn-game-modes').classList.toggle('hidden',!started);
+}
 function openLearning(){
   state.navigationEpoch=(state.navigationEpoch||0)+1;
   $('learn-coach-dialog').close();
   if(state.learning){stopBot();clearTimeout(state.resolutionTimer);state.room=null;state.localGame=false;}
-  showView('learn-view');
+  renderLearningMenu();showView('learn-view');
 }
 async function startLearning(stage=0){
   if(state.learningStarting)return;state.learningStarting=true;
   try{
     $('learn-coach-dialog').close();
     if(!await startLocalBotGame())return;
+    rememberLearningPractice();
     state.learning={stage,hints:true,pointsInfo:true,whoWins:true,roundMessages:[],paused:true,pausedAt:gameTime(),complete:false,scoreMessages:[],tutorialMessages:[{title:'Guía de cartas',pointAtGuide:true,text:'Podés tocar este ícono cuando quieras para abrir la guía. Te ayuda a reconocer tus cartas y saber cuáles son más poderosas.'},{title:'Ayudas',pointAtOptions:true,text:'Aquí podés deshabilitar las ayudas cuando vayas entendiendo.'},{title:'Elegí una carta para empezar',introLast:true,text:'Seleccioná cualquier carta de tu mano para empezar a jugar.'}]};
     state.bot=true;state.botDifficulty='normal';state.botMemory=null;
     state.room.players={player1:{name:cleanName($('player-name').value||savedPlayerName(),'Vos')},player2:{name:'Bot de práctica'}};
@@ -3440,6 +3454,7 @@ function continueLearningStage(){
 $('learn-game').addEventListener('click',openLearning);
 $('learn-back').addEventListener('click',()=>{stopBot();showView('welcome-view');openLobby();});
 $('learn-free').addEventListener('click',()=>startLearning(0));
+$('learn-game-modes').addEventListener('click',event=>{const button=event.target.closest('[data-learning-stage]');if(button)startLearning(Number(button.dataset.learningStage));});
 window.addEventListener('resize',()=>{positionLearningScoreArrow();positionLearningControls();});
 function indicateLearningMessageClose(event){
   const dialog=event.currentTarget;
