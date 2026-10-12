@@ -2033,7 +2033,8 @@ function renderGame() {
   const foldButton=$('fold-hand');
   if(foldButton.parentElement===actions)actions.parentElement.append(foldButton);
   const canAct=room.status==='started'&&!room.resolvingTrick&&!room.pendingNextHand;
-  const availableButtons=canAct?buttons.filter(button=>button.includes('data-action=')):[];
+  const myActionTurn=pending?(pending.revealMode?pending.revealTurn===state.playerId:pending.responder===state.playerId):room.turn===state.playerId;
+  const availableButtons=canAct&&myActionTurn?buttons.filter(button=>button.includes('data-action=')):[];
   actions.innerHTML=availableButtons.length?'<div class="action-buttons compact-actions">'+availableButtons.join('')+'</div>':'';
   const actionContainer=actions.querySelector('.compact-actions');
   if(actionContainer&&pending?.responder===state.playerId){
@@ -2148,7 +2149,10 @@ function renderMatchEnd(){
   if(!visible)return;
   const name=room.players?.[winner]?.name||'Jugador';
   $('match-end-title').textContent='Ganó '+name;
-  $('match-session-score').textContent='';
+  const wins=sessionWins(room),totalMatches=wins.player1+wins.player2;
+  const sessionScore=$('match-session-score');
+  sessionScore.textContent=totalMatches>=2?'Ganadas: '+(room.players?.player1?.name||'Jugador 1')+' '+wins.player1+' – '+wins.player2+' '+(room.players?.player2?.name||'Jugador 2'):'';
+  sessionScore.classList.toggle('hidden',totalMatches<2);
   $('match-end-score').innerHTML=['player1','player2'].map(player=>`<div class="${player===winner?'match-score-winner':''}"><strong>${capScores(room,room.scores)[player]||0}</strong><span>${escapeHtml(room.players?.[player]?.name||'Jugador')}</span></div>`).join('<b aria-hidden="true">–</b>');
   const request=room.rematch,player=state.playerId,isPlayer=['player1','player2'].includes(player);
   const pending=request?.status==='pending',incoming=pending&&request.requester!==player;

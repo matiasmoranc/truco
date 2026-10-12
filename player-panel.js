@@ -24,7 +24,7 @@ export function installPlayerPanel({document,api,getState}){
  function report(fromMatch=false){
   const token=open('Reportar un problema');const state=getState(),matchId=fromMatch&&state.room?.managedCredits?state.room.creditMatch?.id:null;
   let localId=null;if(fromMatch&&state.localGame&&state.room){if(!localIds.has(state.room))localIds.set(state.room,'local_'+crypto.randomUUID());localId=localIds.get(state.room);}
-  body.append(node('p',matchId||localId?'Se adjuntará el ID de esta partida.':'Contanos qué pasó para que podamos revisarlo.'));
+  if(!matchId&&!localId)body.append(node('p','Contanos qué pasó para que podamos revisarlo.'));
   const form=document.createElement('form'),input=document.createElement('textarea');input.maxLength=1000;input.minLength=5;input.required=true;input.rows=5;input.placeholder='¿Qué pasó?';input.setAttribute('aria-label','Descripción del problema');
   const submit=node('button','Enviar reporte','button primary');submit.type='submit';const status=node('p','');status.setAttribute('role','status');form.append(input,submit,status);body.append(form);
   const requestId=crypto.randomUUID();let busy=false;
