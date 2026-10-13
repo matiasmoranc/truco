@@ -1532,6 +1532,7 @@ html,body,#app{touch-action:pan-x pan-y}
 
 /* Account history and problem reporting */
 .report-link{appearance:none;background:transparent;border:0;color:var(--gold);font:inherit;font-size:13px;text-decoration:underline;padding:10px;cursor:pointer;touch-action:manipulation}
+.legal-links{display:flex;justify-content:center;gap:18px;margin:4px auto 0;font-size:12px}.legal-links a{color:var(--muted);text-underline-offset:3px}.legal-links a:hover{color:var(--gold)}
 #lobby-report{display:block;margin-top:auto;align-self:center}
 #match-report{display:block;margin:10px auto 0}
 .player-account-summary{display:flex;flex-direction:column;gap:6px;padding:16px;background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:14px;margin-bottom:8px}

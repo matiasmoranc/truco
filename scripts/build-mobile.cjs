@@ -27,6 +27,7 @@ const root = path.resolve(__dirname, '..');
   const nativeHtml = path.join(root,'www/index.html');
   await fs.writeFile(nativeHtml,(await fs.readFile(nativeHtml,'utf8')).replace('viewport-fit=cover','viewport-fit=auto'));
   await fs.copyFile(path.join(root,'favicon.svg'), path.join(root,'www/favicon.svg'));
+  await Promise.all(['privacidad.html','soporte.html','legal.css'].map(file=>fs.copyFile(path.join(root,file),path.join(root,'www',file))));
   // CSS dynamically selects card images; retain their original bytes and paths.
   await fs.cp(path.join(root,'assets'), path.join(root,'www/assets'), { recursive: true });
 })().catch(error => { console.error(error); process.exitCode = 1; });
