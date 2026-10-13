@@ -9,3 +9,5 @@ ios/
 *.jks
 .env*
 artifacts/
+gha-creds-*.json
+**/gha-creds-*.json

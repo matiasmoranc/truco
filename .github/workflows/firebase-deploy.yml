@@ -1,0 +1,84 @@
+name: Deploy Firebase
+
+on:
+  workflow_dispatch:
+    inputs:
+      services:
+        description: Servicios que se van a publicar
+        required: true
+        default: functions,hosting
+        type: choice
+        options:
+          - functions,hosting
+          - hosting
+          - functions
+          - database,functions,hosting
+
+permissions:
+  contents: read
+
+concurrency:
+  group: firebase-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.repository == 'matiasmoranc/truco' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      FIREBASE_PROJECT: truco-6553d
+      DEPLOY_SERVICES: ${{ inputs.services }}
+      WORKLOAD_PROVIDER: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+    steps:
+      - name: Obtener el código
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Preparar Node.js 22
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - name: Comprobar configuración del despliegue
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! "$WORKLOAD_PROVIDER" =~ ^projects/[0-9]+/locations/global/workloadIdentityPools/github-truco/providers/github$ ]]; then
+            echo '::error::Falta configurar GCP_WORKLOAD_IDENTITY_PROVIDER en Settings > Secrets and variables > Actions > Variables. Ver DEPLOY.md.'
+            exit 1
+          fi
+          case "$DEPLOY_SERVICES" in
+            functions,hosting|hosting|functions|database,functions,hosting) ;;
+            *) echo '::error::Servicios de despliegue inválidos.'; exit 1 ;;
+          esac
+      - name: Instalar dependencias y herramientas
+        run: |
+          npm ci
+          npm ci --prefix functions
+          npm install --prefix "$RUNNER_TEMP/firebase-cli" --no-audit --no-fund firebase-tools@15.33.0
+      - name: Comprobar el juego y las funciones
+        run: |
+          npm test
+          node --check functions/index.cjs
+          node --check functions/ad-rewards.cjs
+          node scripts/build-credit-referee.cjs
+          git diff --exit-code -- functions/game-referee.cjs
+          npm run mobile:build
+      - name: Autorizar el despliegue en Google Cloud
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
+        with:
+          project_id: truco-6553d
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: github-firebase-deploy@truco-6553d.iam.gserviceaccount.com
+          create_credentials_file: true
+          export_environment_variables: true
+      - name: Desplegar en Firebase
+        run: |
+          "$RUNNER_TEMP/firebase-cli/node_modules/.bin/firebase" deploy \
+            --project "$FIREBASE_PROJECT" --only "$DEPLOY_SERVICES" --non-interactive
+      - name: Informar el resultado
+        run: |
+          printf '### Deploy completado\n\nProyecto: `%s`\n\nServicios: `%s`\n\nJuego: https://truco-6553d.web.app/\n' "$FIREBASE_PROJECT" "$DEPLOY_SERVICES" >> "$GITHUB_STEP_SUMMARY"

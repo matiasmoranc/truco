@@ -6,6 +6,10 @@
     "public": ".",
     "ignore": [
       "firebase.json",
+      "gha-creds-*.json",
+      "**/gha-creds-*.json",
+      "DEPLOY.md",
+      "ANUNCIOS.md",
       "**/.*",
       "**/node_modules/**",
       "functions/**",
