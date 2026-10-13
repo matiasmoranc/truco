@@ -25,11 +25,11 @@ export function dailyCreditChanges(wallet,timestamp) {
   return {...wallet,balance:5,locked:0,lastGrantAt:timestamp};
 }
 
-export function installCredits({services,getState,document,now=()=>Date.now(),setTimer=setTimeout,clearTimer=clearTimeout,onChange=()=>{},notify=()=>{}}) {
+export function installCredits({services,getState,document,api,now=()=>Date.now(),setTimer=setTimeout,clearTimer=clearTimeout,onChange=()=>{},notify=()=>{}}) {
   const el=id=>document.getElementById(id);
   let uid=null,generation=0,unsubscribe=null,timer=null,wallet,busy=false,error='',available=false,detailsOpen=false,initialAttempted=false;
   const clock=()=>now()+(Number(getState().serverTimeOffset)||0);
-  let syncing=null;
+  let syncing=null,adBusy=false;
   async function sync() {
     if(!uid||getState().firebaseConnected!==true)return false;
     if(syncing)return syncing;
@@ -58,8 +58,15 @@ export function installCredits({services,getState,document,now=()=>Date.now(),se
     el('credits-status').textContent=error||messages[eligibility];
     el('credits-status').hidden=!el('credits-status').textContent;
     const button=el('credits-claim');button.hidden=!!error||!available||!['available','claimed'].includes(eligibility);
-    button.disabled=busy||eligibility!=='available'||getState().firebaseConnected!==true;
+    button.disabled=busy||adBusy||eligibility!=='available'||getState().firebaseConnected!==true;
     button.innerHTML=busy?'Reclamando…':eligibility==='claimed'?`<span>5 créditos disponibles mañana</span><span class="credit-countdown">${creditCountdown(clock())}</span>`:'Reclamar 5 créditos';
+    const adButton=el('credits-ad'),ads=globalThis.trucoNative?.rewardedAds;
+    if(adButton){
+      adButton.hidden=!uid||!ads?.supported||!available||!['claimed','available'].includes(eligibility);
+      adButton.disabled=busy||adBusy||getState().firebaseConnected!==true;
+      adButton.textContent=adBusy?'Esperá mientras se completa el anuncio…':ads?.test?'Probar anuncio (sin sumar créditos)':'Ver anuncio para ganar 1 crédito';
+    }
+    const privacy=el('ads-privacy');if(privacy)privacy.hidden=!ads?.supported;
     clearTimer(timer);
     if(uid)timer=setTimer(render,Math.min(detailsOpen&&eligibility==='claimed'?1000:60000,Math.max(50,creditDayStart(clock())+CREDIT_DAY_MS-clock()+50)));
     if(uid&&available&&wallet===null&&!busy&&!initialAttempted&&getState().firebaseConnected===true){initialAttempted=true;void claim(true);}
@@ -87,7 +94,7 @@ export function installCredits({services,getState,document,now=()=>Date.now(),se
     }
   }
   async function claim(initial=false) {
-    if(busy||!uid||!available||getState().firebaseConnected!==true||creditEligibility(wallet,clock())!=='available')return;
+    if(busy||adBusy||!uid||!available||getState().firebaseConnected!==true||creditEligibility(wallet,clock())!=='available')return;
     const user=uid,epoch=generation;busy=true;render();
     try {
       const fb=await services();if(epoch!==generation||getState().uid!==user)return;
@@ -122,6 +129,24 @@ export function installCredits({services,getState,document,now=()=>Date.now(),se
     panel.classList.remove('credits-highlight');void panel.offsetWidth;panel.classList.add('credits-highlight');
   });
   el('credits-claim').addEventListener('click',()=>claim());
+  el('credits-ad')?.addEventListener('click',async()=>{
+    const ads=globalThis.trucoNative?.rewardedAds;
+    if(!ads?.supported||adBusy||busy||!uid||!available||!['claimed','available'].includes(creditEligibility(wallet,clock()))||getState().firebaseConnected!==true)return;
+    const user=uid,epoch=generation;adBusy=true;error='';render();
+    try{
+      const result=await ads.show({api,uid:user});
+      if(epoch!==generation||user!==uid)return;
+      await sync();
+      if(result.test)notify('Anuncio de prueba completado. Tu saldo real no se modifica.');
+      else if(result.credited)notify('¡Ganaste 1 crédito!');
+      else if(result.pending)notify('Estamos verificando tu recompensa. El crédito aparecerá cuando se confirme.');
+      else notify('Completá el anuncio para recibir la recompensa.');
+    }catch{if(epoch===generation)error='No pudimos completar el anuncio. No se modificaron tus créditos. Volvé a intentar.';}
+    finally{adBusy=false;render();}
+  });
+  el('ads-privacy')?.addEventListener('click',()=>{
+    void globalThis.trucoNative?.rewardedAds?.privacy().catch(()=>notify('No pudimos abrir las opciones de publicidad. Volvé a intentar.'));
+  });
   document.addEventListener?.('visibilitychange',()=>{if(document.visibilityState==='visible')void sync();});
   globalThis.addEventListener?.('pageshow',()=>{void sync();});
   return {start,stop,refresh:render,sync,claim,wallet:()=>wallet};

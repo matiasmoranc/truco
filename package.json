@@ -5,9 +5,9 @@
   "scripts": {
     "mobile:build": "node scripts/build-mobile.cjs",
     "mobile:apk": "node scripts/build-android-test.cjs",
-    "mobile:add:android": "npm run mobile:build && cap add android && npm run mobile:icons",
-    "mobile:add:ios": "npm run mobile:build && cap add ios && npm run mobile:icons",
-    "mobile:sync": "npm run mobile:build && cap sync && npm run mobile:icons",
+    "mobile:add:android": "npm run mobile:build && cap add android && npm run mobile:icons && node scripts/prepare-admob.cjs",
+    "mobile:add:ios": "npm run mobile:build && cap add ios && npm run mobile:icons && node scripts/prepare-admob.cjs",
+    "mobile:sync": "npm run mobile:build && cap sync && npm run mobile:icons && node scripts/prepare-admob.cjs",
     "mobile:open:android": "cap open android",
     "mobile:open:ios": "cap open ios",
     "test": "node --test tests/*.cjs",
@@ -26,6 +26,7 @@
   },
   "homepage": "https://github.com/matiasmoranc/truco#readme",
   "dependencies": {
+    "@capacitor-community/admob": "8.2.1",
     "@capacitor-firebase/authentication": "8.5.2",
     "@capacitor/android": "8.5.3",
     "@capacitor/core": "8.5.3",

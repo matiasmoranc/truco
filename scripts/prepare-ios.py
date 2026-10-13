@@ -22,6 +22,8 @@ info["CFBundleURLTypes"] = [{"CFBundleURLSchemes": [firebase["REVERSED_CLIENT_ID
 # Use a unique increasing number for each build of this Codemagic application.
 info["CFBundleVersion"] = str(int(os.environ.get("PROJECT_BUILD_NUMBER", "1")))
 info["CFBundleShortVersionString"] = "1.0.0"
+info["GADApplicationIdentifier"] = "ca-app-pub-9142692584360532~2534067442"
+info["SKAdNetworkItems"] = [{"SKAdNetworkIdentifier": "cstr6suwn9.skadnetwork"}]
 info["UISupportedInterfaceOrientations"] = ["UIInterfaceOrientationPortrait"]
 # Apple requires all four orientations for iPad multitasking. iPhone remains
 # portrait-only; the separate iPad declaration does not rotate the phone UI.

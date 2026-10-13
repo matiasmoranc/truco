@@ -2,7 +2,7 @@ import './chat-moderation.js?v=20261013-moderation1';
 import { installPlayerPanel } from './player-panel.js?v=20261013-blocklist1';
 import { installScorer } from './scorer.js?v=20261011-scorercolors59';
 import { installActivity } from './activity.js?v=20261010-adminstats32';
-import { installCredits } from './credits.js?v=20261012-countdown';
+import { installCredits } from './credits.js?v=20261013-rewarded';
 import { installAccount } from './account.js?v=20261012-welcome64';
 import { initializeGameAuth } from './auth-init.js?v=20261011-authlazy62';
 const FIREBASE_VERSION = '12.4.0';
@@ -476,7 +476,7 @@ function loadConfig() {
 let firebaseReadyPromise=null;
 const activity=installActivity({send:data=>creditApi('playerActivity',data),getUid:()=>state.uid,document});
 const account=installAccount({api:creditApi,services:firebaseServices,getState:()=>state,rememberName:rememberPlayerName,document,onReady:async()=>{activity.start();await openInitialRoom();credits.start();showLobbyOnboarding();},onIdentityChange:resetAccountRoom,onNameChanged:()=>showView('welcome-view'),onRegistered:uid=>{state.lobbyOnboardingUid=uid;requestAnimationFrame(showLobbyOnboarding);},inRoom:()=>!!state.room&&!$('welcome-view').classList.contains('active')});
-const credits=installCredits({services:firebaseServices,getState:()=>state,document,notify:message=>toast(message,true,2000),onChange:()=>{showLobbyOnboarding();if(state.lobbyRooms)renderLobby(state.lobbyRooms);
+const credits=installCredits({services:firebaseServices,api:creditApi,getState:()=>state,document,notify:message=>toast(message,true,2000),onChange:()=>{showLobbyOnboarding();if(state.lobbyRooms)renderLobby(state.lobbyRooms);
   if(state.room)renderMatchEnd();$('table-stake-available').textContent=String(credits.wallet()?.balance??'—');updateStakeControl();}});
 let lobbyWelcomeDialog=null,lobbyWelcomeStep=0,lobbyWelcomeTarget=null;
 const lobbyWelcomeSteps=[

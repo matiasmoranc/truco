@@ -1,6 +1,6 @@
 # Mesas con créditos gratuitos
 
-Los créditos son virtuales, sin dinero ni premios canjeables. No hay compras ni publicidad.
+Los créditos son virtuales, sin dinero ni premios canjeables. No hay compras. La web no muestra publicidad; las apps móviles tienen una integración de anuncios recompensados en modo de prueba, sin acreditación al saldo real. Ver ANUNCIOS.md.
 
 ## Funcionamiento
 
