@@ -1599,3 +1599,7 @@ html,body,#app{touch-action:pan-x pan-y}
 #credits-claim{flex-direction:column;gap:4px;line-height:1.25}
 #credits-claim>span:first-child{display:block;max-width:100%}
 #credits-claim .credit-countdown{display:block;font-variant-numeric:tabular-nums;font-size:.9em;letter-spacing:.04em;opacity:.9}
+
+/* Evitar selección accidental durante el juego; conservar la edición de campos. */
+body{-webkit-user-select:none;user-select:none}
+input,textarea,[contenteditable=""],[contenteditable="true"]{-webkit-user-select:text;user-select:text}
