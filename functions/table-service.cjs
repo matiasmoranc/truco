@@ -2,6 +2,7 @@
 const crypto=require('node:crypto');
 const {createReferee,newSession}=require('./game-referee.cjs');
 const {settleVerifiedMatch,refundCanceledMatch,reserveStakes}=require('./credit-ledger.cjs');
+const {blockedChatReason}=require('./chat-moderation.cjs');
 const WAIT_MS=600000;
 function fail(message){throw new Error(message);}
 function validCode(code){if(typeof code!=='string'||!/^[A-Z2-9]{5}$/.test(code))fail('Mesa inválida.');return code;}
@@ -70,6 +71,8 @@ function tableOperation(ledger,{code,uid,command,requestId,expectedMatchId,prese
   if(command.kind==='mute'){room.chatPreferences={...(room.chatPreferences||{}),[player]:{uid,muted:command.value===true}};}
   else{
    if(typeof command.text!=='string'||!command.text.trim()||command.text.length>40)fail('El mensaje debe tener hasta 40 caracteres.');
+   if(blockedChatReason(command.text))fail('El mensaje no se puede enviar porque contiene lenguaje ofensivo o una amenaza.');
+   if(room.chatPreferences?.[player]?.muted)fail('Bloqueaste el chat con este jugador durante la partida.');
    const other=player==='player1'?'player2':'player1';if(room.chatPreferences?.[other]?.muted)fail('El rival ha silenciado los mensajes.');
    room.chatMessages??={};room.chatMessages[requestId]={sender:player,text:command.text.trim(),at:now};
   }

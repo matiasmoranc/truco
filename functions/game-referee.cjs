@@ -209,7 +209,7 @@ function buildEndEvidence(room,originals){
   const florWinner=flowers.length===1?flowers[0]:flowers.length>1?(Number(room.flors.player1)===Number(room.flors.player2)?room.mano:Number(room.flors.player1)>Number(room.flors.player2)?'player1':'player2'):null;
   if(florWinner){
     const cards=originals[florWinner]||[];
-    if(cards.length===3)groups.push({player:florWinner,label:'Flor · '+florValue(cards,room.muestra)+' tantos',cards});
+    if(cards.length===3)groups.push({player:florWinner,label:room.florCompared?'Flor · '+florValue(cards,room.muestra)+' tantos':'Flor',cards});
   }
   const audit=room.envidoAudit;
   if(audit){
@@ -299,7 +299,7 @@ function localResolveFlor(bet){
   const values=state.room.flors||{};if(values.player1==null||values.player2==null)return;
   const winner=values.player1===values.player2?(state.room.mano||'player1'):(values.player1>values.player2?'player1':'player2');
   localScore(winner,bet.stake||3,`gana las flores (${values.player1} a ${values.player2})`);
-  state.room.pendingBet=bet.suspendedBet||null;state.room.envidoClosed=true;state.room.florSettled=true;
+  state.room.florCompared=bet.called==='conflor'||bet.called==='falta';state.room.pendingBet=bet.suspendedBet||null;state.room.envidoClosed=true;state.room.florSettled=true;
 }
 function localCallAction(kind){
   if(state.learning?.paused)return;
@@ -362,7 +362,7 @@ function localAction(action){
   if(state.learning?.paused)return;
   if(action==='reveal')localAnswerAction('yes');
   else if(action==='flor'){
-    const room=state.room,player=state.playerId;if(room.playedCount>0||room.flors?.[player]!=null||!roomHasFlor(room,localHand(player))){toast('No tenés flor.');return;}
+    const room=state.room,player=state.playerId;if(localHand(player).length!==3||room.flors?.[player]!=null||!roomHasFlor(room,localHand(player))){toast('No tenés flor.');return;}
     const overEnvido=room.pendingBet?.type==='envido'&&room.pendingBet.responder===player;
     const other=otherPlayer(player);room.flors={...(room.flors||{}),[player]:florValue(localHand(player),room.muestra)};room.envidoClosed=true;
     const suspendedBet=room.pendingBet?.type==='truco'?room.pendingBet:(room.pendingBet?.suspendedBet||null);
@@ -428,7 +428,7 @@ function localDealAfterHand(){
   state.localHands={player1:deck.slice(0,3),player2:deck.slice(3,6)};
   state.localOriginalHands=structuredClone(state.localHands);
   state.localTruth={player1:handEnvido(state.localHands.player1,deck[6]),player2:handEnvido(state.localHands.player2,deck[6])};
-  Object.assign(room,{status:'started',resolutionEndsAt:null,resolvingTrick:false,endReveal:null,mano,dealer:otherPlayer(mano),turn:mano,handNumber:room.handNumber+1,tricks:[],trickCards:[],trickNo:1,muestra:deck[6],deckCount:33,playedCount:0,trucoLevel:1,pendingBet:null,lastTrucoCaller:null,flors:{},florSettled:false,envidoClosed:false,callNotice:null});
+  Object.assign(room,{status:'started',resolutionEndsAt:null,resolvingTrick:false,endReveal:null,mano,dealer:otherPlayer(mano),turn:mano,handNumber:room.handNumber+1,tricks:[],trickCards:[],trickNo:1,muestra:deck[6],deckCount:33,playedCount:0,trucoLevel:1,pendingBet:null,lastTrucoCaller:null,flors:{},florCompared:false,florSettled:false,envidoClosed:false,callNotice:null});
   state.hand=[...state.localHands[state.playerId]];
   localFeed(`${room.players[room.dealer].name} reparte. Empieza ${room.players[mano].name}.`);renderGame();
 }

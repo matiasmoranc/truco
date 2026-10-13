@@ -8,6 +8,7 @@ function erasePlayerData(root,{uid,anonymousId,now}){
  const next=structuredClone(root||{}),name=next.profiles?.[uid]?.name;
  for(const [key,owner] of Object.entries(next.usernames||{}))if(owner===uid)delete next.usernames[key];
  for(const branch of ['profiles','administrators','creditRateLimits'])if(next[branch])delete next[branch][uid];
+ if(next.userBlocks){delete next.userBlocks[uid];for(const blocks of Object.values(next.userBlocks))if(blocks&&typeof blocks==='object')delete blocks[uid];}
  if(next.adminMetrics?.presence)delete next.adminMetrics.presence[uid];
  for(const day of Object.values(next.adminMetrics?.days||{}))if(day.users)delete day.users[uid];
  for(const [id,report] of Object.entries(next.problemReports||{}))if(report.uid===uid)delete next.problemReports[id];

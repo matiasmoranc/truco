@@ -60,6 +60,15 @@
       ".read": "(auth != null && root.child('userAccess').child(auth.uid).child('blocked').val() != true)",
       ".write": false
     },
+    "userBlocks": {
+      "$uid": {
+        ".read": "auth != null && auth.uid == $uid && root.child('userAccess').child(auth.uid).child('blocked').val() != true",
+        "$targetUid": {
+          ".write": "auth != null && auth.uid == $uid && $targetUid != auth.uid && root.child('userAccess').child(auth.uid).child('blocked').val() != true && (!newData.exists() || newData.val() == true || (newData.child('blocked').val() == true && newData.child('name').isString() && newData.child('name').val().length <= 18 && newData.child('blockedAt').isNumber()))",
+          ".validate": "newData.val() == true || (newData.hasChildren(['blocked','name','blockedAt']) && newData.numChildren() == 3 && newData.child('blocked').val() == true && newData.child('name').isString() && newData.child('name').val().length <= 18 && newData.child('blockedAt').isNumber())"
+        }
+      }
+    },
     "creditEconomy": {
       ".read": false,
       ".write": false,

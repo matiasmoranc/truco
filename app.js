@@ -1,4 +1,5 @@
-import { installPlayerPanel } from './player-panel.js?v=20261011-reportclose63';
+import './chat-moderation.js?v=20261013-moderation1';
+import { installPlayerPanel } from './player-panel.js?v=20261013-blocklist1';
 import { installScorer } from './scorer.js?v=20261011-scorercolors59';
 import { installActivity } from './activity.js?v=20261010-adminstats32';
 import { installCredits } from './credits.js?v=20261012-countdown';
@@ -31,22 +32,23 @@ async function prepareCardImages(){
 // Card images are warmed after authentication so slow connections prioritize sign-in.
 
 const CHAT_LIMIT=40,CHAT_NOTICE_MS=4000;
+const chatModeration=globalThis.TrucoChatModeration;
 let chatMuted=false;
 
-const matchChat={key:null,messages:[],seen:new Set(),open:false,unread:0,sending:false,noticeTimers:new Map(),signature:''};
+const matchChat={key:null,messages:[],seen:new Set(),reported:new Set(),open:false,unread:0,sending:false,noticeTimers:new Map(),signature:''};
 function chatAvailable(){return !!(state.room&&!state.localGame&&['player1','player2'].includes(state.playerId)&&state.room.players?.player1&&state.room.players?.player2&&state.room.status!=='closed');}
 function peerChatMuted(room=state.room){
   const peer=otherPlayer(state.playerId),preference=room?.chatPreferences?.[peer];
   return !!(preference?.muted&&preference.uid===room?.players?.[peer]?.uid);
 }
 function renderChatComposer(){
-  const blocked=peerChatMuted(),input=$('chat-input');
+  const blocked=chatMuted||peerChatMuted(),input=$('chat-input');
   $('chat-muted').disabled=liveActionsBlocked();
   input.disabled=blocked||liveActionsBlocked()||matchChat.sending;input.classList.toggle('hidden',blocked);
   $('chat-send').disabled=blocked||matchChat.sending||liveActionsBlocked();$('chat-send').classList.toggle('hidden',blocked);
   $('chat-count').classList.toggle('hidden',blocked);
   $('chat-blocked').classList.toggle('hidden',!blocked);
-  $('chat-blocked').textContent=blocked?`${state.room.players[otherPlayer(state.playerId)].name||'El rival'} ha silenciado los mensajes.`:'';
+  $('chat-blocked').textContent=blocked?(chatMuted?'Bloqueaste a este jugador. Se cerró el chat de esta partida y no podrán entrar juntos a futuras mesas.':`${state.room.players[otherPlayer(state.playerId)].name||'El rival'} te bloqueó. El chat está cerrado y no podrán entrar juntos a futuras mesas.`):'';
   for(const button of $('chat-quick').querySelectorAll('button'))button.disabled=blocked||liveActionsBlocked()||matchChat.sending;
   $('chat-quick').classList.toggle('hidden',blocked);
   if(blocked)$('chat-error').classList.add('hidden');
@@ -59,23 +61,40 @@ async function publishChatMute(){
   const key=chatContextKey(),desired=chatMuted,player=state.playerId,uid=state.uid,matchNumber=Number(state.room.matchNumber||1),fb=state.firebase;
   publishingChatMute=true;
   try{
-    if(state.room?.managedCredits){await creditCommand({kind:'mute',value:desired});return;}
-    const result=await fb.runTransaction(fb.ref(fb.db,`rooms/${state.roomCode}/public`),room=>{
-      if(!room||room.status==='closed'||Number(room.matchNumber||1)!==matchNumber||room.players?.[player]?.uid!==uid)return;
-      return {...room,chatPreferences:{...(room.chatPreferences||{}),[player]:{uid,muted:desired}}};
-    },{applyLocally:false});
-    if(!result.committed)throw new Error('chat-unavailable');
+    if(state.room?.managedCredits)await creditCommand({kind:'mute',value:desired});
+    else{
+      const result=await fb.runTransaction(fb.ref(fb.db,`rooms/${state.roomCode}/public`),room=>{
+        if(!room||room.status==='closed'||Number(room.matchNumber||1)!==matchNumber||room.players?.[player]?.uid!==uid)return;
+        return {...room,chatPreferences:{...(room.chatPreferences||{}),[player]:{uid,muted:desired}}};
+      },{applyLocally:false});
+      if(!result.committed)throw new Error('chat-unavailable');
+    }
+    if(key!==chatContextKey())return;
+    const targetUid=state.room.players?.[otherPlayer(player)]?.uid;
+    if(!targetUid)throw new Error('No encontramos la cuenta del otro jugador.');
+    await fb.set(fb.ref(fb.db,`userBlocks/${uid}/${targetUid}`),desired?{blocked:true,name:state.room.players?.[otherPlayer(player)]?.name||'Jugador',blockedAt:Date.now()}:null);
   }catch(error){
     console.error('[truco:chat-mute]',error);
     if(key===chatContextKey()&&chatMuted===desired){
       const current=state.room?.chatPreferences?.[player];chatMuted=!!(current?.muted&&current.uid===uid);
       $('chat-muted').checked=chatMuted;updateChatUnread();
-      $('chat-error').textContent='No se pudo cambiar el silencio. Volvé a intentar.';$('chat-error').classList.remove('hidden');
+      $('chat-error').textContent='No se pudo actualizar el bloqueo. Volvé a intentar.';$('chat-error').classList.remove('hidden');
     }
   }finally{
     publishingChatMute=false;
     if(key!==chatContextKey()||chatMuted!==desired)publishChatMute();
   }
+}
+async function loadPersistentChatBlock(key){
+  const uid=state.uid,targetUid=state.room?.players?.[otherPlayer(state.playerId)]?.uid;
+  if(!uid||!targetUid)return;
+  try{
+    const snapshot=await state.firebase.get(state.firebase.ref(state.firebase.db,`userBlocks/${uid}/${targetUid}`));
+    if(key!==chatContextKey())return;
+    const storedBlock=snapshot.val(),blocked=storedBlock===true||storedBlock?.blocked===true,preference=state.room.chatPreferences?.[state.playerId];
+    chatMuted=blocked;$('chat-muted').checked=blocked;updateChatUnread();renderChatComposer();
+    if(!!preference?.muted!==blocked||(preference?.uid&&preference.uid!==uid))publishChatMute();
+  }catch(error){console.error('[truco:chat-block-read]',error);}
 }
 function chatContextKey(){return `${state.roomCode}:${state.room?.createdAt||''}:${state.room?.matchNumber||1}:${state.playerId}`;}
 function clearChatNotices(){
@@ -99,9 +118,29 @@ function renderChatHistory(){
     const item=document.createElement('div');item.className='chat-message'+(message.sender===state.playerId?' chat-message-mine':'');
     const name=document.createElement('strong');name.textContent=message.sender===state.playerId?'Vos':state.room.players?.[message.sender]?.name||'Rival';
     const text=document.createElement('p');text.textContent=message.text;
-    item.append(name,text);history.append(item);
+    item.append(name,text);
+    if(message.sender!==state.playerId){
+      const report=document.createElement('button');report.type='button';report.className='chat-report-message';report.textContent=matchChat.reported.has(message.id)?'Reporte enviado':'Reportar mensaje';report.disabled=matchChat.reported.has(message.id);report.setAttribute('aria-label','Reportar este mensaje de '+name.textContent);
+      report.addEventListener('click',()=>reportChatMessage(message,report));item.append(report);
+    }
+    history.append(item);
   }
   history.scrollTop=nearBottom||!matchChat.open?history.scrollHeight:previousScroll;
+}
+async function reportChatMessage(message,button){
+  if(matchChat.reported.has(message.id)||!chatAvailable())return;
+  button.disabled=true;button.textContent='Enviando…';
+  try{
+    const player=state.room.players?.[message.sender],playerName=player?.name||'Rival';
+    const reportText=`Reporte de chat. Usuario: ${playerName} (${player?.uid||'sin ID'}). Mensaje: «${message.text}»`;
+    const report={action:'report',message:reportText,requestId:crypto.randomUUID(),localId:state.roomCode,mode:'online'};
+    if(state.room.creditMatch?.id)report.matchId=state.room.creditMatch.id;
+    await creditApi('playerConsole',report);
+    matchChat.reported.add(message.id);renderChatHistory();
+  }catch(error){
+    button.disabled=false;button.textContent='No se pudo reportar';
+    $('chat-error').textContent=error.message||'No se pudo enviar el reporte. Volvé a intentar.';$('chat-error').classList.remove('hidden');
+  }
 }
 function updateChatUnread(){
   $('chat-toggle').setAttribute('aria-label',(chatMuted?'Abrir chat, mensajes silenciados':'Abrir chat')+(matchChat.unread?`, ${matchChat.unread} mensajes nuevos`:''));
@@ -121,22 +160,22 @@ function syncMatchChat(){
   if(!available){closeMatchChat(true);return;}
   const key=chatContextKey(),messages=chatMessageList(state.room),fresh=matchChat.key!==key;
   if(fresh){
-    chatMuted=false;
-    closeMatchChat(true);matchChat.key=key;matchChat.seen=new Set(messages.map(message=>message.id));matchChat.unread=0;matchChat.signature='';matchChat.sending=false;
+    const ownPreference=state.room.chatPreferences?.[state.playerId];chatMuted=!!(ownPreference?.muted&&ownPreference.uid===state.uid);
+    closeMatchChat(true);matchChat.key=key;matchChat.seen=new Set(messages.map(message=>message.id));matchChat.reported=new Set();matchChat.unread=0;matchChat.signature='';matchChat.sending=false;
     $('chat-input').value='';$('chat-count').textContent='0/40';$('chat-send').disabled=false;$('chat-error').classList.add('hidden');
   }
   if(!fresh)for(const message of messages){
     if(matchChat.seen.has(message.id))continue;
     matchChat.seen.add(message.id);
     if(message.sender===state.playerId)continue;
-    if(!matchChat.open)matchChat.unread++;
+    if(!matchChat.open&&!chatMuted)matchChat.unread++;
     if(!chatMuted&&!matchChat.open&&$('game-view').classList.contains('active'))showChatNotice(message);
   }
   matchChat.messages=messages;
   const signature=JSON.stringify(messages);
   if(signature!==matchChat.signature){matchChat.signature=signature;renderChatHistory();}
   $('chat-muted').checked=chatMuted;updateChatUnread();renderChatComposer();
-  if(fresh)publishChatMute();
+  if(fresh)loadPersistentChatBlock(key);
 }
 function openMatchChat(){
   syncMatchChat();if(!chatAvailable())return;
@@ -145,9 +184,11 @@ function openMatchChat(){
   $('chat-history').scrollTop=$('chat-history').scrollHeight;$('chat-close').focus();
 }
 async function sendMatchChat(event){
-  event.preventDefault();if(liveActionsBlocked()||!chatAvailable()||matchChat.sending||peerChatMuted()){renderChatComposer();return;}
+  event.preventDefault();if(liveActionsBlocked()||!chatAvailable()||matchChat.sending||chatMuted||peerChatMuted()){renderChatComposer();return;}
   const input=$('chat-input'),draft=input.value,text=draft.trim();
   if(!text||text.length>CHAT_LIMIT)return;
+  const moderationReason=chatModeration?.blockedChatReason(text);
+  if(moderationReason){$('chat-error').textContent=moderationReason==='threat'?'No se puede enviar una amenaza. Mantené el respeto en la mesa.':'No se pudo enviar el mensaje porque contiene lenguaje ofensivo. Mantené el respeto en la mesa.';$('chat-error').classList.remove('hidden');return;}
   const code=state.roomCode,key=chatContextKey(),sender=state.playerId,uid=state.uid,matchNumber=Number(state.room.matchNumber||1);
   matchChat.sending=true;$('chat-send').disabled=true;$('chat-error').classList.add('hidden');
   try{
@@ -1038,6 +1079,7 @@ async function dealOpeningHand(dealer) {
   patches[`rooms/${code}/public/trucoLevel`] = 1;
   patches[`rooms/${code}/public/lastTrucoCaller`] = null;
   patches[`rooms/${code}/public/pendingBet`] = null;
+  patches[`rooms/${code}/public/florCompared`] = false;
   patches[`rooms/${code}/public/florSettled`] = false;
   patches[`rooms/${code}/public/flors`] = {};
   patches[`rooms/${code}/public/envidoClosed`] = false;
@@ -1328,7 +1370,7 @@ async function answerBet(answer) {
     const flowers=state.room.flors||{},winner=flowers.player1===flowers.player2?(state.room.mano||'player1'):(flowers.player1>flowers.player2?'player1':'player2');
     const scores={...state.room.scores};scores[winner]=(scores[winner]||0)+bet.stake;
     const status=scores[winner]>=targetPoints(state.room)?'complete':'started';
-    await writeRoom({scores,florSettled:true,pendingBet:status==='complete'?null:(bet.suspendedBet||null),envidoClosed:true,feed:topFeed(state.room,`${state.room.players[state.playerId].name} quiere. Flores: ${flowers.player1} a ${flowers.player2}. ${state.room.players[winner].name} suma ${bet.stake}.`),status});return;
+    await writeRoom({scores,florCompared:bet.called==='conflor'||bet.called==='falta',florSettled:true,pendingBet:status==='complete'?null:(bet.suspendedBet||null),envidoClosed:true,feed:topFeed(state.room,`${state.room.players[state.playerId].name} quiere. Flores: ${flowers.player1} a ${flowers.player2}. ${state.room.players[winner].name} suma ${bet.stake}.`),status});return;
   }
   await writeRoom({trucoLevel:bet.stake,pendingBet:null,feed:topFeed(state.room,`${state.room.players[state.playerId].name} dice QUIERO`) });
 }
@@ -1390,7 +1432,7 @@ async function verifyEnvido(scores,winner=null,points=0){
 async function callFlor() {
   if(state.room?.managedCredits)return creditCommand({kind:'call',value:'flor'});
   if(liveActionsBlocked())return;
-  const room=state.room,player=state.playerId;if(!room||(room.playedCount||0)>0||room.flors?.[player]!=null||!roomHasFlor(room,state.hand)){toast('No tenés flor.');return;}
+  const room=state.room,player=state.playerId;if(!room||state.hand.length!==3||room.flors?.[player]!=null||!roomHasFlor(room,state.hand)){toast('No tenés flor.');return;}
   const flors={...(room.flors||{}),[player]:florValue(state.hand,room.muestra)};
   const other=player==='player1'?'player2':'player1';
   const suspendedBet=room.pendingBet?.type==='truco'?room.pendingBet:(room.pendingBet?.suspendedBet||null);
@@ -1441,7 +1483,7 @@ async function nextHand(winner, scores, handNumber, message, envidoVerified=fals
   patches[`rooms/${state.roomCode}/public/envidoAudit`]=null;
   patches[`rooms/${state.roomCode}/public/trucoLevel`]=1;patches[`rooms/${state.roomCode}/public/pendingBet`]=null;
   patches[`rooms/${state.roomCode}/public/lastTrucoCaller`]=null;
-  patches[`rooms/${state.roomCode}/public/florSettled`]=false;patches[`rooms/${state.roomCode}/public/flors`]={};patches[`rooms/${state.roomCode}/public/envidoClosed`]=false;patches[`rooms/${state.roomCode}/public/playedCount`]=0;
+  patches[`rooms/${state.roomCode}/public/florCompared`]=false;patches[`rooms/${state.roomCode}/public/florSettled`]=false;patches[`rooms/${state.roomCode}/public/flors`]={};patches[`rooms/${state.roomCode}/public/envidoClosed`]=false;patches[`rooms/${state.roomCode}/public/playedCount`]=0;
   patches[`rooms/${state.roomCode}/public/resolutionEndsAt`]=null;
   patches[`rooms/${state.roomCode}/public/resolvingTrick`]=false;patches[`rooms/${state.roomCode}/public/resolutionId`]=null;patches[`rooms/${state.roomCode}/public/resolvedWinner`]=null;patches[`rooms/${state.roomCode}/public/resolvedTrickWinner`]=null;patches[`rooms/${state.roomCode}/public/handComplete`]=false;patches[`rooms/${state.roomCode}/public/pendingNextHand`]=null;
   patches[`rooms/${state.roomCode}/public/feed`]=[{text:`${message} Se reparte la siguiente mano.`,time:Date.now()},...(state.room.feed||[]).slice(0,6)];
@@ -1464,7 +1506,7 @@ function buildEndEvidence(room,originals){
   const florWinner=flowers.length===1?flowers[0]:flowers.length>1?(Number(room.flors.player1)===Number(room.flors.player2)?room.mano:Number(room.flors.player1)>Number(room.flors.player2)?'player1':'player2'):null;
   if(florWinner){
     const cards=originals[florWinner]||[];
-    if(cards.length===3)groups.push({player:florWinner,label:'Flor · '+florValue(cards,room.muestra)+' tantos',cards});
+    if(cards.length===3)groups.push({player:florWinner,label:room.florCompared?'Flor · '+florValue(cards,room.muestra)+' tantos':'Flor',cards});
   }
   const audit=room.envidoAudit;
   if(audit){
@@ -2081,9 +2123,9 @@ function renderGame() {
   if(mustDeclareFlor){buttons.push('<button class="call-button" data-action="flor"><strong>FLOR</strong></button>');}
   else if(pending?.revealMode){buttons.push('<span class="action-wait">'+(pending.revealTurn===state.playerId?'Deslizá para elegir tus tantos':'Esperando los tantos del rival…')+'</span>');}
   else if(pending?.type==='flor'){if(pending.responder===state.playerId)buttons.push(...florAnswers(pending,roomHasFlor(room,state.hand)).map(([action,label])=>`<button class="${action==='yes'?'call-button':'pass-button'}" data-action="${action}">${label}</button>`));else buttons.push('<span class="action-wait">ESPERANDO RESPUESTA…</span>');}
-  else if(pending){if(pending.responder===state.playerId){if(['envido','truco'].includes(pending.type)&&(room.playedCount||0)===0&&roomHasFlor(room,state.hand)&&!room.flors?.[state.playerId])buttons.push('<button class="call-button" data-action="flor"><strong>FLOR</strong></button>');if(pending.type==='truco'&&canEnvido)buttons.push('<button class="pass-button" data-action="envido"><strong>ENVIDO</strong></button><button class="pass-button" data-action="real"><strong>REAL ENVIDO</strong></button><button class="pass-button" data-action="falta"><strong>FALTA ENVIDO</strong></button>');if(canRaiseEnvido(pending)&&!Object.keys(room.flors||{}).length){buttons.push('<div class="envido-action-grid"><div class="envido-action-row envido-raises"><button class="pass-button" data-action="raise-envido"><strong>ENVIDO</strong></button><button class="pass-button" data-action="raise-real"><strong>REAL ENVIDO</strong></button><button class="pass-button" data-action="raise-falta"><strong>FALTA ENVIDO</strong></button></div><div class="envido-action-row envido-answer"><button class="call-button" data-action="yes">QUIERO</button><button class="pass-button" data-action="no">NO QUIERO</button></div></div>');}else{buttons.push(`${pending.type==='flor'&&pending.single&&!roomHasFlor(room,state.hand)?'':`<button class="call-button" data-action="yes">${pending.type==='flor'?(pending.single?'FLOR':'LA MÍA ES FLOR'):'QUIERO'}</button>`}<button class="pass-button" data-action="no">${pending.type==='flor'&&pending.single?'TIENE':'NO QUIERO'}</button>`);}if(pending.type==='truco'&&pending.stake<4)buttons.push(`<button class="pass-button" data-action="raise">${pending.stake===2?'RETRUCO':'VALE 4'}</button>`);if(pending.type==='flor'&&!pending.single){buttons.push('<button class="pass-button" data-action="raise-conflor">CON FLOR ENVIDO</button><button class="pass-button" data-action="raise-faltaflor">CONTRA FLOR AL RESTO</button>');}}else buttons.push('<span class="action-wait">ESPERANDO RESPUESTA…</span>');}
+  else if(pending){if(pending.responder===state.playerId){if(['envido','truco'].includes(pending.type)&&state.hand.length===3&&roomHasFlor(room,state.hand)&&!room.flors?.[state.playerId])buttons.push('<button class="call-button" data-action="flor"><strong>FLOR</strong></button>');if(pending.type==='truco'&&canEnvido)buttons.push('<button class="pass-button" data-action="envido"><strong>ENVIDO</strong></button><button class="pass-button" data-action="real"><strong>REAL ENVIDO</strong></button><button class="pass-button" data-action="falta"><strong>FALTA ENVIDO</strong></button>');if(canRaiseEnvido(pending)&&!Object.keys(room.flors||{}).length){buttons.push('<div class="envido-action-grid"><div class="envido-action-row envido-raises"><button class="pass-button" data-action="raise-envido"><strong>ENVIDO</strong></button><button class="pass-button" data-action="raise-real"><strong>REAL ENVIDO</strong></button><button class="pass-button" data-action="raise-falta"><strong>FALTA ENVIDO</strong></button></div><div class="envido-action-row envido-answer"><button class="call-button" data-action="yes">QUIERO</button><button class="pass-button" data-action="no">NO QUIERO</button></div></div>');}else{buttons.push(`${pending.type==='flor'&&pending.single&&!roomHasFlor(room,state.hand)?'':`<button class="call-button" data-action="yes">${pending.type==='flor'?(pending.single?'FLOR':'LA MÍA ES FLOR'):'QUIERO'}</button>`}<button class="pass-button" data-action="no">${pending.type==='flor'&&pending.single?'TIENE':'NO QUIERO'}</button>`);}if(pending.type==='truco'&&pending.stake<4)buttons.push(`<button class="pass-button" data-action="raise">${pending.stake===2?'RETRUCO':'VALE 4'}</button>`);if(pending.type==='flor'&&!pending.single){buttons.push('<button class="pass-button" data-action="raise-conflor">CON FLOR ENVIDO</button><button class="pass-button" data-action="raise-faltaflor">CONTRA FLOR AL RESTO</button>');}}else buttons.push('<span class="action-wait">ESPERANDO RESPUESTA…</span>');}
   else {
-    if((room.playedCount||0)===0&&state.hand.length&&roomHasFlor(room,state.hand)&&!room.flors?.[state.playerId])buttons.push('<button class="call-button" data-action="flor"><strong>FLOR</strong></button>');
+    if(state.hand.length===3&&roomHasFlor(room,state.hand)&&!room.flors?.[state.playerId])buttons.push('<button class="call-button" data-action="flor"><strong>FLOR</strong></button>');
     if(canEnvido)buttons.push('<button class="pass-button" data-action="envido"><strong>ENVIDO</strong></button><button class="pass-button" data-action="real"><strong>REAL</strong></button><button class="pass-button" data-action="falta"><strong>FALTA</strong></button>');
     if(room.status==='started'&&state.hand.length&&!room.resolvingTrick&&!room.pendingNextHand){
     const level=Number(room.trucoLevel)||1;if(level<4&&(level===1||room.lastTrucoCaller!==state.playerId))buttons.push(`<button class="call-button" data-action="${level===1?'truco':level===2?'retruco':'vale4'}"><strong>${level===1?'TRUCO':level===2?'RETRUCO':'VALE 4'}</strong></button>`);
@@ -2141,7 +2183,7 @@ function rematchRoom(room){
     deviceMode:room.deviceMode,targetPoints:targetPoints(room),table:room.table,players:room.players,
     sessionResults:sessionMatchResults(room),
     matchNumber:Number(room.matchNumber||1)+1,status:'drawing',createdAt:gameTime(),
-    scores:{player1:0,player2:0},handNumber:1,deckCount:40,trickNo:1,playedCount:0,trucoLevel:1,lastTrucoCaller:null,pendingBet:null,flors:{},florSettled:false,envidoClosed:false,timeoutCounts:{},turnClock:null,trickCards:[],tricks:[],
+    scores:{player1:0,player2:0},handNumber:1,deckCount:40,trickNo:1,playedCount:0,trucoLevel:1,lastTrucoCaller:null,pendingBet:null,flors:{},florCompared:false,florSettled:false,envidoClosed:false,timeoutCounts:{},turnClock:null,trickCards:[],tricks:[],
     openingDraw:newOpeningDraw(),feed:topFeed({feed:[]},'Revancha. Elegí una carta para sortear quién reparte.')
   };
 }
@@ -2577,7 +2619,7 @@ function localResolveFlor(bet){
   const values=state.room.flors||{};if(values.player1==null||values.player2==null)return;
   const winner=values.player1===values.player2?(state.room.mano||'player1'):(values.player1>values.player2?'player1':'player2');
   localScore(winner,bet.stake||3,`gana las flores (${values.player1} a ${values.player2})`);
-  state.room.pendingBet=bet.suspendedBet||null;state.room.envidoClosed=true;state.room.florSettled=true;
+  state.room.florCompared=bet.called==='conflor'||bet.called==='falta';state.room.pendingBet=bet.suspendedBet||null;state.room.envidoClosed=true;state.room.florSettled=true;
 }
 function localCallAction(kind){
   if(state.learning?.paused)return;
@@ -2640,7 +2682,7 @@ function localAction(action){
   if(state.learning?.paused)return;
   if(action==='reveal')localAnswerAction('yes');
   else if(action==='flor'){
-    const room=state.room,player=state.playerId;if(room.playedCount>0||room.flors?.[player]!=null||!roomHasFlor(room,localHand(player))){toast('No tenés flor.');return;}
+    const room=state.room,player=state.playerId;if(localHand(player).length!==3||room.flors?.[player]!=null||!roomHasFlor(room,localHand(player))){toast('No tenés flor.');return;}
     const overEnvido=room.pendingBet?.type==='envido'&&room.pendingBet.responder===player;
     const other=otherPlayer(player);room.flors={...(room.flors||{}),[player]:florValue(localHand(player),room.muestra)};room.envidoClosed=true;
     const suspendedBet=room.pendingBet?.type==='truco'?room.pendingBet:(room.pendingBet?.suspendedBet||null);
@@ -2706,7 +2748,7 @@ function localDealAfterHand(){
   state.localHands={player1:deck.slice(0,3),player2:deck.slice(3,6)};
   state.localOriginalHands=structuredClone(state.localHands);
   state.localTruth={player1:handEnvido(state.localHands.player1,deck[6]),player2:handEnvido(state.localHands.player2,deck[6])};
-  Object.assign(room,{status:'started',resolutionEndsAt:null,resolvingTrick:false,endReveal:null,mano,dealer:otherPlayer(mano),turn:mano,handNumber:room.handNumber+1,tricks:[],trickCards:[],trickNo:1,muestra:deck[6],deckCount:33,playedCount:0,trucoLevel:1,pendingBet:null,lastTrucoCaller:null,flors:{},florSettled:false,envidoClosed:false,callNotice:null});
+  Object.assign(room,{status:'started',resolutionEndsAt:null,resolvingTrick:false,endReveal:null,mano,dealer:otherPlayer(mano),turn:mano,handNumber:room.handNumber+1,tricks:[],trickCards:[],trickNo:1,muestra:deck[6],deckCount:33,playedCount:0,trucoLevel:1,pendingBet:null,lastTrucoCaller:null,flors:{},florCompared:false,florSettled:false,envidoClosed:false,callNotice:null});
   state.hand=[...state.localHands[state.playerId]];
   localFeed(`${room.players[room.dealer].name} reparte. Empieza ${room.players[mano].name}.`);renderGame();
 }
@@ -2948,13 +2990,13 @@ $('player-sound-toggle').addEventListener('click',()=>{
 document.addEventListener('click',event=>{if(event.isTrusted)unlockVoice();},{capture:true});
 document.addEventListener('touchend',event=>{if(event.isTrusted)unlockVoice();},{capture:true,passive:true});
 $('sound-toggle').addEventListener('click',()=>$('player-sound-toggle').click());
-$('chat-quick').addEventListener('click',event=>{const button=event.target.closest('[data-quick-message]');if(!button||button.disabled||peerChatMuted()||liveActionsBlocked())return;touchFeedback(button);$('chat-input').value=button.dataset.quickMessage;sendMatchChat(event);});
+$('chat-quick').addEventListener('click',event=>{const button=event.target.closest('[data-quick-message]');if(!button||button.disabled||chatMuted||peerChatMuted()||liveActionsBlocked())return;touchFeedback(button);$('chat-input').value=button.dataset.quickMessage;sendMatchChat(event);});
 $('chat-toggle').addEventListener('click',()=>matchChat.open?closeMatchChat():openMatchChat());
 $('chat-close').addEventListener('click',()=>{closeMatchChat();$('chat-toggle').focus();});
 $('chat-backdrop').addEventListener('click',()=>{closeMatchChat();$('chat-toggle').focus();});
 $('chat-form').addEventListener('submit',sendMatchChat);
 $('chat-input').addEventListener('input',()=>{$('chat-input').value=$('chat-input').value.slice(0,CHAT_LIMIT);$('chat-count').textContent=`${$('chat-input').value.length}/${CHAT_LIMIT}`;});
-$('chat-muted').addEventListener('change',()=>{chatMuted=$('chat-muted').checked;if(chatMuted)clearChatNotices();updateChatUnread();publishChatMute();});
+$('chat-muted').addEventListener('change',()=>{chatMuted=$('chat-muted').checked;if(chatMuted)clearChatNotices();updateChatUnread();renderChatComposer();publishChatMute();});
 $('match-chat').addEventListener('keydown',event=>{if(event.key==='Escape'){closeMatchChat();$('chat-toggle').focus();}});
 $('close-config').addEventListener('click',()=>showView('setup-view'));
 $('save-config').addEventListener('click',()=>{try{const cfg=JSON.parse($('firebase-config').value);if(!firebaseConfigValid(cfg))throw new Error('missing');state.config=cfg;localStorage.setItem(storageKey,JSON.stringify(cfg));toast('Configuración guardada.',true);runPendingAction();}catch{toast('Pegá una configuración Firebase válida.',true);}});
