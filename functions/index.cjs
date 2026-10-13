@@ -10,6 +10,7 @@ const {validateAccounting}=require('./accounting-guard.cjs');
 const {loadedTransaction}=require('./loaded-transaction.cjs');
 const {hasStartedMatch}=require('./match-start.cjs');
 const {reservationAlerts,repairReservation,personalHistory}=require('./player-service.cjs');
+const {usersBlockEachOther}=require('./user-blocks.cjs');
 initializeApp();const db=getDatabase();
 const options={region:'us-central1',maxInstances:5,timeoutSeconds:30};
 async function identity(request){
@@ -69,11 +70,17 @@ exports.creditCreateTable=onCall(options,async request=>{
 });
 exports.creditJoinTable=onCall(options,async request=>{
  const user=await identity(request);await rateLimit(user.uid);const {code,password}=request.data||{};const now=Date.now();
+ let table;try{table=tableFor((await db.ref('creditEconomy').get()).val()||{},code);}catch(error){throw new HttpsError('failed-precondition',error.message||'La mesa ya no está disponible.');}
+ if(await usersBlockEachOther(db,user.uid,table.player1))throw new HttpsError('failed-precondition','No pueden entrar a la misma mesa porque uno bloqueó al otro.');
  const ledger=await mutate(current=>joinTable(current,{...user,code,password,now}));return publish(ledger,code);
 });
 exports.creditTableAction=onCall(options,async request=>{
  const user=await identity(request);await rateLimit(user.uid,120,'actions');const {code,command,requestId,expectedMatchId}=request.data||{};
  if(!command||typeof command.kind!=='string'||!requestId||['__proto__','constructor','prototype'].includes(requestId)||!/^[a-zA-Z0-9_-]{1,100}$/.test(requestId))throw new HttpsError('invalid-argument','Jugada inválida.');
+ if(command.kind==='rematch'){
+  let currentMatch;try{currentMatch=tableFor((await db.ref('creditEconomy').get()).val()||{},code);}catch(error){throw new HttpsError('failed-precondition',error.message||'La partida ya no está disponible.');}
+  if(await usersBlockEachOther(db,currentMatch.player1,currentMatch.player2))throw new HttpsError('failed-precondition','No pueden iniciar una revancha porque uno bloqueó al otro.');
+ }
  if(command.kind==='tick'){
   const snapshot=await db.ref('creditEconomy').get(),current=snapshot.val();
   if(!current)throw new HttpsError('failed-precondition','La mesa no está disponible.');

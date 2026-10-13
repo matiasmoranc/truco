@@ -967,6 +967,8 @@ body { min-height:100dvh; }
 .chat-message-mine{align-self:flex-end;background:#ead7a5;color:#15251b}
 .chat-message strong,.chat-notice strong{display:block;font-size:11px}
 .chat-message p,.chat-notice p{margin:4px 0 0;font-size:14px;line-height:1.4;white-space:pre-wrap;overflow-wrap:anywhere}
+.chat-report-message{display:block!important;height:auto!important;margin:6px 0 0 auto;padding:3px 0!important;border:0!important;background:transparent!important;color:#d6c18e!important;font-size:11px;font-weight:500!important;text-decoration:underline;cursor:pointer}
+.chat-report-message:disabled{opacity:.65;cursor:default}
 .chat-form{flex-shrink:0;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 8px;padding-top:12px;border-top:1px solid #ffffff24}
 .chat-input-label{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
 .chat-form input{min-width:0;width:100%;height:42px;padding:10px;border:1px solid #8d9f90;border-radius:8px;background:#0b2b20;color:#f0eee2;font:16px 'DM Sans',sans-serif}
@@ -1544,10 +1546,19 @@ html,body,#app{touch-action:pan-x pan-y}
 .player-panel-body{display:flex;flex-direction:column;gap:14px}.player-panel-body p{margin:5px 0;font-size:14px}.player-panel-body small{display:block;font-size:12px;opacity:.8}
 .player-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.player-stat{padding:12px 6px;border:1px solid var(--line);border-radius:12px;text-align:center}.player-stat strong{display:block;color:var(--gold);font-size:25px}
 .player-history-item{padding:14px;border:1px solid var(--line);border-radius:14px}.player-history-item h3{margin:0 0 6px;color:var(--gold);font-size:17px}
+.player-blocked-item{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px;border:1px solid var(--line);border-radius:12px}.player-blocked-item strong{min-width:0;overflow-wrap:anywhere;color:var(--ink)}.player-blocked-item .button{flex:0 0 auto}
 .player-panel-body summary{color:var(--gold);cursor:pointer;font-size:14px}.player-panel-body form{display:flex;flex-direction:column;gap:12px}.player-panel-body textarea{width:100%;box-sizing:border-box;border:1px solid var(--gold);border-radius:12px;background:#0c291f;color:var(--ink);padding:12px;font:inherit;font-size:16px}
 .player-panel-body .button.primary{background:var(--gold);color:#12382b;border:1px solid var(--gold);border-radius:12px;padding:12px 16px;min-height:46px;height:auto;font:inherit;font-weight:700;letter-spacing:0;text-transform:none}
 
 .player-summary-stats{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.player-summary-stats .player-stat{padding:20px 10px}.player-summary-stats .player-stat strong{font-size:32px}.player-summary-stats .player-stat small{margin-top:5px;font-size:13px}
+
+/* Clear, compact lobby links for privacy and support. */
+#welcome-view .legal-links{display:flex;justify-content:center;align-items:center;gap:8px;width:max-content;max-width:100%;margin:8px auto 0;padding:4px;border:1px solid rgba(232,201,131,.22);border-radius:999px;background:rgba(5,28,20,.28);font-size:12px}
+#welcome-view .legal-links a{display:inline-flex;align-items:center;justify-content:center;min-height:32px;padding:0 13px;border:1px solid transparent;border-radius:999px;color:#d9e2da;text-decoration:none;text-underline-offset:3px;white-space:nowrap;transition:background .18s ease,border-color .18s ease,color .18s ease}
+#welcome-view .legal-links a:hover,#welcome-view .legal-links a:focus-visible{border-color:rgba(232,201,131,.45);background:rgba(232,201,131,.1);color:#f1d99f;outline:none}
+#welcome-view #lobby-report{display:block;width:max-content;max-width:100%;margin:12px auto 0;padding:7px 13px;border:1px solid rgba(232,201,131,.3);border-radius:999px;color:#c9d5cb;font-size:11px;text-decoration:none;transition:background .18s ease,border-color .18s ease,color .18s ease}
+#welcome-view #lobby-report:hover,#welcome-view #lobby-report:focus-visible{border-color:#e8c983;background:rgba(232,201,131,.09);color:#f1d99f;outline:none}
+@media(max-width:380px){#welcome-view .legal-links{gap:3px}#welcome-view .legal-links a{padding:0 10px;font-size:11px}}
 
 /* Evidence stays on the felt, with the deck and sample visible above it. */
 .reveal-mode .end-hand-reveal{inset:34% 3% 10%;background:transparent;gap:18px;padding:12px 8px;justify-content:center}
@@ -1588,149 +1599,3 @@ html,body,#app{touch-action:pan-x pan-y}
 #credits-claim{flex-direction:column;gap:4px;line-height:1.25}
 #credits-claim>span:first-child{display:block;max-width:100%}
 #credits-claim .credit-countdown{display:block;font-variant-numeric:tabular-nums;font-size:.9em;letter-spacing:.04em;opacity:.9}
-
-
-/* Mobile table card: keep the owner name fully visible. */
-@media(max-width:600px){
-  #welcome-view .compact-room{
-    grid-template-columns:repeat(3,minmax(0,1fr));
-    grid-template-rows:auto auto;
-    align-items:stretch;
-    padding:10px 8px;
-  }
-  .compact-room-owner{
-    grid-column:1/3;
-    grid-row:1;
-    min-width:0;
-    padding:0 8px 10px 2px;
-    border-bottom:1px solid #a7c0b350;
-  }
-  .compact-room-owner>svg{width:32px;height:32px}
-  #welcome-view .compact-room h3{
-    min-width:0;
-    overflow:visible;
-    text-overflow:clip;
-    white-space:normal;
-    overflow-wrap:anywhere;
-    font-size:clamp(13px,4vw,16px);
-    line-height:1.2;
-  }
-  .compact-room-privacy{
-    grid-column:3;
-    grid-row:1;
-    flex-direction:row;
-    gap:5px;
-    min-width:0;
-    min-height:52px;
-    padding:0 2px 10px;
-    border-left:0;
-    border-bottom:1px solid #a7c0b350;
-  }
-  .compact-room-privacy svg{width:20px;height:20px;margin:0;flex:0 0 20px}
-  .compact-room-privacy strong{margin:0;font-size:clamp(11px,3.4vw,13px);white-space:nowrap}
-  .compact-room > .compact-room-stat{
-    grid-row:2;
-    flex-direction:row;
-    gap:5px;
-    min-width:0;
-    min-height:60px;
-    padding:8px 4px;
-    border-left:0;
-  }
-  .compact-room > .compact-room-stat:nth-child(2){grid-column:1}
-  .compact-room > .compact-room-stat:nth-child(3){grid-column:2;border-left:1px solid #a7c0b350}
-  .compact-room-stat svg{width:20px;height:20px;margin:0;flex:0 0 20px}
-  .compact-room-stat strong{font-size:clamp(17px,5vw,20px)}
-  .compact-room-stat span{font-size:clamp(10px,3vw,11px);white-space:nowrap}
-  .compact-room > .compact-room-stat:nth-child(3) span{display:none}
-  #welcome-view .compact-room .lobby-join-options{
-    grid-column:3;
-    grid-row:2;
-    align-self:stretch;
-    align-items:center;
-    min-width:0;
-    padding-left:7px;
-    border-left:1px solid #a7c0b350;
-  }
-  #welcome-view .compact-room .lobby-join-options .button{
-    width:100%;
-    min-width:0;
-    height:40px;
-    min-height:40px;
-    padding:0 5px;
-    font-size:clamp(12px,3.5vw,14px);
-  }
-}
-
-
-/* Reduce empty space inside the mobile table card and add a soft gloss to its action. */
-@media(max-width:600px){
-  #welcome-view .compact-room{padding:6px 8px}
-  .compact-room-owner{padding-bottom:6px}
-  .compact-room-privacy{min-height:42px;padding-bottom:6px}
-  .compact-room > .compact-room-stat{min-height:48px;padding:4px 3px}
-  #welcome-view .compact-room .lobby-join-options .button{
-    height:36px;
-    min-height:36px;
-    padding:0 5px;
-    border:1px solid #f4d98e;
-    background:linear-gradient(180deg,#f8dc96 0%,#ebc674 58%,#d9ad56 100%);
-    box-shadow:inset 0 1px 0 rgba(255,255,255,.78),0 3px 0 rgba(0,0,0,.24),0 4px 7px rgba(0,0,0,.12);
-  }
-  #welcome-view .compact-room .lobby-join-options .button:active{
-    transform:translateY(1px);
-    box-shadow:inset 0 1px 0 rgba(255,255,255,.68),0 2px 0 rgba(0,0,0,.24);
-  }
-}
-/* Enlaces de privacidad y soporte en el lobby */
-#welcome-view .legal-links {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 8px;
-  width: max-content;
-  max-width: 100%;
-  margin: 8px auto 0;
-  padding: 4px;
-  border: 1px solid rgba(232, 201, 131, .22);
-  border-radius: 999px;
-  background: rgba(5, 28, 20, .28);
-  font-size: 12px;
-}
-
-#welcome-view .legal-links a {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 32px;
-  padding: 0 13px;
-  border: 1px solid transparent;
-  border-radius: 999px;
-  color: #d9e2da;
-  text-decoration: none;
-  white-space: nowrap;
-}
-
-#welcome-view .legal-links a:hover,
-#welcome-view .legal-links a:focus-visible {
-  border-color: rgba(232, 201, 131, .45);
-  background: rgba(232, 201, 131, .1);
-  color: #f1d99f;
-}
-
-#welcome-view #lobby-report {
-  width: max-content;
-  max-width: 100%;
-  margin: 12px auto 0;
-  padding: 7px 13px;
-  border: 1px solid rgba(232, 201, 131, .3);
-  border-radius: 999px;
-  color: #c9d5cb;
-  font-size: 11px;
-  text-decoration: none;
-}
-
-@media (max-width: 380px) {
-  #welcome-view .legal-links { gap: 3px; }
-  #welcome-view .legal-links a { padding: 0 10px; font-size: 11px; }
-}
