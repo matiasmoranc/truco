@@ -13,7 +13,11 @@ function parseSignedQuery(raw) {
   return { content: match[1], signature: Buffer.from(decodeURIComponent(match[2]), 'base64url'), keyId: match[3], params };
 }
 function verifySignature(parsed, key) {
-  if (!key || !crypto.verify('sha256', Buffer.from(parsed.content), key, parsed.signature)) throw new Error('Invalid signature');
+  if (key && crypto.verify('sha256', Buffer.from(parsed.content), key, parsed.signature)) return;
+  // AdMob's console checker signs percent-decoded text (e.g. Crédito).
+  // Permit that representation ONLY for the wallet-free connection probe.
+  if (key && isVerificationProbe(parsed.params) && crypto.verify('sha256', Buffer.from(decodeURIComponent(parsed.content)), key, parsed.signature)) return;
+  throw new Error('Invalid signature');
 }
 async function googleKeys() {
   if (keys && Date.now() - keysAt < 3600000) return keys;

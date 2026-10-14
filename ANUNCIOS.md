@@ -56,6 +56,9 @@ puede usar ID de usuario `truco-ssv-check` y datos personalizados
 responde HTTP 200 y no crea sesiones ni entrega créditos. Usar la URL
 verificada y guardar en ambos bloques. No confundir una conexión verificada
 con la prueba completa de una recompensa real.
+La consola firma algunos valores decodificados, como el nombre «Crédito»;
+se admite esa representación solo para este diagnóstico sin saldo. Las
+recompensas de partidas mantienen la comprobación del contenido original.
 
 Los nombres desplegados son `creditPrepareAdReward`, `creditAdRewardStatus` y
 `admobReward`. El servidor verifica la firma ECDSA con claves oficiales Google,

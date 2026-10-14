@@ -52,9 +52,16 @@ test('AdMob console probe requires a valid signature and never touches the datab
   const signed=query+'&signature='+crypto.sign('sha256',Buffer.from(query),privateKey).toString('base64url')+'&key_id=1';
   async function request(raw){let status,body;await handler({method:'GET',originalUrl:'/admobReward?'+raw},{status(n){status=n;return this;},send(s){body=s;}});return {status,body};}
   assert.equal((await request(signed)).status,200);assert.equal(databaseCalls,0);
+  const encoded='reward_item=Cr%C3%A9dito&'+query;
+  const consoleSigned=encoded+'&signature='+crypto.sign('sha256',Buffer.from(decodeURIComponent(encoded)),privateKey).toString('base64url')+'&key_id=1';
+  assert.equal((await request(consoleSigned)).status,200);assert.equal(databaseCalls,0);
+  assert.equal((await request(consoleSigned.replace('Cr%C3%A9dito','Otro'))).status,403);assert.equal(databaseCalls,0);
   assert.equal((await request(signed.replace('verify-connection-only','modified'))).status,403);assert.equal(databaseCalls,0);
   assert.equal((await request(query)).status,400);assert.equal(databaseCalls,0);
   const normal=params().toString();
+  const encodedReward='reward_item=Cr%C3%A9dito&'+normal;
+  const decodedRewardSigned=encodedReward+'&signature='+crypto.sign('sha256',Buffer.from(decodeURIComponent(encodedReward)),privateKey).toString('base64url')+'&key_id=1';
+  assert.equal((await request(decodedRewardSigned)).status,403);assert.equal(databaseCalls,0);
   const real=normal+'&signature='+crypto.sign('sha256',Buffer.from(normal),privateKey).toString('base64url')+'&key_id=1';
   assert.equal((await request(real)).status,503);assert.equal(databaseCalls,1);
 });
