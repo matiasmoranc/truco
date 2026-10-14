@@ -12,6 +12,12 @@ callbacks SSV con anuncios de prueba; no se acredita dinero virtual desde un
 evento del cliente. Probar carga, cierre anticipado, finalización y errores en
 dispositivos físicos Android y en TestFlight.
 
+La demostración no llama a `creditPrepareAdReward`: no crea una sesión de
+recompensa ni depende de que las nuevas funciones estén desplegadas. Conserva
+el consentimiento UMP y no modifica el saldo. Los errores distinguen
+consentimiento, inicio del SDK, carga, reproducción y verificación; el detalle
+técnico se registra en la consola nativa.
+
 Instalar con `npm ci`, desplegar `firebase deploy --only functions,hosting` y
 ejecutar `npm run mobile:sync` para proyectos nativos existentes. Codemagic
 genera iOS y configura el ID de AdMob mediante `scripts/prepare-ios.py`.

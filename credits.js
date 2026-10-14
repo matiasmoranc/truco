@@ -141,7 +141,7 @@ export function installCredits({services,getState,document,api,now=()=>Date.now(
       else if(result.credited)notify('¡Ganaste 1 crédito!');
       else if(result.pending)notify('Estamos verificando tu recompensa. El crédito aparecerá cuando se confirme.');
       else notify('Completá el anuncio para recibir la recompensa.');
-    }catch{if(epoch===generation)error='No pudimos completar el anuncio. No se modificaron tus créditos. Volvé a intentar.';}
+    }catch(cause){if(epoch===generation)error=cause?.adStage?cause.message:'No pudimos completar el anuncio. Volvé a intentar.';}
     finally{adBusy=false;render();}
   });
   el('ads-privacy')?.addEventListener('click',()=>{

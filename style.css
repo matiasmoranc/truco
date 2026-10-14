@@ -1603,3 +1603,8 @@ html,body,#app{touch-action:pan-x pan-y}
 /* Evitar selección accidental durante el juego; conservar la edición de campos. */
 body{-webkit-user-select:none;user-select:none}
 input,textarea,[contenteditable=""],[contenteditable="true"]{-webkit-user-select:text;user-select:text}
+
+/* Reward button has its own contrast and a separate grid row. */
+#welcome-view #credits-ad{grid-row:3;grid-column:2;background:#e8c983;color:#12382b;-webkit-text-fill-color:#12382b;font-weight:700;height:auto;min-height:56px;white-space:normal;line-height:1.3;text-align:center}
+#welcome-view #credits-ad:disabled{opacity:.65}
+@media(max-width:500px){#welcome-view #credits-ad{grid-column:1;grid-row:auto}}
