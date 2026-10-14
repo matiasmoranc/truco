@@ -127,23 +127,7 @@ test('Blocked accounts lose wallet access and administrator roles cannot be writ
  assert.equal(rules.administrators.$uid['.write'],false);
 });
 
-test('Demo reward stays separate from the wallet, rejects skips and clears on account change',async()=>{
- const m=await modulePromise,previous=globalThis.trucoNative;
- let result={test:true,earned:true};
- globalThis.trucoNative={rewardedAds:{supported:true,test:true,show:async()=>result}};
- try{
-  const h=harness(m,{balance:0,locked:0,lastGrantAt:today});await h.api.start();
-  await h.listeners['credits-ad:click']();
-  assert.match(h.elements['credits-ad-note'].textContent,/Saldo de prueba: 1/);
-  assert.equal(h.api.wallet().balance,0);assert.equal(h.writes.length,0);
-  result={test:true,earned:false};await h.listeners['credits-ad:click']();
-  assert.match(h.elements['credits-ad-note'].textContent,/Saldo de prueba: 1/);
-  result={test:true,earned:true};await h.listeners['credits-ad:click']();
-  assert.match(h.elements['credits-ad-note'].textContent,/Saldo de prueba: 2/);
-  let finish;globalThis.trucoNative.rewardedAds.show=()=>new Promise(resolve=>{finish=resolve;});
-  const pending=h.listeners['credits-ad:click']();
-  h.state.uid='b';await h.api.start();finish({test:true,earned:true});await pending;
-  assert.match(h.elements['credits-ad-note'].textContent,/Saldo de prueba: 0/);
-  assert.equal(h.api.wallet().balance,0);assert.equal(h.writes.length,0);
- }finally{globalThis.trucoNative=previous;}
+test('No-ads release never registers advertising controls or changes the wallet for advertising',async()=>{
+ const m=await modulePromise,h=harness(m,{balance:0,locked:0,lastGrantAt:today});await h.api.start();
+ assert.equal(h.listeners['credits-ad:click'],undefined);assert.equal(h.listeners['ads-privacy:click'],undefined);assert.equal(h.api.wallet().balance,0);assert.equal(h.writes.length,0);
 });

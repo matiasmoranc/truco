@@ -1653,3 +1653,5 @@ input,textarea,[contenteditable=""],[contenteditable="true"]{-webkit-user-select
 #account-menu #account-report{margin-top:8px;padding-top:16px;border-top:1px solid #91b29e44}#account-menu .legal-links{margin-top:4px;font-size:13px}
 @media(max-width:380px){#account-panel .account-card{padding:20px 16px}.account-avatar{width:54px;height:54px;flex-basis:54px;padding:10px}#account-menu .player-account-summary{gap:12px}#account-menu .button{gap:12px;padding:12px;font-size:14px}}
 #account-menu .button[hidden]{display:none}
+
+.release-intro{font-size:14px;line-height:1.5;color:#cbd9cf;text-align:center;margin:0 0 8px}

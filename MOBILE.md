@@ -2,6 +2,10 @@
 
 La web continúa publicándose en GitHub Pages. Capacitor empaqueta el mismo juego y sus cartas originales; las cuentas, mesas y créditos usan el mismo Firebase. No se publicó ninguna app en las tiendas.
 
+## Primera versión sin anuncios
+
+Todas las nuevas compilaciones usan TRUCO_ADS_MODE=off. No se incluye el plugin AdMob. Ejecutar npm ci después de actualizar; cap sync actualiza las dependencias nativas y prepare-no-ads.cjs limpia configuración publicitaria anterior. Los proyectos nativos viejos deben volver a sincronizarse; un APK/IPA anterior no representa esta versión. npm run mobile:verify:no-ads verifica el resultado antes de firmar.
+
 ## Preparar en Windows
 
 Instalá Node.js 22 o superior y Android Studio. Desde la carpeta del repositorio:
@@ -102,8 +106,6 @@ El preparador rechaza credenciales faltantes, versión inválida, proyecto/paque
 
 ## Verificaciones antes de enviar iOS
 
-El workflow ejecuta los tests antes de construir. `prepare-ios.py` declara que solo usamos cifrado estándar exento, y agrega la lista de 50 SKAdNetwork IDs de la guía oficial Google, revisada el 14/10/2026. Si agregamos cifrado propio o mediación publicitaria, revisar estas declaraciones. `prepare-admob.cjs` usa la misma lista y conserva IDs existentes.
-
-Revisar en el archivo firmado los manifests de privacidad de Capacitor, Firebase, Google Sign-In, Google Mobile Ads y UMP y generar el reporte de privacidad de Xcode. La presencia del archivo de Capacitor en node_modules no prueba que todos los frameworks del IPA lo incluyan. Confirmar con la build real y completar App Privacy según publication/PRIVACIDAD-TIENDAS.md.
+El workflow ejecuta las pruebas y verifica el paquete sin anuncios antes de firmar. prepare-ios.py configura cifrado estándar exento y limpia los metadatos publicitarios. Revisar los manifests y el reporte de privacidad de Capacitor, Firebase y Google Sign-In en el IPA real. No se incluye Google Mobile Ads ni UMP.
 
 El proyecto permite iPad: hacen falta pruebas de orientación y capturas de iPad si se conserva ese soporte. No se ha limitado a iPhone ni se han creado capturas artificiales.

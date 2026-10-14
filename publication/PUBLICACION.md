@@ -6,7 +6,7 @@ Estado al 14/10/2026: preparación técnica en curso. Ninguna aprobación ni env
 
 El juego usa créditos gratuitos; cada rival aporta la misma cantidad y el ganador recibe ambos aportes. No hay compras ni canje por dinero/premios. Declarar esa mecánica en reglas, cuestionarios y notas. La política de recompensas AdMob exige recompensas no transferibles: la compatibilidad de la recompensa con los aportes entre jugadores sigue pendiente. No alcanza cambiar el nombre o el texto de la recompensa.
 
-Para avanzar sin esa dependencia, preparar la primera build pública con `TRUCO_ADS_MODE=off`: oculta anuncios y deja disponibles los créditos diarios y la práctica. La build habitual sigue usando anuncios de prueba para TestFlight y tests internos. Revisar cualquier cuestionario de publicidad según la build final y sus SDK, no según funciones futuras. No habilitar anuncios reales ni compras sin una revisión adicional.
+La primera versión está fijada sin anuncios. TRUCO_ADS_MODE=off es obligatorio en builds locales y de Codemagic. Se retiró el plugin AdMob y se limpian sus permisos y metadatos. No habilitar anuncios reales ni compras sin otra versión y revisión adicional.
 
 ## Apple
 
@@ -40,8 +40,7 @@ Para avanzar sin esa dependencia, preparar la primera build pública con `TRUCO_
 | Partidas | Cartas, muestra, flor, envido y declaraciones, truco, pardas, mazo, fin y revancha |
 | Créditos | Recarga 5 a saldo 0, una vez por día Uruguay, reservas, ganador, sin duplicar cobros |
 | Chat | Mensaje normal, insulto/amenaza filtrado, reporte, bloqueo, salir y desbloquear, revisión admin |
-| Anuncios de prueba | Voluntarios, consentimiento, cierre, completar suma contador de prueba, error no suma, sin afectar billetera |
-| Build sin anuncios | No botón experimental, no inicialización desde la función, recarga y práctica funcionan |
+| Build sin anuncios | Sin SDK, permisos ni botones publicitarios; recarga diaria y práctica funcionan |
 | Dispositivos | iPhone con notch, Android API 36, texto grande/teclado, iPad si se conserva |
 | Backend | Funciones/reglas desplegadas, tiempos y reintegros, borrado programado y reportes atendidos |
 

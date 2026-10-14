@@ -1,6 +1,6 @@
 # Textos preparados para las tiendas
 
-Borrador para una primera versión gratuita, sin compras y con la publicidad oculta si no está resuelta la recompensa. Copiar solo después de verificar que describe la build enviada. No se completaron las consolas de las tiendas.
+Textos para la primera versión gratuita, sin anuncios, SDK publicitario, compras ni suscripciones. Copiar solo después de verificar que describe la build enviada. No se completaron las consolas de las tiendas.
 
 ## Nombre y categoría
 
@@ -12,7 +12,7 @@ Borrador para una primera versión gratuita, sin compras y con la publicidad ocu
 - Sitio del desarrollador: https://trucouruguayo.uy/
 - Privacidad: https://trucouruguayo.uy/privacidad.html
 - Soporte: https://trucouruguayo.uy/soporte.html
-- Eliminación web: https://trucouruguayo.uy/eliminar-cuenta.html (requiere deploy y atención manual del correo).
+- Eliminación web: https://trucouruguayo.uy/eliminar-cuenta.html (requiere atención manual del correo).
 - Países, fecha de lanzamiento y datos del titular: pendientes de definir en las consolas.
 
 ## Descripción breve Google Play
@@ -36,7 +36,7 @@ Creá una mesa pública o con clave, elegí los puntos de la partida y compartí
 
 Los créditos son virtuales y gratuitos: no tienen valor monetario y no se canjean por dinero ni premios. Podés reclamar 5 créditos diarios cuando tu saldo llega a cero y no tenés créditos reservados. En las mesas entre personas, ambos aportan la misma cantidad y el ganador recibe los dos aportes. El aprendizaje y las partidas contra el bot no usan créditos.
 
-Necesitás conexión a internet y una cuenta de Google o Apple compatible con tu dispositivo. No hay compras de créditos en esta versión.
+Necesitás conexión a internet y una cuenta de Google o Apple compatible con tu dispositivo. Esta versión no contiene anuncios, compras de créditos ni suscripciones.
 
 Ayuda y contacto: contacto.trucouruguayo@gmail.com
 Política de privacidad: https://trucouruguayo.uy/privacidad.html
@@ -57,7 +57,7 @@ Account deletion is available from Mi cuenta → Eliminar mi cuenta. It requires
 
 [Before submission: replace this paragraph with the access method actually tested, include review credentials only in the private review field if applicable, and provide the exact steps to access bot practice and online matches. Do not submit placeholders.]
 
-[Only if the reviewed build uses TRUCO_ADS_MODE=off: Rewarded advertising is disabled in this build while its production configuration is being finalized.]
+This version contains no advertising or in-app purchases. It does not include the Google Mobile Ads SDK.
 
 ## Acceso de los revisores: requisito aún pendiente
 

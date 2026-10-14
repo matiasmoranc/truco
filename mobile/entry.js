@@ -4,14 +4,14 @@ import * as appSdk from 'firebase/app';
 import * as dbSdk from 'firebase/database';
 import * as authSdk from 'firebase/auth';
 import * as functionsSdk from 'firebase/functions';
-import { rewardedAds } from './rewarded-ads.js';
+import { rewardedAds } from './no-ads.js';
 
 // The same Firebase JS session drives database rules and callable Functions.
 globalThis.trucoNative = {
   isNative: Capacitor.isNativePlatform(),
   platform: Capacitor.getPlatform(),
   rewardedAds,
-  publicUrl: 'https://matiasmoranc.github.io/truco/',
+  publicUrl: 'https://trucouruguayo.uy/',
   sdk: { app: appSdk, database: dbSdk, auth: authSdk, functions: functionsSdk },
   async reauthenticateForDeletion(fb, user, provider) {
     const result=provider==='apple.com'?await FirebaseAuthentication.signInWithApple():await FirebaseAuthentication.signInWithGoogle();

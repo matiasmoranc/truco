@@ -39,3 +39,18 @@ jobs:
       - name: Verify credit rules and server in isolated Firebase emulator
         run: npx --yes firebase-tools@13 emulators:exec --only database --project demo-truco --config firebase.emulators.json "node scripts/test-credit-rules.cjs && node scripts/test-credit-functions.cjs"
 
+  no-ads-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install the release dependencies
+        run: npm ci
+      - name: Verify the advertising-free release
+        run: |
+          npm run mobile:build
+          npx cap add android
+          node scripts/prepare-no-ads.cjs
+          npm run mobile:verify:no-ads

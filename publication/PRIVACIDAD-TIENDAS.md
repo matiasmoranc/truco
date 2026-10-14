@@ -1,6 +1,6 @@
 # Inventario para App Privacy y Seguridad de los datos
 
-Revisión de código: 14/10/2026. Es un borrador técnico, no un formulario enviado. La clasificación final debe corresponder a la build y sus SDK y a la configuración de Firebase/AdMob realmente usada. No declarar que no se recopilan datos.
+Revisión de código: 14/10/2026. Es un borrador técnico, no un formulario enviado. La clasificación final debe corresponder a la build y sus SDK y a la configuración de Firebase realmente usada. No declarar que no se recopilan datos.
 
 ## Datos del juego
 
@@ -16,15 +16,9 @@ Revisión de código: 14/10/2026. Es un borrador técnico, no un formulario envi
 
 No se observó integración de Firebase Analytics, Crashlytics, Firebase Storage, cámara, contactos, micrófono ni ubicación GPS en el código auditado. Esto no excluye datos técnicos recogidos por Firebase o SDK terceros. La IP puede usarse para inferir ubicación aproximada.
 
-## Google Mobile Ads / UMP
+## Primera versión sin anuncios
 
-Está instalado el SDK de AdMob. El modo por defecto es test y usa anuncios oficiales de demostración. Puede empaquetarse con `TRUCO_ADS_MODE=off` para ocultar la función; no significa que se deba ignorar sin inspección todo SDK incluido en el archivo final.
-
-Según la documentación de Google, Mobile Ads procesa IP, interacciones de producto/publicidad, diagnósticos e identificadores del dispositivo/cuenta. Clasificar ubicación aproximada derivada de IP, identificadores, actividad y diagnóstico según sus guías para iOS y Android. Hay terceros (Google), además de los datos almacenados por el juego. No confundir anuncios no personalizados con ausencia de recopilación, compartición o seguimiento.
-
-La futura SSV real enviaría UID y una sesión de recompensa a Google; la demostración actual no envía esa sesión y no concede créditos reales. La función exige firma Google y evita créditos duplicados. No declarar compras: no están implementadas.
-
-UMP obtiene consentimiento cuando corresponde y permite opciones de privacidad. No se solicita ATT en el código del juego. Antes de declarar «no tracking», confirmar las prácticas de los SDK y la configuración real; no añadir un aviso ATT de forma automática sin identificar una actividad que requiera esa autorización.
+Se retiró @capacitor-community/admob del paquete y las dependencias. No hay publicidad, UMP, recompensas por anuncios ni solicitud ATT. En Play Console declarar que esta versión no contiene anuncios. Siguen recopilándose datos de cuenta, juego, chat, soporte y actividad. Confirmar Firebase y Google/Apple Sign-In en la build firmada; no declarar ausencia de datos.
 
 ## Seguridad, eliminación y conservación
 
@@ -40,7 +34,7 @@ UMP obtiene consentimiento cuando corresponde y permite opciones de privacidad. 
 
 1. Revisar la versión concreta de todos los SDK y el reporte de privacidad del archivo iOS.
 2. Completar finalidades, datos vinculados a identidad y compartición siguiendo las definiciones de cada tienda. Seguridad de los datos distingue compartición y prestadores de servicios; no trasladar respuestas de Apple mecánicamente.
-3. Seleccionar recopilación opcional/obligatoria según el flujo real: autenticación para jugar, chat/reportes voluntarios y anuncios voluntarios.
+3. Seleccionar recopilación opcional/obligatoria según el flujo real: autenticación para jugar y chat/reportes voluntarios.
 4. Revisar publicidad, público objetivo, clasificación por edad y requisitos de niños antes de habilitar anuncios. No se definió ni implementó una experiencia infantil.
 5. Confirmar links HTTPS, prueba de eliminación Google y Apple y atención del correo.
 

@@ -2,8 +2,8 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 const root = path.resolve(__dirname, '..');
 (async () => {
-  const adsMode=process.env.TRUCO_ADS_MODE||'test';
-  if(!['test','off'].includes(adsMode))throw new Error('TRUCO_ADS_MODE debe ser test u off. Los anuncios reales todavía requieren revisión.');
+  const adsMode=process.env.TRUCO_ADS_MODE||'off';
+  if(adsMode!=='off')throw new Error('Esta versión solo admite TRUCO_ADS_MODE=off.');
   const stage = path.join(root, '.mobile-web');
   await fs.rm(stage, { recursive: true, force: true });
   await fs.mkdir(stage, { recursive: true });
@@ -23,12 +23,9 @@ const root = path.resolve(__dirname, '..');
     await fs.writeFile(path.join(stage, file), content);
   }
   await fs.cp(path.join(root,'mobile'), path.join(stage,'mobile'), { recursive: true });
-  if(adsMode==='off'){
-    const adsFile=path.join(stage,'mobile/rewarded-ads.js');
-    const adsSource=await fs.readFile(adsFile,'utf8');
-    if(!adsSource.includes('const ADS_ENABLED = true;'))throw new Error('No se pudo aplicar el modo sin anuncios.');
-    await fs.writeFile(adsFile,adsSource.replace('const ADS_ENABLED = true;','const ADS_ENABLED = false;'));
-  }
+  // Legacy ad experiments are not included in the native web package.
+  await fs.rm(path.join(stage,'mobile/rewarded-ads.js'),{force:true});
+  await fs.rm(path.join(stage,'mobile/skadnetwork-ids.json'),{force:true});
   console.log('Publicidad del paquete: '+adsMode);
   await fs.cp(path.join(root,'assets'), path.join(stage,'assets'), { recursive: true });
   const { build } = await import('vite');

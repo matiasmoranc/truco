@@ -3,8 +3,6 @@
 export const CREDIT_DAY_MS=86400000;
 export const URUGUAY_OFFSET_MS=10800000;
 const giftIcon='<svg class="credit-action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10h18v4H3zM5 14v7h14v-7M12 10v11M12 10H8a3 3 0 1 1 3-3l1 3Zm0 0h4a3 3 0 1 0-3-3l-1 3Z"/></svg>';
-const videoIcon='<svg class="credit-action-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="3" width="20" height="18" rx="2"/><path d="M6 3v18M18 3v18M2 8h4M2 16h4M18 8h4M18 16h4"/><path class="credit-play" d="m10 8 5 4-5 4Z"/></svg>';
-const rewardIcon='<svg class="credit-reward-icon" viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v5c0 4 16 4 16 0V5M4 10v5c0 4 16 4 16 0v-5M4 15v4c0 4 16 4 16 0v-4"/></svg>';
 export function creditDayStart(now) {
   return Math.floor((now-URUGUAY_OFFSET_MS)/CREDIT_DAY_MS)*CREDIT_DAY_MS+URUGUAY_OFFSET_MS;
 }
@@ -32,7 +30,7 @@ export function installCredits({services,getState,document,api,now=()=>Date.now(
   const el=id=>document.getElementById(id);
   let uid=null,generation=0,unsubscribe=null,timer=null,wallet,busy=false,error='',available=false,detailsOpen=false,initialAttempted=false;
   const clock=()=>now()+(Number(getState().serverTimeOffset)||0);
-  let syncing=null,adBusy=false,testBalance=0;
+  let syncing=null;
   async function sync() {
     if(!uid||getState().firebaseConnected!==true)return false;
     if(syncing)return syncing;
@@ -61,24 +59,15 @@ export function installCredits({services,getState,document,api,now=()=>Date.now(
     el('credits-status').textContent=error||messages[eligibility];
     el('credits-status').hidden=!el('credits-status').textContent;
     const button=el('credits-claim');button.hidden=!available||!['available','claimed'].includes(eligibility);
-    button.disabled=busy||adBusy||eligibility!=='available'||getState().firebaseConnected!==true;
+    button.disabled=busy||eligibility!=='available'||getState().firebaseConnected!==true;
     button.innerHTML=giftIcon+'<span>'+(busy?'Reclamando…':eligibility==='claimed'?'5 créditos disponibles mañana':'Reclamar 5 créditos')+'</span>';
-    const adButton=el('credits-ad'),ads=globalThis.trucoNative?.rewardedAds;
-    if(adButton){
-      adButton.hidden=!uid||!ads?.supported||!available||!['claimed','available'].includes(eligibility);
-      adButton.disabled=busy||adBusy||getState().firebaseConnected!==true;
-      adButton.innerHTML=videoIcon+'<span>'+(adBusy?'Cargando…':'Ver anuncio')+'</span><span class="credit-ad-reward">'+rewardIcon+'<b>+1</b></span>';
-      adButton.setAttribute?.('aria-label',ads?.test?'Ver anuncio de prueba para sumar 1 crédito de prueba.':'Ver anuncio para ganar 1 crédito');
-    }
-    const adNote=el('credits-ad-note');if(adNote){adNote.hidden=!ads?.test||adButton?.hidden!==false;adNote.textContent='Saldo de prueba: '+testBalance+' · No sirve para jugar. Se reinicia al cerrar la app o cambiar de cuenta.';}
-    const privacy=el('ads-privacy');if(privacy)privacy.hidden=!ads?.supported;
     clearTimer(timer);
     if(uid)timer=setTimer(render,Math.min(60000,Math.max(50,creditDayStart(clock())+CREDIT_DAY_MS-clock()+50)));
     if(uid&&available&&wallet===null&&!busy&&!initialAttempted&&getState().firebaseConnected===true){initialAttempted=true;void claim(true);}
   }
   function stop() {
     ++generation;unsubscribe?.();unsubscribe=null;clearTimer(timer);timer=null;
-    uid=null;wallet=undefined;testBalance=0;busy=false;error='';available=false;detailsOpen=false;initialAttempted=false;syncing=null;render();
+    uid=null;wallet=undefined;busy=false;error='';available=false;detailsOpen=false;initialAttempted=false;syncing=null;render();
   }
   async function start() {
     const user=getState().uid;if(!user){stop();return;}
@@ -99,7 +88,7 @@ export function installCredits({services,getState,document,api,now=()=>Date.now(
     }
   }
   async function claim(initial=false) {
-    if(busy||adBusy||!uid||!available||getState().firebaseConnected!==true||creditEligibility(wallet,clock())!=='available')return;
+    if(busy||!uid||!available||getState().firebaseConnected!==true||creditEligibility(wallet,clock())!=='available')return;
     const user=uid,epoch=generation;busy=true;render();
     try {
       const fb=await services();if(epoch!==generation||getState().uid!==user)return;
@@ -134,28 +123,6 @@ export function installCredits({services,getState,document,api,now=()=>Date.now(
     panel.classList.remove('credits-highlight');void panel.offsetWidth;panel.classList.add('credits-highlight');
   });
   el('credits-claim').addEventListener('click',()=>claim());
-  el('credits-ad')?.addEventListener('click',async()=>{
-    const ads=globalThis.trucoNative?.rewardedAds;
-    if(!ads?.supported||adBusy||busy||!uid||!available||!['claimed','available'].includes(creditEligibility(wallet,clock()))||getState().firebaseConnected!==true)return;
-    const user=uid,epoch=generation;adBusy=true;error='';render();
-    try{
-      const result=await ads.show({api,uid:user});
-      if(epoch!==generation||user!==uid)return;
-      if(ads.test&&result.test&&result.earned){
-        testBalance+=1;render();notify('¡+1 crédito de prueba! No se puede usar en partidas.');return;
-      }
-      await sync();
-      if(epoch!==generation||user!==uid)return;
-      if(result.test)notify('Completá el anuncio para recibir el crédito de prueba.');
-      else if(result.credited)notify('¡Ganaste 1 crédito!');
-      else if(result.pending)notify('Estamos verificando tu recompensa. El crédito aparecerá cuando se confirme.');
-      else notify('Completá el anuncio para recibir la recompensa.');
-    }catch(cause){if(epoch===generation)error=cause?.adStage?cause.message:'No pudimos completar el anuncio. Volvé a intentar.';}
-    finally{adBusy=false;render();}
-  });
-  el('ads-privacy')?.addEventListener('click',()=>{
-    void globalThis.trucoNative?.rewardedAds?.privacy().catch(()=>notify('No pudimos abrir las opciones de publicidad. Volvé a intentar.'));
-  });
   document.addEventListener?.('visibilitychange',()=>{if(document.visibilityState==='visible')void sync();});
   globalThis.addEventListener?.('pageshow',()=>{void sync();});
   return {start,stop,refresh:render,sync,claim,wallet:()=>wallet};
