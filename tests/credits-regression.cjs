@@ -69,11 +69,11 @@ test('Wallets are private and the browser cannot write match accounting',()=>{
 });
 function harness(m,initial={balance:0,locked:0,lastGrantAt:today-86400000}) {
  const elements={},listeners={},callbacks=[],writes=[];
- for(const id of ['credits-panel','credits-balance','credits-status','credits-claim'])elements[id]={hidden:false,disabled:false,textContent:'',addEventListener(name,fn){listeners[id+':'+name]=fn;}};
+ for(const id of ['credits-panel','credits-balance','credits-status','credits-claim','credits-ad','credits-ad-note'])elements[id]={hidden:false,disabled:false,textContent:'',addEventListener(name,fn){listeners[id+':'+name]=fn;}};
  const state={uid:'a',firebaseConnected:true,serverTimeOffset:0};let value=initial;
  const fb={db:{},ref:(_db,p)=>p,onValue(_ref,onValue,onError){callbacks.push({onValue,onError});onValue({val:()=>value});return ()=>{};},serverTimestamp:()=>({'.sv':'timestamp'}),async runTransaction(ref,update,options){writes.push({ref,options});const next=update(value);if(next)value={...next,lastGrantAt:today};return {committed:!!next,snapshot:{val:()=>value}};},get:async()=>({val:()=>value})};
  const api=m.installCredits({services:async()=>fb,getState:()=>state,document:{getElementById:id=>elements[id]},now:()=>today,setTimer:()=>1,clearTimer(){}});
- return {api,state,elements,callbacks,writes,fb};
+ return {api,state,elements,callbacks,writes,fb,listeners};
 }
 test('A missing wallet gets the initial grant automatically exactly once',async()=>{
  const m=await modulePromise,h=harness(m,null);await h.api.start();
@@ -125,4 +125,25 @@ test('Blocked accounts lose wallet access and administrator roles cannot be writ
  const context={auth:{uid:'a'},$uid:'a',root:new Snapshot({userAccess:{a:{blocked:true}}})};
  assert.equal(run(creditRules['.read'],context),false);
  assert.equal(rules.administrators.$uid['.write'],false);
+});
+
+test('Demo reward stays separate from the wallet, rejects skips and clears on account change',async()=>{
+ const m=await modulePromise,previous=globalThis.trucoNative;
+ let result={test:true,earned:true};
+ globalThis.trucoNative={rewardedAds:{supported:true,test:true,show:async()=>result}};
+ try{
+  const h=harness(m,{balance:0,locked:0,lastGrantAt:today});await h.api.start();
+  await h.listeners['credits-ad:click']();
+  assert.match(h.elements['credits-ad-note'].textContent,/Saldo de prueba: 1/);
+  assert.equal(h.api.wallet().balance,0);assert.equal(h.writes.length,0);
+  result={test:true,earned:false};await h.listeners['credits-ad:click']();
+  assert.match(h.elements['credits-ad-note'].textContent,/Saldo de prueba: 1/);
+  result={test:true,earned:true};await h.listeners['credits-ad:click']();
+  assert.match(h.elements['credits-ad-note'].textContent,/Saldo de prueba: 2/);
+  let finish;globalThis.trucoNative.rewardedAds.show=()=>new Promise(resolve=>{finish=resolve;});
+  const pending=h.listeners['credits-ad:click']();
+  h.state.uid='b';await h.api.start();finish({test:true,earned:true});await pending;
+  assert.match(h.elements['credits-ad-note'].textContent,/Saldo de prueba: 0/);
+  assert.equal(h.api.wallet().balance,0);assert.equal(h.writes.length,0);
+ }finally{globalThis.trucoNative=previous;}
 });

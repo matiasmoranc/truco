@@ -32,7 +32,7 @@ export function installCredits({services,getState,document,api,now=()=>Date.now(
   const el=id=>document.getElementById(id);
   let uid=null,generation=0,unsubscribe=null,timer=null,wallet,busy=false,error='',available=false,detailsOpen=false,initialAttempted=false;
   const clock=()=>now()+(Number(getState().serverTimeOffset)||0);
-  let syncing=null,adBusy=false;
+  let syncing=null,adBusy=false,testBalance=0;
   async function sync() {
     if(!uid||getState().firebaseConnected!==true)return false;
     if(syncing)return syncing;
@@ -68,9 +68,9 @@ export function installCredits({services,getState,document,api,now=()=>Date.now(
       adButton.hidden=!uid||!ads?.supported||!available||!['claimed','available'].includes(eligibility);
       adButton.disabled=busy||adBusy||getState().firebaseConnected!==true;
       adButton.innerHTML=videoIcon+'<span>'+(adBusy?'Cargando…':'Ver anuncio')+'</span><span class="credit-ad-reward">'+rewardIcon+'<b>+1</b></span>';
-      adButton.setAttribute?.('aria-label',ads?.test?'Ver anuncio de prueba. No suma créditos todavía.':'Ver anuncio para ganar 1 crédito');
+      adButton.setAttribute?.('aria-label',ads?.test?'Ver anuncio de prueba para sumar 1 crédito de prueba.':'Ver anuncio para ganar 1 crédito');
     }
-    const adNote=el('credits-ad-note');if(adNote){adNote.hidden=!ads?.test||adButton?.hidden!==false;adNote.textContent='Modo de prueba: todavía no suma créditos.';}
+    const adNote=el('credits-ad-note');if(adNote){adNote.hidden=!ads?.test||adButton?.hidden!==false;adNote.textContent='Saldo de prueba: '+testBalance+' · No sirve para jugar. Se reinicia al cerrar la app o cambiar de cuenta.';}
     const privacy=el('ads-privacy');if(privacy)privacy.hidden=!ads?.supported;
     clearTimer(timer);
     if(uid)timer=setTimer(render,Math.min(60000,Math.max(50,creditDayStart(clock())+CREDIT_DAY_MS-clock()+50)));
@@ -78,7 +78,7 @@ export function installCredits({services,getState,document,api,now=()=>Date.now(
   }
   function stop() {
     ++generation;unsubscribe?.();unsubscribe=null;clearTimer(timer);timer=null;
-    uid=null;wallet=undefined;busy=false;error='';available=false;detailsOpen=false;initialAttempted=false;syncing=null;render();
+    uid=null;wallet=undefined;testBalance=0;busy=false;error='';available=false;detailsOpen=false;initialAttempted=false;syncing=null;render();
   }
   async function start() {
     const user=getState().uid;if(!user){stop();return;}
@@ -141,8 +141,12 @@ export function installCredits({services,getState,document,api,now=()=>Date.now(
     try{
       const result=await ads.show({api,uid:user});
       if(epoch!==generation||user!==uid)return;
+      if(ads.test&&result.test&&result.earned){
+        testBalance+=1;render();notify('¡+1 crédito de prueba! No se puede usar en partidas.');return;
+      }
       await sync();
-      if(result.test)notify('Anuncio de prueba completado. Tu saldo real no se modifica.');
+      if(epoch!==generation||user!==uid)return;
+      if(result.test)notify('Completá el anuncio para recibir el crédito de prueba.');
       else if(result.credited)notify('¡Ganaste 1 crédito!');
       else if(result.pending)notify('Estamos verificando tu recompensa. El crédito aparecerá cuando se confirme.');
       else notify('Completá el anuncio para recibir la recompensa.');
