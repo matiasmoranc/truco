@@ -163,7 +163,9 @@
         <div id="chat-backdrop" class="chat-backdrop hidden" aria-hidden="true"></div>
         <section id="match-chat" class="match-chat hidden" role="dialog" aria-labelledby="chat-title">
           <div class="chat-heading"><h2 id="chat-title">Chat de la partida</h2><button type="button" id="chat-close" aria-label="Cerrar chat">×</button></div>
-          <label class="chat-mute"><input type="checkbox" id="chat-muted" role="switch" /> Bloquear jugador (chat y futuras mesas)</label>
+          <label class="chat-mute"><input type="checkbox" id="chat-muted" role="switch" /> Silenciar mensajes</label>
+          <details class="chat-options"><summary>Más opciones</summary><label class="chat-block-option"><input type="checkbox" id="chat-player-blocked" /> Bloquear jugador en futuras mesas</label><button type="button" id="chat-report-mode" aria-pressed="false">Reportar un mensaje</button></details>
+          <p id="chat-report-hint" class="chat-report-hint hidden" role="status">Elegí el mensaje que querés reportar.</p>
           <div id="chat-history" class="chat-history" role="log" aria-live="polite" aria-label="Historial de mensajes"></div>
           <div id="chat-quick" class="chat-quick" aria-label="Mensajes rápidos"><button type="button" data-quick-message="¡Buena mano!">¡Buena mano!</button><button type="button" data-quick-message="Un segundo">Un segundo</button><button type="button" data-quick-message="¿Otra partida?">¿Otra partida?</button></div><form id="chat-form" class="chat-form"><label class="chat-input-label" for="chat-input">Mensaje</label><input id="chat-input" type="text" maxlength="40" placeholder="Escribí un mensaje…" autocomplete="off" /><div id="chat-blocked" class="chat-blocked hidden"></div><button id="chat-send" type="submit">Enviar</button><span id="chat-count" class="chat-count">0/40</span><p id="chat-error" class="chat-error hidden" role="status"></p></form>
         </section>
