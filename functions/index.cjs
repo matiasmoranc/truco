@@ -113,11 +113,11 @@ async function adminIdentity(request){
  try{requireAdmin(request.auth,role.val()===true&&!user.disabled);}catch{throw new HttpsError('permission-denied','Tu cuenta no tiene acceso de administrador.');}
  await rateLimit(uid,60,'admin');return uid;
 }
-const {prepareSelfDeletion,erasePlayerData}=require('./self-deletion.cjs');
+const {prepareSelfDeletion,prepareAdminPrivacyDeletion,erasePlayerData}=require('./self-deletion.cjs');
 async function completeSelfDeletion(uid,job){
  let failure;
  const result=await loadedTransaction(db.ref(),root=>{
-  try{return erasePlayerData(root,{uid,anonymousId:job.anonymousId,now:Date.now()});}catch(e){failure=e;return undefined;}
+  try{const next=erasePlayerData(root,{uid,anonymousId:job.anonymousId,now:Date.now()});next.userAccess[uid].deletionRequestId=job.requestId;return next;}catch(e){failure=e;return undefined;}
  });
  if(!result.committed)throw failure||new Error('No se pudieron limpiar los datos.');
  try{await getAuth().deleteUser(uid);}catch(e){if(e.code!=='auth/user-not-found')throw e;}
@@ -165,15 +165,17 @@ exports.adminConsole=onCall(options,async request=>{
  }
  if(action==='delete'){
   let failure;
+  const anonymousId='deleted_'+crypto.randomUUID();
   const prepared=await loadedTransaction(db.ref(),root=>{
-   failure=null;if(!root)return undefined;try{return prepareUserDeletion(root,{...data,actor,now:Date.now()});}catch(e){failure=e.message;return undefined;}
+   failure=null;if(!root)return undefined;
+   try{return prepareAdminPrivacyDeletion(root,{...data,actor,anonymousId,now:Date.now()});}catch(e){failure=e.message;return undefined;}
   });
   if(!prepared.committed)throw new HttpsError('failed-precondition',failure||'No se pudo preparar la eliminación.');
-  try{await getAuth().deleteUser(data.uid);}catch(e){if(e.code!=='auth/user-not-found')throw new HttpsError('internal','No se pudo eliminar la cuenta. Reintentá el mismo cambio.');}
-  const done=await loadedTransaction(db.ref(),root=>{
-   failure=null;if(!root)return undefined;try{return finishUserDeletion(root,{uid:data.uid,requestId:data.requestId,now:Date.now()});}catch(e){failure=e.message;return undefined;}
-  });
-  if(!done.committed)throw new HttpsError('internal','La cuenta fue eliminada pero falta limpiar el perfil. Reintentá el mismo cambio.');return {ok:true};
+  const next=prepared.snapshot.val();
+  const job=next.accountDeletionJobs?.[data.uid];
+  if(!job&&next.userAccess?.[data.uid]?.deletionRequestId===data.requestId)return {ok:true};
+  try{await completeSelfDeletion(data.uid,job);}catch(e){console.error('Admin account deletion pending',e.code||'internal');throw new HttpsError('internal','La eliminación está en proceso. Se completará automáticamente.');}
+  return {ok:true};
  }
  if(action==='users'){
   let page;

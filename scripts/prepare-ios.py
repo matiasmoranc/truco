@@ -1,6 +1,7 @@
 """Configure the freshly generated Capacitor project on the Codemagic Mac."""
 import base64
 import os
+import json
 import plistlib
 from pathlib import Path
 
@@ -22,8 +23,12 @@ info["CFBundleURLTypes"] = [{"CFBundleURLSchemes": [firebase["REVERSED_CLIENT_ID
 # Use a unique increasing number for each build of this Codemagic application.
 info["CFBundleVersion"] = str(int(os.environ.get("PROJECT_BUILD_NUMBER", "1")))
 info["CFBundleShortVersionString"] = "1.0.0"
+# Only standard platform/provider encryption is used; no proprietary encryption.
+info["ITSAppUsesNonExemptEncryption"] = False
 info["GADApplicationIdentifier"] = "ca-app-pub-9142692584360532~2534067442"
-info["SKAdNetworkItems"] = [{"SKAdNetworkIdentifier": "cstr6suwn9.skadnetwork"}]
+network_ids = json.loads((root / "mobile/skadnetwork-ids.json").read_text())["ids"]
+existing_ids = [item["SKAdNetworkIdentifier"] for item in info.get("SKAdNetworkItems", []) if "SKAdNetworkIdentifier" in item]
+info["SKAdNetworkItems"] = [{"SKAdNetworkIdentifier": value} for value in dict.fromkeys(existing_ids + network_ids)]
 info["UISupportedInterfaceOrientations"] = ["UIInterfaceOrientationPortrait"]
 # Apple requires all four orientations for iPad multitasking. iPhone remains
 # portrait-only; the separate iPad declaration does not rotate the phone UI.

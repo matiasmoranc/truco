@@ -1,8 +1,24 @@
 'use strict';
-const {prepareUserDeletion}=require('./admin-service.cjs');
+const {prepareUserDeletion,validKey}=require('./admin-service.cjs');
 function prepareSelfDeletion(root,{uid,requestId,now}){
  for(const entry of Object.values(root?.rooms||{}))if(entry?.public?.table?.uid===uid&&require('./admin-service.cjs').legacyTableActive(entry.public,now))throw new Error('Cerrá tu mesa antes de eliminar tu cuenta.');
  return prepareUserDeletion(root,{uid,actor:uid,self:true,requestId,confirmName:root?.profiles?.[uid]?.name||uid,reason:'Eliminación solicitada por el jugador',now});
+}
+function prepareAdminPrivacyDeletion(root,{anonymousId,...request}){
+ if(!validKey(request.uid)||!validKey(request.actor)||!validKey(request.requestId))throw new Error('Usuario o solicitud inválidos.');
+ if(request.uid===request.actor||root?.administrators?.[request.uid]===true)throw new Error('No podés eliminar administradores.');
+ const existing=root?.accountDeletionJobs?.[request.uid];
+ if(existing){
+  if(existing.requestId!==request.requestId)throw new Error('Ya hay otra eliminación en proceso.');
+  return structuredClone(root);
+ }
+ if(root?.userAccess?.[request.uid]?.deletionRequestId===request.requestId)return structuredClone(root);
+ for(const entry of Object.values(root?.rooms||{}))if(entry?.public?.table?.uid===request.uid&&require('./admin-service.cjs').legacyTableActive(entry.public,request.now))throw new Error('El usuario tiene una mesa activa. Cerrala primero.');
+ if(!/^deleted_[a-zA-Z0-9-]+$/.test(anonymousId||''))throw new Error('Identificador de anonimización inválido.');
+ const next=prepareUserDeletion(root,{...request,self:false});
+ next.accountDeletionJobs??={};
+ next.accountDeletionJobs[request.uid]={anonymousId,requestId:request.requestId,at:request.now};
+ return next;
 }
 function erasePlayerData(root,{uid,anonymousId,now}){
  const next=structuredClone(root||{}),name=next.profiles?.[uid]?.name;
@@ -30,4 +46,4 @@ function erasePlayerData(root,{uid,anonymousId,now}){
  next.userAccess??={};next.userAccess[uid]={blocked:true,deletedAt:now};
  return next;
 }
-module.exports={prepareSelfDeletion,erasePlayerData};
+module.exports={prepareSelfDeletion,prepareAdminPrivacyDeletion,erasePlayerData};

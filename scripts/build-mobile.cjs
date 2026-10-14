@@ -2,6 +2,8 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 const root = path.resolve(__dirname, '..');
 (async () => {
+  const adsMode=process.env.TRUCO_ADS_MODE||'test';
+  if(!['test','off'].includes(adsMode))throw new Error('TRUCO_ADS_MODE debe ser test u off. Los anuncios reales todavía requieren revisión.');
   const stage = path.join(root, '.mobile-web');
   await fs.rm(stage, { recursive: true, force: true });
   await fs.mkdir(stage, { recursive: true });
@@ -21,13 +23,20 @@ const root = path.resolve(__dirname, '..');
     await fs.writeFile(path.join(stage, file), content);
   }
   await fs.cp(path.join(root,'mobile'), path.join(stage,'mobile'), { recursive: true });
+  if(adsMode==='off'){
+    const adsFile=path.join(stage,'mobile/rewarded-ads.js');
+    const adsSource=await fs.readFile(adsFile,'utf8');
+    if(!adsSource.includes('const ADS_ENABLED = true;'))throw new Error('No se pudo aplicar el modo sin anuncios.');
+    await fs.writeFile(adsFile,adsSource.replace('const ADS_ENABLED = true;','const ADS_ENABLED = false;'));
+  }
+  console.log('Publicidad del paquete: '+adsMode);
   await fs.cp(path.join(root,'assets'), path.join(stage,'assets'), { recursive: true });
   const { build } = await import('vite');
   await build({ root: stage, base: './', publicDir: false, build: { outDir: path.join(root,'www'), emptyOutDir: true, target: 'es2022', assetsInlineLimit: 0, copyPublicDir: false } });
   const nativeHtml = path.join(root,'www/index.html');
   await fs.writeFile(nativeHtml,(await fs.readFile(nativeHtml,'utf8')).replace('viewport-fit=cover','viewport-fit=auto'));
   await fs.copyFile(path.join(root,'favicon.svg'), path.join(root,'www/favicon.svg'));
-  await Promise.all(['privacidad.html','soporte.html','legal.css'].map(file=>fs.copyFile(path.join(root,file),path.join(root,'www',file))));
+  await Promise.all(['privacidad.html','soporte.html','eliminar-cuenta.html','reglas.html','legal.css'].map(file=>fs.copyFile(path.join(root,file),path.join(root,'www',file))));
   // CSS dynamically selects card images; retain their original bytes and paths.
   await fs.cp(path.join(root,'assets'), path.join(root,'www/assets'), { recursive: true });
 })().catch(error => { console.error(error); process.exitCode = 1; });

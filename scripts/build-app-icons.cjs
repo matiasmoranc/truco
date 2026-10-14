@@ -9,6 +9,11 @@ async function main(){
   return sharp({create:{width:size,height:size,channels:4,background:transparent?'#00000000':green}}).composite([{input:mark,gravity:'centre'}]).png().toBuffer();
  }
  async function write(file,buffer){await fs.mkdir(path.dirname(file),{recursive:true});await fs.writeFile(file,buffer);}
+ // Reusable store artwork uses the same logo and opaque background.
+ const store=path.join(root,'publication/assets');
+ for(const size of [512,1024]){
+  await write(path.join(store,'truco-icon-'+size+'.png'),await sharp(await icon(size,0.78)).removeAlpha().png({palette:true,colours:256,effort:10}).toBuffer());
+ }
  const android=path.join(root,'android/app/src/main/res');
  try{await fs.access(android);
   for(const [density,size] of Object.entries({mdpi:48,hdpi:72,xhdpi:96,xxhdpi:144,xxxhdpi:192})){

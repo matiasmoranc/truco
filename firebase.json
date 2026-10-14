@@ -24,7 +24,11 @@
       "mobile/**",
       "package*.json",
       "capacitor.config.json",
-      "MOBILE.md"
+      "MOBILE.md",
+      "publication/**",
+      "README.md",
+      "ADMIN.md",
+      "GOOGLE-LOGIN.md"
     ]
   },
   "functions": {

@@ -16,6 +16,8 @@ workflows:
     scripts:
       - name: Instalar dependencias
         script: npm ci
+      - name: Verificar el juego
+        script: npm test
       - name: Preparar el juego y generar iOS
         script: |
           set -e
@@ -40,3 +42,43 @@ workflows:
         auth: integration
         submit_to_testflight: false
         submit_to_app_store: false
+
+  android-play:
+    name: Truco Uruguayo - Android Google Play (AAB)
+    instance_type: linux_x2
+    max_build_duration: 60
+    environment:
+      node: 22
+      java: 21
+      groups:
+        - truco_android
+      android_signing:
+        - truco_android_upload
+    scripts:
+      - name: Instalar dependencias y verificar el juego
+        script: |
+          set -e
+          npm ci
+          npm test
+      - name: Preparar Android
+        script: |
+          set -e
+          npm run mobile:build
+          npx cap add android
+          npx cap sync android
+          npm run mobile:icons
+          node scripts/prepare-admob.cjs
+      - name: Configurar Firebase y firma de distribucion
+        script: |
+          set -e
+          node scripts/prepare-android-release.cjs
+          cd android
+          ./gradlew signingReport
+      - name: Generar el paquete para Google Play
+        script: |
+          set -e
+          cd android
+          ./gradlew bundleRelease
+    artifacts:
+      - android/app/build/outputs/bundle/release/*.aab
+      - android/app/build/outputs/mapping/release/mapping.txt

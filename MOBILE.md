@@ -86,3 +86,24 @@ npm run mobile:sync
 Este comando reconstruye y copia el juego a los proyectos nativos existentes. Para comprobar solo el paquete: `npm run mobile:build`. Las cartas se copian sin recomprimir.
 
 Antes de una beta: probar Google y Apple en dispositivos reales, restauración de cuenta, crear/unirse a mesa, desconexión, abandonar, cobro de créditos y revanchas. La compilación web no sustituye esas pruebas. La firma de release, iconos/splash definitivos, privacidad y publicación se preparan después.
+
+## Android firmado para Google Play desde Codemagic
+
+El workflow manual **Truco Uruguayo - Android Google Play (AAB)** genera un AAB firmado. No lo sube ni lo envía a revisión automáticamente. Antes de ejecutarlo:
+
+1. Crear/verificar Play Console y registrar la app `com.matiasmoranc.truco`.
+2. Crear o reutilizar una clave de **carga** para Android, conservar una copia segura y subirla a Codemagic → Code signing identities → Android keystores con referencia `truco_android_upload`. No usar ni subir a Google Play el certificado debug del APK de prueba.
+3. En el grupo `truco_android`, guardar `GOOGLE_SERVICES_JSON_BASE64` como secreto. El JSON debe ser de Firebase `truco-6553d`, paquete `com.matiasmoranc.truco`, con cliente OAuth web. Guardar también `ANDROID_VERSION_CODE`: entero positivo mayor que cualquier versionCode ya cargado. Elegir explícitamente cada número; el contador no se comparte con iOS.
+4. Ejecutar el workflow desde main. Requiere Android SDK y JDK 21; el proyecto generado usa API 36. Revisar el AAB en artefactos.
+5. Subir el AAB a pruebas internas y activar Play App Signing. En Firebase registrar SHA-1 y SHA-256 de **App signing key certificate** que muestra Play Console, además de la clave de carga si se prueba por otra vía. Descargar de nuevo el JSON si cambia. La firma usada al instalar desde Play difiere de la clave de carga; sin estas huellas puede fallar Google.
+6. Probar una instalación desde Play. Después iniciar prueba cerrada si la cuenta lo requiere. Ver publication/PUBLICACION.md.
+
+El preparador rechaza credenciales faltantes, versión inválida, proyecto/paquete Firebase incorrectos y falta de cliente Google antes de modificar archivos. Nunca imprime las contraseñas ni las escribe en Gradle: se leen de las variables de firma que entrega Codemagic. No hubo una build firmada Android en el entorno de esta auditoría.
+
+## Verificaciones antes de enviar iOS
+
+El workflow ejecuta los tests antes de construir. `prepare-ios.py` declara que solo usamos cifrado estándar exento, y agrega la lista de 50 SKAdNetwork IDs de la guía oficial Google, revisada el 14/10/2026. Si agregamos cifrado propio o mediación publicitaria, revisar estas declaraciones. `prepare-admob.cjs` usa la misma lista y conserva IDs existentes.
+
+Revisar en el archivo firmado los manifests de privacidad de Capacitor, Firebase, Google Sign-In, Google Mobile Ads y UMP y generar el reporte de privacidad de Xcode. La presencia del archivo de Capacitor en node_modules no prueba que todos los frameworks del IPA lo incluyan. Confirmar con la build real y completar App Privacy según publication/PRIVACIDAD-TIENDAS.md.
+
+El proyecto permite iPad: hacen falta pruebas de orientación y capturas de iPad si se conserva ese soporte. No se ha limitado a iPhone ni se han creado capturas artificiales.

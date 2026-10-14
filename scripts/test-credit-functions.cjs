@@ -41,5 +41,25 @@ let seq=0;
  const privateHand=(await db.ref('hands/'+code+'/a').get()).val();assert.equal(privateHand.creditMatchId,rematch.creditMatch.id);
  assert.equal((await db.ref('creditEconomy/wallets/a').get()).val().balance,20);
  console.log('Firebase Admin/emulator: callable authentication, password, concurrent joins, complete match payout, retries, private projections and rematch passed.');
+ // Exercise the real callable and root cleanup with local RTDB. Auth deletion
+ // is a fixture: no Google Auth service, real users or production credentials.
+ const auth=serverRequire('firebase-admin/auth').getAuth(),oldGet=auth.getUser,oldDelete=auth.deleteUser;
+ let deletionAttempts=0;
+ auth.getUser=async uid=>({uid,disabled:false});
+ auth.deleteUser=async uid=>{assert.equal(uid,'victim');deletionAttempts++;if(deletionAttempts===1)throw Error('Simulated Auth outage');};
+ try{
+  await db.ref().set({administrators:{admin:true},profiles:{victim:{name:'Victim'},other:{name:'Other'}},usernames:{victim:'victim'},userBlocks:{victim:{other:true},other:{victim:true}},problemReports:{own:{uid:'victim',message:'personal'}},creditEconomy:{wallets:{victim:{balance:2,locked:0},other:{balance:4,locked:0}},matches:{past:{player1:'victim',player2:'other',status:'settled'}}}});
+  const request={action:'delete',uid:'victim',requestId:'privacy-e2e',confirmName:'Victim',reason:'Solicitud verificada de prueba'};
+  await assert.rejects(()=>call('adminConsole','admin',request),/en proceso/);
+  const pending=(await db.ref().get()).val();assert.ok(pending.accountDeletionJobs.victim);
+  assert.equal(pending.profiles?.victim,undefined);assert.equal(pending.userBlocks?.victim,undefined);
+  const anonymousId=pending.accountDeletionJobs.victim.anonymousId;
+  assert.equal(pending.creditEconomy.matches.past.player1,anonymousId);
+  assert.equal((await call('adminConsole','admin',request)).ok,true);
+  assert.equal((await db.ref('accountDeletionJobs/victim').get()).exists(),false);
+  assert.equal((await db.ref('creditEconomy/wallets/other/balance').get()).val(),4);
+  await call('adminConsole','admin',request);assert.equal(deletionAttempts,2,'finished retry never deletes twice');
+  console.log('Firebase Admin/emulator: administrator privacy deletion, Auth failure recovery, anonymous history and idempotent retries passed (Auth mocked).');
+ }finally{auth.getUser=oldGet;auth.deleteUser=oldDelete;}
  await db.ref().set(null);process.exit(0);
 })().catch(error=>{console.error(error);process.exit(1);});

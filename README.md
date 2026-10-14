@@ -2,19 +2,23 @@
 
 Primera versión de la mesa de truco para tres dispositivos: un teléfono como mesa y dos como jugadores. La mesa ve las cartas jugadas y el tanteador; la mano de cada jugador se guarda por separado y solo ese jugador puede leerla. El proyecto es una web estática y usa Firebase Realtime Database para sincronizar partidas.
 
-## Probar la interfaz
+## Preparación para las tiendas
 
-Abrí `index.html` con un servidor estático y elegí **Explorar una demo**. La demo sirve para recorrer la mesa y jugar una mano ficticia en un solo dispositivo; no se sincroniza con otros teléfonos.
+La web pública está en https://trucouruguayo.uy/. Las apps usan Capacitor y el mismo Firebase. El acceso requiere Google o Apple; no se crean nuevas cuentas anónimas para jugar. Las partidas con créditos son arbitradas por Cloud Functions y no por el navegador.
 
-## Conectar partidas entre dispositivos
+- [MOBILE.md](MOBILE.md): builds iOS y Android, firma y pruebas.
+- [publication/PUBLICACION.md](publication/PUBLICACION.md): requisitos y orden de envío a ambas tiendas.
+- [publication/FICHAS.md](publication/FICHAS.md): textos preparados y acceso de revisores.
+- [publication/PRIVACIDAD-TIENDAS.md](publication/PRIVACIDAD-TIENDAS.md): inventario de datos para completar formularios.
+- [publication/REPORTE-2026-10-14.md](publication/REPORTE-2026-10-14.md): revisión de preparación y pendientes.
+- [CREDITOS.md](CREDITOS.md), [ANUNCIOS.md](ANUNCIOS.md): economía y anuncios actualmente en prueba.
 
-1. Habilitá **Authentication → Sign-in method → Anonymous** en Firebase.
-2. La configuración web ya está cargada en `firebase-config.js`. No pegues claves de cuenta de servicio ni credenciales privadas.
-3. Una persona crea una mesa y elige su lugar: mesa, Jugador 1 o Jugador 2.
-4. En los demás dispositivos, abrí la misma web, tocá **Ver mesas abiertas** y elegí un puesto libre.
-5. Cuando la mesa y ambos jugadores estén conectados, la mesa puede repartir.
+## Ejecutar y verificar
 
-`firebase.json` deja preparado el despliegue del sitio y las reglas con Firebase CLI (`firebase deploy --only hosting,database`). También podés importar `firebase.database.rules.json` desde Firebase Console. La regla de lectura en `rooms` permite que usuarios autenticados vean la lista de mesas abiertas; las manos se mantienen separadas y cada jugador solo puede leer la suya. El acceso a partidas públicas todavía permite que cualquier usuario autenticado modifique el estado. Son reglas para probar el juego, no para una partida competitiva o con premios.
+Usá Node.js 22: `npm ci`, `npm test` y `npm run mobile:build`.
+Para abrir la web localmente usá un servidor estático y un dominio autorizado en Firebase Authentication. Las sesiones reales necesitan conexión y un proveedor configurado. No pegues claves privadas de cuentas de servicio en la web ni en GitHub.
+
+El juego, soporte y privacidad también se empaquetan en las apps. Un deploy web no actualiza las apps instaladas: necesitás reconstruirlas y distribuir la nueva build. Ver DEPLOY.md para Firebase y MOBILE.md para las apps.
 
 ## Reglas implementadas
 

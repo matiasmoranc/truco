@@ -3,6 +3,8 @@ import { Capacitor } from '@capacitor/core';
 
 // Live serving requires a deliberate release change AND the server switch.
 export const TEST_ADS = true;
+// Packaging can disable the unfinished reward feature for a public build.
+const ADS_ENABLED = true;
 const units = {
   android: { test: 'ca-app-pub-3940256099942544/5224354917', live: 'ca-app-pub-9142692584360532/6281740760' },
   ios: { test: 'ca-app-pub-3940256099942544/1712485313', live: 'ca-app-pub-9142692584360532/2408365354' },
@@ -37,9 +39,10 @@ async function initialize() {
   initialized = true;
 }
 export const rewardedAds = {
-  supported: Capacitor.isNativePlatform() && !!units[Capacitor.getPlatform()],
+  supported: ADS_ENABLED && Capacitor.isNativePlatform() && !!units[Capacitor.getPlatform()],
   test: TEST_ADS,
   async show({ api, uid }) {
+    if (!this.supported) throw new Error('La publicidad no está habilitada en esta versión.');
     if (running) throw new Error('Ya hay un anuncio en curso.');
     running = true;
     try {
@@ -78,6 +81,7 @@ export const rewardedAds = {
     } finally { running = false; }
   },
   async privacy() {
+    if (!this.supported) throw new Error('La publicidad no está habilitada en esta versión.');
     await initialize();
     if (consent?.privacyOptionsRequirementStatus === 'REQUIRED') {
       await AdMob.showPrivacyOptionsForm();
