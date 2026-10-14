@@ -34,8 +34,9 @@ async function prepareCardImages(){
 const CHAT_LIMIT=40,CHAT_NOTICE_MS=4000;
 const chatModeration=globalThis.TrucoChatModeration;
 let chatMuted=false;
+let chatPlayerBlocked=false;
 
-const matchChat={key:null,messages:[],seen:new Set(),reported:new Set(),open:false,unread:0,sending:false,noticeTimers:new Map(),signature:''};
+const matchChat={key:null,messages:[],seen:new Set(),reported:new Set(),reporting:false,open:false,unread:0,sending:false,noticeTimers:new Map(),signature:''};
 function chatAvailable(){return !!(state.room&&!state.localGame&&['player1','player2'].includes(state.playerId)&&state.room.players?.player1&&state.room.players?.player2&&state.room.status!=='closed');}
 function peerChatMuted(room=state.room){
   const peer=otherPlayer(state.playerId),preference=room?.chatPreferences?.[peer];
@@ -43,12 +44,13 @@ function peerChatMuted(room=state.room){
 }
 function renderChatComposer(){
   const blocked=chatMuted||peerChatMuted(),input=$('chat-input');
-  $('chat-muted').disabled=liveActionsBlocked();
+  $('chat-muted').disabled=liveActionsBlocked()||chatPlayerBlocked;
+  if($('chat-player-blocked')){$('chat-player-blocked').checked=chatPlayerBlocked;$('chat-player-blocked').disabled=liveActionsBlocked();}
   input.disabled=blocked||liveActionsBlocked()||matchChat.sending;input.classList.toggle('hidden',blocked);
   $('chat-send').disabled=blocked||matchChat.sending||liveActionsBlocked();$('chat-send').classList.toggle('hidden',blocked);
   $('chat-count').classList.toggle('hidden',blocked);
   $('chat-blocked').classList.toggle('hidden',!blocked);
-  $('chat-blocked').textContent=blocked?(chatMuted?'Bloqueaste a este jugador. Se cerró el chat de esta partida y no podrán entrar juntos a futuras mesas.':`${state.room.players[otherPlayer(state.playerId)].name||'El rival'} te bloqueó. El chat está cerrado y no podrán entrar juntos a futuras mesas.`):'';
+  $('chat-blocked').textContent=blocked?(chatPlayerBlocked?'Bloqueaste a este jugador. El chat está cerrado y no podrán entrar juntos a futuras mesas.':chatMuted?'Silenciaste los mensajes. El chat está cerrado para ambos en esta partida.':`${state.room.players[otherPlayer(state.playerId)].name||'El rival'} silenció los mensajes. El chat está cerrado en esta partida.`):'';
   for(const button of $('chat-quick').querySelectorAll('button'))button.disabled=blocked||liveActionsBlocked()||matchChat.sending;
   $('chat-quick').classList.toggle('hidden',blocked);
   if(blocked)$('chat-error').classList.add('hidden');
@@ -70,15 +72,12 @@ async function publishChatMute(){
       if(!result.committed)throw new Error('chat-unavailable');
     }
     if(key!==chatContextKey())return;
-    const targetUid=state.room.players?.[otherPlayer(player)]?.uid;
-    if(!targetUid)throw new Error('No encontramos la cuenta del otro jugador.');
-    await fb.set(fb.ref(fb.db,`userBlocks/${uid}/${targetUid}`),desired?{blocked:true,name:state.room.players?.[otherPlayer(player)]?.name||'Jugador',blockedAt:Date.now()}:null);
   }catch(error){
     console.error('[truco:chat-mute]',error);
     if(key===chatContextKey()&&chatMuted===desired){
       const current=state.room?.chatPreferences?.[player];chatMuted=!!(current?.muted&&current.uid===uid);
       $('chat-muted').checked=chatMuted;updateChatUnread();
-      $('chat-error').textContent='No se pudo actualizar el bloqueo. Volvé a intentar.';$('chat-error').classList.remove('hidden');
+      $('chat-error').textContent='No se pudo actualizar el silencio. Volvé a intentar.';$('chat-error').classList.remove('hidden');
     }
   }finally{
     publishingChatMute=false;
@@ -92,11 +91,41 @@ async function loadPersistentChatBlock(key){
     const snapshot=await state.firebase.get(state.firebase.ref(state.firebase.db,`userBlocks/${uid}/${targetUid}`));
     if(key!==chatContextKey())return;
     const storedBlock=snapshot.val(),blocked=storedBlock===true||storedBlock?.blocked===true,preference=state.room.chatPreferences?.[state.playerId];
-    chatMuted=blocked;$('chat-muted').checked=blocked;updateChatUnread();renderChatComposer();
-    if(!!preference?.muted!==blocked||(preference?.uid&&preference.uid!==uid))publishChatMute();
+    chatPlayerBlocked=blocked;
+    if(blocked)chatMuted=true;
+    $('chat-muted').checked=chatMuted;updateChatUnread();renderChatComposer();
+    if(blocked&&(!preference?.muted||preference.uid!==uid))publishChatMute();
   }catch(error){console.error('[truco:chat-block-read]',error);}
 }
 function chatContextKey(){return `${state.roomCode}:${state.room?.createdAt||''}:${state.room?.matchNumber||1}:${state.playerId}`;}
+function setChatReporting(enabled){
+  matchChat.reporting=enabled;
+  $('chat-report-mode')?.setAttribute('aria-pressed',String(enabled));
+  if($('chat-report-mode'))$('chat-report-mode').textContent=enabled?'Cancelar reporte':'Reportar un mensaje';
+  $('chat-report-hint')?.classList.toggle('hidden',!enabled);
+  renderChatHistory();
+}
+let publishingChatBlock=false;
+async function changeChatPlayerBlock(){
+  if(publishingChatBlock||!chatAvailable()||liveActionsBlocked())return;
+  const key=chatContextKey(),uid=state.uid,peer=state.room.players?.[otherPlayer(state.playerId)],desired=$('chat-player-blocked').checked;
+  if(!uid||!peer?.uid)return;
+  publishingChatBlock=true;$('chat-player-blocked').disabled=true;
+  try{
+    await state.firebase.set(state.firebase.ref(state.firebase.db,`userBlocks/${uid}/${peer.uid}`),desired?{blocked:true,name:peer.name||'Jugador',blockedAt:Date.now()}:null);
+    if(key!==chatContextKey())return;
+    chatPlayerBlocked=desired;
+    if(desired){chatMuted=true;$('chat-muted').checked=true;clearChatNotices();}
+    updateChatUnread();renderChatComposer();
+    if(desired)await publishChatMute();
+  }catch(error){
+    if(key!==chatContextKey())return;
+    $('chat-error').textContent='No se pudo actualizar el bloqueo. Volvé a intentar.';$('chat-error').classList.remove('hidden');
+  }finally{
+    publishingChatBlock=false;
+    if(key===chatContextKey()){$('chat-player-blocked').checked=chatPlayerBlocked;$('chat-player-blocked').disabled=liveActionsBlocked();}
+  }
+}
 function clearChatNotices(){
   for(const timer of matchChat.noticeTimers.values())clearTimeout(timer);
   matchChat.noticeTimers.clear();$('chat-notices')?.replaceChildren();
@@ -119,7 +148,7 @@ function renderChatHistory(){
     const name=document.createElement('strong');name.textContent=message.sender===state.playerId?'Vos':state.room.players?.[message.sender]?.name||'Rival';
     const text=document.createElement('p');text.textContent=message.text;
     item.append(name,text);
-    if(message.sender!==state.playerId){
+    if(message.sender!==state.playerId&&matchChat.reporting){
       const report=document.createElement('button');report.type='button';report.className='chat-report-message';report.textContent=matchChat.reported.has(message.id)?'Reporte enviado':'Reportar mensaje';report.disabled=matchChat.reported.has(message.id);report.setAttribute('aria-label','Reportar este mensaje de '+name.textContent);
       report.addEventListener('click',()=>reportChatMessage(message,report));item.append(report);
     }
@@ -136,7 +165,7 @@ async function reportChatMessage(message,button){
     const report={action:'report',message:reportText,requestId:crypto.randomUUID(),localId:state.roomCode,mode:'online'};
     if(state.room.creditMatch?.id)report.matchId=state.room.creditMatch.id;
     await creditApi('playerConsole',report);
-    matchChat.reported.add(message.id);renderChatHistory();
+    matchChat.reported.add(message.id);setChatReporting(false);toast('Reporte enviado.');
   }catch(error){
     button.disabled=false;button.textContent='No se pudo reportar';
     $('chat-error').textContent=error.message||'No se pudo enviar el reporte. Volvé a intentar.';$('chat-error').classList.remove('hidden');
@@ -160,6 +189,10 @@ function syncMatchChat(){
   if(!available){closeMatchChat(true);return;}
   const key=chatContextKey(),messages=chatMessageList(state.room),fresh=matchChat.key!==key;
   if(fresh){
+    chatPlayerBlocked=false;matchChat.reporting=false;
+    $('chat-report-mode')?.setAttribute('aria-pressed','false');
+    if($('chat-report-mode'))$('chat-report-mode').textContent='Reportar un mensaje';
+    $('chat-report-hint')?.classList.add('hidden');
     const ownPreference=state.room.chatPreferences?.[state.playerId];chatMuted=!!(ownPreference?.muted&&ownPreference.uid===state.uid);
     closeMatchChat(true);matchChat.key=key;matchChat.seen=new Set(messages.map(message=>message.id));matchChat.reported=new Set();matchChat.unread=0;matchChat.signature='';matchChat.sending=false;
     $('chat-input').value='';$('chat-count').textContent='0/40';$('chat-send').disabled=false;$('chat-error').classList.add('hidden');
@@ -2997,6 +3030,8 @@ $('chat-backdrop').addEventListener('click',()=>{closeMatchChat();$('chat-toggle
 $('chat-form').addEventListener('submit',sendMatchChat);
 $('chat-input').addEventListener('input',()=>{$('chat-input').value=$('chat-input').value.slice(0,CHAT_LIMIT);$('chat-count').textContent=`${$('chat-input').value.length}/${CHAT_LIMIT}`;});
 $('chat-muted').addEventListener('change',()=>{chatMuted=$('chat-muted').checked;if(chatMuted)clearChatNotices();updateChatUnread();renderChatComposer();publishChatMute();});
+$('chat-player-blocked')?.addEventListener('change',changeChatPlayerBlock);
+$('chat-report-mode')?.addEventListener('click',()=>setChatReporting(!matchChat.reporting));
 $('match-chat').addEventListener('keydown',event=>{if(event.key==='Escape'){closeMatchChat();$('chat-toggle').focus();}});
 $('close-config').addEventListener('click',()=>showView('setup-view'));
 $('save-config').addEventListener('click',()=>{try{const cfg=JSON.parse($('firebase-config').value);if(!firebaseConfigValid(cfg))throw new Error('missing');state.config=cfg;localStorage.setItem(storageKey,JSON.stringify(cfg));toast('Configuración guardada.',true);runPendingAction();}catch{toast('Pegá una configuración Firebase válida.',true);}});
