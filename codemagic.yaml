@@ -85,7 +85,8 @@ workflows:
         script: |
           set -e
           cd android
-          ./gradlew bundleRelease
+          ./gradlew bundleRelease assembleRelease
     artifacts:
       - android/app/build/outputs/bundle/release/*.aab
+      - android/app/build/outputs/apk/release/*.apk
       - android/app/build/outputs/mapping/release/mapping.txt
