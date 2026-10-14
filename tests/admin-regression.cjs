@@ -101,7 +101,7 @@ test('Admin current tables exclude settled games, expired waiting tables and com
 
 test('Closing a legacy table aborts rather than deleting an empty Firebase transaction cache',()=>{
  const source=require('node:fs').readFileSync(require('node:path').join(__dirname,'../functions/index.cjs'),'utf8');
- const callback=source.split('let failure;const result=await loadedTransaction(db.ref(),')[1].split(');\n')[0];
+ const callback=source.split('let failure;const result=await loadedTransaction(db.ref(),')[1].split(/\);\r?\n/)[0];
  const context={closeLegacyTable,data:{...args,code:'LIVE'},actor:args.actor,failure:'previous'};
  const transaction=require('node:vm').runInNewContext('('+callback+')',context);
  assert.equal(transaction(null),undefined);assert.equal(context.failure,null);
