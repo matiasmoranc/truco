@@ -5,13 +5,14 @@
   "scripts": {
     "mobile:build": "node scripts/build-mobile.cjs",
     "mobile:apk": "node scripts/build-android-test.cjs",
-    "mobile:add:android": "npm run mobile:build && cap add android && npm run mobile:icons && node scripts/prepare-admob.cjs",
-    "mobile:add:ios": "npm run mobile:build && cap add ios && npm run mobile:icons && node scripts/prepare-admob.cjs",
-    "mobile:sync": "npm run mobile:build && cap sync && npm run mobile:icons && node scripts/prepare-admob.cjs",
+    "mobile:add:android": "npm run mobile:build && cap add android && npm run mobile:icons && node scripts/prepare-no-ads.cjs",
+    "mobile:add:ios": "npm run mobile:build && cap add ios && npm run mobile:icons && node scripts/prepare-no-ads.cjs",
+    "mobile:sync": "npm run mobile:build && cap sync && npm run mobile:icons && node scripts/prepare-no-ads.cjs",
     "mobile:open:android": "cap open android",
     "mobile:open:ios": "cap open ios",
     "test": "node --test tests/*.cjs",
-    "mobile:icons": "node scripts/build-app-icons.cjs"
+    "mobile:icons": "node scripts/build-app-icons.cjs",
+    "mobile:verify:no-ads": "node scripts/verify-no-ads.cjs"
   },
   "repository": {
     "type": "git",
@@ -26,7 +27,6 @@
   },
   "homepage": "https://github.com/matiasmoranc/truco#readme",
   "dependencies": {
-    "@capacitor-community/admob": "8.2.1",
     "@capacitor-firebase/authentication": "8.5.2",
     "@capacitor/android": "8.5.3",
     "@capacitor/core": "8.5.3",

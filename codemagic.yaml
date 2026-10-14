@@ -7,6 +7,8 @@ workflows:
       app_store_connect: truco-apple
     environment:
       node: 22
+      vars:
+        TRUCO_ADS_MODE: "off"
       xcode: latest
       groups:
         - truco_ios
@@ -22,9 +24,11 @@ workflows:
         script: |
           set -e
           npm run mobile:build
+          npm run mobile:verify:no-ads
           npx cap add ios
           npx cap sync ios
           node scripts/build-app-icons.cjs
+          node scripts/prepare-no-ads.cjs
       - name: Configurar Firebase, Google y Apple
         script: python3 scripts/prepare-ios.py
       - name: Aplicar certificados y perfiles
@@ -49,6 +53,8 @@ workflows:
     max_build_duration: 60
     environment:
       node: 22
+      vars:
+        TRUCO_ADS_MODE: "off"
       java: 21
       groups:
         - truco_android
@@ -64,10 +70,11 @@ workflows:
         script: |
           set -e
           npm run mobile:build
+          npm run mobile:verify:no-ads
           npx cap add android
           npx cap sync android
           npm run mobile:icons
-          node scripts/prepare-admob.cjs
+          node scripts/prepare-no-ads.cjs
       - name: Configurar Firebase y firma de distribucion
         script: |
           set -e

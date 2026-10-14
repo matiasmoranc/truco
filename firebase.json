@@ -28,7 +28,12 @@
       "publication/**",
       "README.md",
       "ADMIN.md",
-      "GOOGLE-LOGIN.md"
+      "GOOGLE-LOGIN.md",
+      "*.patch",
+      "*.log",
+      "artifacts/**",
+      "work/**",
+      "outputs/**"
     ]
   },
   "functions": {
