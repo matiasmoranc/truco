@@ -994,6 +994,13 @@ body { min-height:100dvh; }
 .chat-mute input:checked{background:#ead7a5;border-color:#ead7a5}
 .chat-mute input:checked::after{transform:translateX(16px);background:#12382b}
 .chat-mute input:focus-visible{outline:2px solid #ead7a5;outline-offset:3px}
+.chat-options{margin:-4px 0 12px;color:#aabbb0;font-size:12px}
+.chat-options summary{width:fit-content;cursor:pointer;padding:6px 0}
+.chat-block-option{display:flex;align-items:center;gap:8px;margin:8px 0;font-size:12px;cursor:pointer}
+.chat-block-option input{accent-color:#ead7a5}
+.chat-options #chat-report-mode{border:0;background:transparent;color:#d6c18e;padding:8px 0;font-size:12px;text-decoration:underline}
+.chat-report-hint{margin:0 0 10px;color:#ead7a5;font-size:13px}
+.chat-mute{font-size:14px;font-weight:600;color:#f7f3e9}
 
 .chat-backdrop{position:fixed;inset:0;z-index:175;background:rgba(4,20,12,.2);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);touch-action:manipulation}
 .chat-backdrop.hidden{display:none!important}
