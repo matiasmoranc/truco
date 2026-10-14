@@ -2,6 +2,9 @@
 // only used to explain availability; it can never authorize an extra grant.
 export const CREDIT_DAY_MS=86400000;
 export const URUGUAY_OFFSET_MS=10800000;
+const giftIcon='<svg class="credit-action-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10h18v4H3zM5 14v7h14v-7M12 10v11M12 10H8a3 3 0 1 1 3-3l1 3Zm0 0h4a3 3 0 1 0-3-3l-1 3Z"/></svg>';
+const videoIcon='<svg class="credit-action-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="3" width="20" height="18" rx="2"/><path d="M6 3v18M18 3v18M2 8h4M2 16h4M18 8h4M18 16h4"/><path class="credit-play" d="m10 8 5 4-5 4Z"/></svg>';
+const rewardIcon='<svg class="credit-reward-icon" viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v5c0 4 16 4 16 0V5M4 10v5c0 4 16 4 16 0v-5M4 15v4c0 4 16 4 16 0v-4"/></svg>';
 export function creditDayStart(now) {
   return Math.floor((now-URUGUAY_OFFSET_MS)/CREDIT_DAY_MS)*CREDIT_DAY_MS+URUGUAY_OFFSET_MS;
 }
@@ -57,18 +60,20 @@ export function installCredits({services,getState,document,api,now=()=>Date.now(
     const messages={loading:'Cargando tus créditos…',invalid:'No pudimos verificar tu saldo.',balance:'Podés reclamar 5 créditos diarios cuando tu saldo llegue a 0.',locked:'Tenés créditos reservados en una partida.',claimed:'',available:''};
     el('credits-status').textContent=error||messages[eligibility];
     el('credits-status').hidden=!el('credits-status').textContent;
-    const button=el('credits-claim');button.hidden=!!error||!available||!['available','claimed'].includes(eligibility);
+    const button=el('credits-claim');button.hidden=!available||!['available','claimed'].includes(eligibility);
     button.disabled=busy||adBusy||eligibility!=='available'||getState().firebaseConnected!==true;
-    button.innerHTML=busy?'Reclamando…':eligibility==='claimed'?`<span>5 créditos disponibles mañana</span><span class="credit-countdown">${creditCountdown(clock())}</span>`:'Reclamar 5 créditos';
+    button.innerHTML=giftIcon+'<span>'+(busy?'Reclamando…':eligibility==='claimed'?'5 créditos disponibles mañana':'Reclamar 5 créditos')+'</span>';
     const adButton=el('credits-ad'),ads=globalThis.trucoNative?.rewardedAds;
     if(adButton){
       adButton.hidden=!uid||!ads?.supported||!available||!['claimed','available'].includes(eligibility);
       adButton.disabled=busy||adBusy||getState().firebaseConnected!==true;
-      adButton.textContent=adBusy?'Esperá mientras se completa el anuncio…':ads?.test?'Probar anuncio (sin sumar créditos)':'Ver anuncio para ganar 1 crédito';
+      adButton.innerHTML=videoIcon+'<span>'+(adBusy?'Cargando…':'Ver anuncio')+'</span><span class="credit-ad-reward">'+rewardIcon+'<b>+1</b></span>';
+      adButton.setAttribute?.('aria-label',ads?.test?'Ver anuncio de prueba. No suma créditos todavía.':'Ver anuncio para ganar 1 crédito');
     }
+    const adNote=el('credits-ad-note');if(adNote){adNote.hidden=!ads?.test||adButton?.hidden!==false;adNote.textContent='Modo de prueba: todavía no suma créditos.';}
     const privacy=el('ads-privacy');if(privacy)privacy.hidden=!ads?.supported;
     clearTimer(timer);
-    if(uid)timer=setTimer(render,Math.min(detailsOpen&&eligibility==='claimed'?1000:60000,Math.max(50,creditDayStart(clock())+CREDIT_DAY_MS-clock()+50)));
+    if(uid)timer=setTimer(render,Math.min(60000,Math.max(50,creditDayStart(clock())+CREDIT_DAY_MS-clock()+50)));
     if(uid&&available&&wallet===null&&!busy&&!initialAttempted&&getState().firebaseConnected===true){initialAttempted=true;void claim(true);}
   }
   function stop() {

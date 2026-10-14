@@ -12,7 +12,7 @@ async function adStep(stage, action) {
   try { return await action(); }
   catch (cause) {
     const messages = {
-      consent: 'No pudimos consultar el consentimiento de publicidad. Revisá la conexión y la configuración de privacidad en AdMob.',
+      consent: 'No pudimos habilitar el anuncio por un problema de consentimiento. Volvé a intentar más tarde.',
       initialize: 'No pudimos iniciar la publicidad en esta versión de la app.',
       session: 'No pudimos preparar tu recompensa en el servidor. Volvé a intentar más tarde.',
       load: 'No pudimos cargar el anuncio. Revisá tu conexión y volvé a intentar.',
