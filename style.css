@@ -1632,3 +1632,24 @@ input,textarea,[contenteditable=""],[contenteditable="true"]{-webkit-user-select
 #welcome-view #credits-status{grid-column:1;grid-row:auto;order:4;padding:0;font-size:13px;line-height:1.4}
 #welcome-view #credits-ad-note{grid-column:1;order:5;padding:0;text-align:center;color:#b2c6ba;font-size:11px;line-height:1.4}
 @media(max-width:500px){#welcome-view .credits-panel{padding:16px;gap:10px}#welcome-view #credits-claim,#welcome-view #credits-ad{font-size:14px;gap:10px;padding:10px 12px}.credit-ad-reward{padding-left:12px}}
+
+/* Account menu: profile and clear action rows. */
+#account-panel{border:1px solid #e8c983;background:linear-gradient(145deg,#103b2d,#06271e);box-shadow:0 18px 60px #001b1480}
+#account-panel .account-card{padding:24px;gap:18px}
+#account-panel h2{font-size:28px;line-height:1.2;margin:0 0 2px}
+#account-panel .account-close{width:38px;height:38px;right:16px;top:16px;border-color:#d8b87599;background:#06271e80}
+#account-menu{gap:10px}
+#account-menu .player-account-summary{flex-direction:row;align-items:center;gap:18px;padding:18px 16px;margin:0 0 8px;border-color:#91b29e44;background:linear-gradient(145deg,#6c957a28,#123c2e33)}
+.account-avatar{width:64px;height:64px;flex:0 0 64px;padding:12px;border:2px solid #e8c983;border-radius:50%;fill:#e8c983;stroke:#e8c983;stroke-width:1.5}
+.account-profile-copy{display:flex;flex-direction:column;gap:6px;min-width:0}.account-profile-copy strong{overflow-wrap:anywhere}.account-profile-copy span{font-weight:500}
+#account-menu .button{display:flex;justify-content:flex-start;align-items:center;gap:14px;min-height:54px;padding:12px 16px;border-radius:13px;text-align:left;font-size:15px;font-weight:600}
+#account-menu .button.secondary{border-color:#91b29e88;background:#06271e55;color:#e1e8e3}
+#account-menu .button.secondary:hover{background:#204638}
+#account-menu .button.primary{background:linear-gradient(120deg,#edcf85,#e2bc69);color:#0c3428;border-color:#f1d58e}
+.account-menu-icon{width:25px;height:25px;flex:0 0 25px;fill:none;stroke:#e8c983;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+#player-history .account-menu-icon{stroke:currentColor;stroke-width:4}
+.account-action-label{flex:1;min-width:0}.account-action-chevron{width:18px;height:22px;flex:0 0 18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+#account-menu #account-delete{margin-top:8px;border-color:#e85b58;background:#a62d2522;color:#ff6b66}#account-delete .account-menu-icon{stroke:currentColor}
+#account-menu #account-report{margin-top:8px;padding-top:16px;border-top:1px solid #91b29e44}#account-menu .legal-links{margin-top:4px;font-size:13px}
+@media(max-width:380px){#account-panel .account-card{padding:20px 16px}.account-avatar{width:54px;height:54px;flex-basis:54px;padding:10px}#account-menu .player-account-summary{gap:12px}#account-menu .button{gap:12px;padding:12px;font-size:14px}}
+#account-menu .button[hidden]{display:none}
