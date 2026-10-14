@@ -2221,7 +2221,7 @@ function rematchRoom(room){
   };
 }
 function rematchChanges(room,player,action,id){
-  if(!matchFinished(room)||!room.players?.[player])return null;
+  if(!matchFinished(room)||!room.players?.[player]||room.matchResult?.reason==='abandon')return null;
   const request=room.rematch;
   if(action==='request'){
     if(request?.status==='pending')return request.requester===player?null:rematchRoom(room);
@@ -2234,6 +2234,7 @@ function rematchChanges(room,player,action,id){
 }
 let rematchInFlight=false;
 async function respondRematch(action){
+  if(state.room?.matchResult?.reason==='abandon')return;
   if(liveActionsBlocked())return;
   if(rematchInFlight||!['player1','player2'].includes(state.playerId))return;
   rematchInFlight=true;
@@ -2289,17 +2290,18 @@ function renderMatchEnd(){
   sessionScore.classList.toggle('hidden',totalMatches<2);
   $('match-end-score').innerHTML=['player1','player2'].map(player=>`<div class="${player===winner?'match-score-winner':''}"><strong>${capScores(room,room.scores)[player]||0}</strong><span>${escapeHtml(room.players?.[player]?.name||'Jugador')}</span></div>`).join('<b aria-hidden="true">–</b>');
   const request=room.rematch,player=state.playerId,isPlayer=['player1','player2'].includes(player);
-  const pending=request?.status==='pending',incoming=pending&&request.requester!==player;
+  const canRematch=room.matchResult?.reason!=='abandon';
+  const pending=canRematch&&request?.status==='pending',incoming=pending&&request.requester!==player;
   $('match-end-message').textContent=pending?(incoming?(room.players?.[request.requester]?.name||'Tu rival')+' quiere jugar la revancha.':'Revancha enviada. Esperando al rival…'):request?.status==='declined'?'La revancha no fue aceptada.':room.matchResult?.reason==='inactivity'?'Victoria por inactividad.':room.matchResult?.reason==='disconnect'?'Victoria por desconexión.':room.matchResult?.reason==='abandon'?'El rival abandonó la partida.':'Partida terminada';
 
-  $('request-rematch').classList.toggle('hidden',!isPlayer||pending);
-  $('accept-rematch').classList.toggle('hidden',!isPlayer||!incoming);
-  $('decline-rematch').classList.toggle('hidden',!isPlayer);
+  $('request-rematch').classList.toggle('hidden',!isPlayer||!canRematch||pending);
+  $('accept-rematch').classList.toggle('hidden',!isPlayer||!canRematch||!incoming);
+  $('decline-rematch').classList.toggle('hidden',!isPlayer||!canRematch);
   for(const id of ['request-rematch','accept-rematch','decline-rematch'])$(id).disabled=rematchInFlight||liveActionsBlocked();
   syncRematchCreditControls();
   if(state.focusedMatchEnd!==matchEndKey(room)){
     state.focusedMatchEnd=matchEndKey(room);
-    (isPlayer?(incoming?$('accept-rematch'):pending?$('close-match-end'):$('request-rematch')):$('close-match-end')).focus({preventScroll:true});
+    (isPlayer&&canRematch?(incoming?$('accept-rematch'):pending?$('close-match-end'):$('request-rematch')):$('close-match-end')).focus({preventScroll:true});
   }
 }
 function closeFinishedRoomChanges(room,player,uid,matchNumber){
