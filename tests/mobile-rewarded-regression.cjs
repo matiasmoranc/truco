@@ -1,7 +1,7 @@
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs'),vm=require('node:vm');
-const source=fs.readFileSync('mobile/rewarded-ads.js','utf8').replace(/^import .*;\n/gm,'').replace(/export /g,'')+'\nglobalThis.ads=rewardedAds;';
+const source=fs.readFileSync('mobile/rewarded-ads.js','utf8').replace(/^import .*;\r?\n/gm,'').replace(/export /g,'')+'\nglobalThis.ads=rewardedAds;';
 function setup(platform,{earned=true,consent=true,disabled=false}={}){
  const events={Rewarded:'reward',Dismissed:'dismiss',FailedToShow:'failed'},listeners={},loads=[],calls=[];
  const AdMob={requestConsentInfo:async()=>({canRequestAds:consent,status:'NOT_REQUIRED'}),initialize:async()=>calls.push('initialize'),addListener:async(name,fn)=>{listeners[name]=fn;return {remove:async()=>{delete listeners[name];}};},prepareRewardVideoAd:async options=>loads.push(options),showRewardVideoAd:async()=>{if(earned)listeners.reward({amount:1,type:'credit'});listeners.dismiss();return {amount:earned?1:0};}};
