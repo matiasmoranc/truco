@@ -215,3 +215,8 @@ test('Practice menu remembers the first start and shows three modes on later vis
 });
 
 test('Flor can be declared after the rival opening card while own three cards remain',()=>{const c=harness(),r=room();r.playedCount=1;r.turn='player2';c.state={room:r,playerId:'player2',localHands:{player2:[card('♥',3),card('♥',6),card('♥',7)]}};vm.runInContext(extract('localAction'),c);c.localAction('flor');assert.equal(r.flors.player2,36);assert.equal(r.pendingBet.type,'flor');});
+
+test('Abandonment cannot request or accept a rematch',()=>{
+ const c=harness(),ended={status:'complete',targetPoints:20,scores:{player1:20,player2:0},players:{player1:{uid:'a'},player2:{uid:'b'}},matchResult:{winner:'player1',loser:'player2',reason:'abandon'},endReveal:{done:true},rematch:{id:'old',requester:'player2',status:'pending'}};
+ for(const action of ['request','accept','decline'])assert.equal(c.rematchChanges(ended,'player1',action,'old'),null);
+});
