@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const vm = require('node:vm');
 const fs = require('node:fs');
-const source = fs.readFileSync('mobile/entry.js','utf8').replace(/^import .*;\n/gm,'').replace("await import('../app.js');",'');
+const source = fs.readFileSync('mobile/entry.js','utf8').replace(/^import .*;\r?\n/gm,'').replace("await import('../app.js');",'');
 for (const provider of ['google.com','apple.com']) {
   test(`Native ${provider} delivers credentials to the game Firebase session`, async () => {
     const calls=[];
