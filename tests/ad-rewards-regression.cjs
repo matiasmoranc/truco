@@ -37,3 +37,24 @@ test('A transaction cannot be replayed through another session',()=>{
   after.creditEconomy.adRewards[other]={uid:'u',platform:'ios',createdAt:now-1000,expiresAt:now+600000};
   const p=params();p.set('custom_data',other);assert.throws(()=>applyReward(after,p,now));
 });
+
+test('AdMob console probe requires a valid signature and never touches the database',async()=>{
+  const fs=require('node:fs'),vm=require('node:vm'),{createRequire}=require('node:module');
+  const filename=require('node:path').resolve('functions/ad-rewards.cjs'),localRequire=createRequire(filename);
+  const {privateKey,publicKey}=crypto.generateKeyPairSync('ec',{namedCurve:'prime256v1'});
+  const sandbox={module:{exports:{}},URLSearchParams,Buffer,Date,AbortSignal,structuredClone,
+    require:name=>name==='firebase-functions/v2/https'?{onCall:(_,fn)=>fn,onRequest:(_,fn)=>fn,HttpsError:Error}:localRequire(name),
+    fetch:async()=>({ok:true,json:async()=>({keys:[{keyId:1,pem:publicKey.export({type:'spki',format:'pem'})}]})})};
+  vm.runInNewContext(fs.readFileSync(filename,'utf8'),sandbox);
+  let databaseCalls=0;
+  const handler=sandbox.module.exports.createRewardFunctions({db:{ref(){databaseCalls++;throw new Error('Database must not be used');}},identity:()=>{},rateLimit:()=>{},options:{}}).admobReward;
+  const query=new URLSearchParams({user_id:'truco-ssv-check',custom_data:'verify-connection-only'}).toString();
+  const signed=query+'&signature='+crypto.sign('sha256',Buffer.from(query),privateKey).toString('base64url')+'&key_id=1';
+  async function request(raw){let status,body;await handler({method:'GET',originalUrl:'/admobReward?'+raw},{status(n){status=n;return this;},send(s){body=s;}});return {status,body};}
+  assert.equal((await request(signed)).status,200);assert.equal(databaseCalls,0);
+  assert.equal((await request(signed.replace('verify-connection-only','modified'))).status,403);assert.equal(databaseCalls,0);
+  assert.equal((await request(query)).status,400);assert.equal(databaseCalls,0);
+  const normal=params().toString();
+  const real=normal+'&signature='+crypto.sign('sha256',Buffer.from(normal),privateKey).toString('base64url')+'&key_id=1';
+  assert.equal((await request(real)).status,503);assert.equal(databaseCalls,1);
+});

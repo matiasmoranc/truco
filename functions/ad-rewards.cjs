@@ -23,6 +23,9 @@ async function googleKeys() {
   keys = Object.fromEntries(data.keys.map(k => [String(k.keyId), k.pem])); keysAt = Date.now();
   return keys;
 }
+function isVerificationProbe(p) {
+  return p.get('user_id') === 'truco-ssv-check' && p.get('custom_data') === 'verify-connection-only';
+}
 // All checks and the grant run in one root transaction, including deletion's
 // tombstone. Signed retries return success without issuing a second credit.
 function applyReward(root, p, now) {
@@ -94,6 +97,9 @@ function createRewardFunctions({ db, identity, rateLimit, options }) {
       } catch (error) {
         res.status(error.message === 'Invalid signature' ? 403 : 503).send('Verification failed'); return;
       }
+      // The AdMob console can check connectivity without a gameplay session.
+      // This branch still requires Google's signature and never reads/writes a wallet.
+      if (isVerificationProbe(parsed.params)) { res.status(200).send('Verified connection; no credit granted'); return; }
       let failure;
       try {
         const now = Date.now();
@@ -107,4 +113,4 @@ function createRewardFunctions({ db, identity, rateLimit, options }) {
     }),
   };
 }
-module.exports = { createRewardFunctions, parseSignedQuery, verifySignature, applyReward };
+module.exports = { createRewardFunctions, parseSignedQuery, verifySignature, applyReward, isVerificationProbe };

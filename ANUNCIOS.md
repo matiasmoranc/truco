@@ -50,6 +50,13 @@ Completar los SKAdNetwork IDs recomendados por Google para la publicación.
 En ambos bloques configurar la URL de verificación del servidor:
 https://us-central1-truco-6553d.cloudfunctions.net/admobReward
 
+Después de desplegar `admobReward`, la herramienta «Verificar URL» de AdMob
+puede usar ID de usuario `truco-ssv-check` y datos personalizados
+`verify-connection-only`. Este diagnóstico exige una firma válida de Google,
+responde HTTP 200 y no crea sesiones ni entrega créditos. Usar la URL
+verificada y guardar en ambos bloques. No confundir una conexión verificada
+con la prueba completa de una recompensa real.
+
 Los nombres desplegados son `creditPrepareAdReward`, `creditAdRewardStatus` y
 `admobReward`. El servidor verifica la firma ECDSA con claves oficiales Google,
 unidad, importe, usuario, sesión y timestamp. Una transacción atómica registra
