@@ -315,10 +315,10 @@ function setupSuitIcons(root=document){root.querySelectorAll('[data-suit-icon]')
 
 function renderPointsPicker(){
   const menu=$('points-picker-menu'),select=$('target-points');
-  menu.innerHTML=[10,20,30,40,50,60].map(points=>`<button type="button" class="points-option ${Number(select.value)===points?'selected':''}" role="option" aria-selected="${Number(select.value)===points}" data-points="${points}">${points}<span>puntos</span></button>`).join('');
+  menu.innerHTML=[10,20,30,40].map(points=>`<button type="button" class="points-option ${Number(select.value)===points?'selected':''}" aria-pressed="${Number(select.value)===points}" data-points="${points}">${points}<span>puntos</span></button>`).join('');
   $('points-picker-trigger').querySelector('span').textContent=`${select.value} puntos`;
   menu.querySelectorAll('[data-points]').forEach(option=>option.addEventListener('click',()=>{
-    select.value=option.dataset.points;renderPointsPicker();menu.classList.add('hidden');$('points-picker-trigger').setAttribute('aria-expanded','false');
+    select.value=option.dataset.points;renderPointsPicker();$('points-picker-trigger').setAttribute('aria-expanded','false');
   }));
 }
 function toast(message, global = false, duration = 2400) {
@@ -498,6 +498,9 @@ function isCoordinator() { return !state.room?.managedCredits && state.room?.tab
 function configureSetup() {
   state.navigationEpoch=(state.navigationEpoch||0)+1;
   state.invitationEntry=false;
+  $('table-visibility').value='public';$('table-password-row').hidden=true;
+  document.querySelectorAll('[data-visibility]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.visibility==='public')));
+  $('target-points').value='20';renderPointsPicker();
   $('play-bot').checked=false;updateBotSetup();
   state.joining = false;
   showView('setup-view');
@@ -2953,8 +2956,6 @@ $('dismiss-score-details').addEventListener('click',()=>$('score-details').close
 $('score-details').addEventListener('click',event=>{if(event.target===$('score-details'))$('score-details').close();});
 $('play-bot').addEventListener('change',updateBotSetup);
 $('points-picker-trigger').addEventListener('click',()=>{const menu=$('points-picker-menu'),opening=menu.classList.contains('hidden');menu.classList.toggle('hidden',!opening);$('points-picker-trigger').setAttribute('aria-expanded',String(opening));});
-document.addEventListener('click',event=>{if(!event.target.closest('.points-picker')){$('points-picker-menu').classList.add('hidden');$('points-picker-trigger').setAttribute('aria-expanded','false');}});
-document.addEventListener('keydown',event=>{if(event.key==='Escape'){$('points-picker-menu').classList.add('hidden');$('points-picker-trigger').setAttribute('aria-expanded','false');}});
 $('create-room').addEventListener('click',()=>{configureSetup();void credits.sync();});
 $('open-room-list').addEventListener('click',(event)=>{const button=event.target.closest('[data-room][data-seat]');if(button)joinOpenRoom(button.dataset.room,button.dataset.seat);});
 
@@ -3730,3 +3731,11 @@ for(const button of document.querySelectorAll('[data-password-toggle]')){
 installScorer({document,showView,renderTally:renderCompactTally});
 
 installPlayerPanel({document,api:creditApi,getState:()=>state});
+
+// Visible choices keep the underlying values used by online and bot games.
+document.querySelectorAll('[data-visibility]').forEach(button=>button.addEventListener('click',()=>{
+  $('table-visibility').value=button.dataset.visibility;
+  $('table-visibility').dispatchEvent(new Event('change'));
+  document.querySelectorAll('[data-visibility]').forEach(option=>option.setAttribute('aria-pressed',String(option===button)));
+}));
+
