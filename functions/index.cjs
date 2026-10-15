@@ -17,8 +17,9 @@ Object.assign(exports,require('./ad-rewards.cjs').createRewardFunctions({db,iden
 async function identity(request){
  const auth=request.auth,provider=auth?.token?.firebase?.sign_in_provider;
  if(!auth||!['google.com','apple.com'].includes(provider))throw new HttpsError('unauthenticated','Iniciá sesión con Google o Apple.');
- if((await db.ref('userAccess/'+auth.uid+'/blocked').get()).val()===true)throw new HttpsError('permission-denied','Tu cuenta está bloqueada.');
- const snap=await db.ref('profiles/'+auth.uid+'/name').get();const name=snap.val();
+ const [access,snap]=await Promise.all([db.ref('userAccess/'+auth.uid+'/blocked').get(),db.ref('profiles/'+auth.uid+'/name').get()]);
+ if(access.val()===true)throw new HttpsError('permission-denied','Tu cuenta está bloqueada.');
+ const name=snap.val();
  if(typeof name!=='string'||!name)throw new HttpsError('failed-precondition','Guardá tu nombre de usuario primero.');return {uid:auth.uid,name};
 }
 async function rateLimit(uid,limit=15,bucket='tables'){const now=Date.now();const r=await db.ref('creditRateLimits/'+uid+'/'+bucket).transaction(current=>{if(!current||now-current.start>=60000)return {start:now,count:1};if(current.count>=limit)return undefined;return {...current,count:current.count+1};});if(!r.committed)throw new HttpsError('resource-exhausted','Esperá un minuto antes de volver a intentar.');}
@@ -76,19 +77,20 @@ exports.creditJoinTable=onCall(options,async request=>{
  const ledger=await mutate(current=>joinTable(current,{...user,code,password,now}));return publish(ledger,code);
 });
 exports.creditTableAction=onCall(options,async request=>{
- const user=await identity(request);await rateLimit(user.uid,120,'actions');const {code,command,requestId,expectedMatchId}=request.data||{};
- if(!command||typeof command.kind!=='string'||!requestId||['__proto__','constructor','prototype'].includes(requestId)||!/^[a-zA-Z0-9_-]{1,100}$/.test(requestId))throw new HttpsError('invalid-argument','Jugada inválida.');
+ const started=Date.now(),user=await identity(request);const {code,command,requestId,expectedMatchId}=request.data||{};
+ if(!command||typeof command.kind!=='string'||!requestId||['__proto__','constructor','prototype'].includes(requestId)||!/^[a-zA-Z0-9_-]{1,100}$/.test(requestId)){await rateLimit(user.uid,120,'actions');throw new HttpsError('invalid-argument','Jugada inválida.');}
+ const [,presenceSnapshot]=await Promise.all([rateLimit(user.uid,120,'actions'),db.ref('rooms/'+code+'/public/connectionPresence').get()]);
  if(command.kind==='rematch'){
   let currentMatch;try{currentMatch=tableFor((await db.ref('creditEconomy').get()).val()||{},code);}catch(error){throw new HttpsError('failed-precondition',error.message||'La partida ya no está disponible.');}
   if(await usersBlockEachOther(db,currentMatch.player1,currentMatch.player2))throw new HttpsError('failed-precondition','No pueden iniciar una revancha porque uno bloqueó al otro.');
  }
- if(command.kind==='tick'){
-  const snapshot=await db.ref('creditEconomy').get(),current=snapshot.val();
-  if(!current)throw new HttpsError('failed-precondition','La mesa no está disponible.');
-  let m;try{m=tableFor(current,code);if(![m.player1,m.player2].includes(user.uid))throw new Error('No pertenecés a esta mesa.');}catch(e){throw new HttpsError('permission-denied',e.message);}
- }
- const now=Date.now();const presence=(await db.ref('rooms/'+code+'/public/connectionPresence').get()).val();
- const ledger=await mutate(current=>tableOperation(current,{code,uid:user.uid,command,requestId:command.kind==='tick'?null:requestId,expectedMatchId,presence,now}),false,{code,uid:user.uid,kind:command.kind,requestId});return publish(ledger,code);
+ // Membership and match identity are checked atomically by tableOperation,
+ // including ticks; do not pre-read the entire historical ledger for a tick.
+ const now=Date.now(),presence=presenceSnapshot.val();
+ const ledger=await mutate(current=>tableOperation(current,{code,uid:user.uid,command,requestId:command.kind==='tick'?null:requestId,expectedMatchId,presence,now}),false,{code,uid:user.uid,kind:command.kind,requestId});
+ const saved=Date.now(),result=await publish(ledger,code);
+ if(command.kind!=='tick')console.info('Game action timing',{kind:command.kind,validationMs:now-started,transactionMs:saved-now,projectionMs:Date.now()-saved,totalMs:Date.now()-started});
+ return result;
 });
 exports.creditExpireTables=onSchedule({schedule:'every 1 minutes',region:'us-central1',maxInstances:1},async()=>{
  const now=Date.now();let changed=[];

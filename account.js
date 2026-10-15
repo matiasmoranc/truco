@@ -10,7 +10,7 @@ export function installAccount({ api, services, getState, rememberName, document
   const el=id=>document.getElementById(id);
   let slowLoading=false;
   let busy=false, ready=false, profileKey=null, profilePromise=null, currentUser=null;
-  let profileName='', readyUid=null, generation=0, loaded=false;
+  let profileName='', readyUid=null, generation=0, loaded=false, startupPromise=Promise.resolve();
   const message=text=>{
     el('auth-status').textContent=text;
     el('account-status').textContent=text;
@@ -48,7 +48,8 @@ export function installAccount({ api, services, getState, rememberName, document
     ready=true;render();
     if(readyUid!==user.uid) {
       readyUid=user.uid;
-      Promise.resolve(onReady()).catch(()=>message('No pudimos cargar las mesas. Revisá tu conexión.'));
+      const epoch=generation;
+      startupPromise=Promise.resolve(onReady()).catch(()=>{if(epoch===generation)message('No pudimos cargar las mesas. Revisá tu conexión.');});
     }
   }
   function observe(fb,user,force=false) {
@@ -294,7 +295,7 @@ export function installAccount({ api, services, getState, rememberName, document
     url.searchParams.delete('appleLogin');
     globalThis.history.replaceState(null,'',url.href);
     if(!registered(currentUser))return el('account-apple').click();
-  },isReady:()=>ready,loadingSlow:stage=>{if(ready)return;slowLoading=true;message(stage==='session'?'Estamos restaurando tu sesión guardada. Si no avanza, volvé a intentar.':stage==='modules'?'El servicio de inicio de sesión todavía no terminó de cargar. Podés volver a intentar.':'Estamos preparando el acceso. Podés volver a intentar.');render();},failed:error=>{slowLoading=true;message(errorText(error));render();}};
+  },whenReady:()=>startupPromise,isReady:()=>ready,loadingSlow:stage=>{if(ready)return;slowLoading=true;message(stage==='session'?'Estamos restaurando tu sesión guardada. Si no avanza, volvé a intentar.':stage==='modules'?'El servicio de inicio de sesión todavía no terminó de cargar. Podés volver a intentar.':'Estamos preparando el acceso. Podés volver a intentar.');render();},failed:error=>{slowLoading=true;message(errorText(error));render();}};
 }
 
 

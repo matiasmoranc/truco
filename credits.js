@@ -30,7 +30,8 @@ export function installCredits({services,getState,document,api,now=()=>Date.now(
   const el=id=>document.getElementById(id);
   let uid=null,generation=0,unsubscribe=null,timer=null,wallet,busy=false,error='',available=false,detailsOpen=false,initialAttempted=false;
   const clock=()=>now()+(Number(getState().serverTimeOffset)||0);
-  let syncing=null;
+  let syncing=null,firstLoad=Promise.resolve(false),finishFirstLoad=null;
+  function settled(value){const finish=finishFirstLoad;finishFirstLoad=null;finish?.(value);}
   async function sync() {
     if(!uid||getState().firebaseConnected!==true)return false;
     if(syncing)return syncing;
@@ -51,10 +52,12 @@ export function installCredits({services,getState,document,api,now=()=>Date.now(
   function render() {
     const panel=el('credits-panel');
     const eligibility=creditEligibility(wallet,clock());
-    panel.hidden=!uid||(!detailsOpen&&['balance','claimed'].includes(eligibility));
-    el('credits-balance').textContent=wallet===undefined?'—':String(wallet?.balance??0);
+    const loading=wallet===undefined||(wallet===null&&busy);
+    panel.hidden=!uid||(loading&&!error)||(!detailsOpen&&['balance','claimed'].includes(eligibility));
+    el('credits-balance').textContent=loading?(error?'—':'…'):String(wallet?.balance??0);
     const setupBalance=el('table-stake-available');if(setupBalance)setupBalance.textContent=el('credits-balance').textContent;
-    const headerBalance=el('credits-header-balance');if(headerBalance)headerBalance.textContent=el('credits-balance').textContent;
+    const headerBalance=el('credits-header-balance');if(headerBalance){headerBalance.textContent=el('credits-balance').textContent;headerBalance.setAttribute?.('aria-busy',String(loading&&!error));}
+    const open=el('credits-open');if(open)open.disabled=!available||loading;
     const messages={loading:'Cargando tus créditos…',invalid:'No pudimos verificar tu saldo.',balance:'Podés reclamar 5 créditos diarios cuando tu saldo llegue a 0.',locked:'Tenés créditos reservados en una partida.',claimed:'',available:''};
     el('credits-status').textContent=error||messages[eligibility];
     el('credits-status').hidden=!el('credits-status').textContent;
@@ -66,25 +69,27 @@ export function installCredits({services,getState,document,api,now=()=>Date.now(
     if(uid&&available&&wallet===null&&!busy&&!initialAttempted&&getState().firebaseConnected===true){initialAttempted=true;void claim(true);}
   }
   function stop() {
+    settled(false);firstLoad=Promise.resolve(false);
     ++generation;unsubscribe?.();unsubscribe=null;clearTimer(timer);timer=null;
     uid=null;wallet=undefined;busy=false;error='';available=false;detailsOpen=false;initialAttempted=false;syncing=null;render();
   }
   async function start() {
     const user=getState().uid;if(!user){stop();return;}
     if(uid===user&&unsubscribe)return;
-    stop();uid=user;const epoch=generation;render();
+    stop();uid=user;const epoch=generation;
+    firstLoad=new Promise(resolve=>{finishFirstLoad=resolve;});render();
     try {
       const fb=await services();if(epoch!==generation||getState().uid!==user)return;
       unsubscribe=fb.onValue(fb.ref(fb.db,'creditEconomy/wallets/'+user),snapshot=>{
         if(epoch!==generation)return;
-        wallet=snapshot.val();available=true;error='';render();onChange();
+        wallet=snapshot.val();available=true;error='';render();onChange();if(wallet!==null)settled(true);
       },()=>{
         if(epoch!==generation)return;
-        wallet=undefined;available=false;error='Los créditos todavía no están habilitados. Podés jugar contra el bot o practicar.';render();
+        wallet=undefined;available=false;error='Los créditos todavía no están habilitados. Podés jugar contra el bot o practicar.';render();settled(false);
       });
     }catch {
       if(epoch!==generation)return;
-      error='No pudimos cargar tus créditos. Revisá la conexión.';render();
+      error='No pudimos cargar tus créditos. Revisá la conexión.';render();settled(false);
     }
   }
   async function claim(initial=false) {
@@ -111,7 +116,7 @@ export function installCredits({services,getState,document,api,now=()=>Date.now(
         if(epoch!==generation)return;
         wallet=snapshot.val();error=creditEligibility(wallet,clock())==='available'?'No se pudieron acreditar. Revisá la conexión y volvé a intentar.':'';
       }catch {if(epoch===generation)error='No pudimos confirmar los créditos. Revisá la conexión.';}
-    }finally {if(epoch===generation){busy=false;render();}}
+    }finally {if(epoch===generation){busy=false;render();settled(available);}}
   }
   el('credits-open')?.addEventListener('click',()=>{
     if(!uid)return;
@@ -125,5 +130,5 @@ export function installCredits({services,getState,document,api,now=()=>Date.now(
   el('credits-claim').addEventListener('click',()=>claim());
   document.addEventListener?.('visibilitychange',()=>{if(document.visibilityState==='visible')void sync();});
   globalThis.addEventListener?.('pageshow',()=>{void sync();});
-  return {start,stop,refresh:render,sync,claim,wallet:()=>wallet};
+  return {start,stop,whenReady:()=>firstLoad,refresh:render,sync,claim,wallet:()=>wallet};
 }

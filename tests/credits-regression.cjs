@@ -131,3 +131,18 @@ test('No-ads release never registers advertising controls or changes the wallet 
  const m=await modulePromise,h=harness(m,{balance:0,locked:0,lastGrantAt:today});await h.api.start();
  assert.equal(h.listeners['credits-ad:click'],undefined);assert.equal(h.listeners['ads-privacy:click'],undefined);assert.equal(h.api.wallet().balance,0);assert.equal(h.writes.length,0);
 });
+
+test('Startup hides the credit panel until the first confirmed wallet and exposes readiness',async()=>{
+ const m=await modulePromise,h=harness(m,{balance:5,locked:0,lastGrantAt:today});let receive;
+ h.fb.onValue=(_ref,callback)=>{receive=callback;return ()=>{};};
+ await h.api.start();let ready=false;const first=h.api.whenReady().then(value=>{ready=value;});
+ await Promise.resolve();assert.equal(ready,false);assert.equal(h.elements['credits-panel'].hidden,true);assert.equal(h.elements['credits-balance'].textContent,'…');
+ receive({val:()=>({balance:5,locked:0,lastGrantAt:today})});await first;
+ assert.equal(ready,true);assert.equal(h.elements['credits-balance'].textContent,'5');assert.equal(h.elements['credits-panel'].hidden,true);
+});
+test('Wallet errors and changing accounts settle startup instead of leaving an endless splash',async()=>{
+ const m=await modulePromise,h=harness(m);let fail;
+ h.fb.onValue=(_ref,_callback,error)=>{fail=error;return ()=>{};};await h.api.start();
+ const first=h.api.whenReady();fail();assert.equal(await first,false);assert.match(h.elements['credits-status'].textContent,/habilitados/);
+ h.state.uid='b';await h.api.start();const second=h.api.whenReady();h.api.stop();assert.equal(await second,false);
+});

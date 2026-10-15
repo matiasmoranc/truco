@@ -4,11 +4,11 @@ const vm=require('node:vm');
 const fs=require('node:fs');
 const path=require('node:path');
 const source=fs.readFileSync(path.join(__dirname,'../account.js'),'utf8').replaceAll('export function','function');
-function setup(platform,userAgent=platform,origin='https://matiasmoranc.github.io'){
+function setup(platform,userAgent=platform,origin='https://matiasmoranc.github.io',onReady=()=>{}){
  const elements=new Map();const document={getElementById(id){if(!elements.has(id))elements.set(id,{hidden:false,disabled:false,textContent:'',value:'',events:{},addEventListener(event,handler){this.events[event]=handler;},close(){},focus(){}});return elements.get(id);}};
  let reloads=0;const state={firebase:null};
- const context={document,navigator:{platform,userAgent},state,localStorage:{getItem(){return null;}},URL,history:{replaceState(){}},location:{origin,href:origin+'/',assign(url){this.destination=url;},reload(){reloads++;}},setTimeout,clearTimeout};
- vm.createContext(context);vm.runInContext(source+';globalThis.account=installAccount({services:async()=>state.firebase,getState:()=>state,rememberName:()=>{},document});',context);
+ const context={onReady,document,navigator:{platform,userAgent},state,localStorage:{getItem(){return null;}},URL,history:{replaceState(){}},location:{origin,href:origin+'/',assign(url){this.destination=url;},reload(){reloads++;}},setTimeout,clearTimeout};
+ vm.createContext(context);vm.runInContext(source+';globalThis.account=installAccount({services:async()=>state.firebase,getState:()=>state,rememberName:()=>{},document,onReady});',context);
  return {account:context.account,state,el:id=>document.getElementById(id),reloads:()=>reloads,location:context.location};
 }
 test('Slow iPhone startup shows Apple immediately and offers retry without enabling unready providers',()=>{
@@ -57,3 +57,13 @@ for(const ua of ['iPhone Version/26 Mobile Safari/605','iPad Version/26 Mobile S
   assert.equal(app.location.destination,'https://truco-6553d.firebaseapp.com/?appleLogin=1&v=apple46');
  });
 }
+
+test('Startup exposes a promise for lobby data so the splash can wait for real values',async()=>{
+ let finish;const pending=new Promise(resolve=>{finish=resolve;});
+ const app=setup('Win32','Windows','https://matiasmoranc.github.io',()=>pending);
+ const user={uid:'u',isAnonymous:false,providerData:[{providerId:'google.com'}]};
+ const fb={ref:()=>({}),get:async()=>({val:()=>({name:'Mati'})})};app.state.firebase=fb;
+ await app.account.observe(fb,user);let finished=false;const ready=app.account.whenReady().then(()=>{finished=true;});
+ await Promise.resolve();assert.equal(finished,false);assert.equal(app.el('account-username').textContent,'Mati');
+ finish();await ready;assert.equal(finished,true);
+});

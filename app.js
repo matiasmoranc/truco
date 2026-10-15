@@ -2,8 +2,8 @@ import './chat-moderation.js?v=20261013-moderation1';
 import { installPlayerPanel } from './player-panel.js?v=20261013-blocklist1';
 import { installScorer } from './scorer.js?v=20261011-scorercolors59';
 import { installActivity } from './activity.js?v=20261010-adminstats32';
-import { installCredits } from './credits.js?v=20261014-noads-release';
-import { installAccount } from './account.js?v=20261012-welcome64';
+import { installCredits } from './credits.js?v=20261015-startup';
+import { installAccount } from './account.js?v=20261015-startup';
 import { initializeGameAuth } from './auth-init.js?v=20261011-authlazy62';
 const FIREBASE_VERSION = '12.4.0';
 const $ = (id) => document.getElementById(id);
@@ -510,8 +510,13 @@ function loadConfig() {
   try { return JSON.parse(localStorage.getItem(storageKey) || 'null'); } catch { return null; }
 }
 let firebaseReadyPromise=null;
+let creditFunctionsPromise=null,creditTickPending=false;
 const activity=installActivity({send:data=>creditApi('playerActivity',data),getUid:()=>state.uid,document});
-const account=installAccount({api:creditApi,services:firebaseServices,getState:()=>state,rememberName:rememberPlayerName,document,onReady:async()=>{activity.start();await openInitialRoom();credits.start();showLobbyOnboarding();},onIdentityChange:resetAccountRoom,onNameChanged:()=>showView('welcome-view'),onRegistered:uid=>{state.lobbyOnboardingUid=uid;requestAnimationFrame(showLobbyOnboarding);},inRoom:()=>!!state.room&&!$('welcome-view').classList.contains('active')});
+const account=installAccount({api:creditApi,services:firebaseServices,getState:()=>state,rememberName:rememberPlayerName,document,onReady:async()=>{
+  const initialCredits=credits.start().then(()=>credits.whenReady());
+  loadCreditFunctions().catch(()=>{});activity.start();
+  await Promise.all([openInitialRoom(),initialCredits]);showLobbyOnboarding();
+},onIdentityChange:resetAccountRoom,onNameChanged:()=>showView('welcome-view'),onRegistered:uid=>{state.lobbyOnboardingUid=uid;requestAnimationFrame(showLobbyOnboarding);},inRoom:()=>!!state.room&&!$('welcome-view').classList.contains('active')});
 const credits=installCredits({services:firebaseServices,api:creditApi,getState:()=>state,document,notify:message=>toast(message,true,2000),onChange:()=>{showLobbyOnboarding();if(state.lobbyRooms)renderLobby(state.lobbyRooms);
   if(state.room)renderMatchEnd();$('table-stake-available').textContent=String(credits.wallet()?.balance??'—');updateStakeControl();}});
 let lobbyWelcomeDialog=null,lobbyWelcomeStep=0,lobbyWelcomeTarget=null;
@@ -3615,10 +3620,13 @@ async function initializePage(){
       if(firebaseConfigValid(bundled.firebaseConfig))state.config=bundled.firebaseConfig;
     }catch{ /* Optional during initial setup. */ }
     const fb=await firebaseServices();
-    await account.observe(fb,fb.auth.currentUser);
-    await account.startRequestedAppleLogin();
-    // Loading card artwork never blocks the sign-in screen.
+    // Artwork and a cached profile's refresh need not delay the first wallet.
     preloadCardImages().catch(error=>console.error('[truco:startup-cards]',error));
+    const profileLoad=account.observe(fb,fb.auth.currentUser);
+    if(!account.isReady())await profileLoad;
+    else profileLoad.catch(error=>console.warn('[truco:profile-refresh]',error));
+    await account.whenReady();
+    await account.startRequestedAppleLogin();
   }catch(error){console.error('[truco:startup]',error);account.failed(error);}
   finally{clearTimeout(slowTimer);releaseLoading();}
 }
@@ -3628,20 +3636,23 @@ await initializePage();
 
 
 
-let creditFunctionsPromise=null,creditTickPending=false;
+function loadCreditFunctions(){
+  return creditFunctionsPromise??=import('https://www.gstatic.com/firebasejs/12.4.0/firebase-functions.js').catch(error=>{creditFunctionsPromise=null;throw error;});
+}
 async function creditApi(name,data){
   const fb=await firebaseServices();
-  creditFunctionsPromise??=import('https://www.gstatic.com/firebasejs/12.4.0/firebase-functions.js');
-  const {getFunctions,httpsCallable}=await creditFunctionsPromise;
+  const {getFunctions,httpsCallable}=await loadCreditFunctions();
   const result=(await httpsCallable(getFunctions(fb.auth.app,'us-central1'),name)(data)).data;
-  if(['creditCreateTable','creditJoinTable','creditTableAction'].includes(name))await credits.sync();
+  // The wallet subscription supplies balance changes. A refresh must never
+  // hold a played card/call (or every background tick) behind another request.
+  if(['creditCreateTable','creditJoinTable'].includes(name))await credits.sync();
   return result;
 }
 async function creditCommand(command){
   const code=state.roomCode,matchId=state.room?.creditMatch?.id;
   if(!code||!matchId)return;
   if(liveActionsBlocked()&&command.kind!=='tick')throw new Error('Esperá a recuperar la conexión.');
-  if(command.kind==='tick'&&creditTickPending)return;
+  if(command.kind==='tick'&&(creditTickPending||state.liveAction||state.playActionInFlight||state.foldInFlight))return;
   if(command.kind==='tick')creditTickPending=true;
   try{return await creditApi('creditTableAction',{code,command,expectedMatchId:matchId,requestId:crypto.randomUUID()});}
   catch(error){if(command.kind!=='tick')toast(firebaseError(error),true);throw error;}

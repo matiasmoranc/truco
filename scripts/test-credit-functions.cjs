@@ -23,6 +23,7 @@ let seq=0;
  const races=await Promise.allSettled(['b','c'].map(uid=>call('creditJoinTable',uid,{code:created.code,password:'clave-de-prueba'})));
  assert.equal(races.filter(x=>x.status==='fulfilled').length,1);
  const joined=races.find(x=>x.status==='fulfilled').value,peer=joined.player2,code=created.code,id=joined.room.creditMatch.id;
+ await assert.rejects(()=>call('creditTableAction',peer==='b'?'c':'b',{code,command:{kind:'tick'},requestId:'outsider-tick',expectedMatchId:id}),/No pertenecés/);
  const action=(uid,command)=>call('creditTableAction',uid,{code,command,expectedMatchId:id,requestId:'e2e-'+(++seq)});
  await action('a',{kind:'draw'});await action(peer,{kind:'draw'});
  await db.ref('creditEconomy/matches/'+id+'/session/room/openingDraw').update({'cards/player1/rank':1,'cards/player2/rank':7,resolveAt:Date.now()-1});
