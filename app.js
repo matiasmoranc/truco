@@ -11,6 +11,9 @@ const views = ['welcome-view', 'invite-view', 'setup-view', 'waiting-view', 'gam
 const storageKey = 'truco-firebase-config';
 let state = { joining: false, config: null, firebase: null, roomCode: null, selectedRoom: null, uid: null, playerId: null, unsubscribe: null, privateUnsubscribe: null, lobbyUnsubscribe: null, room: null, hand: [], handOrder: [], handOrderKey: null, localGame: false, localHands: {}, nextAction: null, resolutionTimer: null, resolutionTimerKey: null, playActionInFlight: false, legacyRepairKey: null, emptyHandRepairKey: null };
 
+const opponentFlights=new Map();
+let opponentPlaySnapshot={scope:null,keys:new Set()};
+
 const cardImageCache=[];
 let cardImagesPromise=null;
 function preloadCardImages(){
@@ -471,7 +474,9 @@ function renderCallNotice(){
   helpNotice.classList.add('hidden');helpNotice.innerHTML='';
   const evidenceOpen=state.room?.status==='revealing'&&!!state.room.endReveal;
   el.classList.toggle('hidden',!visible||helpOpen||evidenceOpen);
+  el.setAttribute('data-speaker',own?'self':'opponent');
   el.innerHTML=visible&&!helpOpen&&!evidenceOpen?callNoticeHtml(notice):'';
+  requestAnimationFrame(positionMobileCallNotice);
   if(!visible)return;
   if(!awaitingResponse&&!helpOpen)callNoticeTimer=setTimeout(()=>{callNoticeTimer=null;renderCallNotice();},Math.max(0,remaining));
   if(callSeen.get(key)!==notice.id){
@@ -988,6 +993,8 @@ function openingDrawExpired(room,now=gameTime()){
   return room?.status==='drawing'&&Number.isFinite(draw?.endsAt)&&now>=draw.endsAt&&!(draw.cards?.player1&&draw.cards?.player2);
 }
 function returnToLobby(message=''){
+  for(const key of opponentFlights.keys())clearOpponentFlight(key);
+  opponentPlaySnapshot={scope:null,keys:new Set()};
   state.cancelingWaitingRoom=null;
   removeCardFlight();
   stopRoomPresence();
@@ -1686,7 +1693,7 @@ function animateFoldedHand(){
     const rect=source.getBoundingClientRect(),flight=source.cloneNode(true);
     flight.classList.remove('dragging','launching-card');flight.classList.add('card-flight','fold-card-flight');
     flight.removeAttribute('data-card');flight.setAttribute('aria-hidden','true');flight.tabIndex=-1;
-    Object.assign(flight.style,{left:rect.left+'px',top:rect.top+'px',width:rect.width+'px',height:rect.height+'px'});
+    Object.assign(flight.style,{left:(rect.left+rect.width/2-width/2)+'px',top:(rect.top+rect.height/2-height/2)+'px',width:width+'px',height:height+'px'});
     document.body.append(flight);
     const dx=target.left+target.width/2-(rect.left+rect.width/2),dy=target.top+target.height/2-(rect.top+rect.height/2);
     flight.animate?.([{transform:'translate(0,0) scale(1)',opacity:1},{transform:`translate(${dx}px,${dy}px) scale(.28) rotate(12deg)`,opacity:0}],{duration:650,delay:index*80,easing:'cubic-bezier(.4,0,.2,1)',fill:'forwards'});
@@ -2120,6 +2127,7 @@ function renderGame() {
     const hint=bothChosen?(dealer?'':'Empataron. Van a sacar otra carta.') :cards[state.playerId]?'Esperando que el otro jugador toque el mazo.':'Tocá el mazo para sortear quién reparte.';
     $('opening-draw').innerHTML=`<div class="draw-prompt"><h2>${prompt}</h2>${hint?`<p>${hint}</p>`:''}</div><div id="opening-timer" class="opening-timer" role="timer" aria-label="Tiempo para elegir carta"></div><button class="draw-deck" id="draw-deck" ${canDraw?'':'disabled'} aria-label="Sacar carta para sortear repartidor"></button><div class="draw-results">${['player1','player2'].map(player=>`<div class="draw-result ${dealer===player?'draw-winner':''}"><span>${escapeHtml(players[player]?.name||player)}${dealer===player?' · REPARTE':mano===player?' · EMPIEZA':''}</span>${cards[player]?`<div class="draw-card sprite-card ${cards[player].justDrawn?'draw-card-new':''}" style="${cardImageStyle(cards[player])}" aria-label="${cardAccessibleName(cards[player])}"></div>`:`<p>Esperando carta</p>`}</div>`).join('')}</div>`;
     if(canDraw)$('draw-deck').addEventListener('click',event=>runLiveAction(event.currentTarget,drawOpeningCard));
+    renderOpponentHand(room);
     $('hand').innerHTML='';$('player-actions').classList.add('hidden');$('fold-hand').classList.add('hidden');$('fold-hand').disabled=true;$('trick-cards').innerHTML='';$('deck-stack').classList.add('hidden');$('muestra-card').classList.add('hidden');$('envido-picker').classList.add('hidden');renderOpeningTimer();syncLiveControls();return;
   }
   clearTimeout(openingTimerHandle);openingTimerHandle=null;
@@ -2138,6 +2146,7 @@ function renderGame() {
   animateFoldedHand();
 
   renderPlayedCards(room);
+  renderOpponentHand(room);
   const sample=room.muestra;
   $('muestra-card').classList.toggle('hidden',!sharedTable||!sample);
   $('muestra-card').classList.toggle('sprite-card',!!(sharedTable&&sample));
@@ -2358,6 +2367,11 @@ function alignHandWithControls(){
     const left=Math.min(...Array.from(cards,card=>card.getBoundingClientRect().left));
     const offset=Number.parseFloat(hand.style.getPropertyValue('--hand-edge-offset'))||0;
     hand.style.setProperty('--hand-edge-offset',(offset+controls.getBoundingClientRect().left-left)+'px');
+    if(matchMedia('(max-width:700px)').matches){
+      const bottom=Math.max(...Array.from(cards,card=>card.getBoundingClientRect().bottom));
+      hand.style.setProperty('--mobile-hand-top',(hand.offsetTop+controls.getBoundingClientRect().top-18-bottom)+'px');
+    }
+    positionMobileCallNotice();
   });
 }
 function renderCompactTally(points,target){
@@ -2797,6 +2811,84 @@ function localDealAfterHand(){
 }
 
 
+function opponentCardCount(room,playerId=otherPlayer(state.playerId)){
+  if(!room||room.status!=='started')return 0;
+  const count=room.handCounts?.[playerId];
+  if(Number.isInteger(count)&&count>=0&&count<=3)return count;
+  // Only public plays are counted; an opponent's private hand is never read.
+  const played=new Set();
+  for(const item of [...(room.tricks||[]).flatMap(trick=>trick.played||[]),...(room.trickCards||[])]){
+    if(item.playerId===playerId&&item.card?.id)played.add(item.card.id);
+  }
+  return Math.max(0,3-played.size);
+}
+function renderOpponentHand(room){
+  const hand=$('opponent-hand');if(!hand)return;
+  const count=opponentCardCount(room),name=room.players?.[otherPlayer(state.playerId)]?.name||'Tu rival';
+  hand.setAttribute('aria-label',`${name}: ${count} ${count===1?'carta':'cartas'} boca abajo`);
+  while(hand.children.length>count)hand.lastElementChild.remove();
+  while(hand.children.length<count){const card=document.createElement('i');card.className='opponent-card-back';card.setAttribute('aria-hidden','true');hand.append(card);}
+  [...hand.children].forEach((card,index)=>{
+    card.style.setProperty('--fan-index',index-(count-1)/2);
+  });
+}
+function positionMobileCallNotice(){
+  if(!matchMedia('(max-width:700px)').matches||!state.room)return;
+  const notice=$('call-notice');if(notice.classList.contains('hidden')){positionMobileTable();return;}
+  const own=notice.getAttribute('data-speaker')==='self';
+  const cards=own?[...$('hand').querySelectorAll('.hand-card:not(.launching-card)')]:[...$('opponent-hand').children];
+  if(!cards.length)return;
+  const rects=cards.map(card=>card.getBoundingClientRect()),frame=$('game-view').getBoundingClientRect();
+  const left=Math.min(...rects.map(rect=>rect.left)),right=Math.max(...rects.map(rect=>rect.right));
+  const center=Math.max(frame.left+90,Math.min((left+right)/2,frame.right-90));
+  const top=own?Math.min(...rects.map(rect=>rect.top))-12:Math.max(...rects.map(rect=>rect.bottom))+12;
+  notice.style.setProperty('--call-anchor-x',(center-frame.left)+'px');
+  notice.style.setProperty('--call-anchor-top',(top-frame.top)+'px');
+  positionMobileTable();
+}
+function positionMobileTable(){
+  if(opponentFlights.size||state.launchingCardId)return;
+  const felt=$('felt-area'),bounds=felt.getBoundingClientRect();
+  const backs=[...$('opponent-hand').children],mine=[...$('hand').querySelectorAll('.hand-card:not(.launching-card)')];
+  const tableCards=[...$('trick-cards').children,$('deck-stack')].filter(Boolean);
+  const half=Math.max(84,...tableCards.map(card=>card.getBoundingClientRect().height))/2;
+  let upper=backs.length?Math.max(...backs.map(card=>card.getBoundingClientRect().bottom))+10:bounds.top+20;
+  let lower=mine.length?Math.min(...mine.map(card=>card.getBoundingClientRect().top))-10:bounds.bottom-20;
+  const notice=$('call-notice');
+  if(!notice.classList.contains('hidden')){
+    const bubble=notice.getBoundingClientRect();
+    if(notice.getAttribute('data-speaker')==='self')lower=Math.min(lower,bubble.top-10);
+    else upper=Math.max(upper,bubble.bottom+10);
+  }
+  const minimum=upper-bounds.top+half,maximum=lower-bounds.top-half;
+  const center=minimum<=maximum?Math.max(minimum,Math.min(bounds.height*.42,maximum)):(upper+lower)/2-bounds.top;
+  felt.style.setProperty('--mobile-table-center',center+'px');
+}
+function clearOpponentFlight(key){
+  const flight=opponentFlights.get(key);if(!flight)return;
+  opponentFlights.delete(key);flight.animation?.cancel();flight.node.remove();flight.target.style.visibility='';
+}
+function animateOpponentCard(card,playerId,target,key){
+  const source=$('opponent-hand')?.lastElementChild;
+  if(!source||!source.getBoundingClientRect().width)return;
+  const rect=source.getBoundingClientRect(),destination=target.getBoundingClientRect();
+  const width=source.offsetWidth,height=source.offsetHeight;
+  const transform=getComputedStyle(source).transform,matrix=transform==='none'?null:new DOMMatrixReadOnly(transform);
+  const angle=matrix?Math.atan2(matrix.b,matrix.a)*180/Math.PI:0;
+  const flight=document.createElement('div');flight.className='opponent-launch-flight';flight.setAttribute('aria-hidden','true');
+  Object.assign(flight.style,{left:rect.left+'px',top:rect.top+'px',width:rect.width+'px',height:rect.height+'px'});
+  const front=createPlayedCard(card,playerId);front.className='sprite-card opponent-flight-face';
+  const back=document.createElement('div');back.className='opponent-card-back opponent-flight-face';
+  flight.append(front,back);document.body.append(flight);target.style.visibility='hidden';
+  const dx=destination.left+destination.width/2-(rect.left+rect.width/2),dy=destination.top+destination.height/2-(rect.top+rect.height/2);
+  const duration=matchMedia('(prefers-reduced-motion: reduce)').matches?100:420;
+  const animation=flight.animate([{transform:`translate3d(0,0,0) rotate(${angle}deg) scale(1)`},{transform:`translate3d(${dx}px,${dy}px,0) rotate(6deg) scale(${target.offsetWidth/width},${target.offsetHeight/height})`}],{duration,easing:'cubic-bezier(.22,.61,.36,1)',fill:'forwards'});
+  front.animate([{opacity:0},{opacity:0,offset:.4},{opacity:1,offset:.6},{opacity:1}],{duration,fill:'forwards'});
+  back.animate([{opacity:1},{opacity:1,offset:.4},{opacity:0,offset:.6},{opacity:0}],{duration,fill:'forwards'});
+  opponentFlights.set(key,{node:flight,target,animation});
+  animation.finished.then(()=>{if(opponentFlights.get(key)?.node===flight)clearOpponentFlight(key);}).catch(()=>{});
+}
+
 let activeCardFlight=null;
 function removeCardFlight(){
   const flight=activeCardFlight;
@@ -2807,7 +2899,7 @@ function removeCardFlight(){
 }
 function createPlayedCard(card,playerId){
   const node=document.createElement('div');
-  node.className=`played-card played-card-${playerId||'player1'} sprite-card ${card.red?'card-red':''}`;
+  node.className=`played-card played-card-${playerId||'player1'} ${playerId===state.playerId?'is-own-play':'is-opponent-play'} sprite-card ${card.red?'card-red':''}`;
   node.style.cssText=cardImageStyle(card);
   node.setAttribute('role','img');node.setAttribute('aria-label',cardAccessibleName(card));
   node.dataset.playedKey=playerId+':'+card.id;
@@ -2815,18 +2907,26 @@ function createPlayedCard(card,playerId){
 }
 function renderPlayedCards(room){
   const container=$('trick-cards'),cards=room.trickCards||[];
+  const scope=[state.roomCode,state.playerId,room.matchNumber||1,room.handNumber].join(':');
+  const sameHand=opponentPlaySnapshot.scope===scope;
+  const publicKeys=new Set(cards.map(({card,playerId})=>playerId+':'+card.id));
+  for(const key of opponentFlights.keys())if(!sameHand||room.status!=='started'||!publicKeys.has(key))clearOpponentFlight(key);
   if(activeCardFlight&&(activeCardFlight.room!==state.roomCode||activeCardFlight.hand!==room.handNumber||!['started'].includes(room.status)))removeCardFlight();
   const existing=new Map([...container.children].map(node=>[node.dataset.playedKey,node]));
   for(const {card,playerId} of cards){
     const key=playerId+':'+card.id;
     let node=existing.get(key);
-    if(!node){node=createPlayedCard(card,playerId);container.append(node);}
+    if(!node){
+      node=createPlayedCard(card,playerId);container.append(node);
+      if(sameHand&&room.status==='started'&&playerId!==state.playerId&&!opponentPlaySnapshot.keys.has(key)&&matchMedia('(max-width:700px)').matches)animateOpponentCard(card,playerId,node,key);
+    }
     existing.delete(key);
     const flying=activeCardFlight?.cardId===card.id&&activeCardFlight.playerId===playerId;
     if(flying&&activeCardFlight.finished)removeCardFlight();
-    node.style.visibility=flying&&activeCardFlight?'hidden':'';
+    node.style.visibility=(flying&&activeCardFlight)||opponentFlights.has(key)?'hidden':'';
   }
   for(const node of existing.values())node.remove();
+  opponentPlaySnapshot={scope,keys:publicKeys};
 }
 function animatePlayedHandCard(card,origin=null){
   const source=$('hand').querySelector('[data-card="'+CSS.escape(card.id)+'"]');
@@ -3542,7 +3642,7 @@ $('learn-game').addEventListener('click',openLearning);
 $('learn-back').addEventListener('click',()=>{stopBot();showView('welcome-view');openLobby();});
 $('learn-free').addEventListener('click',()=>startLearning(0));
 $('learn-game-modes').addEventListener('click',event=>{const button=event.target.closest('[data-learning-stage]');if(button)startLearning(Number(button.dataset.learningStage));});
-window.addEventListener('resize',()=>{positionLearningScoreArrow();positionLearningControls();});
+window.addEventListener('resize',()=>{positionLearningScoreArrow();positionLearningControls();alignHandWithControls();positionMobileCallNotice();});
 function indicateLearningMessageClose(event){
   const dialog=event.currentTarget;
   if(!dialog.open)return;

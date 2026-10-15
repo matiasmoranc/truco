@@ -140,7 +140,7 @@ test('Truco explanations repeat with help enabled despite previous practice visi
 test('Practice overlays never embed yellow calls, including stale QUIERO inside round help',()=>{
  const c=harness(),nodes={};let open=true;
  const node=()=>({innerHTML:'',classList:{hidden:false,add(name){if(name==='hidden')this.hidden=true},remove(name){if(name==='hidden')this.hidden=false},toggle(name,value){if(name==='hidden')this.hidden=value}},setAttribute(){}});
- c.$=id=>nodes[id]??=(node());c.document={querySelector:()=>open?{}:null};c.clearTimeout=()=>{};c.setTimeout=()=>1;c.callNoticeTimer=null;c.soundEnabled=false;c.CALL_NOTICE_DURATION=3000;c.receivedCallNotices=new Map();c.callSeen=new Map();c.speakCall=()=>{};c.callNoticeHtml=()=>'<strong>QUIERO</strong>';
+ c.$=id=>nodes[id]??=(node());c.document={querySelector:()=>open?{}:null};c.clearTimeout=()=>{};c.setTimeout=()=>1;c.callNoticeTimer=null;c.soundEnabled=false;c.CALL_NOTICE_DURATION=3000;c.receivedCallNotices=new Map();c.callSeen=new Map();c.speakCall=()=>{};c.callNoticeHtml=()=>'<strong>QUIERO</strong>';c.requestAnimationFrame=()=>{};c.positionMobileCallNotice=()=>{};
  c.state={playerId:'player1',roomCode:'X',learning:{activeTutorial:{roundCards:[]}},room:{handNumber:1,callNotice:{id:'reply',from:'player2',to:'player1',spoken:'Quiero',handNumber:1}}};
  vm.runInContext(extract('renderCallNotice'),c);c.renderCallNotice();assert.equal(nodes['learning-call-notice'].innerHTML,'');assert.equal(nodes['call-notice'].classList.hidden,true);
  open=false;c.renderCallNotice();assert.equal(nodes['learning-call-notice'].innerHTML,'');assert.match(nodes['call-notice'].innerHTML,/QUIERO/);
