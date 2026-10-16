@@ -49,3 +49,19 @@ test('Opponent animations follow the other seat on both desktop and mobile',()=>
  const desktop=setup(false);desktop.context.renderPlayedCards({...room,trickCards:[]});desktop.context.renderPlayedCards({...room,trickCards:[rivalCard('r1')]});assert.deepEqual(desktop.context.flights,['player2:r1']);
  const {context}=setup(true);context.state.playerId='player2';context.renderPlayedCards({...room,trickCards:[]});context.renderPlayedCards(room);assert.deepEqual(context.flights,['player1:1']);
 });
+
+test('Both seats rotate during flight and land at the actual table angle without a final snap',()=>{
+ for(const playerId of ['player1','player2']){
+  const frames=[],state={playerId,roomCode:'room',room:{handNumber:1}};
+  const source={offsetWidth:100,offsetHeight:160,angle:12,classList:{add(){}},getBoundingClientRect:()=>({left:20,top:400,width:123,height:175})};
+  const nodes=[];
+  const c={state,$:id=>id==='hand'?{querySelector:()=>source}:{append(){}},CSS:{escape:v=>v},removeCardFlight(){},getComputedStyle:n=>({transform:String(n.angle)}),DOMMatrixReadOnly:class{constructor(v){const a=Number(v)*Math.PI/180;this.a=Math.cos(a);this.b=Math.sin(a);}},createPlayedCard(){const n={angle:-6,offsetWidth:58,offsetHeight:84,style:{},setAttribute(){},remove(){},getBoundingClientRect:()=>({left:150,top:200,width:66,height:90}),animate(f,o){frames.push(f);return {finished:new Promise(()=>{}),cancel(){}};}};nodes.push(n);return n;},document:{body:{append(){}}},matchMedia:()=>({matches:false}),renderPlayerHand(){},orderedHand:()=>[]};
+  vm.createContext(c);vm.runInContext('let activeCardFlight=null;'+sourceText(),c);c.animatePlayedHandCard({id:'a'});
+  const destination=frames[0][1].transform;
+  const angle=Number(destination.match(/rotate\(([^d]+)deg\)/)[1]);
+  assert.ok(Math.abs(angle+6)<1e-8,playerId);
+  assert.match(destination,/scale\(0.58,0.525\)/);
+  assert.equal(nodes[1].style.width,'100px');assert.equal(nodes[1].style.height,'160px');
+ }
+ function sourceText(){return source.slice(source.indexOf('function animatePlayedHandCard('),source.indexOf('let handGesture='));}
+});

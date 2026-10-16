@@ -2940,13 +2940,15 @@ function animateOpponentCard(card,playerId,target,key){
   const transform=getComputedStyle(source).transform,matrix=transform==='none'?null:new DOMMatrixReadOnly(transform);
   const angle=matrix?Math.atan2(matrix.b,matrix.a)*180/Math.PI:0;
   const flight=document.createElement('div');flight.className='opponent-launch-flight';flight.setAttribute('aria-hidden','true');
-  Object.assign(flight.style,{left:rect.left+'px',top:rect.top+'px',width:rect.width+'px',height:rect.height+'px'});
+  Object.assign(flight.style,{left:(rect.left+rect.width/2-width/2)+'px',top:(rect.top+rect.height/2-height/2)+'px',width:width+'px',height:height+'px'});
   const front=createPlayedCard(card,playerId);front.className='sprite-card opponent-flight-face';
   const back=document.createElement('div');back.className='opponent-card-back opponent-flight-face';
   flight.append(front,back);document.body.append(flight);target.style.visibility='hidden';
   const dx=destination.left+destination.width/2-(rect.left+rect.width/2),dy=destination.top+destination.height/2-(rect.top+rect.height/2);
+  const landingTransform=getComputedStyle(target).transform,landingMatrix=landingTransform==='none'?null:new DOMMatrixReadOnly(landingTransform);
+  const landingAngle=landingMatrix?Math.atan2(landingMatrix.b,landingMatrix.a)*180/Math.PI:0;
   const duration=matchMedia('(prefers-reduced-motion: reduce)').matches?100:420;
-  const animation=flight.animate([{transform:`translate3d(0,0,0) rotate(${angle}deg) scale(1)`},{transform:`translate3d(${dx}px,${dy}px,0) rotate(6deg) scale(${target.offsetWidth/width},${target.offsetHeight/height})`}],{duration,easing:'cubic-bezier(.22,.61,.36,1)',fill:'forwards'});
+  const animation=flight.animate([{transform:`translate3d(0,0,0) rotate(${angle}deg) scale(1)`},{transform:`translate3d(${dx}px,${dy}px,0) rotate(${landingAngle}deg) scale(${target.offsetWidth/width},${target.offsetHeight/height})`}],{duration,easing:'cubic-bezier(.22,.61,.36,1)',fill:'forwards'});
   front.animate([{opacity:0},{opacity:0,offset:.4},{opacity:1,offset:.6},{opacity:1}],{duration,fill:'forwards'});
   back.animate([{opacity:1},{opacity:1,offset:.4},{opacity:0,offset:.6},{opacity:0}],{duration,fill:'forwards'});
   opponentFlights.set(key,{node:flight,target,animation});
@@ -3043,6 +3045,8 @@ function animatePlayedHandCard(card,origin=null){
   const target=createPlayedCard(card,state.playerId);
   target.style.visibility='hidden';$('trick-cards').append(target);
   const targetRect=target.getBoundingClientRect(),targetWidth=target.offsetWidth,targetHeight=target.offsetHeight;
+  const landingTransform=getComputedStyle(target).transform,landingMatrix=landingTransform==='none'?null:new DOMMatrixReadOnly(landingTransform);
+  const endAngle=landingMatrix?Math.atan2(landingMatrix.b,landingMatrix.a)*180/Math.PI:0;
   target.remove();
   const flight=createPlayedCard(card,state.playerId);
   flight.className='sprite-card played-card launch-flight';
@@ -3050,7 +3054,6 @@ function animatePlayedHandCard(card,origin=null){
   flight.setAttribute('aria-hidden','true');
   const dx=targetRect.left+targetRect.width/2-(rect.left+rect.width/2);
   const dy=targetRect.top+targetRect.height/2-(rect.top+rect.height/2);
-  const endAngle=state.playerId==='player2'?6:-6;
   state.launchingCardId=card.id;source.classList.add('launching-card');
   document.body.append(flight);
   const context={node:flight,cardId:card.id,playerId:state.playerId,room:state.roomCode,hand:state.room?.handNumber,finished:false};
