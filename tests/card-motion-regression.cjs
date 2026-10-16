@@ -45,7 +45,7 @@ test('Changing hands clears the flight and does not animate an old snapshot in t
  const {context}=setup(true);context.renderPlayedCards({...room,trickCards:[]});context.renderPlayedCards({...room,trickCards:[rivalCard('r1')]});
  context.renderPlayedCards({...room,handNumber:2,trickCards:[rivalCard('r2')]});assert.equal(context.opponentFlights.size,0);assert.deepEqual(context.flights,['player2:r1']);
 });
-test('Opponent animations follow the other seat and leave desktop rendering unchanged',()=>{
- const desktop=setup(false);desktop.context.renderPlayedCards({...room,trickCards:[]});desktop.context.renderPlayedCards({...room,trickCards:[rivalCard('r1')]});assert.deepEqual(desktop.context.flights,[]);
+test('Opponent animations follow the other seat on both desktop and mobile',()=>{
+ const desktop=setup(false);desktop.context.renderPlayedCards({...room,trickCards:[]});desktop.context.renderPlayedCards({...room,trickCards:[rivalCard('r1')]});assert.deepEqual(desktop.context.flights,['player2:r1']);
  const {context}=setup(true);context.state.playerId='player2';context.renderPlayedCards({...room,trickCards:[]});context.renderPlayedCards(room);assert.deepEqual(context.flights,['player1:1']);
 });

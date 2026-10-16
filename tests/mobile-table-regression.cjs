@@ -72,3 +72,28 @@ test('Fixed slots reserve room for both messages, table cards and the selector o
   assert.ok(g.deckHeight>=63&&g.deckHeight<=88.2);
  }
 });
+
+test('Desktop board reserves independent call slots and fits the centered hand above actions',()=>{
+ const c=harness();vm.runInContext(extract('mobileBoardGeometry','positionMobileCallNotice'),c);
+ for(const [width,height] of [[768,600],[1024,650],[1366,688],[1600,820],[1920,1000]]){
+  const g=c.desktopBoardGeometry(width,height);
+  assert.equal(g.playedHeight,g.deckHeight);
+  assert.ok(g.tableCenter-g.playedHeight/2>=g.rivalNoticeTop+g.noticeHeight,`rival overlap at ${height}`);
+  assert.ok(g.tableCenter+g.playedHeight/2<=g.ownNoticeBottom-g.noticeHeight,`own overlap at ${height}`);
+  assert.ok(g.handCenter+g.handHeight*.56<=height-85,`controls overlap at ${height}`);
+  assert.equal(g.ownNoticeX,width/2);
+ }
+});
+test('Desktop calls and changing actions never shift card slots',()=>{
+ const c=harness(),properties={},noticeProperties={};let speaker='self';
+ const felt={getBoundingClientRect:()=>({left:100,top:80,width:1366,height:688}),style:{setProperty:(k,v)=>properties[k]=v}};
+ const nodes={'felt-area':felt,'game-view':{getBoundingClientRect:()=>({left:0,top:0})},'call-notice':{getAttribute:()=>speaker,style:{setProperty:(k,v)=>noticeProperties[k]=v}}};
+ c.state.room={};Object.assign(c,{matchMedia:()=>({matches:false}),$:id=>nodes[id]});
+ vm.runInContext(extract('mobileBoardGeometry','clearOpponentFlight'),c);
+ c.positionMobileTable();const initial={...properties},g=c.desktopBoardGeometry(1366,688);
+ for(const action of ['normal','flor','contra-flor','envido','declare','yes','no']){
+  c.state.room.pendingBet={type:action};speaker=action==='yes'?'self':'opponent';
+  c.positionMobileTable();c.positionMobileCallNotice();assert.deepEqual(properties,initial);
+  assert.equal(parseFloat(noticeProperties['--call-anchor-top']),(speaker==='self'?g.ownNoticeBottom:g.rivalNoticeTop)+80);
+ }
+});

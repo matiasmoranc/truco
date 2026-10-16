@@ -6,11 +6,11 @@ test('Mobile call bubbles contain the action alone and still escape content',()=
  for(const from of ['player1','player2'])assert.equal(c.callNoticeHtml({from,spoken:'Quiero'},null,true),'<strong>QUIERO</strong>');
  assert.equal(c.callNoticeHtml({spoken:'<flor>'},null,true),'<strong>&lt;FLOR&gt;</strong>');
 });
-test('The same clock node moves into the mobile header and returns on desktop without duplication',()=>{
+test('The clock stays in the shared header across screen widths without duplication',()=>{
  let mobile=true,moves=0;const badge={},header={append(n){moves++;n.parentElement=this;}},original={append(n){moves++;n.parentElement=this;}};badge.parentElement=original;
  const c={$:()=>badge,matchMedia:()=>({matches:mobile}),document:{querySelector:s=>s==='.game-topbar'?header:original}};
  vm.createContext(c);vm.runInContext(extract('syncMobileGameHeader'),c);c.syncMobileGameHeader();c.syncMobileGameHeader();assert.equal(badge.parentElement,header);assert.equal(moves,1);
- mobile=false;c.syncMobileGameHeader();assert.equal(badge.parentElement,original);assert.equal(moves,2);
+ mobile=false;c.syncMobileGameHeader();assert.equal(badge.parentElement,header);assert.equal(moves,1);
 });
 test('Saved tally positions remain inside phone bounds after resizing',()=>{
  const c={};vm.createContext(c);vm.runInContext(extract('mobileTallyCoordinates'),c);

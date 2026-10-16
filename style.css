@@ -1728,7 +1728,7 @@ input,textarea,[contenteditable=""],[contenteditable="true"]{-webkit-user-select
 .opponent-flight-face{position:absolute!important;inset:0!important;display:block;width:100%!important;height:100%!important;margin:0!important;border-radius:6px;transform:none!important;animation:none!important}
 .opponent-card-back{display:block;border:1px solid #eee5d4;border-radius:6px;background:#f5f0df url('./assets/cards/13.jpg') 100% 0/300% 100% no-repeat;box-shadow:0 3px 8px #00180e55}
 /* Fixed mobile board: viewport geometry only. Calls and controls are separate layers. */
-@media(max-width:700px){
+@media all{
  .game.player-mode.two-device-mode .opponent-hand{position:absolute;left:50%;transform:translateX(-50%);display:flex;align-items:center;justify-content:center;pointer-events:none;z-index:8}
  .opponent-hand .opponent-card-back{position:absolute;top:0;left:50%;transform-origin:50% 85%}
  .game.player-mode.two-device-mode .center-table{left:0;width:100%;margin:0;transform:translateY(-50%)}
@@ -1749,7 +1749,7 @@ input,textarea,[contenteditable=""],[contenteditable="true"]{-webkit-user-select
  .game.player-mode.two-device-mode .center-table{top:var(--board-tableCenter,39.5%);height:110px}
  .game.player-mode.two-device-mode .deck-stack,.game.player-mode.two-device-mode .muestra-card{width:var(--board-deckWidth,58px);height:var(--board-deckHeight,84px)}
  .game.player-mode.two-device-mode .muestra-card{right:calc(6% + var(--board-deckWidth,58px)*.76)}
- .game.player-mode.two-device-mode .played-card{width:auto;height:var(--board-playedHeight,84px);aspect-ratio:280/435}
+ .game.player-mode.two-device-mode .played-card{width:var(--board-deckWidth,58px);height:var(--board-deckHeight,84px);aspect-ratio:auto}
  .game.player-mode.two-device-mode .mobile-score{top:var(--board-markerTop,55%);height:min(var(--compact-tally-height),150px);right:4%}
  .game.player-mode.two-device-mode .hand{top:var(--board-handCenter,66%);left:14px;width:calc(100% - 105px);max-width:none;height:var(--board-handHeight,130px);min-height:0;padding:0;margin:0;transform:translateY(-50%);justify-content:flex-start}
  .game.player-mode.two-device-mode .hand-card{width:var(--board-handWidth,84px);height:var(--board-handHeight,130px);flex:0 0 var(--board-handWidth,84px);margin:0 calc(var(--board-handWidth,84px)*-.2)}
@@ -1770,7 +1770,7 @@ input,textarea,[contenteditable=""],[contenteditable="true"]{-webkit-user-select
 }
 
 /* Mobile refinements: centered hand, header clock, floating messages and movable tally. */
-@media(max-width:700px){
+@media all{
  .game.player-mode .game-topbar{position:relative;z-index:95;overflow:visible}
  .game.player-mode .game-topbar #turn-badge{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:max-content;max-width:calc(100% - 200px);min-width:0;margin:0;padding:5px 6px;font-size:10px;gap:5px;line-height:1.25;z-index:2}
  .game.player-mode .game-topbar .turn-badge-label{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -1796,8 +1796,42 @@ input,textarea,[contenteditable=""],[contenteditable="true"]{-webkit-user-select
 @media(prefers-reduced-motion:reduce){.game .chat-notice{animation:none}}
 
 /* Default tally corner and a balanced fan for three, two or one remaining cards. */
-@media(max-width:700px){
+@media all{
  .game.player-mode.two-device-mode .mobile-score{left:12px;top:12px;right:auto}
  .game.player-mode.two-device-mode .mobile-score.tally-moved{left:var(--tally-user-x);top:var(--tally-user-y)}
  .game.player-mode.two-device-mode .hand-card{transform:rotate(var(--hand-fan-angle,0deg)) translateY(var(--hand-fan-y,0px));transition:translate .16s ease}
+}
+
+/* Landscape player board, using the same fixed slots and interactions as mobile. */
+@media(min-width:701px){
+ .game.player-mode .game-topbar{height:80px;flex:0 0 80px;width:100%;padding:0 max(32px,calc((100% - 1360px)/2));border-bottom:0}
+ .game.player-mode .game-topbar .truco-logo{width:92px;height:64px}
+ .game.player-mode .game-topbar #turn-badge{max-width:calc(100% - 360px);font-size:14px;padding:8px 12px;gap:8px}
+ .game.player-mode .game-topbar .turn-timer,.game.player-mode .game-topbar .round-pause-timer{font-size:14px}
+ .game.player-mode .game-topbar .player-sound-toggle,.game.player-mode .game-topbar .chat-toggle{width:48px;height:48px;flex-basis:48px}
+ .game.player-mode .game-layout{display:flex;flex:1 1 0;min-height:0;height:auto;overflow:hidden}
+ .game.player-mode .felt-area{position:relative;flex:1;width:100%;max-width:1600px;height:100%;min-height:0;margin:0 auto;padding:0;overflow:hidden}
+ .game.player-mode.two-device-mode .hand{position:absolute;bottom:auto;align-items:flex-end;z-index:10}
+ .game.player-mode.two-device-mode .opponent-hand{width:240px}
+ .game.player-mode.two-device-mode .opponent-hand .opponent-card-back{transform:translate(-50%,-50%) translateX(calc(var(--fan-index)*var(--board-deckWidth)*.48)) rotate(calc(var(--fan-index)*15deg))}
+ .game.player-mode.two-device-mode .deck-stack{right:16%}
+ .game.player-mode.two-device-mode .muestra-card{right:calc(16% + var(--board-deckWidth)*.76)}
+ .game.player-mode.two-device-mode .played-card.is-own-play{left:46%}
+ .game.player-mode.two-device-mode .played-card.is-opponent-play{left:54%}
+ .game.player-mode.two-device-mode .mobile-score{position:absolute;left:clamp(24px,8vw,128px);top:12px;bottom:auto;right:auto;width:98px;height:min(var(--compact-tally-height),230px);max-height:230px;padding:0;display:flex;flex-direction:column;gap:6px;background:transparent;border:0}
+ .game.player-mode.two-device-mode .mobile-score.tally-moved{left:var(--tally-user-x);top:var(--tally-user-y)}
+ .game.player-mode.two-device-mode .mobile-score-head{display:grid;grid-template-columns:42px 42px;gap:14px;height:26px;flex:0 0 26px}
+ .game.player-mode.two-device-mode .mobile-score-head h2{font-size:22px}
+ .game.player-mode.two-device-mode .mobile-score-grid{display:grid;grid-template-columns:42px 1px 42px;gap:6px;width:100%;height:calc(100% - 32px);flex:1;align-items:stretch}
+ .game.player-mode.two-device-mode .mobile-score-divider{height:100%;max-height:none}
+ .game.player-mode.two-device-mode .mobile-tally,.game.player-mode.two-device-mode .compact-score-sticks{display:block;height:100%;width:100%;min-height:0}
+ .game.player-mode .player-controls{width:min(800px,calc(100% - 48px));max-width:none;height:88px;gap:10px;bottom:12px}
+ .game.player-mode .compact-actions .call-button,.game.player-mode .compact-actions .pass-button{height:40px;min-height:40px;font-size:14px;padding:6px 10px}
+ .game.player-mode .compact-actions>[data-action=truco],.game.player-mode .compact-actions>[data-action=retruco],.game.player-mode .compact-actions>[data-action=vale4]{flex-basis:100%}
+ .game.player-mode .player-controls>.fold-hand{flex-basis:118px;width:118px;height:40px;font-size:12px}
+ .game.player-mode .call-notice{max-width:300px;font-size:14px;padding:6px 14px}
+ .game.player-mode .call-notice strong{font-size:16px}
+ .game.player-mode.declaring-envido .envido-picker{left:calc(50% - min(400px,calc((100% - 48px)/2)));width:min(672px,calc(100% - 176px));height:94px;bottom:12px}
+ .game.player-mode.declaring-envido .player-controls>.fold-hand{width:118px}
+ .game .chat-notices{top:88px;left:24px}
 }

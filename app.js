@@ -481,7 +481,7 @@ function renderCallNotice(){
   const evidenceOpen=state.room?.status==='revealing'&&!!state.room.endReveal;
   el.classList.toggle('hidden',!visible||helpOpen||evidenceOpen);
   el.setAttribute('data-speaker',own?'self':'opponent');
-  el.innerHTML=visible&&!helpOpen&&!evidenceOpen?callNoticeHtml(notice,state.room,typeof matchMedia==='function'&&matchMedia('(max-width:700px)').matches):'';
+  el.innerHTML=visible&&!helpOpen&&!evidenceOpen?callNoticeHtml(notice,state.room,true):'';
   requestAnimationFrame(positionMobileCallNotice);
   if(!visible)return;
   if(!awaitingResponse&&!helpOpen)callNoticeTimer=setTimeout(()=>{callNoticeTimer=null;renderCallNotice();},Math.max(0,remaining));
@@ -2367,7 +2367,7 @@ $('match-end').addEventListener('keydown',event=>{
 
 function alignHandWithControls(){
   requestAnimationFrame(()=>{
-    if(matchMedia('(max-width:700px)').matches){positionMobileTable();positionMobileCallNotice();return;}
+    if($('game-view').classList.contains('two-device-mode')){positionMobileTable();positionMobileCallNotice();return;}
     if(state.handGestureActive)return;
     const hand=$('hand'),controls=document.querySelector('.player-controls');
     const cards=hand?.querySelectorAll('.hand-card:not(.launching-card)');
@@ -2836,7 +2836,7 @@ function renderOpponentHand(room){
   });
 }
 function syncMobileGameHeader(){
-  const badge=$('turn-badge'),parent=matchMedia('(max-width:700px)').matches?document.querySelector('.game-topbar'):document.querySelector('.my-player-info');
+  const badge=$('turn-badge'),parent=document.querySelector('.game-topbar');
   if(parent&&badge.parentElement!==parent)parent.append(badge);
 }
 function readMobileTallyPosition(){
@@ -2847,7 +2847,6 @@ function mobileTallyCoordinates(position,width,height,markerWidth,markerHeight){
   return {x:6+Math.max(0,Math.min(1,position.x))*Math.max(0,width-markerWidth-12),y:6+Math.max(0,Math.min(1,position.y))*Math.max(0,height-markerHeight-12)};
 }
 function applyMobileTallyPosition(){
-  if(!matchMedia('(max-width:700px)').matches)return;
   const marker=document.querySelector('.mobile-score'),felt=$('felt-area');if(!marker||!felt)return;
   marker.classList.toggle('tally-moved',!!mobileTallyPosition);
   if(!mobileTallyPosition)return;
@@ -2858,7 +2857,7 @@ function applyMobileTallyPosition(){
 function installMobileTallyDrag(marker){
   marker.title='Arrastrá para mover. Tocá para ver el historial de puntos.';
   marker.addEventListener('pointerdown',event=>{
-    if(!matchMedia('(max-width:700px)').matches||event.button!==0||!event.isPrimary)return;
+    if(event.button!==0||!event.isPrimary)return;
     const bounds=$('felt-area').getBoundingClientRect(),rect=marker.getBoundingClientRect();
     mobileTallyDrag={id:event.pointerId,x:event.clientX,y:event.clientY,left:rect.left-bounds.left,top:rect.top-bounds.top,width:rect.width,height:rect.height,prior:mobileTallyPosition,moved:false};
     marker.setPointerCapture(event.pointerId);
@@ -2890,7 +2889,7 @@ function mobileBoardGeometry(width,height){
   const deckHeight=Math.max(60,Math.min(84,height*.13))*1.05;
   const handHeight=Math.max(82,Math.min(166,(height-300)*.4))*1.05;
   const rivalCenter=Math.max(42,Math.min(50,height*.085));
-  const playedHeight=Math.max(62,Math.min(84,height*.13))*1.05;
+  const playedHeight=deckHeight;
   const handCenter=height-114-handHeight*.56,noticeHeight=height<560?42:50;
   const ownNoticeBottom=handCenter-handHeight*.58-8,rivalNoticeTop=rivalCenter+deckHeight*.6+10;
   // Reserve BOTH message slots permanently, even when no message is visible.
@@ -2901,10 +2900,21 @@ function mobileBoardGeometry(width,height){
     rivalCenter,tableCenter,playedHeight,markerTop:tableCenter+playedHeight/2+28,
     handCenter,noticeHeight,ownNoticeX:width/2,ownNoticeBottom,rivalNoticeTop};
 }
+function desktopBoardGeometry(width,height){
+  const scale=Math.min(1,height/700),deckHeight=Math.min(160,height*.17);
+  const handHeight=Math.min(210,height*.25),rivalCenter=deckHeight*.55+12*scale;
+  const handCenter=height-100*scale-handHeight*.56,noticeHeight=42*scale;
+  const ownNoticeBottom=handCenter-handHeight*.58-8*scale,rivalNoticeTop=rivalCenter+deckHeight*.6+10*scale;
+  const minimum=rivalNoticeTop+noticeHeight+5*scale+deckHeight/2;
+  const maximum=ownNoticeBottom-noticeHeight-5*scale-deckHeight/2;
+  const tableCenter=minimum<=maximum?Math.max(minimum,Math.min(height*.43,maximum)):(minimum+maximum)/2;
+  return {deckHeight,deckWidth:deckHeight*58/84,playedHeight:deckHeight,handHeight,handWidth:handHeight*280/435,
+    rivalCenter,tableCenter,markerTop:12,handCenter,noticeHeight,ownNoticeX:width/2,ownNoticeBottom,rivalNoticeTop};
+}
 function positionMobileCallNotice(){
-  if(!matchMedia('(max-width:700px)').matches||!state.room)return;
+  if(!state.room)return;
   const felt=$('felt-area'),frame=$('game-view').getBoundingClientRect(),bounds=felt.getBoundingClientRect();
-  const layout=mobileBoardGeometry(bounds.width,bounds.height),notice=$('call-notice');
+  const layout=(matchMedia('(max-width:700px)').matches?mobileBoardGeometry:desktopBoardGeometry)(bounds.width,bounds.height),notice=$('call-notice');
   const own=notice.getAttribute('data-speaker')==='self';
   // The message reads the board's slots; it never moves cards or measures buttons.
   notice.style.setProperty('--call-anchor-x',(own?layout.ownNoticeX:bounds.width/2)+bounds.left-frame.left+'px');
@@ -2912,9 +2922,9 @@ function positionMobileCallNotice(){
   notice.style.setProperty('--call-max-height',layout.noticeHeight+'px');
 }
 function positionMobileTable(){
-  if(!matchMedia('(max-width:700px)').matches||!state.room)return;
+  if(!state.room)return;
   const felt=$('felt-area'),bounds=felt.getBoundingClientRect();
-  const layout=mobileBoardGeometry(bounds.width,bounds.height);
+  const layout=(matchMedia('(max-width:700px)').matches?mobileBoardGeometry:desktopBoardGeometry)(bounds.width,bounds.height);
   for(const [name,value] of Object.entries(layout))felt.style.setProperty('--board-'+name,value+'px');
   applyMobileTallyPosition();
 }
@@ -2950,9 +2960,9 @@ function handFanPose(count,index){
 function renderPlayerHand(cards,myTurn){
   const container=$('hand'),visible=cards.filter(card=>card.id!==state.launchingCardId);
   const oldNodes=[...container.children],oldKeys=oldNodes.map(node=>node.dataset.card),keys=visible.map(card=>card.id);
-  const changed=oldKeys.join('|')!==keys.join('|'),mobile=matchMedia('(max-width:700px)').matches;
+  const changed=oldKeys.join('|')!==keys.join('|');
   const before=new Map();
-  if(changed&&mobile)for(const node of oldNodes){
+  if(changed)for(const node of oldNodes){
     before.set(node.dataset.card,{rect:node.getBoundingClientRect(),transform:getComputedStyle(node).transform});
     node._centerAnimation?.cancel();
   }
@@ -2970,7 +2980,7 @@ function renderPlayerHand(cards,myTurn){
     if(container.children[index]!==node)container.insertBefore(node,container.children[index]||null);
   });
   for(const node of existing.values()){node._centerAnimation?.cancel();node.remove();}
-  if(!changed||!mobile||matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+  if(!changed||matchMedia('(prefers-reduced-motion: reduce)').matches)return;
   for(const node of container.children){
     const prior=before.get(node.dataset.card);if(!prior)continue;
     const finalTransform=getComputedStyle(node).transform;
@@ -3011,7 +3021,7 @@ function renderPlayedCards(room){
     let node=existing.get(key);
     if(!node){
       node=createPlayedCard(card,playerId);container.append(node);
-      if(sameHand&&room.status==='started'&&playerId!==state.playerId&&!opponentPlaySnapshot.keys.has(key)&&matchMedia('(max-width:700px)').matches)animateOpponentCard(card,playerId,node,key);
+      if(sameHand&&room.status==='started'&&playerId!==state.playerId&&!opponentPlaySnapshot.keys.has(key))animateOpponentCard(card,playerId,node,key);
     }
     existing.delete(key);
     const flying=activeCardFlight?.cardId===card.id&&activeCardFlight.playerId===playerId;
@@ -3054,7 +3064,7 @@ function animatePlayedHandCard(card,origin=null){
     context.finished=true;
     if(state.room)renderPlayedCards(state.room);else removeCardFlight();
   }).catch(()=>{});
-  if(matchMedia('(max-width:700px)').matches)renderPlayerHand(orderedHand(),false);
+  renderPlayerHand(orderedHand(),false);
 }
 let handGesture=null,ignoreHandClickUntil=0;
 const handSurface=$('hand');
