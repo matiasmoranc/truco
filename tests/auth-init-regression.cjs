@@ -40,6 +40,14 @@ test('Custom Hosting domain completes Apple redirect on the same origin',async()
  const {initializeGameAuth}=await modulePromise;const auth={authStateReady:async()=>{}};const sdk=sdkFor(auth);let processed=0,cleared=0;
  sdk.getRedirectResult=async()=>{processed++;auth.currentUser={uid:'same-account'};};
  globalThis.location={hostname:'trucouruguayo.uy'};globalThis.sessionStorage={getItem:key=>key==='truco-apple-redirect-pending'?'pending':null,removeItem(){cleared++;}};
- try{await initializeGameAuth(sdk,{options:{authDomain:'trucouruguayo.uy'}});assert.equal(processed,1);assert.equal(cleared,1);assert.equal(auth.currentUser.uid,'same-account');}
+ try{await initializeGameAuth(sdk,{options:{authDomain:'trucouruguayo.uy'}});assert.equal(processed,1);assert.equal(cleared,2);assert.equal(auth.currentUser.uid,'same-account');}
+ finally{delete globalThis.location;delete globalThis.sessionStorage;}
+});
+
+test('Android Google return restores the session before the game observes it',async()=>{
+ const {initializeGameAuth}=await modulePromise;const auth={authStateReady:async()=>{}};const sdk=sdkFor(auth);const cleared=[];let called=0;
+ sdk.getRedirectResult=async()=>{called++;auth.currentUser={uid:'google-return',providerData:[{providerId:'google.com'}]};};
+ globalThis.location={hostname:'trucouruguayo.uy'};globalThis.sessionStorage={getItem:k=>k==='truco-google-redirect-pending'?'pending':null,removeItem:k=>cleared.push(k)};
+ try{await initializeGameAuth(sdk,{options:{authDomain:'trucouruguayo.uy'}});assert.equal(called,1);assert.equal(auth.currentUser.uid,'google-return');assert.ok(cleared.includes('truco-google-redirect-pending'));}
  finally{delete globalThis.location;delete globalThis.sessionStorage;}
 });

@@ -107,6 +107,7 @@ export function installAccount({ api, services, getState, rememberName, document
       case 'auth/account-exists-with-different-credential':return 'Este correo ya está registrado con otra forma de acceso. Entrá con Google para usar tu cuenta existente. (auth/account-exists-with-different-credential)';
       case 'auth/invalid-credential':return 'Firebase no pudo validar la respuesta de '+loginProvider+'. Hay que revisar la configuración de ese acceso. (auth/invalid-credential)';
       case 'auth/invalid-oauth-response':return 'No recibimos una respuesta válida de '+loginProvider+'. (auth/invalid-oauth-response)';
+      case 'auth/google-session-missing':return 'Google confirmó el acceso, pero no recibimos tu sesión. Volvé a intentar. (auth/google-session-missing)';
       case 'auth/apple-session-missing':return 'Apple confirmó el acceso, pero no recibimos tu sesión en el juego. Volvé a intentar. (auth/apple-session-missing)';
       default:return 'No pudimos completar el acceso con '+loginProvider+'. Volvé a intentar.'+(typeof error?.code==='string'?' ('+error.code+')':'');
     }
@@ -128,17 +129,30 @@ export function installAccount({ api, services, getState, rememberName, document
     const provider=new fb.authSdk.GoogleAuthProvider();
     provider.setCustomParameters({prompt:'select_account'});
     const user=fb.auth.currentUser;
+    const android=/Android/i.test((navigator?.userAgentData?.platform||'')+' '+(navigator?.userAgent||''));
+    const sameOrigin=globalThis.location?.hostname===fb.auth.app?.options?.authDomain;
+    // Android account choosers may replace or discard the popup. Keep the
+    // complete redirect on the Hosting origin, so startup can recover it.
+    if(android&&sameOrigin&&!user?.isAnonymous){
+      try{globalThis.sessionStorage?.setItem('truco-google-redirect-pending',String(Date.now()));}catch{}
+      try{await fb.authSdk.signInWithRedirect(fb.auth,provider,fb.authSdk.browserPopupRedirectResolver);}
+      catch(error){try{globalThis.sessionStorage?.removeItem('truco-google-redirect-pending');}catch{}throw error;}
+      return;
+    }
+    let result;
     try{
       // Preserve old anonymous seats when an existing installation first links Google.
-      if(user?.isAnonymous)await fb.authSdk.linkWithPopup(user,provider,fb.authSdk.browserPopupRedirectResolver);
-      else await fb.authSdk.signInWithPopup(fb.auth,provider,fb.authSdk.browserPopupRedirectResolver);
+      if(user?.isAnonymous)result=await fb.authSdk.linkWithPopup(user,provider,fb.authSdk.browserPopupRedirectResolver);
+      else result=await fb.authSdk.signInWithPopup(fb.auth,provider,fb.authSdk.browserPopupRedirectResolver);
     }catch(error){
       if(!['auth/credential-already-in-use','auth/email-already-in-use'].includes(error.code))throw error;
       const credential=fb.authSdk.GoogleAuthProvider.credentialFromError(error);
       if(!credential)throw error;
-      await fb.authSdk.signInWithCredential(fb.auth,credential);
+      result=await fb.authSdk.signInWithCredential(fb.auth,credential);
     }
-    await observe(fb,fb.auth.currentUser);
+    const signedIn=result?.user||fb.auth.currentUser;
+    if(!registered(signedIn)){const error=new Error('Missing Google session');error.code='auth/google-session-missing';throw error;}
+    await observe(fb,signedIn);
   },{allowRegistration:true}));
   el('account-apple').addEventListener('click',()=> {
     if(!appleDevice)return;

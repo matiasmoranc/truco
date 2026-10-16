@@ -215,3 +215,17 @@ test('Wrong identity or an active table prevents deletion',async()=>{
  calls.length=0;h.fb.api=async()=>{throw new Error('Cerrá tu mesa')};
  await h.click('account-delete-submit');assert.deepEqual(calls,[]);assert.match(h.nodes['account-status'].textContent,/Cerrá tu mesa/);
 });
+
+test('Android Google uses a same-origin redirect and records its return marker',async()=>{
+ const h=await harness(null,{name:'Mati'},{platform:'Linux armv8l',userAgent:'Mozilla/5.0 Android 14 Chrome/130'});let redirects=0;const markers=new Map();
+ h.fb.auth.app={options:{authDomain:'trucouruguayo.uy'}};h.fb.authSdk.signInWithRedirect=async()=>{redirects++;};h.fb.authSdk.signInWithPopup=()=>{throw Error('Popup should not open');};
+ globalThis.location={hostname:'trucouruguayo.uy'};globalThis.sessionStorage={setItem:(k,v)=>markers.set(k,v),removeItem:k=>markers.delete(k)};
+ try{await h.click('account-google');assert.equal(redirects,1);assert.ok(markers.has('truco-google-redirect-pending'));assert.equal(h.account.isReady(),false);}
+ finally{delete globalThis.location;delete globalThis.sessionStorage;}
+});
+test('Google popup uses the returned user even when currentUser has not updated',async()=>{
+ const h=await harness(null,{name:'Mati'});h.fb.authSdk.signInWithPopup=async()=>({user:google('confirmed')});await h.click('account-google');assert.equal(h.account.isReady(),true);assert.equal(h.state.uid,'confirmed');
+});
+test('A popup with no Google session shows an error instead of silently returning to login',async()=>{
+ const h=await harness();h.fb.authSdk.signInWithPopup=async()=>({});await h.click('account-google');assert.equal(h.account.isReady(),false);assert.match(h.nodes['auth-status'].textContent,/auth\/google-session-missing/);
+});
