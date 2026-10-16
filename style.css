@@ -1687,7 +1687,7 @@ input,textarea,[contenteditable=""],[contenteditable="true"]{-webkit-user-select
 
 /* Desktop lobby: felt table and a centered, comfortably sized playing area. */
 @media(min-width:1024px){
- #welcome-view{padding:clamp(28px,5vh,50px) 32px 30px;gap:36px;background:linear-gradient(#001e161f,#001e161f),url('./assets/lobby-desktop-tatu.webp') center center/cover no-repeat fixed;isolation:isolate}
+ #welcome-view{padding:clamp(28px,5vh,50px) 32px 30px;gap:36px;background:linear-gradient(#001e161f,#001e161f),url('./assets/lobby-desktop-real-cards.webp') center center/cover no-repeat fixed;isolation:isolate}
  #welcome-view .home-topbar,#welcome-view .home-content{width:min(840px,100%);max-width:840px;margin:0 auto;padding:0}
  #welcome-view .home-topbar{height:80px;min-height:80px;gap:32px}
  #welcome-view .home-topbar .brand-lockup{flex:0 0 90px}
