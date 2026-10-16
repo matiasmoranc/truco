@@ -15,7 +15,7 @@ export function installAccount({ api, services, getState, rememberName, document
     el('auth-status').textContent=text;
     el('account-status').textContent=text;
   };
-  const registered=user=>!!user&&!user.isAnonymous&&user.providerData?.some(provider=>['google.com','apple.com'].includes(provider.providerId));
+  const registered=user=>!!user&&!user.isAnonymous&&user.providerData?.some(provider=>['google.com','apple.com','password'].includes(provider.providerId));
   const validName=value=>typeof value==='string'&&/^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9._-]{1,18}$/.test(value);
   const nameKey=name=>name.toLowerCase().replaceAll('.', '%2E');
   const cleanName=value=>typeof value==='string'?value.trim().slice(0,18):'';
@@ -36,6 +36,7 @@ export function installAccount({ api, services, getState, rememberName, document
     el('account-google').disabled=busy||!getState().firebase;
     el('account-apple').hidden=!appleDevice;
     el('account-apple').disabled=busy||!getState().firebase;
+    if(el('auth-email-submit'))el('auth-email-submit').disabled=busy||!getState().firebase;
     el('auth-name-save').disabled=busy||!google||!loaded;
     for(const id of ['account-change-name','account-logout','account-save','account-delete','account-delete-submit','account-delete-back'])el(id).disabled=busy||!ready||inRoom();
     el('auth-retry').hidden=!slowLoading&&(!getState().firebase||(!google||loaded));
@@ -105,7 +106,9 @@ export function installAccount({ api, services, getState, rememberName, document
       case 'auth/operation-not-allowed':return 'Falta configurar el acceso con '+loginProvider+' en Firebase.';
       case 'auth/unauthorized-domain':return 'Falta autorizar el dominio de esta página en Firebase.';
       case 'auth/account-exists-with-different-credential':return 'Este correo ya está registrado con otra forma de acceso. Entrá con Google para usar tu cuenta existente. (auth/account-exists-with-different-credential)';
-      case 'auth/invalid-credential':return 'Firebase no pudo validar la respuesta de '+loginProvider+'. Hay que revisar la configuración de ese acceso. (auth/invalid-credential)';
+      case 'auth/invalid-login-credentials':case 'auth/wrong-password':case 'auth/user-not-found':return 'Correo o contraseña incorrectos.';
+      case 'auth/too-many-requests':return 'Demasiados intentos. Esperá unos minutos y volvé a intentar.';
+      case 'auth/invalid-credential':if(loginProvider==='correo')return 'Correo o contraseña incorrectos.';return 'Firebase no pudo validar la respuesta de '+loginProvider+'. Hay que revisar la configuración de ese acceso. (auth/invalid-credential)';
       case 'auth/invalid-oauth-response':return 'No recibimos una respuesta válida de '+loginProvider+'. (auth/invalid-oauth-response)';
       case 'auth/google-session-missing':return 'Google confirmó el acceso, pero no recibimos tu sesión. Volvé a intentar. (auth/google-session-missing)';
       case 'auth/apple-session-missing':return 'Apple confirmó el acceso, pero no recibimos tu sesión en el juego. Volvé a intentar. (auth/apple-session-missing)';
@@ -188,6 +191,16 @@ export function installAccount({ api, services, getState, rememberName, document
       await observe(fb,user);
     },{allowRegistration:true});
   });
+  el('auth-email-form')?.addEventListener('submit',event=>{
+    event.preventDefault();
+    return action(async fb=>{
+      loginProvider='correo';message('Ingresando…');
+      try{
+        const result=await fb.authSdk.signInWithEmailAndPassword(fb.auth,el('auth-email').value.trim(),el('auth-password').value);
+        await observe(fb,result.user);
+      }finally{el('auth-password').value='';}
+    },{allowRegistration:true});
+  });
   async function save(fb,input,registration) {
     const user=fb.auth.currentUser;
     if(!registered(user)){message('Iniciá sesión para guardar tu nombre.');return;}
@@ -243,6 +256,8 @@ export function installAccount({ api, services, getState, rememberName, document
   el('account-delete').addEventListener('click',()=>{
     if(busy||!ready)return;
     el('account-menu').hidden=true;el('account-delete-confirm').hidden=false;message('');
+    const password=currentUser.providerData.some(p=>p.providerId==='password');
+    el('delete-password').hidden=!password;el('delete-password-label').hidden=!password;el('delete-password').value='';
     el('account-delete-back').focus();
   });
   el('account-delete-back').addEventListener('click',()=>{
@@ -255,7 +270,10 @@ export function installAccount({ api, services, getState, rememberName, document
       await api('deleteMyAccount',{action:'check'});
       const apple=user.providerData.some(p=>p.providerId==='apple.com');
       message('Verificá tu identidad para eliminar tu cuenta…');
-      if(globalThis.trucoNative?.isNative){
+      if(user.providerData.some(p=>p.providerId==='password')){
+        const credential=fb.authSdk.EmailAuthProvider.credential(user.email,el('delete-password').value);
+        try{await fb.authSdk.reauthenticateWithCredential(user,credential);}finally{el('delete-password').value='';}
+      }else if(globalThis.trucoNative?.isNative){
         await globalThis.trucoNative.reauthenticateForDeletion(fb,user,apple?'apple.com':'google.com');
       }else{
         const provider=apple?new fb.authSdk.OAuthProvider('apple.com'):new fb.authSdk.GoogleAuthProvider();

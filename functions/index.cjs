@@ -16,7 +16,7 @@ const options={region:'us-central1',maxInstances:5,timeoutSeconds:30};
 Object.assign(exports,require('./ad-rewards.cjs').createRewardFunctions({db,identity,rateLimit,options}));
 async function identity(request){
  const auth=request.auth,provider=auth?.token?.firebase?.sign_in_provider;
- if(!auth||!['google.com','apple.com'].includes(provider))throw new HttpsError('unauthenticated','Iniciá sesión con Google o Apple.');
+ if(!auth||!['google.com','apple.com','password'].includes(provider))throw new HttpsError('unauthenticated','Iniciá sesión con tu cuenta.');
  const [access,snap]=await Promise.all([db.ref('userAccess/'+auth.uid+'/blocked').get(),db.ref('profiles/'+auth.uid+'/name').get()]);
  if(access.val()===true)throw new HttpsError('permission-denied','Tu cuenta está bloqueada.');
  const name=snap.val();
@@ -127,7 +127,7 @@ async function completeSelfDeletion(uid,job){
 }
 exports.deleteMyAccount=onCall({...options,timeoutSeconds:120},async request=>{
  const uid=request.auth?.uid,data=request.data||{};
- if(!uid||!['google.com','apple.com'].includes(request.auth.token?.firebase?.sign_in_provider))throw new HttpsError('unauthenticated','Iniciá sesión con tu cuenta.');
+ if(!uid||!['google.com','apple.com','password'].includes(request.auth.token?.firebase?.sign_in_provider))throw new HttpsError('unauthenticated','Iniciá sesión con tu cuenta.');
  if(!['check','delete'].includes(data.action))throw new HttpsError('invalid-argument','Acción inválida.');
  const existing=(await db.ref('accountDeletionJobs/'+uid).get()).val();
  if(existing){await completeSelfDeletion(uid,existing);return {ok:true};}
@@ -160,7 +160,7 @@ exports.adminConsole=onCall(options,async request=>{
  }
  if(action==='metrics'){
   const registeredUids=[];let token;
-  do{const page=await getAuth().listUsers(1000,token);registeredUids.push(...page.users.filter(u=>u.providerData.some(p=>['google.com','apple.com'].includes(p.providerId))).map(u=>u.uid));token=page.pageToken;}while(token);
+  do{const page=await getAuth().listUsers(1000,token);registeredUids.push(...page.users.filter(u=>u.providerData.some(p=>['google.com','apple.com','password'].includes(p.providerId))).map(u=>u.uid));token=page.pageToken;}while(token);
   const now=Date.now(),cutoff=uruguayDate(now-29*86400000).day;
   const [days,presence,start]=await Promise.all([db.ref('adminMetrics/days').orderByKey().startAt(cutoff).get(),db.ref('adminMetrics/presence').get(),db.ref('adminMetrics/startedAt').get()]);
   return activitySummary({registeredUids,now,metrics:{days:days.val()||{},presence:presence.val()||{},startedAt:start.val()}});
@@ -193,7 +193,7 @@ exports.adminConsole=onCall(options,async request=>{
    const result=batch.length?await getAuth().getUsers(batch.map(uid=>({uid}))):{users:[]};
    page={users:result.users,pageToken:offset+100<ids.length?String(offset+100):null};
   }else page=await getAuth().listUsers(100,data.pageToken||undefined);
-  const users=await Promise.all(page.users.filter(u=>!u.providerData.every(p=>!['google.com','apple.com'].includes(p.providerId))).map(async u=>{
+  const users=await Promise.all(page.users.filter(u=>!u.providerData.every(p=>!['google.com','apple.com','password'].includes(p.providerId))).map(async u=>{
    const [profile,wallet]=await Promise.all([db.ref('profiles/'+u.uid).get(),db.ref('creditEconomy/wallets/'+u.uid).get()]);
    return {uid:u.uid,email:u.email||'',name:profile.val()?.name||'',disabled:u.disabled,createdAt:u.metadata.creationTime,balance:wallet.val()?.balance??0,locked:wallet.val()?.locked??0};
   }));

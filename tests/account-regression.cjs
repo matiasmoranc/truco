@@ -11,6 +11,7 @@ async function harness(user=null,profile=null,navigator={platform:"Win32",userAg
  const fb={db:{},auth:{currentUser:user},authSdk:{OAuthProvider:class{constructor(id){this.providerId=id;this.scopes=[]}addScope(scope){this.scopes.push(scope)}setCustomParameters(params){this.params=params}},GoogleAuthProvider:class{setCustomParameters(){} static credentialFromError(e){return e.credential}},async linkWithPopup(u){fb.auth.currentUser=google(u.uid)},async signInWithPopup(auth,provider){fb.auth.currentUser=provider?.providerId==='apple.com'?{uid:'apple',isAnonymous:false,providerData:[{providerId:'apple.com'}]}:google('google')},async signInWithCredential(){fb.auth.currentUser=google('existing')},async signOut(){fb.auth.currentUser=null}},ref(db,path){return path},get:async(ref)=>({val:()=>ref==='usernameIndexReady'?true:ref?.startsWith('usernames/')?null:profile}),update:async(ref,value)=>{writes.push({ref,value})}};
  const state={firebase:fb,room:null,uid:user?.uid||null};let name='',starts=0,resets=0,registrations=[];
  const account=installAccount({api:async(name,data)=>fb.api?.(name,data),services:async()=>fb,getState:()=>state,rememberName:v=>name=v,document,navigator,storage:{getItem:k=>cache.get(k),setItem:(k,v)=>cache.set(k,v)},onReady:()=>{starts++},onIdentityChange:()=>{resets++},onRegistered:uid=>registrations.push(uid)});
+ for(const id of ['auth-email','auth-password'])document.getElementById(id);
  await account.observe(fb,user);
  return {account,fb,state,nodes,writes,cache,registrations,name:()=>name,starts:()=>starts,resets:()=>resets,click:async id=>nodes[id].handlers.click(),submit:async id=>nodes[id].handlers.submit({preventDefault(){}})};
 }
@@ -228,4 +229,16 @@ test('Google popup uses the returned user even when currentUser has not updated'
 });
 test('A popup with no Google session shows an error instead of silently returning to login',async()=>{
  const h=await harness();h.fb.authSdk.signInWithPopup=async()=>({});await h.click('account-google');assert.equal(h.account.isReady(),false);assert.match(h.nodes['auth-status'].textContent,/auth\/google-session-missing/);
+});
+
+test('Password account signs in through Firebase and clears the entered password',async()=>{
+ const h=await harness();const user={uid:'review',isAnonymous:false,email:'review@example.test',providerData:[{providerId:'password'}]};
+ h.fb.authSdk.signInWithEmailAndPassword=async(auth,email,password)=>{assert.equal(email,'review@example.test');assert.equal(password,'test-password');auth.currentUser=user;return {user};};
+ h.nodes['auth-email'].value=' review@example.test ';h.nodes['auth-password'].value='test-password';
+ await h.submit('auth-email-form');assert.equal(h.nodes['auth-password'].value,'');assert.equal(h.nodes['auth-register'].hidden,false);
+});
+test('Invalid password cannot unlock gameplay and is cleared',async()=>{
+ const h=await harness();h.fb.authSdk.signInWithEmailAndPassword=async()=>{throw {code:'auth/invalid-credential'};};
+ h.nodes['auth-email'].value='review@example.test';h.nodes['auth-password'].value='wrong';
+ await h.submit('auth-email-form');assert.equal(h.account.isReady(),false);assert.equal(h.nodes['auth-password'].value,'');assert.match(h.nodes['auth-status'].textContent,/Correo o contraseña incorrectos/);
 });

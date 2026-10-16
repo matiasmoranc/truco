@@ -1873,3 +1873,9 @@ input,textarea,[contenteditable=""],[contenteditable="true"]{-webkit-user-select
 .auth-gate>.auth-card{flex:0 0 auto;margin:auto}
 .auth-gate>.legal-links{flex:0 0 auto;margin:0;max-width:100%;flex-wrap:wrap;gap:8px 20px}
 .auth-gate>.legal-links a{display:inline-flex;align-items:center;min-height:36px}
+
+/* Acceso por correo para cuentas existentes, sin registro público adicional. */
+.email-access{margin-top:16px;text-align:left;color:var(--gold,#e8c983)}
+.email-access summary{cursor:pointer;text-align:center;padding:10px}
+#auth-email-form{display:grid;gap:10px;margin-top:12px}
+#auth-email-form input,#delete-password{box-sizing:border-box;width:100%;min-height:44px;padding:12px;border:1px solid #e8c98380;border-radius:12px;background:#102f25;color:#fff;font:inherit;user-select:text;-webkit-user-select:text}
