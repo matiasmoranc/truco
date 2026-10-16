@@ -2360,6 +2360,7 @@ $('match-end').addEventListener('keydown',event=>{
 
 function alignHandWithControls(){
   requestAnimationFrame(()=>{
+    if(matchMedia('(max-width:700px)').matches){positionMobileTable();positionMobileCallNotice();return;}
     if(state.handGestureActive)return;
     const hand=$('hand'),controls=document.querySelector('.player-controls');
     const cards=hand?.querySelectorAll('.hand-card:not(.launching-card)');
@@ -2367,11 +2368,6 @@ function alignHandWithControls(){
     const left=Math.min(...Array.from(cards,card=>card.getBoundingClientRect().left));
     const offset=Number.parseFloat(hand.style.getPropertyValue('--hand-edge-offset'))||0;
     hand.style.setProperty('--hand-edge-offset',(offset+controls.getBoundingClientRect().left-left)+'px');
-    if(matchMedia('(max-width:700px)').matches){
-      const bottom=Math.max(...Array.from(cards,card=>card.getBoundingClientRect().bottom));
-      hand.style.setProperty('--mobile-hand-top',(hand.offsetTop+controls.getBoundingClientRect().top-18-bottom)+'px');
-    }
-    positionMobileCallNotice();
   });
 }
 function renderCompactTally(points,target){
@@ -2832,37 +2828,36 @@ function renderOpponentHand(room){
     card.style.setProperty('--fan-index',index-(count-1)/2);
   });
 }
+function mobileBoardGeometry(width,height){
+  const deckHeight=Math.max(60,Math.min(84,height*.13));
+  const handHeight=Math.max(82,Math.min(166,(height-300)*.4));
+  const rivalCenter=Math.max(73,Math.min(84,height*.148));
+  const playedHeight=Math.max(62,Math.min(84,height*.13));
+  const handCenter=height-114-handHeight*.56,noticeHeight=height<560?42:50;
+  const ownNoticeBottom=handCenter-handHeight*.58-8,rivalNoticeTop=rivalCenter+deckHeight*.6+10;
+  // Reserve BOTH message slots permanently, even when no message is visible.
+  const minimum=rivalNoticeTop+noticeHeight+5+playedHeight/2;
+  const maximum=ownNoticeBottom-noticeHeight-5-playedHeight/2;
+  const tableCenter=minimum<=maximum?Math.max(minimum,Math.min(height*.395,maximum)):(minimum+maximum)/2;
+  return {deckHeight,deckWidth:deckHeight*58/84,handHeight,handWidth:handHeight*280/435,
+    rivalCenter,tableCenter,playedHeight,markerTop:tableCenter+playedHeight/2+28,
+    handCenter,noticeHeight,ownNoticeX:Math.min(width*.36,160),ownNoticeBottom,rivalNoticeTop};
+}
 function positionMobileCallNotice(){
   if(!matchMedia('(max-width:700px)').matches||!state.room)return;
-  const notice=$('call-notice');if(notice.classList.contains('hidden')){positionMobileTable();return;}
+  const felt=$('felt-area'),frame=$('game-view').getBoundingClientRect(),bounds=felt.getBoundingClientRect();
+  const layout=mobileBoardGeometry(bounds.width,bounds.height),notice=$('call-notice');
   const own=notice.getAttribute('data-speaker')==='self';
-  const cards=own?[...$('hand').querySelectorAll('.hand-card:not(.launching-card)')]:[...$('opponent-hand').children];
-  if(!cards.length)return;
-  const rects=cards.map(card=>card.getBoundingClientRect()),frame=$('game-view').getBoundingClientRect();
-  const left=Math.min(...rects.map(rect=>rect.left)),right=Math.max(...rects.map(rect=>rect.right));
-  const center=Math.max(frame.left+90,Math.min((left+right)/2,frame.right-90));
-  const top=own?Math.min(...rects.map(rect=>rect.top))-12:Math.max(...rects.map(rect=>rect.bottom))+12;
-  notice.style.setProperty('--call-anchor-x',(center-frame.left)+'px');
-  notice.style.setProperty('--call-anchor-top',(top-frame.top)+'px');
-  positionMobileTable();
+  // The message reads the board's slots; it never moves cards or measures buttons.
+  notice.style.setProperty('--call-anchor-x',(own?layout.ownNoticeX:bounds.width/2)+bounds.left-frame.left+'px');
+  notice.style.setProperty('--call-anchor-top',(own?layout.ownNoticeBottom:layout.rivalNoticeTop)+bounds.top-frame.top+'px');
+  notice.style.setProperty('--call-max-height',layout.noticeHeight+'px');
 }
 function positionMobileTable(){
-  if(opponentFlights.size||state.launchingCardId)return;
+  if(!matchMedia('(max-width:700px)').matches||!state.room)return;
   const felt=$('felt-area'),bounds=felt.getBoundingClientRect();
-  const backs=[...$('opponent-hand').children],mine=[...$('hand').querySelectorAll('.hand-card:not(.launching-card)')];
-  const tableCards=[...$('trick-cards').children,$('deck-stack')].filter(Boolean);
-  const half=Math.max(84,...tableCards.map(card=>card.getBoundingClientRect().height))/2;
-  let upper=backs.length?Math.max(...backs.map(card=>card.getBoundingClientRect().bottom))+10:bounds.top+20;
-  let lower=mine.length?Math.min(...mine.map(card=>card.getBoundingClientRect().top))-10:bounds.bottom-20;
-  const notice=$('call-notice');
-  if(!notice.classList.contains('hidden')){
-    const bubble=notice.getBoundingClientRect();
-    if(notice.getAttribute('data-speaker')==='self')lower=Math.min(lower,bubble.top-10);
-    else upper=Math.max(upper,bubble.bottom+10);
-  }
-  const minimum=upper-bounds.top+half,maximum=lower-bounds.top-half;
-  const center=minimum<=maximum?Math.max(minimum,Math.min(bounds.height*.42,maximum)):(upper+lower)/2-bounds.top;
-  felt.style.setProperty('--mobile-table-center',center+'px');
+  const layout=mobileBoardGeometry(bounds.width,bounds.height);
+  for(const [name,value] of Object.entries(layout))felt.style.setProperty('--board-'+name,value+'px');
 }
 function clearOpponentFlight(key){
   const flight=opponentFlights.get(key);if(!flight)return;
