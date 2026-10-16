@@ -2149,7 +2149,7 @@ function renderGame() {
   const myTurn=room.turn===state.playerId&&room.status==='started'&&!room.resolvingTrick&&state.hand.length>0&&!room.pendingBet&&!room.pendingNextHand;
   setTurnBadge(myTurn?'TU TURNO':'ESPERÁ'); $('turn-badge').classList.toggle('waiting-turn',!myTurn);
   const visibleHand=orderedHand();
-  if(!state.handGestureActive)$('hand').innerHTML=visibleHand.map((card) => `<button class="hand-card sprite-card ${card.red?'card-red':''} ${state.launchingCardId===card.id?'launching-card':''} ${state.pendingCardId===card.id?'card-pending':''}" style="${cardImageStyle(card)}" aria-label="${cardAccessibleName(card)}" aria-disabled="${!myTurn}" data-card="${card.id}"><span class="sr-only">${cardAccessibleName(card)}</span></button>`).join('');
+  if(!state.handGestureActive)renderPlayerHand(visibleHand,myTurn);
   animateFoldedHand();
 
   renderPlayedCards(room);
@@ -2888,7 +2888,7 @@ function installMobileTallyDrag(marker){
 
 function mobileBoardGeometry(width,height){
   const deckHeight=Math.max(60,Math.min(84,height*.13))*1.05;
-  const handHeight=Math.max(82,Math.min(166,(height-300)*.4));
+  const handHeight=Math.max(82,Math.min(166,(height-300)*.4))*1.05;
   const rivalCenter=Math.max(42,Math.min(50,height*.085));
   const playedHeight=Math.max(62,Math.min(84,height*.13))*1.05;
   const handCenter=height-114-handHeight*.56,noticeHeight=height<560?42:50;
@@ -2941,6 +2941,45 @@ function animateOpponentCard(card,playerId,target,key){
   back.animate([{opacity:1},{opacity:1,offset:.4},{opacity:0,offset:.6},{opacity:0}],{duration,fill:'forwards'});
   opponentFlights.set(key,{node:flight,target,animation});
   animation.finished.then(()=>{if(opponentFlights.get(key)?.node===flight)clearOpponentFlight(key);}).catch(()=>{});
+}
+
+function handFanPose(count,index){
+  const middle=(count-1)/2;
+  return {angle:(index-middle)*(count===2?15:12),y:count===3?(index===1?-2:7):0};
+}
+function renderPlayerHand(cards,myTurn){
+  const container=$('hand'),visible=cards.filter(card=>card.id!==state.launchingCardId);
+  const oldNodes=[...container.children],oldKeys=oldNodes.map(node=>node.dataset.card),keys=visible.map(card=>card.id);
+  const changed=oldKeys.join('|')!==keys.join('|'),mobile=matchMedia('(max-width:700px)').matches;
+  const before=new Map();
+  if(changed&&mobile)for(const node of oldNodes){
+    before.set(node.dataset.card,{rect:node.getBoundingClientRect(),transform:getComputedStyle(node).transform});
+    node._centerAnimation?.cancel();
+  }
+  const existing=new Map(oldNodes.map(node=>[node.dataset.card,node]));
+  visible.forEach((card,index)=>{
+    let node=existing.get(card.id);
+    if(!node){node=document.createElement('button');node.type='button';node.dataset.card=card.id;}
+    existing.delete(card.id);
+    node.className=`hand-card sprite-card ${card.red?'card-red':''} ${state.pendingCardId===card.id?'card-pending':''}`;
+    node.setAttribute('aria-label',cardAccessibleName(card));node.setAttribute('aria-disabled',String(!myTurn));
+    // Preserve nodes, so repeated snapshots cannot restart the centering animation.
+    const image=cardImageStyle(card);if(node._cardImage!==image){node.style.cssText=image;node._cardImage=image;}
+    const pose=handFanPose(visible.length,index);
+    node.style.setProperty('--hand-fan-angle',pose.angle+'deg');node.style.setProperty('--hand-fan-y',pose.y+'px');
+    if(container.children[index]!==node)container.insertBefore(node,container.children[index]||null);
+  });
+  for(const node of existing.values()){node._centerAnimation?.cancel();node.remove();}
+  if(!changed||!mobile||matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+  for(const node of container.children){
+    const prior=before.get(node.dataset.card);if(!prior)continue;
+    const finalTransform=getComputedStyle(node).transform;
+    node.style.transform=prior.transform;
+    const placed=node.getBoundingClientRect();node.style.removeProperty('transform');
+    const dx=prior.rect.left-placed.left,dy=prior.rect.top-placed.top;
+    node._centerAnimation=node.animate([{transform:`translate(${dx}px,${dy}px) ${prior.transform==='none'?'':prior.transform}`},{transform:finalTransform}],{duration:500,easing:'cubic-bezier(.22,.61,.36,1)'});
+    node._centerAnimation.finished.catch(()=>{});
+  }
 }
 
 let activeCardFlight=null;
@@ -3015,6 +3054,7 @@ function animatePlayedHandCard(card,origin=null){
     context.finished=true;
     if(state.room)renderPlayedCards(state.room);else removeCardFlight();
   }).catch(()=>{});
+  if(matchMedia('(max-width:700px)').matches)renderPlayerHand(orderedHand(),false);
 }
 let handGesture=null,ignoreHandClickUntil=0;
 const handSurface=$('hand');

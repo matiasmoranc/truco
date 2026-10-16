@@ -1794,3 +1794,10 @@ input,textarea,[contenteditable=""],[contenteditable="true"]{-webkit-user-select
 }
 @keyframes chat-notice-drop{from{opacity:0;transform:translate3d(-12px,-24px,0)}to{opacity:1;transform:translate3d(0,0,0)}}
 @media(prefers-reduced-motion:reduce){.game .chat-notice{animation:none}}
+
+/* Default tally corner and a balanced fan for three, two or one remaining cards. */
+@media(max-width:700px){
+ .game.player-mode.two-device-mode .mobile-score{left:12px;top:12px;right:auto}
+ .game.player-mode.two-device-mode .mobile-score.tally-moved{left:var(--tally-user-x);top:var(--tally-user-y)}
+ .game.player-mode.two-device-mode .hand-card{transform:rotate(var(--hand-fan-angle,0deg)) translateY(var(--hand-fan-y,0px));transition:translate .16s ease}
+}
