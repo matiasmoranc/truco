@@ -552,14 +552,16 @@ function positionLobbyWelcomeArrow(){
  const up=target.top+target.height/2<box.top+box.height/2,x1=box.left+box.width/2,y1=up?box.top-2:box.bottom+2;
  const x2=target.left+target.width/2,y2=up?target.bottom+8:target.top-8,bend=Math.max(24,Math.min(80,Math.abs(y2-y1)*.35));
  const svg=lobbyWelcomeDialog.querySelector('svg');svg.setAttribute('viewBox','0 0 '+innerWidth+' '+innerHeight);
- svg.querySelector('.lobby-welcome-path').setAttribute('d','M '+x1+' '+y1+' C '+x1+' '+(y1+(up?-bend:bend))+' '+x2+' '+(y2+(up?bend:-bend))+' '+x2+' '+y2);
+ // Keep a straight terminal segment so the arrowhead aligns with the shaft.
+ const neckY=y2+(up?20:-20);
+ svg.querySelector('.lobby-welcome-path').setAttribute('d','M '+x1+' '+y1+' C '+x1+' '+(y1+(up?-bend:bend))+' '+x2+' '+(neckY+(up?bend:-bend))+' '+x2+' '+neckY+' L '+x2+' '+y2);
 }
 function showLobbyOnboarding(){
  if(!state.lobbyOnboardingUid||state.lobbyOnboardingUid!==state.uid||!account.isReady()||!$('welcome-view').classList.contains('active')||state.room||typeof credits.wallet()?.balance!=='number')return;
  if(lobbyWelcomeDialog?.open)return;
  if(!lobbyWelcomeDialog){
   lobbyWelcomeDialog=document.createElement('dialog');lobbyWelcomeDialog.className='lobby-welcome-dialog';lobbyWelcomeDialog.setAttribute('aria-labelledby','lobby-welcome-title');
-  lobbyWelcomeDialog.innerHTML='<svg class="lobby-welcome-arrow" aria-hidden="true"><defs><marker id="lobby-welcome-tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0 L10 5 L0 10 Z" fill="#ead39b"/></marker></defs><path class="lobby-welcome-path" fill="none" stroke="#ead39b" stroke-width="3" marker-end="url(#lobby-welcome-tip)"/></svg><button type="button" class="learn-close" aria-label="Cerrar aviso">×</button><h2 id="lobby-welcome-title"></h2><div class="lobby-welcome-copy"></div><p class="lobby-welcome-step"></p>';
+  lobbyWelcomeDialog.innerHTML='<svg class="lobby-welcome-arrow" aria-hidden="true"><defs><marker id="lobby-welcome-tip" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0 L10 5 L0 10 Z" fill="#ead39b"/></marker></defs><path class="lobby-welcome-path" fill="none" stroke="#ead39b" stroke-width="3" marker-end="url(#lobby-welcome-tip)"/></svg><button type="button" class="learn-close" aria-label="Cerrar aviso">×</button><h2 id="lobby-welcome-title"></h2><div class="lobby-welcome-copy"></div><p class="lobby-welcome-step"></p>';
   document.body.append(lobbyWelcomeDialog);
   lobbyWelcomeDialog.querySelector('button').onclick=advanceLobbyWelcome;
   lobbyWelcomeDialog.addEventListener('cancel',event=>{event.preventDefault();advanceLobbyWelcome();});
