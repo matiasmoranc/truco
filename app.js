@@ -3826,7 +3826,7 @@ async function initializePage(){
   const slowTimer=setTimeout(()=>{account.loadingSlow(state.authLoadingStage||'config');releaseLoading();},12000);
   try{
     try{
-      const bundled=await import('./firebase-config.js');
+      const bundled=await import('./firebase-config.js?v=20261016-auth-domain');
       if(firebaseConfigValid(bundled.firebaseConfig))state.config=bundled.firebaseConfig;
     }catch{ /* Optional during initial setup. */ }
     const fb=await firebaseServices();

@@ -149,8 +149,8 @@ export function installAccount({ api, services, getState, rememberName, document
       provider.addScope('email');provider.addScope('name');
       provider.setCustomParameters({locale:'es'});
       // iOS browsers can block the first popup or lose Apple's native return.
-      // Keep redirect auth
-      // and its storage on Firebase's own origin instead of GitHub Pages.
+      // Keep redirect storage on the configured auth origin. On the custom
+      // Hosting domain this stays in place; GitHub Pages uses Firebase Hosting.
       if(/iPhone|iPad|iPod/i.test(navigator.userAgent||navigator.platform||'')||(/Mac/i.test(navigator.platform||'')&&navigator.maxTouchPoints>1)) {
         const target=new URL('https://'+fb.auth.app.options.authDomain+'/');
         if(globalThis.location.origin!==target.origin) {

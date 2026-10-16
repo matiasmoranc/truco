@@ -35,3 +35,11 @@ test('An ordinary Firebase-hosted visit never waits for the redirect iframe',asy
  globalThis.location={hostname:'truco-6553d.firebaseapp.com'};globalThis.sessionStorage={getItem:()=>null};
  try{assert.equal(await initializeGameAuth(sdk,{options:{authDomain:'truco-6553d.firebaseapp.com'}}),auth);assert.equal(auth.currentUser,user);assert.equal('popupRedirectResolver' in sdk.options,false);}finally{delete globalThis.location;delete globalThis.sessionStorage;}
 });
+
+test('Custom Hosting domain completes Apple redirect on the same origin',async()=>{
+ const {initializeGameAuth}=await modulePromise;const auth={authStateReady:async()=>{}};const sdk=sdkFor(auth);let processed=0,cleared=0;
+ sdk.getRedirectResult=async()=>{processed++;auth.currentUser={uid:'same-account'};};
+ globalThis.location={hostname:'trucouruguayo.uy'};globalThis.sessionStorage={getItem:key=>key==='truco-apple-redirect-pending'?'pending':null,removeItem(){cleared++;}};
+ try{await initializeGameAuth(sdk,{options:{authDomain:'trucouruguayo.uy'}});assert.equal(processed,1);assert.equal(cleared,1);assert.equal(auth.currentUser.uid,'same-account');}
+ finally{delete globalThis.location;delete globalThis.sessionStorage;}
+});

@@ -2,7 +2,10 @@
 // keys or other server credentials in this file.
 export const firebaseConfig = {
   apiKey: "AIzaSyCS6VqXgyf3DbBH-_FCF2BouQnhwVggSc8",
-  authDomain: "truco-6553d.firebaseapp.com",
+  // Custom Hosting origin keeps Safari redirect storage on the game domain.
+  // Other web hosts and native builds preserve their existing OAuth callbacks.
+  authDomain: !globalThis.trucoNative?.isNative && globalThis.location?.hostname === "trucouruguayo.uy"
+    ? "trucouruguayo.uy" : "truco-6553d.firebaseapp.com",
   databaseURL: "https://truco-6553d-default-rtdb.firebaseio.com",
   projectId: "truco-6553d",
   storageBucket: "truco-6553d.firebasestorage.app",
