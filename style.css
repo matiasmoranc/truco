@@ -1768,3 +1768,29 @@ input,textarea,[contenteditable=""],[contenteditable="true"]{-webkit-user-select
  .game.player-mode.declaring-envido #declare-points,.game.player-mode.declaring-envido #good-points{height:36px;min-height:36px;min-width:0;padding:0 5px;font-size:12px}
  .game.player-mode.reveal-mode .end-hand-reveal{top:calc(var(--board-tableCenter,39.5%) + var(--board-deckHeight,84px)/2 + 24px);bottom:14px;justify-content:flex-start}
 }
+
+/* Mobile refinements: centered hand, header clock, floating messages and movable tally. */
+@media(max-width:700px){
+ .game.player-mode .game-topbar{position:relative;z-index:95;overflow:visible}
+ .game.player-mode .game-topbar #turn-badge{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:max-content;max-width:calc(100% - 200px);min-width:0;margin:0;padding:5px 6px;font-size:10px;gap:5px;line-height:1.25;z-index:2}
+ .game.player-mode .game-topbar .turn-badge-label{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+ .game.player-mode .game-topbar .turn-timer,.game.player-mode .game-topbar .round-pause-timer{font-size:10px;padding-left:5px}
+ .game.player-mode .game-topbar .inactivity-life{right:-11px;left:auto}
+ .game.player-mode .my-player-info{display:none}
+ .game.drawing-mode .game-topbar #turn-badge{display:none}
+ .game.player-mode.two-device-mode .hand{left:50%;width:calc(100% - 28px);transform:translate(-50%,-50%);justify-content:center}
+ .game.player-mode .call-notice{overflow:visible}
+ .game.player-mode .call-notice strong{margin-top:0}
+ .game.player-mode .call-notice::after{content:'';display:block;position:absolute;left:calc(50% - 4px);width:8px;height:8px;background:#ead7a5;transform:rotate(45deg)}
+ .game.player-mode .call-notice[data-speaker=self]::after{bottom:-5px;border-right:1px solid #d8b875;border-bottom:1px solid #d8b875}
+ .game.player-mode .call-notice[data-speaker=opponent]::after{top:-5px;border-left:1px solid #d8b875;border-top:1px solid #d8b875}
+ .game .chat-notices{position:absolute;top:62px;left:12px;transform:none;width:min(300px,calc(100% - 24px));max-width:none;gap:8px}
+ .game .chat-notice{border:1px solid #d8e9df40;background:#143f32c9;color:#f1f5ee;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-radius:16px;padding:10px 12px;box-shadow:0 6px 22px #00190f40;animation:chat-notice-drop .24s cubic-bezier(.2,.7,.3,1) both}
+ .game .chat-notice strong{color:#e8c983;font-size:11px}
+ .game .chat-notice p{font-size:14px;margin-top:3px}
+ .game.player-mode.two-device-mode .mobile-score{touch-action:none;user-select:none;-webkit-user-select:none;cursor:grab}
+ .game.player-mode.two-device-mode .mobile-score.tally-moved{left:var(--tally-user-x);top:var(--tally-user-y);right:auto;bottom:auto;transform:none}
+ .game .mobile-score.tally-dragging{cursor:grabbing;z-index:130;filter:drop-shadow(0 3px 5px #001b1480)}
+}
+@keyframes chat-notice-drop{from{opacity:0;transform:translate3d(-12px,-24px,0)}to{opacity:1;transform:translate3d(0,0,0)}}
+@media(prefers-reduced-motion:reduce){.game .chat-notice{animation:none}}

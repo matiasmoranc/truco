@@ -5,7 +5,7 @@ const fs=require('node:fs');
 const source=fs.readFileSync(require('node:path').join(__dirname,'../app.js'),'utf8');
 function extract(name,next){return source.slice(source.indexOf('function '+name+'('),source.indexOf('function '+next+'('));}
 function harness(){
- const context={opponentFlights:new Map(),state:{playerId:'player1'},otherPlayer:id=>id==='player1'?'player2':'player1'};
+ const context={applyMobileTallyPosition:()=>{},opponentFlights:new Map(),state:{playerId:'player1'},otherPlayer:id=>id==='player1'?'player2':'player1'};
  vm.createContext(context);vm.runInContext(extract('opponentCardCount','renderOpponentHand'),context);return context;
 }
 const play=(playerId,id)=>({playerId,card:{id}});
@@ -69,6 +69,6 @@ test('Fixed slots reserve room for both messages, table cards and the selector o
   assert.ok(g.tableCenter-g.playedHeight/2>=g.rivalNoticeTop+g.noticeHeight,`rival overlap at ${height}`);
   assert.ok(g.tableCenter+g.playedHeight/2<=g.ownNoticeBottom-g.noticeHeight,`own overlap at ${height}`);
   assert.ok(g.handCenter+g.handHeight*.56<=height-112,`selector overlap at ${height}`);
-  assert.ok(g.deckHeight>=60&&g.deckHeight<=84);
+  assert.ok(g.deckHeight>=63&&g.deckHeight<=88.2);
  }
 });

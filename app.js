@@ -14,6 +14,8 @@ let state = { joining: false, config: null, firebase: null, roomCode: null, sele
 const opponentFlights=new Map();
 let opponentPlaySnapshot={scope:null,keys:new Set()};
 
+let mobileTallyPosition=readMobileTallyPosition();
+let mobileTallyDrag=null,tallyIgnoreClickUntil=0;
 const cardImageCache=[];
 let cardImagesPromise=null;
 function preloadCardImages(){
@@ -181,7 +183,7 @@ function updateChatUnread(){
 function showChatNotice(message){
   const notice=document.createElement('div');notice.className='chat-notice';
   const content=document.createElement('div'),name=document.createElement('strong'),text=document.createElement('p'),close=document.createElement('button');
-  name.textContent=state.room.players?.[message.sender]?.name||'Rival';text.textContent=message.text;
+  name.textContent=message.sender===state.playerId?'Vos':state.room.players?.[message.sender]?.name||'Rival';text.textContent=message.text;
   close.type='button';close.textContent='×';close.setAttribute('aria-label','Cerrar mensaje');
   const dismiss=()=>{clearTimeout(matchChat.noticeTimers.get(message.id));matchChat.noticeTimers.delete(message.id);notice.remove();};
   close.addEventListener('click',dismiss);content.append(name,text);notice.append(content,close);$('chat-notices').append(notice);
@@ -203,7 +205,10 @@ function syncMatchChat(){
   if(!fresh)for(const message of messages){
     if(matchChat.seen.has(message.id))continue;
     matchChat.seen.add(message.id);
-    if(message.sender===state.playerId)continue;
+    if(message.sender===state.playerId){
+      if(!chatMuted&&!matchChat.open&&$('game-view').classList.contains('active'))showChatNotice(message);
+      continue;
+    }
     if(!matchChat.open&&!chatMuted)matchChat.unread++;
     if(!chatMuted&&!matchChat.open&&$('game-view').classList.contains('active'))showChatNotice(message);
   }
@@ -371,9 +376,10 @@ function ownCallVerb(main,bet){
   if(call==='envido'&&!(bet?.calls?.length>1)&&!(bet?.accepted>0))return 'Tocaste';
   return 'Dijiste';
 }
-function callNoticeHtml(notice,room=state.room){
+function callNoticeHtml(notice,room=state.room,compact=false){
   const main=notice.spoken||spokenCall(notice.text||'');
   if(!main)return escapeHtml(callNoticeText(notice.text||''));
+  if(compact)return `<strong>${escapeHtml(main.toLocaleUpperCase('es-UY'))}</strong>`;
   if(notice.from===state.playerId){
     return `${escapeHtml(notice.selfVerb||'Dijiste')} <strong>${escapeHtml(main.toLocaleUpperCase('es-UY'))}</strong>`;
   }
@@ -475,7 +481,7 @@ function renderCallNotice(){
   const evidenceOpen=state.room?.status==='revealing'&&!!state.room.endReveal;
   el.classList.toggle('hidden',!visible||helpOpen||evidenceOpen);
   el.setAttribute('data-speaker',own?'self':'opponent');
-  el.innerHTML=visible&&!helpOpen&&!evidenceOpen?callNoticeHtml(notice):'';
+  el.innerHTML=visible&&!helpOpen&&!evidenceOpen?callNoticeHtml(notice,state.room,typeof matchMedia==='function'&&matchMedia('(max-width:700px)').matches):'';
   requestAnimationFrame(positionMobileCallNotice);
   if(!visible)return;
   if(!awaitingResponse&&!helpOpen)callNoticeTimer=setTimeout(()=>{callNoticeTimer=null;renderCallNotice();},Math.max(0,remaining));
@@ -2098,6 +2104,7 @@ function renderGame() {
     if(groups.length)localShowEvidence(groups);
   }
   $('game-sheet').classList.toggle('hidden',!state.learning);
+  syncMobileGameHeader();
   renderCallNotice();
   renderTurnTimer();
   const room = state.room, players=room.players||{}, mine=players[state.playerId], opponent=players[state.playerId==='player1'?'player2':'player1'];
@@ -2828,11 +2835,62 @@ function renderOpponentHand(room){
     card.style.setProperty('--fan-index',index-(count-1)/2);
   });
 }
+function syncMobileGameHeader(){
+  const badge=$('turn-badge'),parent=matchMedia('(max-width:700px)').matches?document.querySelector('.game-topbar'):document.querySelector('.my-player-info');
+  if(parent&&badge.parentElement!==parent)parent.append(badge);
+}
+function readMobileTallyPosition(){
+  try{const p=JSON.parse(localStorage.getItem('truco-mobile-tally-position'));if(p&&Number.isFinite(p.x)&&Number.isFinite(p.y))return {x:Math.max(0,Math.min(1,p.x)),y:Math.max(0,Math.min(1,p.y))};}catch{}
+  return null;
+}
+function mobileTallyCoordinates(position,width,height,markerWidth,markerHeight){
+  return {x:6+Math.max(0,Math.min(1,position.x))*Math.max(0,width-markerWidth-12),y:6+Math.max(0,Math.min(1,position.y))*Math.max(0,height-markerHeight-12)};
+}
+function applyMobileTallyPosition(){
+  if(!matchMedia('(max-width:700px)').matches)return;
+  const marker=document.querySelector('.mobile-score'),felt=$('felt-area');if(!marker||!felt)return;
+  marker.classList.toggle('tally-moved',!!mobileTallyPosition);
+  if(!mobileTallyPosition)return;
+  const bounds=felt.getBoundingClientRect(),rect=marker.getBoundingClientRect();
+  const p=mobileTallyCoordinates(mobileTallyPosition,bounds.width,bounds.height,rect.width,rect.height);
+  marker.style.setProperty('--tally-user-x',p.x+'px');marker.style.setProperty('--tally-user-y',p.y+'px');
+}
+function installMobileTallyDrag(marker){
+  marker.title='Arrastrá para mover. Tocá para ver el historial de puntos.';
+  marker.addEventListener('pointerdown',event=>{
+    if(!matchMedia('(max-width:700px)').matches||event.button!==0||!event.isPrimary)return;
+    const bounds=$('felt-area').getBoundingClientRect(),rect=marker.getBoundingClientRect();
+    mobileTallyDrag={id:event.pointerId,x:event.clientX,y:event.clientY,left:rect.left-bounds.left,top:rect.top-bounds.top,width:rect.width,height:rect.height,prior:mobileTallyPosition,moved:false};
+    marker.setPointerCapture(event.pointerId);
+  });
+  marker.addEventListener('pointermove',event=>{
+    const drag=mobileTallyDrag;if(!drag||drag.id!==event.pointerId)return;
+    const dx=event.clientX-drag.x,dy=event.clientY-drag.y;
+    if(!drag.moved&&Math.hypot(dx,dy)<6)return;
+    event.preventDefault();drag.moved=true;marker.classList.add('tally-dragging');
+    const bounds=$('felt-area').getBoundingClientRect();
+    mobileTallyPosition={x:Math.max(0,Math.min(1,(drag.left+dx-6)/Math.max(1,bounds.width-drag.width-12))),y:Math.max(0,Math.min(1,(drag.top+dy-6)/Math.max(1,bounds.height-drag.height-12)))};
+    applyMobileTallyPosition();
+  });
+  const end=event=>{
+    const drag=mobileTallyDrag;if(!drag||drag.id!==event.pointerId)return;
+    mobileTallyDrag=null;marker.classList.remove('tally-dragging');
+    if(marker.hasPointerCapture(event.pointerId))marker.releasePointerCapture(event.pointerId);
+    if(!drag.moved)return;
+    tallyIgnoreClickUntil=Date.now()+500;
+    if(event.type==='pointercancel')mobileTallyPosition=drag.prior;
+    else try{localStorage.setItem('truco-mobile-tally-position',JSON.stringify(mobileTallyPosition));}catch{}
+    applyMobileTallyPosition();
+  };
+  marker.addEventListener('pointerup',end);marker.addEventListener('pointercancel',end);
+  marker.addEventListener('lostpointercapture',event=>end({pointerId:event.pointerId,type:'pointercancel'}));
+}
+
 function mobileBoardGeometry(width,height){
-  const deckHeight=Math.max(60,Math.min(84,height*.13));
+  const deckHeight=Math.max(60,Math.min(84,height*.13))*1.05;
   const handHeight=Math.max(82,Math.min(166,(height-300)*.4));
-  const rivalCenter=Math.max(73,Math.min(84,height*.148));
-  const playedHeight=Math.max(62,Math.min(84,height*.13));
+  const rivalCenter=Math.max(42,Math.min(50,height*.085));
+  const playedHeight=Math.max(62,Math.min(84,height*.13))*1.05;
   const handCenter=height-114-handHeight*.56,noticeHeight=height<560?42:50;
   const ownNoticeBottom=handCenter-handHeight*.58-8,rivalNoticeTop=rivalCenter+deckHeight*.6+10;
   // Reserve BOTH message slots permanently, even when no message is visible.
@@ -2841,7 +2899,7 @@ function mobileBoardGeometry(width,height){
   const tableCenter=minimum<=maximum?Math.max(minimum,Math.min(height*.395,maximum)):(minimum+maximum)/2;
   return {deckHeight,deckWidth:deckHeight*58/84,handHeight,handWidth:handHeight*280/435,
     rivalCenter,tableCenter,playedHeight,markerTop:tableCenter+playedHeight/2+28,
-    handCenter,noticeHeight,ownNoticeX:Math.min(width*.36,160),ownNoticeBottom,rivalNoticeTop};
+    handCenter,noticeHeight,ownNoticeX:width/2,ownNoticeBottom,rivalNoticeTop};
 }
 function positionMobileCallNotice(){
   if(!matchMedia('(max-width:700px)').matches||!state.room)return;
@@ -2858,6 +2916,7 @@ function positionMobileTable(){
   const felt=$('felt-area'),bounds=felt.getBoundingClientRect();
   const layout=mobileBoardGeometry(bounds.width,bounds.height);
   for(const [name,value] of Object.entries(layout))felt.style.setProperty('--board-'+name,value+'px');
+  applyMobileTallyPosition();
 }
 function clearOpponentFlight(key){
   const flight=opponentFlights.get(key);if(!flight)return;
@@ -3048,7 +3107,8 @@ handSurface.addEventListener('keydown',event=>{
 
 document.querySelectorAll('.scoreboard,.mobile-score').forEach(marker=>{
   marker.setAttribute('role','button');marker.setAttribute('tabindex','0');marker.setAttribute('aria-label','Ver historial de puntos de todas las manos');
-  marker.addEventListener('click',openScoreDetails);
+  marker.addEventListener('click',event=>{if(Date.now()<tallyIgnoreClickUntil){event.preventDefault();return;}openScoreDetails();});
+  if(marker.classList.contains('mobile-score'))installMobileTallyDrag(marker);
   marker.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();openScoreDetails();}});
 });
 $('close-score-details').addEventListener('click',()=>$('score-details').close());
@@ -3637,7 +3697,7 @@ $('learn-game').addEventListener('click',openLearning);
 $('learn-back').addEventListener('click',()=>{stopBot();showView('welcome-view');openLobby();});
 $('learn-free').addEventListener('click',()=>startLearning(0));
 $('learn-game-modes').addEventListener('click',event=>{const button=event.target.closest('[data-learning-stage]');if(button)startLearning(Number(button.dataset.learningStage));});
-window.addEventListener('resize',()=>{positionLearningScoreArrow();positionLearningControls();alignHandWithControls();positionMobileCallNotice();});
+window.addEventListener('resize',()=>{syncMobileGameHeader();positionLearningScoreArrow();positionLearningControls();alignHandWithControls();positionMobileCallNotice();});
 function indicateLearningMessageClose(event){
   const dialog=event.currentTarget;
   if(!dialog.open)return;
