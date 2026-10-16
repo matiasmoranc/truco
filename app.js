@@ -136,6 +136,7 @@ function clearChatNotices(){
   matchChat.noticeTimers.clear();$('chat-notices')?.replaceChildren();
 }
 function closeMatchChat(clearNotices=false){
+  const options=$('chat-options');if(options)options.open=false;
   matchChat.open=false;$('chat-backdrop')?.classList.add('hidden');$('match-chat')?.classList.add('hidden');$('chat-toggle')?.setAttribute('aria-expanded','false');
   if(clearNotices)clearChatNotices();
 }
@@ -3247,7 +3248,8 @@ $('chat-form').addEventListener('submit',sendMatchChat);
 $('chat-input').addEventListener('input',()=>{$('chat-input').value=$('chat-input').value.slice(0,CHAT_LIMIT);$('chat-count').textContent=`${$('chat-input').value.length}/${CHAT_LIMIT}`;});
 $('chat-muted').addEventListener('change',()=>{chatMuted=$('chat-muted').checked;if(chatMuted)clearChatNotices();updateChatUnread();renderChatComposer();publishChatMute();});
 $('chat-player-blocked')?.addEventListener('change',changeChatPlayerBlock);
-$('chat-report-mode')?.addEventListener('click',()=>setChatReporting(!matchChat.reporting));
+$('chat-report-mode')?.addEventListener('click',()=>{setChatReporting(!matchChat.reporting);$('chat-options').open=false;});
+$('match-chat').addEventListener('click',event=>{const options=$('chat-options');if(options.open&&!options.contains(event.target))options.open=false;});
 $('match-chat').addEventListener('keydown',event=>{if(event.key==='Escape'){closeMatchChat();$('chat-toggle').focus();}});
 $('close-config').addEventListener('click',()=>showView('setup-view'));
 $('save-config').addEventListener('click',()=>{try{const cfg=JSON.parse($('firebase-config').value);if(!firebaseConfigValid(cfg))throw new Error('missing');state.config=cfg;localStorage.setItem(storageKey,JSON.stringify(cfg));toast('Configuración guardada.',true);runPendingAction();}catch{toast('Pegá una configuración Firebase válida.',true);}});

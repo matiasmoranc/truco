@@ -1839,3 +1839,31 @@ input,textarea,[contenteditable=""],[contenteditable="true"]{-webkit-user-select
 /* Unframed header icons with adjacent touch targets. */
 .game.player-mode .game-topbar .player-sound-toggle,.game.player-mode .game-topbar .chat-toggle{border:0;border-radius:0;background:transparent;box-shadow:none}
 .game.player-mode .game-topbar .chat-toggle{margin-left:0}
+
+/* Chat settings: discreet overflow menu and matching gold switches. */
+.match-chat .chat-heading{gap:6px;flex-shrink:0}
+.match-chat .chat-heading h2{flex:1;min-width:0;font-size:17px}
+.match-chat .chat-heading #chat-close{width:36px;height:36px;border-radius:9px;color:#bfd0c4}
+.match-chat .chat-options{position:relative;flex:0 0 36px;margin:0;color:#f7f3e9;font-size:14px}
+.match-chat .chat-options summary{display:grid;place-items:center;list-style:none;width:36px;height:36px;padding:7px;border:1px solid #e8c98338;border-radius:9px;background:#ffffff05;color:#e8c983;cursor:pointer;touch-action:manipulation}
+.match-chat .chat-options summary::-webkit-details-marker{display:none}
+.match-chat .chat-options summary::marker{content:''}
+.match-chat .chat-options summary svg{width:22px;height:22px;fill:currentColor}
+.match-chat .chat-options[open] summary{border-color:#e8c983aa;background:#e8c98315}
+.match-chat .chat-options-panel{position:absolute;top:44px;right:0;z-index:3;width:280px;max-width:calc(100vw - 72px);padding:6px;border:1px solid #bda46780;border-radius:14px;background:#103428;box-shadow:0 10px 28px #00170ec0}
+.match-chat .chat-block-option{display:grid;grid-template-columns:22px minmax(0,1fr) 38px;align-items:center;gap:10px;margin:0;padding:12px 10px;border-radius:9px;color:#f7f3e9;font-size:14px;line-height:1.3;cursor:pointer}
+.match-chat .chat-block-option svg,.match-chat .chat-mute>svg{width:21px;height:21px;fill:none;stroke:#e8c983;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.match-chat .chat-block-option strong{display:block;font-size:14px;font-weight:600}
+.match-chat .chat-block-option small{display:block;margin-top:3px;font-size:11px;color:#a9bfb0}
+.match-chat .chat-options #chat-report-mode{display:flex;align-items:center;gap:10px;width:100%;height:auto;min-height:46px;padding:10px;border-top:1px solid #e8c98326;border-radius:0 0 9px 9px;color:#e8c983;font-size:14px;line-height:1.3;text-decoration:none;text-align:left}
+.match-chat .chat-options #chat-report-mode::before{content:'!';display:grid;place-items:center;flex:0 0 19px;width:19px;height:19px;border:1.5px solid currentColor;border-radius:50%;font-size:13px;font-weight:700}
+.match-chat .chat-mute{display:flex;align-items:center;gap:10px;min-height:48px;margin:0 0 10px;padding:10px 12px;border:1px solid #b4c6b62e;border-radius:11px;background:#082c2055;font-size:14px;font-weight:500;color:#e8eee5;flex-shrink:0}
+.match-chat .chat-mute>span{flex:1;min-width:0}
+.match-chat .chat-mute input,.match-chat .chat-block-option input{appearance:none;-webkit-appearance:none;position:relative;flex:0 0 38px;width:38px;height:22px;margin:0;border:1px solid #8d9f90;border-radius:14px;background:#08291e;cursor:pointer;transition:background .18s,border-color .18s}
+.match-chat .chat-mute input::after,.match-chat .chat-block-option input::after{content:'';position:absolute;top:3px;left:3px;width:14px;height:14px;border-radius:50%;background:#b4c1b6;transition:transform .18s,background .18s}
+.match-chat .chat-mute input:checked,.match-chat .chat-block-option input:checked{background:#e8c983;border-color:#e8c983}
+.match-chat .chat-mute input:checked::after,.match-chat .chat-block-option input:checked::after{transform:translateX(16px);background:#12382b}
+.match-chat .chat-mute input:disabled,.match-chat .chat-block-option input:disabled{opacity:.45;cursor:default}
+.match-chat .chat-options summary:focus-visible,.match-chat .chat-options button:focus-visible,.match-chat .chat-options input:focus-visible,.match-chat .chat-mute input:focus-visible{outline:2px solid #e8c983;outline-offset:3px}
+@media(hover:hover){.match-chat .chat-options summary:hover,.match-chat .chat-block-option:hover,.match-chat .chat-options #chat-report-mode:hover{background:#e8c98312}}
+@media(prefers-reduced-motion:reduce){.match-chat .chat-mute input,.match-chat .chat-block-option input,.match-chat .chat-mute input::after,.match-chat .chat-block-option input::after{transition:none}}
