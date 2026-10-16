@@ -1867,3 +1867,9 @@ input,textarea,[contenteditable=""],[contenteditable="true"]{-webkit-user-select
 .match-chat .chat-options summary:focus-visible,.match-chat .chat-options button:focus-visible,.match-chat .chat-options input:focus-visible,.match-chat .chat-mute input:focus-visible{outline:2px solid #e8c983;outline-offset:3px}
 @media(hover:hover){.match-chat .chat-options summary:hover,.match-chat .chat-block-option:hover,.match-chat .chat-options #chat-report-mode:hover{background:#e8c98312}}
 @media(prefers-reduced-motion:reduce){.match-chat .chat-mute input,.match-chat .chat-block-option input,.match-chat .chat-mute input::after,.match-chat .chat-block-option input::after{transition:none}}
+
+/* Login content stays centered; legal links sit at the safe bottom edge. */
+.auth-gate{flex-direction:column;align-items:center;justify-content:flex-start;gap:24px;padding:max(24px,env(safe-area-inset-top)) 24px max(12px,env(safe-area-inset-bottom))}
+.auth-gate>.auth-card{flex:0 0 auto;margin:auto}
+.auth-gate>.legal-links{flex:0 0 auto;margin:0;max-width:100%;flex-wrap:wrap;gap:8px 20px}
+.auth-gate>.legal-links a{display:inline-flex;align-items:center;min-height:36px}
