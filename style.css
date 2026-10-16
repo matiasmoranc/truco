@@ -1772,9 +1772,9 @@ input,textarea,[contenteditable=""],[contenteditable="true"]{-webkit-user-select
 /* Mobile refinements: centered hand, header clock, floating messages and movable tally. */
 @media all{
  .game.player-mode .game-topbar{position:relative;z-index:95;overflow:visible}
- .game.player-mode .game-topbar #turn-badge{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:max-content;max-width:calc(100% - 200px);min-width:0;margin:0;padding:5px 6px;font-size:10px;gap:5px;line-height:1.25;z-index:2}
+ .game.player-mode .game-topbar #turn-badge{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:max-content;max-width:calc(100% - 200px);min-width:0;margin:0;padding:5px 6px;font-size:12px;gap:5px;line-height:1.25;z-index:2}
  .game.player-mode .game-topbar .turn-badge-label{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
- .game.player-mode .game-topbar .turn-timer,.game.player-mode .game-topbar .round-pause-timer{font-size:10px;padding-left:5px}
+ .game.player-mode .game-topbar .turn-timer,.game.player-mode .game-topbar .round-pause-timer{font-size:12px;padding-left:5px}
  .game.player-mode .game-topbar .inactivity-life{right:-11px;left:auto}
  .game.player-mode .my-player-info{display:none}
  .game.drawing-mode .game-topbar #turn-badge{display:none}
@@ -1806,8 +1806,8 @@ input,textarea,[contenteditable=""],[contenteditable="true"]{-webkit-user-select
 @media(min-width:701px){
  .game.player-mode .game-topbar{height:80px;flex:0 0 80px;width:100%;padding:0 max(32px,calc((100% - 1360px)/2));border-bottom:0}
  .game.player-mode .game-topbar .truco-logo{width:92px;height:64px}
- .game.player-mode .game-topbar #turn-badge{max-width:calc(100% - 360px);font-size:14px;padding:8px 12px;gap:8px}
- .game.player-mode .game-topbar .turn-timer,.game.player-mode .game-topbar .round-pause-timer{font-size:14px}
+ .game.player-mode .game-topbar #turn-badge{max-width:calc(100% - 360px);font-size:16px;padding:8px 12px;gap:8px}
+ .game.player-mode .game-topbar .turn-timer,.game.player-mode .game-topbar .round-pause-timer{font-size:16px}
  .game.player-mode .game-topbar .player-sound-toggle,.game.player-mode .game-topbar .chat-toggle{width:48px;height:48px;flex-basis:48px}
  .game.player-mode .game-layout{display:flex;flex:1 1 0;min-height:0;height:auto;overflow:hidden}
  .game.player-mode .felt-area{position:relative;flex:1;width:100%;max-width:1600px;height:100%;min-height:0;margin:0 auto;padding:0;overflow:hidden}
@@ -1835,3 +1835,7 @@ input,textarea,[contenteditable=""],[contenteditable="true"]{-webkit-user-select
  .game.player-mode.declaring-envido .player-controls>.fold-hand{width:118px}
  .game .chat-notices{top:88px;left:auto;right:24px}
 }
+
+/* Unframed header icons with adjacent touch targets. */
+.game.player-mode .game-topbar .player-sound-toggle,.game.player-mode .game-topbar .chat-toggle{border:0;border-radius:0;background:transparent;box-shadow:none}
+.game.player-mode .game-topbar .chat-toggle{margin-left:0}
