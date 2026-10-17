@@ -1881,4 +1881,8 @@ input,textarea,[contenteditable=""],[contenteditable="true"]{-webkit-user-select
 #auth-email-form input,#delete-password{box-sizing:border-box;width:100%;min-height:44px;padding:12px;border:1px solid #e8c98380;border-radius:12px;background:#102f25;color:#fff;font:inherit;user-select:text;-webkit-user-select:text}
 
 /* Practice coaching occupies the rival area without shifting the board. */
-#learning-hint{inset:auto 0 auto 0;margin:0 auto;transform:none;max-height:35dvh;overflow:auto}
+#learning-hint,#learning-points-tip{inset:auto;margin:0;transform:none;max-height:40dvh;overflow:visible}
+#learning-message-body{max-height:25dvh;overflow:auto}
+.game.learning-mode.player-mode.two-device-mode .mobile-score:not(.tally-moved){top:var(--learning-marker-top,56px)}
+.game.learning-mode.player-mode.two-device-mode .mobile-score.tally-moved{top:max(var(--learning-marker-top,56px),var(--tally-user-y))}
+.learning-score-arrow{overflow:hidden}

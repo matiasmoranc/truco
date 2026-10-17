@@ -3375,10 +3375,19 @@ function queueLearningPoints(before,after,entries){
   }
 }
 function positionLearningScoreArrow(){
-  const hint=$('learning-hint');
-  if(hint.open){
-    const header=document.querySelector('#game-view .game-topbar');
-    hint.style.top=((header?.getBoundingClientRect().bottom||80)+8)+'px';
+  positionLearningControls();
+  const header=document.querySelector('#game-view .game-topbar');
+  const top=(header?.getBoundingClientRect().bottom||80)+10;
+  // Both coaching dialogs share the rival zone; neither participates in board layout.
+  for(const hint of [$('learning-hint'),$('learning-points-tip')]){
+    if(!hint.open)continue;
+    const marker=document.querySelector('.mobile-score').getBoundingClientRect();
+    const left=Math.max(12,marker.right+12),available=window.innerWidth-left-12;
+    const beside=available>=220;
+    hint.style.width=Math.min(440,beside?available:window.innerWidth-24)+'px';
+    hint.style.left=(beside?left:(window.innerWidth-parseFloat(hint.style.width))/2)+'px';
+    hint.style.right='auto';
+    hint.style.top=(beside?top:Math.max(top,marker.bottom+12))+'px';
   }
   const tipActive=$('learning-points-tip').open;
   $('learning-points-arrow').classList.toggle('hidden',!tipActive);
@@ -3390,34 +3399,34 @@ function positionLearningScoreArrow(){
   arrow.classList.toggle('hidden',!active);
   document.querySelectorAll('.scoreboard,.mobile-score').forEach(marker=>marker.classList.toggle('learning-score-highlight',!!scoreActive));
   if(!active)return;
-  if(guideActive||optionsActive){
-    const targetElement=$(guideActive?'game-sheet':'learning-options');
-    const box=dialog.getBoundingClientRect(),target=targetElement.getBoundingClientRect();
+  {
+    const targetElement=guideActive?$('game-sheet'):optionsActive?$('learning-options'):trucoActive?$('player-actions').querySelector('[data-action="truco"]'):[...document.querySelectorAll('.mobile-score,.scoreboard')].find(el=>el.getBoundingClientRect().width&&el.getBoundingClientRect().height);
+    if(!targetElement){arrow.classList.add('hidden');return;}
+    const target=targetElement.getBoundingClientRect();
     if(!target.width||!target.height){arrow.classList.add('hidden');return;}
-    const x1=box.left+box.width/2,y1=guideActive?box.top-2:box.bottom+2;
-    const x2=guideActive?target.left+target.width/2:target.left-8,y2=guideActive?target.bottom+8:target.top+target.height/2;
-    const bend=Math.max(24,Math.min(80,Math.abs(y2-y1)*.35));
     arrow.setAttribute('viewBox','0 0 '+window.innerWidth+' '+window.innerHeight);
-    // The final tangent points up at the book or right into the help controls.
-    path.setAttribute('d',guideActive
-      ?'M '+x1+' '+y1+' C '+x1+' '+(y1-bend)+' '+x2+' '+(y2+bend)+' '+x2+' '+y2
-      :'M '+x1+' '+y1+' C '+x1+' '+(y1+bend)+' '+(x2-40)+' '+y2+' '+x2+' '+y2);
+    path.setAttribute('d',learningArrowPath(dialog.getBoundingClientRect(),target));
     return;
   }
-  if(trucoActive){
-    const button=$('player-actions').querySelector('[data-action="truco"]');
-    if(!button){arrow.classList.add('hidden');return;}
-    const box=dialog.getBoundingClientRect(),target=button.getBoundingClientRect(),x=target.left+target.width/2,y1=box.bottom-4,y2=target.top-6;
-    arrow.setAttribute('viewBox','0 0 '+window.innerWidth+' '+window.innerHeight);
-    path.setAttribute('d','M '+x+' '+y1+' C '+x+' '+(y1+20)+' '+x+' '+(y2-20)+' '+x+' '+y2);
-    return;
+}
+function learningArrowPath(box,target){
+  // Join the nearest visible edges. Control points stay between the endpoints,
+  // including when the tally sits against the left edge of a narrow screen.
+  const clamp=(value,min,max)=>Math.max(min,Math.min(max,value));
+  const cx=target.left+target.width/2,cy=target.top+target.height/2;
+  let x1,y1,x2,y2;
+  if(target.bottom<box.top||target.top>box.bottom){
+    const below=target.top>box.bottom;
+    x1=clamp(cx,box.left+16,box.right-16);y1=below?box.bottom:box.top;
+    x2=clamp(x1,target.left+4,target.right-4);y2=below?target.top-7:target.bottom+7;
+    const mid=(y1+y2)/2;
+    return `M ${x1} ${y1} C ${x1} ${mid} ${x2} ${mid} ${x2} ${y2}`;
   }
-  const marker=[...document.querySelectorAll('.mobile-score,.scoreboard')].find(el=>el.getBoundingClientRect().width&&el.getBoundingClientRect().height);
-  if(!marker){arrow.classList.add('hidden');return;}
-  const box=dialog.getBoundingClientRect(),target=marker.getBoundingClientRect();
-  const x1=Math.max(box.left+20,Math.min(box.right-24,target.left-40)),y1=box.top+12,x2=target.left-8,y2=target.top+target.height*.65;
-  arrow.setAttribute('viewBox','0 0 '+window.innerWidth+' '+window.innerHeight);
-  path.setAttribute('d','M '+x1+' '+y1+' C '+x1+' '+y2+' '+(x2-28)+' '+y2+' '+x2+' '+y2);
+  const right=cx>box.left+box.width/2;
+  x1=right?box.right:box.left;y1=clamp(cy,box.top+16,box.bottom-16);
+  x2=right?target.left-7:target.right+7;y2=clamp(y1,target.top+4,target.bottom-4);
+  const mid=(x1+x2)/2;
+  return `M ${x1} ${y1} C ${mid} ${y1} ${mid} ${y2} ${x2} ${y2}`;
 }
 const learningSeen=new Set((()=>{try{return JSON.parse(localStorage.getItem('truco-learning-seen-v1')||'[]');}catch{return [];}})());
 function learningHelpTopic(bet=state.room?.pendingBet){
@@ -3539,6 +3548,8 @@ function positionLearningControls(){
   if(!state.learning||!state.localGame)return;
   const game=$('game-view'),box=game.getBoundingClientRect(),header=game.querySelector('.game-topbar'),hand=$('hand').getBoundingClientRect();
   if(header)game.style.setProperty('--learning-exit-top',(header.getBoundingClientRect().bottom-box.top+10)+'px');
+  const exit=$('learn-menu').getBoundingClientRect(),feltBox=$('felt-area').getBoundingClientRect();
+  game.style.setProperty('--learning-marker-top',Math.max(12,exit.bottom-feltBox.top+12)+'px');
   game.style.setProperty('--learning-options-top',(hand.top+hand.height/2-box.top)+'px');
   const cards=[...$('hand').querySelectorAll('.hand-card')].map(card=>card.getBoundingClientRect());
   if(cards.length){
