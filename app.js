@@ -3382,12 +3382,14 @@ function positionLearningScoreArrow(){
   for(const hint of [$('learning-hint'),$('learning-points-tip')]){
     if(!hint.open)continue;
     const marker=document.querySelector('.mobile-score').getBoundingClientRect();
-    const left=Math.max(12,marker.right+12),available=window.innerWidth-left-12;
-    const beside=available>=220;
-    hint.style.width=Math.min(440,beside?available:window.innerWidth-24)+'px';
+    const points=hint.id==='learning-points-tip'||state.learning?.activeScoreMessage;
+    const guide=state.learning?.activeTutorial?.pointAtGuide;
+    const left=Math.max(16,marker.right+56),available=window.innerWidth-left-16;
+    const beside=points&&available>=240;
+    hint.style.width=Math.min(380,beside?available:window.innerWidth-32)+'px';
     hint.style.left=(beside?left:(window.innerWidth-parseFloat(hint.style.width))/2)+'px';
     hint.style.right='auto';
-    hint.style.top=(beside?top:Math.max(top,marker.bottom+12))+'px';
+    hint.style.top=(points?(beside?top+48:Math.max(top+100,marker.bottom+56)):guide?top+90:top+24)+'px';
   }
   const tipActive=$('learning-points-tip').open;
   $('learning-points-arrow').classList.toggle('hidden',!tipActive);
@@ -3400,11 +3402,12 @@ function positionLearningScoreArrow(){
   document.querySelectorAll('.scoreboard,.mobile-score').forEach(marker=>marker.classList.toggle('learning-score-highlight',!!scoreActive));
   if(!active)return;
   {
-    const targetElement=guideActive?$('game-sheet'):optionsActive?$('learning-options'):trucoActive?$('player-actions').querySelector('[data-action="truco"]'):[...document.querySelectorAll('.mobile-score,.scoreboard')].find(el=>el.getBoundingClientRect().width&&el.getBoundingClientRect().height);
+    const targetElement=guideActive?$('game-sheet'):optionsActive?$('learn-hints').closest('label'):trucoActive?$('player-actions').querySelector('[data-action="truco"]'):[...document.querySelectorAll('.mobile-score,.scoreboard')].find(el=>el.getBoundingClientRect().width&&el.getBoundingClientRect().height);
     if(!targetElement){arrow.classList.add('hidden');return;}
     const target=targetElement.getBoundingClientRect();
     if(!target.width||!target.height){arrow.classList.add('hidden');return;}
     arrow.setAttribute('viewBox','0 0 '+window.innerWidth+' '+window.innerHeight);
+    path.removeAttribute('marker-end');
     path.setAttribute('d',learningArrowPath(dialog.getBoundingClientRect(),target));
     return;
   }
@@ -3420,13 +3423,15 @@ function learningArrowPath(box,target){
     x1=clamp(cx,box.left+16,box.right-16);y1=below?box.bottom:box.top;
     x2=clamp(x1,target.left+4,target.right-4);y2=below?target.top-7:target.bottom+7;
     const mid=(y1+y2)/2;
-    return `M ${x1} ${y1} C ${x1} ${mid} ${x2} ${mid} ${x2} ${y2}`;
+    const direction=below?1:-1;
+    return `M ${x1} ${y1} C ${x1} ${mid} ${x2} ${mid} ${x2} ${y2} M ${x2-6} ${y2-direction*10} L ${x2} ${y2} L ${x2+6} ${y2-direction*10}`;
   }
   const right=cx>box.left+box.width/2;
   x1=right?box.right:box.left;y1=clamp(cy,box.top+16,box.bottom-16);
   x2=right?target.left-7:target.right+7;y2=clamp(y1,target.top+4,target.bottom-4);
   const mid=(x1+x2)/2;
-  return `M ${x1} ${y1} C ${mid} ${y1} ${mid} ${y2} ${x2} ${y2}`;
+  const direction=right?1:-1;
+  return `M ${x1} ${y1} C ${mid} ${y1} ${mid} ${y2} ${x2} ${y2} M ${x2-direction*10} ${y2-6} L ${x2} ${y2} L ${x2-direction*10} ${y2+6}`;
 }
 const learningSeen=new Set((()=>{try{return JSON.parse(localStorage.getItem('truco-learning-seen-v1')||'[]');}catch{return [];}})());
 function learningHelpTopic(bet=state.room?.pendingBet){
