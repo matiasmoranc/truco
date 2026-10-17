@@ -1879,3 +1879,6 @@ input,textarea,[contenteditable=""],[contenteditable="true"]{-webkit-user-select
 .email-access summary{cursor:pointer;text-align:center;padding:10px}
 #auth-email-form{display:grid;gap:10px;margin-top:12px}
 #auth-email-form input,#delete-password{box-sizing:border-box;width:100%;min-height:44px;padding:12px;border:1px solid #e8c98380;border-radius:12px;background:#102f25;color:#fff;font:inherit;user-select:text;-webkit-user-select:text}
+
+/* Practice coaching occupies the rival area without shifting the board. */
+#learning-hint{inset:auto 0 auto 0;margin:0 auto;transform:none;max-height:35dvh;overflow:auto}

@@ -155,7 +155,7 @@ function revealEnvido(good=false,declaredNumber=null) {
   if(bet?.type!=='envido'||!bet.revealMode||bet.revealTurn!==player)return;
   const first=room.mano,second=otherPlayer(first),number=Number(declaredNumber??($('envido-picker').dataset.value||0));
   if(good&&player!==second)return;
-  if(!good&&(!Number.isInteger(number)||number<0||number>50||(player===second&&number<bet.reveals?.[first]))){toast('Igualá o superá los tantos.');return;}
+  if(!good&&(!Number.isInteger(number)||number<0||number>37||(player===second&&number<bet.reveals?.[first]))){toast('Igualá o superá los tantos.');return;}
   const reveals={...(bet.reveals||{})};if(!good)reveals[player]=number;
   let changes;
   if(player===first){changes={pendingBet:{...bet,reveals,revealTurn:second},feed:topFeed(room,`${room.players[player].name} canta ${number} tantos.`)};}

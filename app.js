@@ -1440,7 +1440,7 @@ async function revealEnvido(good=false,declaredNumber=null) {
   if(bet?.type!=='envido'||!bet.revealMode||bet.revealTurn!==player)return;
   const first=room.mano,second=otherPlayer(first),number=Number(declaredNumber??($('envido-picker').dataset.value||0));
   if(good&&player!==second)return;
-  if(!good&&(!Number.isInteger(number)||number<0||number>50||(player===second&&number<bet.reveals?.[first]))){toast('Igualá o superá los tantos.');return;}
+  if(!good&&(!Number.isInteger(number)||number<0||number>37||(player===second&&number<bet.reveals?.[first]))){toast('Igualá o superá los tantos.');return;}
   const reveals={...(bet.reveals||{})};if(!good)reveals[player]=number;
   let changes;
   if(player===first){changes={pendingBet:{...bet,reveals,revealTurn:second},feed:topFeed(room,`${room.players[player].name} canta ${number} tantos.`)};}
@@ -2440,15 +2440,16 @@ function renderEnvidoPicker(room){
   $('game-view').classList.toggle('declaring-envido',!!active);
   if(!active){el.stopWheelHint?.();el.dataset.key='';return;}
   const opponentPoints=bet.reveals?.[otherPlayer(state.playerId)],second=opponentPoints!=null,min=envidoPickerMinimum(room,state.playerId);
-  const key=`${room.handNumber}:${state.playerId}:${opponentPoints??'first'}`;
-  if(el.dataset.key===key)return;el.stopWheelHint?.();el.dataset.key=key;const initial=Math.min(50,Math.max(20,min));el.dataset.value=String(initial);
-  el.innerHTML=`<p>Arrastra los números para seleccionar</p><div class="number-wheel" role="listbox" aria-label="Tantos del 0 al 50">${Array.from({length:Math.max(0,51-min)},(_,index)=>{const number=min+index;return `<button role="option" aria-selected="${number===min}" ${number<min?'disabled':''} data-number="${number}">${number}</button>`;}).join('')}</div><div class="declaration-buttons">${min<=50?'<button id="declare-points" class="call-button">DECLARAR <span id="selected-points">'+min+'</span></button>':''}${second?'<button id="good-points" class="pass-button">SON BUENAS</button>':''}</div>`;
-  if(min>50){el.querySelector('.number-wheel').classList.add('hidden');el.querySelector('p').textContent='El rival declaró el máximo de tantos.';$('good-points')?.addEventListener('click',()=>runLiveAction($('good-points'),()=>revealEnvido(true)));return;}
+  const max=bet.type==='flor'?47:37;
+  const key=`${max}:${room.handNumber}:${state.playerId}:${opponentPoints??'first'}`;
+  if(el.dataset.key===key)return;el.stopWheelHint?.();el.dataset.key=key;const initial=Math.min(max,Math.max(20,min));el.dataset.value=String(initial);
+  el.innerHTML=`<p>Arrastra los números para seleccionar</p><div class="number-wheel" role="listbox" aria-label="Tantos del 0 al ${max}">${Array.from({length:Math.max(0,max+1-min)},(_,index)=>{const number=min+index;return `<button role="option" aria-selected="${number===min}" ${number<min?'disabled':''} data-number="${number}">${number}</button>`;}).join('')}</div><div class="declaration-buttons">${min<=max?'<button id="declare-points" class="call-button">DECLARAR <span id="selected-points">'+min+'</span></button>':''}${second?'<button id="good-points" class="pass-button">SON BUENAS</button>':''}</div>`;
+  if(min>max){el.querySelector('.number-wheel').classList.add('hidden');el.querySelector('p').textContent='El rival declaró el máximo de tantos.';$('good-points')?.addEventListener('click',()=>runLiveAction($('good-points'),()=>revealEnvido(true)));return;}
   const wheel=el.querySelector('.number-wheel');
   const step=()=>wheel.querySelector('[data-number]').getBoundingClientRect().width;
   let hintRunning=false,hintFrame=null;
   const select=number=>{el.dataset.value=String(number);el.querySelectorAll('[data-number]').forEach(button=>{const distance=Math.abs(Number(button.dataset.number)-number);button.setAttribute('aria-selected',String(distance===0));button.dataset.distance=String(Math.min(distance,4));});const label=$('selected-points');if(label)label.textContent=number;};
-  const syncWheel=()=>{const buttons=[...wheel.querySelectorAll('[data-number]')],center=wheel.getBoundingClientRect().left+wheel.clientWidth/2;let nearest=null,best=Infinity;buttons.forEach(button=>{const rect=button.getBoundingClientRect(),distance=Math.abs((rect.left+rect.width/2)-center);if(distance<best){best=distance;nearest=button;}const steps=distance/step();button.style.opacity=String(steps<.65?1:steps<1.65?.78:steps<2.65?.48:steps<3.65?.25:.1);});if(nearest&&!hintRunning)select(Math.max(Math.min(50,min),Number(nearest.dataset.number)));};
+  const syncWheel=()=>{const buttons=[...wheel.querySelectorAll('[data-number]')],center=wheel.getBoundingClientRect().left+wheel.clientWidth/2;let nearest=null,best=Infinity;buttons.forEach(button=>{const rect=button.getBoundingClientRect(),distance=Math.abs((rect.left+rect.width/2)-center);if(distance<best){best=distance;nearest=button;}const steps=distance/step();button.style.opacity=String(steps<.65?1:steps<1.65?.78:steps<2.65?.48:steps<3.65?.25:.1);});if(nearest&&!hintRunning)select(Math.max(Math.min(max,min),Number(nearest.dataset.number)));};
   const stopHint=()=>{
     if(!hintRunning)return;
     hintRunning=false;cancelAnimationFrame(hintFrame);
@@ -3374,6 +3375,11 @@ function queueLearningPoints(before,after,entries){
   }
 }
 function positionLearningScoreArrow(){
+  const hint=$('learning-hint');
+  if(hint.open){
+    const header=document.querySelector('#game-view .game-topbar');
+    hint.style.top=((header?.getBoundingClientRect().bottom||80)+8)+'px';
+  }
   const tipActive=$('learning-points-tip').open;
   $('learning-points-arrow').classList.toggle('hidden',!tipActive);
   if(tipActive)$('learning-score-arrow').classList.add('hidden');
@@ -3687,7 +3693,7 @@ function nextStudy(kind=studyExercise?.kind||'envido'){
   const add=(card,label)=>{const wrap=document.createElement('div'),caption=document.createElement('span'),image=document.createElement('div');wrap.className='study-card';caption.textContent=label;image.className='sprite-card';image.style.cssText=cardImageStyle(card);image.setAttribute('role','img');image.setAttribute('aria-label',cardAccessibleName(card));wrap.append(caption,image);cards.append(wrap);};
   studyExercise.hand.forEach((card,index)=>add(card,'Carta '+(index+1)));add(studyExercise.muestra,'Muestra');
   $('learn-study-envido').classList.toggle('hidden',kind==='flor');$('learn-study-flor').classList.toggle('hidden',kind!=='flor');
-  $('learn-study-value').value='';$('learn-study-check').disabled=false;
+  $('learn-study-value').max=kind==='flor-points'?'47':'37';$('learn-study-value').value='';$('learn-study-check').disabled=false;
   $('learn-study-feedback').textContent='';$('learn-study-feedback').className='study-feedback';
   $('learn-study-next').classList.add('hidden');
   $('learn-study-flor').querySelectorAll('button').forEach(button=>button.disabled=false);
@@ -3695,7 +3701,8 @@ function nextStudy(kind=studyExercise?.kind||'envido'){
 function checkStudy(answer){
   if(!studyExercise||studyExercise.answered)return;
   const exercise=studyExercise,result=exercise.kind==='envido'?explainEnvido(exercise.hand,exercise.muestra):exercise.kind==='flor-points'?explainFlorPoints(exercise.hand,exercise.muestra):explainFlor(exercise.hand,exercise.muestra);
-  if(exercise.kind!=='flor'&&(!Number.isInteger(answer)||answer<0||answer>50)){ $('learn-study-feedback').textContent='Escribí un número entero entre 0 y 50.';return;}
+  const max=exercise.kind==='flor-points'?47:37;
+  if(exercise.kind!=='flor'&&(!Number.isInteger(answer)||answer<0||answer>max)){ $('learn-study-feedback').textContent=`Escribí un número entero entre 0 y ${max}.`;return;}
   const correct=answer===result.value;exercise.answered=true;
   const feedback=(correct?'¡Correcto! ':exercise.kind!=='flor'?'Tu respuesta fue '+answer+'. '+(exercise.kind==='flor-points'?'Tu flor suma '+result.value+' pts. ':'Tenés '+result.value+' tantos. '):result.value?'Esta mano sí tiene flor. ':'Esta mano no tiene flor. ')+result.explanation;
   $('learn-study-feedback').textContent=feedback.replace(/\.\s*/g,'.\n').trim();

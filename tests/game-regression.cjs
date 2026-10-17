@@ -220,3 +220,11 @@ test('Abandonment cannot request or accept a rematch',()=>{
  const c=harness(),ended={status:'complete',targetPoints:20,scores:{player1:20,player2:0},players:{player1:{uid:'a'},player2:{uid:'b'}},matchResult:{winner:'player1',loser:'player2',reason:'abandon'},endReveal:{done:true},rematch:{id:'old',requester:'player2',status:'pending'}};
  for(const action of ['request','accept','decline'])assert.equal(c.rematchChanges(ended,'player1',action,'old'),null);
 });
+
+test('Envido declarations accept 37 and reject 38 without advancing the reveal',async()=>{
+ const c=harness(),r=room();r.pendingBet={type:'envido',stake:2,revealMode:true,revealTurn:'player1',reveals:{}};
+ c.state={room:r,playerId:'player1',localGame:true};c.$=()=>({dataset:{}});
+ vm.runInContext(extract('revealEnvido'),c);
+ await c.revealEnvido(false,38);assert.equal(r.pendingBet.revealTurn,'player1');assert.equal(r.pendingBet.reveals.player1,undefined);
+ await c.revealEnvido(false,37);assert.equal(r.pendingBet.reveals.player1,37);assert.equal(r.pendingBet.revealTurn,'player2');
+});
