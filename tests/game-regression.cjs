@@ -17,6 +17,25 @@ function harness(){
  vm.createContext(context);vm.runInContext(names.map(extract).join('\n'),context);return context;
 }
 const card=(suit,rank)=>({id:({'♦':'oro','♥':'copa','♠':'espada','♣':'basto'}[suit])+'-'+rank,suit,rank});
+test('Folding with cards renders its animation and schedules the following hand in bot and practice games',async()=>{
+ for(const practice of [false,true]){
+  const c=harness(),r=room(),flights=[],errors=[];
+  const rect={left:50,top:400,width:100,height:160};
+  const source={offsetWidth:90,offsetHeight:150,getBoundingClientRect:()=>rect,cloneNode:()=>({style:{},classList:{remove(){},add(){}},removeAttribute(){},setAttribute(){},animate(){},remove(){}})};
+  const nodes={'game-view':{classList:{toggle(){}}},hand:{querySelectorAll:()=>[source,source]},'deck-stack':{getBoundingClientRect:()=>({left:250,top:200,width:60,height:100})}};
+  c.$=id=>nodes[id];c.document={body:{append:flight=>flights.push(flight)}};c.setTimeout=()=>1;
+  c.toast=message=>errors.push(message);c.state={room:r,playerId:'player1',localGame:true,learning:practice?{}:null};
+  c.renderGame=()=>c.animateFoldedHand();
+  vm.runInContext(['canFoldHand','foldHandChanges','animateFoldedHand','scheduleLocalNextHand','foldHand'].map(extract).join('\n'),c);
+  c.clearTimeout=()=>{};
+  await c.foldHand();
+  assert.deepEqual(errors,[]);assert.equal(flights.length,2);
+  assert.equal(flights[0].style.width,'90px');assert.equal(flights[0].style.height,'150px');
+  assert.equal(typeof c.transition,'function');c.transition();
+  assert.equal(c.finished.winner,'player2');assert.equal(c.finished.points,2);
+  assert.equal(c.state.foldInFlight,false);
+ }
+});
 test('Own normal-table calls use the requested verbs; raised envido and rival notices stay distinct',()=>{
  const c=harness();c.escapeHtml=String;c.state={playerId:'player1',room:{handNumber:1,players:{player2:{name:'Ricky'}}}};
  vm.runInContext(['spokenCall','callNoticeText','ownCallVerb','makeCallNotice','callNoticeHtml'].map(extract).join('\n'),c);

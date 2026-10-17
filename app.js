@@ -1700,6 +1700,7 @@ function animateFoldedHand(){
   const target=deck.getBoundingClientRect();
   cards.forEach((source,index)=>{
     const rect=source.getBoundingClientRect(),flight=source.cloneNode(true);
+    const width=source.offsetWidth||rect.width,height=source.offsetHeight||rect.height;
     flight.classList.remove('dragging','launching-card');flight.classList.add('card-flight','fold-card-flight');
     flight.removeAttribute('data-card');flight.setAttribute('aria-hidden','true');flight.tabIndex=-1;
     Object.assign(flight.style,{left:(rect.left+rect.width/2-width/2)+'px',top:(rect.top+rect.height/2-height/2)+'px',width:width+'px',height:height+'px'});
