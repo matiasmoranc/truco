@@ -4013,6 +4013,13 @@ installScorer({document,showView,renderTally:renderCompactTally});
 installPlayerPanel({document,api:creditApi,getState:()=>state});
 
 // Visible choices keep the underlying values used by online and bot games.
+document.querySelectorAll('[data-table-mode]').forEach(button=>button.addEventListener('click',()=>{
+  $('table-mode').value=button.dataset.tableMode;
+  $('table-mode').dispatchEvent(new Event('change'));
+}));
+$('table-mode').addEventListener('change',()=>{
+  document.querySelectorAll('[data-table-mode]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.tableMode===$('table-mode').value)));
+});
 document.querySelectorAll('[data-visibility]').forEach(button=>button.addEventListener('click',()=>{
   $('table-visibility').value=button.dataset.visibility;
   $('table-visibility').dispatchEvent(new Event('change'));
