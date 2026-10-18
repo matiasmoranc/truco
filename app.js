@@ -3954,7 +3954,6 @@ $('join-credit-dialog').addEventListener('cancel',event=>{if(state.joinSubmittin
 $('join-credit-dialog').addEventListener('close',()=>{state.joinPassword='';state.joinConfirmed=false;});
 $('join-credit-password').addEventListener('input',()=>{$('join-credit-error').textContent='';});
 $('table-visibility').addEventListener('change',()=>{$('table-password-row').hidden=$('table-visibility').value!=='password';});
-$('table-mode').addEventListener('change',()=>{$('team-stake-info').hidden=$('table-mode').value!=='2v2';});
 setInterval(()=>{if(state.room?.managedCredits&&state.firebaseConnected===true&&navigator.onLine!==false&&document.visibilityState==='visible'&&state.room.status!=='closed')creditCommand({kind:'tick'}).catch(()=>{});},2000);
 
 function updateStakeControl(){
