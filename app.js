@@ -2512,6 +2512,7 @@ function escapeHtml(value='') { return String(value).replace(/[&<>"']/g,(ch)=>({
 function botLevelLabel(level){return {easy:'Fácil',normal:'Normal',hard:'Difícil'}[level]||'Normal';}
 function updateBotSetup(){
   const enabled=$('play-bot').checked;
+  document.querySelectorAll('[data-table-mode]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.tableMode===(enabled?'bot':$('table-mode').value))));
   $('bot-levels').classList.toggle('hidden',!enabled);
   $('credit-table-settings').classList.toggle('hidden',enabled);
   $('enter-room').textContent=enabled?'Jugar contra Bot':'Crear mesa';
@@ -4014,11 +4015,13 @@ installPlayerPanel({document,api:creditApi,getState:()=>state});
 
 // Visible choices keep the underlying values used by online and bot games.
 document.querySelectorAll('[data-table-mode]').forEach(button=>button.addEventListener('click',()=>{
-  $('table-mode').value=button.dataset.tableMode;
+  $('play-bot').checked=button.dataset.tableMode==='bot';
+  if(!$('play-bot').checked)$('table-mode').value=button.dataset.tableMode;
   $('table-mode').dispatchEvent(new Event('change'));
+  updateBotSetup();
 }));
 $('table-mode').addEventListener('change',()=>{
-  document.querySelectorAll('[data-table-mode]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.tableMode===$('table-mode').value)));
+  document.querySelectorAll('[data-table-mode]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.tableMode===($('play-bot').checked?'bot':$('table-mode').value))));
 });
 document.querySelectorAll('[data-visibility]').forEach(button=>button.addEventListener('click',()=>{
   $('table-visibility').value=button.dataset.visibility;
