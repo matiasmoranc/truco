@@ -12,7 +12,7 @@ function recordHistory(before,after,now){
   const old=before?.matches?.[id];
   if(old&&JSON.stringify(old)===JSON.stringify(m))continue;
   const changes=[];
-  for(const uid of [m.player1,m.player2].filter(Boolean)){
+  for(const uid of [...new Set([m.player1,m.player2,...Object.values(m.players||{}).map(p=>p.uid)].filter(Boolean))]){
    const a=before?.wallets?.[uid]||{balance:0,locked:0},b=next.wallets?.[uid];
    if(b&&(a.balance!==b.balance||a.locked!==b.locked))changes.push({uid,before:a.balance,after:b.balance,reservedBefore:a.locked,reservedAfter:b.locked});
   }

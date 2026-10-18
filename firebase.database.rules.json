@@ -10,7 +10,7 @@
           ".write": "(auth != null && root.child('userAccess').child(auth.uid).child('blocked').val() != true) && data.child('managedCredits').val() != true && newData.child('managedCredits').val() != true",
           "connectionPresence": {
             "$player": {
-              ".write": "(auth != null && root.child('userAccess').child(auth.uid).child('blocked').val() != true) && ($player == 'player1' || $player == 'player2') && root.child('rooms').child($room).child('public').child('players').child($player).child('uid').val() == auth.uid && newData.child('uid').val() == auth.uid && newData.child('matchNumber').val() == root.child('rooms').child($room).child('public').child('matchNumber').val()",
+              ".write": "(auth != null && root.child('userAccess').child(auth.uid).child('blocked').val() != true) && ($player == 'player1' || $player == 'player2' || (root.child('rooms').child($room).child('public').child('mode').val() == '2v2' && ($player == 'player3' || $player == 'player4'))) && root.child('rooms').child($room).child('public').child('players').child($player).child('uid').val() == auth.uid && newData.child('uid').val() == auth.uid && newData.child('matchNumber').val() == root.child('rooms').child($room).child('public').child('matchNumber').val()",
               ".validate": "newData.hasChildren(['uid','matchNumber','session','online'])",
               "online": {
                 ".validate": "newData.isBoolean()"

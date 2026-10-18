@@ -52,13 +52,13 @@ async function publish(ledger,code){
 }
 exports.creditCreateTable=onCall(options,async request=>{
  const user=await identity(request);await rateLimit(user.uid);
- const {stake,targetPoints,visibility,password}=request.data||{};
+ const {stake,targetPoints,visibility,password,mode='1v1'}=request.data||{};
  if(!['public','password'].includes(visibility))throw new HttpsError('invalid-argument','Elegí mesa pública o con clave.');
  let secret;try{secret=visibility==='password'?passwordHash(password):null;}catch(e){throw new HttpsError('invalid-argument',e.message);}
  const alphabet='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';const code=Array.from({length:5},()=>alphabet[crypto.randomInt(alphabet.length)]).join('');
  if((await db.ref('rooms/'+code+'/public').get()).exists())throw new HttpsError('aborted','Volvé a intentar crear la mesa.');
  const id=crypto.randomUUID(),now=Date.now();
- const ledger=await mutate(current=>createTable(current,{...user,code,id,stake,targetPoints,secret,now}));
+ const ledger=await mutate(current=>createTable(current,{...user,code,id,stake,targetPoints,mode,secret,now}));
  try{return await publish(ledger,code);}catch(error){
   // Recover a reservation if a legacy room claimed the same code before publish.
   // Retain the receipt and let a later create choose a different code.
@@ -71,10 +71,10 @@ exports.creditCreateTable=onCall(options,async request=>{
  }
 });
 exports.creditJoinTable=onCall(options,async request=>{
- const user=await identity(request);await rateLimit(user.uid);const {code,password}=request.data||{};const now=Date.now();
+ const user=await identity(request);await rateLimit(user.uid);const {code,password,team}=request.data||{};const now=Date.now();
  let table;try{table=tableFor((await db.ref('creditEconomy').get()).val()||{},code);}catch(error){throw new HttpsError('failed-precondition',error.message||'La mesa ya no está disponible.');}
- if(await usersBlockEachOther(db,user.uid,table.player1))throw new HttpsError('failed-precondition','No pueden entrar a la misma mesa porque uno bloqueó al otro.');
- const ledger=await mutate(current=>joinTable(current,{...user,code,password,now}));return publish(ledger,code);
+ for(const person of Object.values(table.players||{}))if(await usersBlockEachOther(db,user.uid,person.uid))throw new HttpsError('failed-precondition','No pueden entrar a la misma mesa porque uno bloqueó al otro.');
+ const ledger=await mutate(current=>joinTable(current,{...user,code,password,team,now}));return publish(ledger,code);
 });
 exports.creditTableAction=onCall(options,async request=>{
  const started=Date.now(),user=await identity(request);const {code,command,requestId,expectedMatchId}=request.data||{};
@@ -82,7 +82,7 @@ exports.creditTableAction=onCall(options,async request=>{
  const [,presenceSnapshot]=await Promise.all([rateLimit(user.uid,120,'actions'),db.ref('rooms/'+code+'/public/connectionPresence').get()]);
  if(command.kind==='rematch'){
   let currentMatch;try{currentMatch=tableFor((await db.ref('creditEconomy').get()).val()||{},code);}catch(error){throw new HttpsError('failed-precondition',error.message||'La partida ya no está disponible.');}
-  if(await usersBlockEachOther(db,currentMatch.player1,currentMatch.player2))throw new HttpsError('failed-precondition','No pueden iniciar una revancha porque uno bloqueó al otro.');
+  const people=Object.values(currentMatch.players||{});for(let a=0;a<people.length;a++)for(let b=a+1;b<people.length;b++)if(await usersBlockEachOther(db,people[a].uid,people[b].uid))throw new HttpsError('failed-precondition','No pueden iniciar una revancha porque hay jugadores bloqueados.');
  }
  // Membership and match identity are checked atomically by tableOperation,
  // including ticks; do not pre-read the entire historical ledger for a tick.
@@ -155,7 +155,7 @@ exports.adminConsole=onCall(options,async request=>{
   if(!validKey(data.uid))throw new HttpsError('invalid-argument','Usuario inválido.');
   const repairId=crypto.randomUUID();
   const ledger=await mutate(current=>{const now=Date.now(),next=repairReservation(current,{uid:data.uid,now});next.adminAudit??={};next.adminAudit[repairId]={actor,action:'repair-reservation',uid:data.uid,reason:'Resolver una reserva vencida o pendiente de liquidación',at:now};return next;});
-  for(const m of Object.values(ledger.matches||{}).filter(m=>[m.player1,m.player2].includes(data.uid)&&ledger.tables?.[m.code]===m.id))await publish(ledger,m.code);
+  for(const m of Object.values(ledger.matches||{}).filter(m=>Object.values(m.players||{}).some(p=>p.uid===data.uid)&&ledger.tables?.[m.code]===m.id))await publish(ledger,m.code);
   return {ok:true};
  }
  if(action==='metrics'){
@@ -292,7 +292,7 @@ exports.playerConsole=onCall(options,async request=>{
   if(data.matchId){
    if(!validKey(data.matchId))throw new HttpsError('invalid-argument','Partida inválida.');
    match=(await db.ref('creditEconomy/matches/'+data.matchId).get()).val();
-   if(!match||![match.player1,match.player2].includes(user.uid))throw new HttpsError('permission-denied','No pertenecés a esa partida.');
+   if(!match||!Object.values(match.players||{}).some(p=>p.uid===user.uid))throw new HttpsError('permission-denied','No pertenecés a esa partida.');
   }
   if(data.localId&&!validKey(data.localId))throw new HttpsError('invalid-argument','Identificador inválido.');
   const report={uid:user.uid,name:user.name,message:data.message.trim(),matchId:match?.id||null,code:match?.code||null,localId:!match&&data.localId?data.localId:null,mode:match?'online':data.mode==='bot'?'bot':'general',at:Date.now()};

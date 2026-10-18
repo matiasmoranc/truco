@@ -433,6 +433,7 @@ function localDealAfterHand(){
   localFeed(`${room.players[room.dealer].name} reparte. Empieza ${room.players[mano].name}.`);renderGame();
 }
 function canFoldHand(room,player){
+  if(room?.mode==='2v2')return room.status==='started'&&!!room.players?.[player]&&!room.folded?.[player]&&!room.resolvingTrick&&!room.pendingNextHand;
   return !!room&&['player1','player2'].includes(player)&&room.status==='started'&&!room.resolvingTrick&&!room.pendingNextHand;
 }
 function foldHandChanges(room,loser){
@@ -461,6 +462,7 @@ function turnClockPlayer(room=state.room){
   return room?.turn;
 }
 function turnClockKey(room=state.room){
+  if(room?.mode==='2v2')return room.turnClock?.key||null;
   if(state.learning&&state.localGame)return null;
   if(room?.status==='timed-out'&&room.turnTimeout)return ['timeout',room.handNumber||1,room.turnTimeout.loser||otherPlayer(room.turnTimeout.winner),room.timeoutCounts?.[room.turnTimeout.loser||otherPlayer(room.turnTimeout.winner)]||1].join(':');
   if(!room||room.status!=='started'||room.resolvingTrick||room.pendingNextHand||room.endReveal&&!room.endReveal.done)return null;

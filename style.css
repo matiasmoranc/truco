@@ -1886,3 +1886,49 @@ input,textarea,[contenteditable=""],[contenteditable="true"]{-webkit-user-select
 .game.learning-mode.player-mode.two-device-mode .mobile-score:not(.tally-moved){top:var(--learning-marker-top,56px)}
 .game.learning-mode.player-mode.two-device-mode .mobile-score.tally-moved{top:max(var(--learning-marker-top,56px),var(--tally-user-y))}
 .learning-score-arrow{overflow:hidden}
+
+/* Four independent seats share the same fixed board on phones and desktop. */
+.table-mode-select{width:100%;padding:12px 14px;border:1px solid #e8c98380;border-radius:12px;background:#103c2e;color:#e8c983;font:inherit;min-height:46px}
+.team-stake-info{font-size:12px;line-height:1.4;color:#c7d7cd;margin:8px 0 0}
+.room-mode-label{display:block;font-size:11px;font-weight:400;color:#e8c983;margin-top:3px}
+.seat-name small{font-size:11px;color:#e8c983;display:block;margin-bottom:4px}
+.game.team-mode{--team-card-width:clamp(42px,13vw,72px);--team-card-height:calc(var(--team-card-width)*1.54);--team-hand-width:clamp(68px,20vw,110px);--team-hand-height:calc(var(--team-hand-width)*1.54)}
+.game.team-mode .opponent-info,.game.team-mode .my-player-info,.game.team-mode #opponent-hand{display:none!important}
+.game.team-mode.player-mode.two-device-mode .center-table{position:absolute;top:44%;left:0;height:1px;width:100%;transform:none;overflow:visible}
+.game.team-mode.player-mode.two-device-mode .deck-stack,.game.team-mode.player-mode.two-device-mode .muestra-card{width:var(--team-card-width);height:var(--team-card-height);top:0}
+.game.team-mode.player-mode.two-device-mode .deck-stack{right:6%}
+.game.team-mode.player-mode.two-device-mode .muestra-card{right:calc(6% + var(--team-card-width)*.65)}
+.game.team-mode.player-mode.two-device-mode .hand{left:50%;top:72%;width:max-content;max-width:85%;height:var(--team-hand-height);transform:translate(-50%,-50%);justify-content:center;z-index:10}
+.game.team-mode.player-mode.two-device-mode .hand-card{width:var(--team-hand-width);height:var(--team-hand-height);flex-basis:var(--team-hand-width);margin:0 calc(var(--team-hand-width)*-.16)}
+.game.team-mode.player-mode.two-device-mode .hand-card:first-child{margin-left:0}.game.team-mode.player-mode.two-device-mode .hand-card:last-child{margin-right:0}
+.game.team-mode .team-seats{position:absolute;inset:0;pointer-events:none;z-index:11}
+.team-seat{position:absolute;text-align:center;width:108px;transform:translate(-50%,-50%);color:#d6e0d8;font-size:12px}
+.team-seat .team-player-name{display:flex;flex-direction:column;justify-content:center;height:46px;line-height:1.15;max-width:100%;overflow-wrap:anywhere;padding:4px 6px;border:1px solid #e8c98338;border-radius:9px;background:#07392cbb}
+.team-player-name small{display:block;font-size:9px;color:#e8c983;margin-top:2px;letter-spacing:.5px}
+.team-seat.is-turn .team-player-name{border-color:#f7d88b;box-shadow:0 0 14px #e8c98340;color:#fff}
+.team-seat.is-folded .team-backs{opacity:.2}
+.team-partner{left:50%;top:11%;width:140px}.team-right{left:86%;top:32%}.team-left{left:14%;top:32%}.team-self{left:50%;top:calc(72% - var(--team-hand-height)*.65 - 18px);width:140px}
+.team-backs{height:var(--team-card-height);position:relative;margin-top:10px}
+.team-backs .opponent-card-back{position:absolute;left:50%;top:0;width:var(--team-card-width);height:var(--team-card-height);transform:translateX(calc(-50% + var(--fan-index)*var(--team-card-width)*.36)) rotate(calc(var(--fan-index)*12deg));transform-origin:50% 85%;border-radius:4px}
+.team-right .team-backs,.team-left .team-backs{transform:scale(.84);margin-top:2px}
+.team-speech{position:absolute;top:calc(100% + 10px);left:50%;transform:translateX(-50%);width:max-content;max-width:min(160px,42vw);padding:7px 10px;background:#ead39b;color:#103b2c;border:1px solid #c5a455;border-radius:10px;font-size:12px;font-weight:700;line-height:1.25;overflow-wrap:anywhere;z-index:15}
+.team-speech::before{content:'';position:absolute;top:-5px;left:calc(50% - 5px);width:8px;height:8px;background:#ead39b;transform:rotate(45deg);border-left:1px solid #c5a455;border-top:1px solid #c5a455}
+.team-self .team-speech{top:auto;bottom:calc(100% + 8px)}.team-self .team-speech::before{top:auto;bottom:-5px;transform:rotate(225deg)}
+.team-left .team-speech{left:10px;transform:none}.team-right .team-speech{left:auto;right:10px;transform:none}
+.game.team-mode.player-mode.two-device-mode #trick-cards{position:absolute;left:40%;top:0;width:1px;height:1px;transform:none;overflow:visible}
+.game.team-mode.player-mode.two-device-mode .deck-stack,.game.team-mode.player-mode.two-device-mode .muestra-card{top:80px}
+.team-played{position:absolute;width:var(--team-card-width);height:var(--team-card-height);transform:translate(-50%,-50%);border-radius:4px;box-shadow:0 3px 7px #001b1460}
+.team-played-self{left:0;top:40px;rotate:-5deg}.team-played-partner{left:0;top:-60px;rotate:5deg}.team-played-left{left:-44px;top:-10px;rotate:-7deg}.team-played-right{left:44px;top:-10px;rotate:7deg}
+.game.team-mode.player-mode.two-device-mode .mobile-score:not(.tally-moved){left:12px;top:8px;width:58px;height:min(var(--compact-tally-height),90px);max-height:90px}
+.game.team-mode .mobile-score-head{transform:scale(.8);transform-origin:top left}
+.game.team-mode.player-mode .player-controls{width:calc(100% - 24px);height:auto;min-height:44px;bottom:10px;gap:6px;z-index:30}
+.game.team-mode.player-mode .player-actions{flex:1;min-width:0}
+.game.team-mode .team-actions{display:flex;flex-wrap:wrap;gap:5px;justify-content:center}
+.game.team-mode .team-actions button{flex:1 1 28%;font-size:11px!important;padding:5px!important;height:34px!important;min-height:34px!important;border-radius:8px}
+.game.team-mode.player-mode .player-controls>.fold-hand{flex-basis:84px;width:84px;height:36px;min-height:36px;font-size:10px;white-space:normal}
+.game.team-mode.player-mode #envido-picker{position:absolute;inset:auto 104px 12px 12px;transform:none;width:auto;max-width:none;padding:0;border:0;background:transparent;z-index:40}
+.team-declare-label{display:flex;flex-wrap:wrap;gap:5px;align-items:center;color:#ead39b;font-size:12px}.team-declare-label output{font-size:22px;font-weight:700}.team-declare-label input{width:100%;accent-color:#ead39b;height:28px}.team-declare-buttons{display:flex;gap:5px}.team-declare-buttons button{flex:1;height:34px;font-size:11px;min-height:34px}
+.team-draw-results{display:flex;justify-content:center;gap:12px;margin-top:20px}.team-draw-results>div{display:flex;flex-direction:column;align-items:center;width:70px;gap:8px;font-size:12px}.team-draw-results .sprite-card{display:block;width:55px;height:85px;border-radius:5px}
+.game.team-mode #end-hand-reveal{position:absolute;top:26%;left:12%;width:76%;max-height:45%;overflow:auto;transform:none;display:flex;gap:10px;flex-wrap:wrap;background:#103c2ef5;border:1px solid #e8c98388;padding:12px;border-radius:14px;z-index:25}
+.game.team-mode #end-hand-reveal section{flex:1 1 40%;font-size:11px;text-align:center}.game.team-mode #end-hand-reveal section>div{display:flex;justify-content:center;gap:2px;margin-top:6px}.game.team-mode #end-hand-reveal i{display:block;width:38px;height:59px;border-radius:3px}
+@media(min-width:901px){.game.team-mode{--team-card-width:78px;--team-hand-width:125px}.team-seat{font-size:15px;width:160px}.team-player-name small{font-size:11px}.team-partner{top:10%;width:190px}.team-left{left:20%}.team-right{left:80%}.team-self{top:87%}.team-speech{font-size:14px;max-width:220px}.game.team-mode.player-mode .player-controls{width:min(800px,90%)}.game.team-mode.player-mode.two-device-mode #trick-cards{left:45%}.game.team-mode.player-mode.two-device-mode .deck-stack{right:19%}.game.team-mode.player-mode.two-device-mode .muestra-card{right:calc(19% + var(--team-card-width)*.65)}.game.team-mode.player-mode #envido-picker{left:calc(50% - 300px);right:auto;width:480px}}

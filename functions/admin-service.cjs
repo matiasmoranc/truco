@@ -68,7 +68,7 @@ function prepareUserDeletion(root,{uid,actor,requestId,confirmName,reason,now,se
  if((next.creditEconomy?.wallets?.[uid]?.locked||0)>0)throw new Error('Cerrá primero la mesa y devolvé los créditos reservados.');
  for(const id of Object.values(next.creditEconomy?.tables||{})){
   const m=next.creditEconomy.matches?.[id];
-  if(m&&[m.player1,m.player2].includes(uid)&&!m.closedAt&&['waiting','reserved'].includes(m.status))throw new Error('El usuario tiene una mesa activa. Cerrala primero.');
+  if(m&&[m.player1,m.player2,...Object.values(m.players||{}).map(p=>p.uid)].includes(uid)&&!m.closedAt&&['waiting','reserved'].includes(m.status))throw new Error('El usuario tiene una mesa activa. Cerrala primero.');
  }
  for(const [code,entry] of Object.entries(next.rooms||{})){
   const room=entry?.public;

@@ -4,25 +4,28 @@ const {createReferee,newSession}=require('./game-referee.cjs');
 const {settleVerifiedMatch,refundCanceledMatch,reserveStakes}=require('./credit-ledger.cjs');
 const {blockedChatReason}=require('./chat-moderation.cjs');
 const WAIT_MS=600000;
+const teams=require('./team-table-service.cjs');
 function fail(message){throw new Error(message);}
 function validCode(code){if(typeof code!=='string'||!/^[A-Z2-9]{5}$/.test(code))fail('Mesa inválida.');return code;}
 function passwordHash(password){if(typeof password!=='string'||password.trim().length<4||password.length>64)fail('La clave debe tener entre 4 y 64 caracteres.');const salt=crypto.randomBytes(16).toString('hex');return {salt,hash:crypto.scryptSync(password,salt,32).toString('hex')};}
 function passwordMatches(password,secret){if(!secret)return true;if(typeof password!=='string'||password.length>64)return false;const actual=crypto.scryptSync(password,secret.salt,32);return crypto.timingSafeEqual(actual,Buffer.from(secret.hash,'hex'));}
 function checkWallet(ledger,uid,stake){const w=ledger.wallets?.[uid];if(w?.deleting||w?.deletedAt)fail('La cuenta fue eliminada.');if(!w||!Number.isSafeInteger(w.balance)||!Number.isSafeInteger(w.locked))fail('Reclamá tus créditos antes de crear o entrar a una mesa.');if(w.locked!==0)fail('Ya tenés créditos reservados en otra mesa.');if(!Number.isSafeInteger(stake)||stake<1||stake>w.balance)fail('No tenés créditos suficientes para esta apuesta.');return w;}
 function tableFor(ledger,code){validCode(code);const id=ledger.tables?.[code],m=id&&ledger.matches?.[id];if(!m)fail('La mesa ya no está disponible.');return m;}
-function findPlayer(m,uid){return m.player1===uid?'player1':m.player2===uid?'player2':null;}
-function createTable(ledger,{code,id,uid,name,stake,targetPoints,secret=null,now}){
+function findPlayer(m,uid){return Object.keys(m.players||{}).find(p=>m.players[p]?.uid===uid)||null;}
+function createTable(ledger,{code,id,uid,name,stake,targetPoints,mode='1v1',secret=null,now}){
+ if(!['1v1','2v2'].includes(mode))fail('Modalidad inválida.');
  validCode(code);if(![10,20,30,40,50,60].includes(targetPoints))fail('Puntaje inválido.');
  const next=structuredClone(ledger||{});if(next.tables?.[code])fail('La mesa cambió. Volvé a intentar.');
  const wallet=checkWallet(next,uid,stake);wallet.balance-=stake;wallet.locked=stake;
  next.matches??={};next.tables??={};next.tables[code]=id;
- next.matches[id]={id,code,player1:uid,player2:null,stake,targetPoints,status:'waiting',createdAt:now,secret,revision:1,players:{player1:{uid,name,online:true}},requests:{},matchNumber:1};return next;
+ next.matches[id]={id,code,mode,player1:uid,player2:null,stake,targetPoints,status:'waiting',createdAt:now,secret,revision:1,players:{player1:{uid,name,online:true}},requests:{},matchNumber:1};return next;
 }
-function joinTable(ledger,{code,uid,name,password='',now}){
+function joinTable(ledger,{code,uid,name,password='',team,now}){
  const next=structuredClone(ledger),m=tableFor(next,code);
  if(findPlayer(m,uid))return next;
  if(m.status!=='waiting'||now-m.createdAt>=WAIT_MS)fail('La mesa ya no está disponible.');
  if(!passwordMatches(password,m.secret))fail('La clave no es correcta.');
+ if(m.mode==='2v2')return teams.join(next,m,{uid,name,team,now});
  const wallet=checkWallet(next,uid,m.stake),host=next.wallets[m.player1];
  if(host.locked!==m.stake)fail('La reserva de la mesa no es válida.');
  wallet.balance-=m.stake;wallet.locked=m.stake;m.player2=uid;m.players.player2={uid,name,online:true};m.status='reserved';
@@ -41,6 +44,7 @@ function finishAccounting(ledger,m,now){
 function tableOperation(ledger,{code,uid,command,requestId,expectedMatchId,presence,now}){
  let next=structuredClone(ledger),m=tableFor(next,code),player=findPlayer(m,uid);
  if(!player)fail('No pertenecés a esta mesa.');
+ if(m.mode==='2v2')return teams.operation(next,m,{uid,command,requestId,expectedMatchId,presence,now});
  m.requests??={};
  if(expectedMatchId&&expectedMatchId!==m.id)fail('La partida cambió. Esperá la actualización.');
  if(requestId&&Object.hasOwn(m.requests||{},requestId))return next;
@@ -103,6 +107,10 @@ function tableOperation(ledger,{code,uid,command,requestId,expectedMatchId,prese
  next=finishAccounting(next,m,now);return next;
 }
 function publicTable(m){
+ if(m.mode==='2v2'){
+  const room=m.session?structuredClone(m.session.room):{mode:'2v2',managedCredits:true,creditMatch:{id:m.id,stake:m.stake,pot:4*m.stake,hasPassword:!!m.secret},status:m.status==='waiting'?'waiting':'closed',deviceMode:'two',createdAt:m.createdAt,targetPoints:m.targetPoints,table:m.players.player1,players:m.players,scores:{player1:0,player2:0},handNumber:0,trickCards:[],feed:[]};
+  room.revision=m.revision;if(m.closedAt||m.status==='refunded')room.status='closed';room.handCounts=Object.fromEntries(Object.keys(m.players).map(p=>[p,m.session?.hands?.[p]?.length||0]));room.creditResult=m.status==='settled'?{winnerUids:m.winners,pot:m.stake*4,payout:m.stake*2,stake:m.stake}:null;return room;
+ }
  if(m.status==='waiting')return {managedCredits:true,creditMatch:{id:m.id,stake:m.stake,pot:m.stake*2,hasPassword:!!m.secret},revision:m.revision,status:'waiting',deviceMode:'two',createdAt:m.createdAt,targetPoints:m.targetPoints,table:m.players.player1,players:m.players,scores:{player1:0,player2:0},handNumber:1,trickCards:[],feed:[]};
  const room=m.session?structuredClone(m.session.room):publicWaitingClosed(m);
  room.revision=m.revision;room.managedCredits=true;if(m.closedAt||m.status==='refunded')room.status='closed';

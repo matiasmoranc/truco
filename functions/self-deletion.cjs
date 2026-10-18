@@ -32,7 +32,7 @@ function erasePlayerData(root,{uid,anonymousId,now}){
   if(Object.values(entry?.public?.players||{}).some(p=>p?.uid===uid)||entry?.public?.table?.uid===uid){delete next.rooms[code];if(next.hands)delete next.hands[code];}
  }
  for(const hands of Object.values(next.hands||{}))if(hands&&typeof hands==='object')delete hands[uid];
- for(const match of Object.values(next.creditEconomy?.matches||{}))if([match.player1,match.player2].includes(uid))delete match.session;
+ for(const match of Object.values(next.creditEconomy?.matches||{}))if([match.player1,match.player2,...Object.values(match.players||{}).map(p=>p.uid)].includes(uid))delete match.session;
  // Preserve credit totals and opponents' results with an unrelated identifier.
  const scrub=value=>{
   if(typeof value==='string')return value===uid?anonymousId:name&&value===name?'Jugador eliminado':value;
