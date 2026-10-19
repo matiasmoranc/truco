@@ -1908,6 +1908,16 @@ input,textarea,[contenteditable=""],[contenteditable="true"]{-webkit-user-select
 .team-seat .team-player-name{display:flex;flex-direction:column;justify-content:center;height:46px;line-height:1.15;max-width:100%;overflow-wrap:anywhere;padding:4px 6px;border:1px solid #e8c98338;border-radius:9px;background:#07392cbb}
 .team-player-name small{display:block;font-size:9px;color:#e8c983;margin-top:2px;letter-spacing:.5px}
 .team-self-status{font-size:9px;color:#e8c983;letter-spacing:.5px}
+.game.team-mode.player-mode.two-device-mode #deck-stack,.game.team-mode.player-mode.two-device-mode #muestra-card{width:calc(var(--team-card-width)*.72);height:calc(var(--team-card-height)*.72)}
+.lobby-team-row{grid-column:1/-1;display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:9px;border-top:1px solid #a7c0b350;margin-top:10px;padding-top:10px}
+.lobby-team{display:flex;align-items:center;justify-content:center;gap:5px;min-width:0}
+.lobby-team-name{min-width:0;max-width:50%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;color:#f7f3e9}
+.lobby-team-dash,.lobby-team-versus{color:#d8b875;font-size:12px;flex-shrink:0}
+.lobby-team-join{border:1px solid #d8b875;border-radius:8px;background:#e8c983;color:#12382b;padding:7px 8px;font-size:12px;font-weight:700;min-height:36px}
+.lobby-team-join:disabled{opacity:.4;cursor:not-allowed}
+#welcome-view .compact-room.has-team-seats{grid-template-columns:minmax(0,1.3fr) .7fr .7fr .9fr}
+#welcome-view .has-team-seats>.lobby-join-options{display:none}
+@media(max-width:380px){.lobby-team-row{gap:6px}.lobby-team{gap:3px}.lobby-team-name,.lobby-team-join{font-size:11px}.lobby-team-join{padding:6px}}
 .team-seat.is-turn .team-player-name{border-color:#f7d88b;box-shadow:0 0 14px #e8c98340;color:#fff}
 .team-seat.is-folded .team-backs{opacity:.2}
 .team-partner{left:50%;top:11%;width:140px}.team-right{left:86%;top:32%}.team-left{left:14%;top:32%}.team-self{left:50%;top:calc(72% - var(--team-hand-height)*.65 - 18px);width:140px}

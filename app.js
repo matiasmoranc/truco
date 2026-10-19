@@ -5,7 +5,7 @@ import { installActivity } from './activity.js?v=20261010-adminstats32';
 import { installCredits } from './credits.js?v=20261015-startup';
 import { installAccount } from './account.js?v=20261016-android-google';
 import { initializeGameAuth } from './auth-init.js?v=20261016-android-google';
-import {installTeamTable,TEAM_SEATS,playerTeam,positionDealerDeck} from './team-table-ui.js?v=20261019-partner-peek';
+import {installTeamTable,TEAM_SEATS,playerTeam,positionDealerDeck,renderTeamLobbySeats} from './team-table-ui.js?v=20261019-round-deck';
 const FIREBASE_VERSION = '12.4.0';
 const $ = (id) => document.getElementById(id);
 const views = ['welcome-view', 'invite-view', 'setup-view', 'waiting-view', 'game-view', 'config-view', 'learn-view', 'scorer-view'];
@@ -774,8 +774,8 @@ async function enterRoom() {
       let room=snap.val(),seat=roomSeatForUid(room,state.uid);
       if(room.status==='closed'||roomExpired(room)){if($('join-credit-dialog').open)throw new Error('La mesa ya está cerrada.');toast('La mesa ya está cerrada.',true);await openLobby();return;}
       if(room.managedCredits){
-        if(!seat&&(room.creditMatch.hasPassword||room.mode==='2v2')&&!state.joinConfirmed){openCreditJoin(code,room);return;}
-        const result=await creditApi('creditJoinTable',{code,password:state.joinPassword||'',...(room.mode==='2v2'?{team:$('join-credit-team').value}:{})});
+        if(!seat&&(room.creditMatch.hasPassword||(room.mode==='2v2'&&!state.joinTeam))&&!state.joinConfirmed){openCreditJoin(code,room);return;}
+        const result=await creditApi('creditJoinTable',{code,password:state.joinPassword||'',...(room.mode==='2v2'?{team:state.joinConfirmed?$('join-credit-team').value:state.joinTeam}:{})});
         room=result.room;seat=roomSeatForUid(room,state.uid);state.joinPassword='';state.joinConfirmed=false;
         if(!seat)throw new Error('La mesa ya no tiene lugares disponibles.');
       }
@@ -831,7 +831,7 @@ function showInvitationForm(){
 async function openInvitation(code){
   showView('invite-view');
   if(!/^[A-Z2-9]{5}$/.test(code)){toast('La invitación no es válida.',true);await openLobby();return;}
-  state.joining=true;state.invitationEntry=true;state.selectedRoom=code;
+  state.joining=true;state.invitationEntry=true;state.selectedRoom=code;state.joinTeam=null;
   $('invite-name').value=savedPlayerName();
   showInvitationForm();
 }
@@ -896,14 +896,18 @@ function renderLobby(rooms) {
     const title = room.table?.name || players.player1?.name || players.player2?.name || 'Mesa abierta';
     const available = seats.filter(([, , person]) => !person);
     const actions=[];
-    if(roomSeats(room).some(p=>!players[p]))actions.push(['player','Entrar']);
+    if(room.mode!=='2v2'&&roomSeats(room).some(p=>!players[p]))actions.push(['player','Entrar']);
+    const joinDisabled=!!(room.managedCredits&&!roomSeatForUid(room,state.uid)&&((credits.wallet()?.balance??0)<room.creditMatch.stake||(credits.wallet()?.locked??0)>0));
+    const teamSeats=room.mode==='2v2'?renderTeamLobbySeats(code,room,escapeHtml,joinDisabled):'';
     const privateTable=!!(room.managedCredits&&room.creditMatch.hasPassword);
     const coins='<svg viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v5c0 4 16 4 16 0V5M4 10v5c0 4 16 4 16 0v-5M4 15v4c0 4 16 4 16 0v-4"/></svg>';
     const lock='<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="'+(privateTable?'M8 10V6a4 4 0 0 1 8 0v4':'M8 10V6a4 4 0 0 1 8 0')+'"/><path d="M12 14v3"/></svg>';
-    return `<article class="lobby-card compact-room"><div class="compact-room-owner"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21v-2a8 8 0 0 1 16 0v2"/></svg><h3>${escapeHtml(title)}${room.mode==='2v2'?'<small class="room-mode-label">2 vs 2 · '+Object.keys(players).length+'/4</small>':''}</h3></div><div class="compact-room-stat"><strong>${targetPoints(room)}</strong><span>puntos</span></div><div class="compact-room-stat">${coins}<strong>${room.managedCredits?escapeHtml(String(room.creditMatch.stake)):'0'}</strong></div><div class="compact-room-privacy ${privateTable?'is-private':'is-public'}">${lock}<strong>${privateTable?'Privada':'Pública'}</strong></div><div class="lobby-join-options">${actions.map(([key,label])=>`<button class="button lobby-player-button" data-room="${code}" data-seat="${key}" ${room.managedCredits&&!roomSeatForUid(room,state.uid)&&((credits.wallet()?.balance??0)<room.creditMatch.stake||(credits.wallet()?.locked??0)>0)?'disabled':''}>${label}</button>`).join('')}</div></article>`;
+    return `<article class="lobby-card compact-room ${room.mode==='2v2'?'has-team-seats':''}"><div class="compact-room-owner"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21v-2a8 8 0 0 1 16 0v2"/></svg><h3>${escapeHtml(title)}${room.mode==='2v2'?'<small class="room-mode-label">2 vs 2 · '+Object.keys(players).length+'/4</small>':''}</h3></div><div class="compact-room-stat"><strong>${targetPoints(room)}</strong><span>puntos</span></div><div class="compact-room-stat">${coins}<strong>${room.managedCredits?escapeHtml(String(room.creditMatch.stake)):'0'}</strong></div><div class="compact-room-privacy ${privateTable?'is-private':'is-public'}">${lock}<strong>${privateTable?'Privada':'Pública'}</strong></div><div class="lobby-join-options">${actions.map(([key,label])=>`<button class="button lobby-player-button" data-room="${code}" data-seat="${key}" ${room.managedCredits&&!roomSeatForUid(room,state.uid)&&((credits.wallet()?.balance??0)<room.creditMatch.stake||(credits.wallet()?.locked??0)>0)?'disabled':''}>${label}</button>`).join('')}</div>${teamSeats}</article>`;
   }).join('');
 }
-function joinOpenRoom(code, seat) {
+function joinOpenRoom(code, seat, team=null) {
+  if(state.enteringRoom||state.joinSubmitting)return;
+  state.joinTeam=['player1','player2'].includes(team)?team:null;
   state.joining = true; state.selectedRoom = code;
   const name = cleanName($('player-name').value||savedPlayerName(), 'Jugador');
   $('player-name').value = name;
@@ -3184,7 +3188,7 @@ $('score-details').addEventListener('click',event=>{if(event.target===$('score-d
 $('play-bot').addEventListener('change',updateBotSetup);
 $('points-picker-trigger').addEventListener('click',()=>{const menu=$('points-picker-menu'),opening=menu.classList.contains('hidden');menu.classList.toggle('hidden',!opening);$('points-picker-trigger').setAttribute('aria-expanded',String(opening));});
 $('create-room').addEventListener('click',()=>{configureSetup();void credits.sync();});
-$('open-room-list').addEventListener('click',(event)=>{const button=event.target.closest('[data-room][data-seat]');if(button)joinOpenRoom(button.dataset.room,button.dataset.seat);});
+$('open-room-list').addEventListener('click',(event)=>{const button=event.target.closest('[data-room][data-seat]');if(button)joinOpenRoom(button.dataset.room,button.dataset.seat,button.dataset.team);});
 
 $('back-home').addEventListener('click',()=>{showView('welcome-view');openLobby();});
 $('fold-hand').addEventListener('click',event=>runLiveAction(event.currentTarget,foldHand));
@@ -3787,7 +3791,7 @@ $('learn-game').addEventListener('click',openLearning);
 $('learn-back').addEventListener('click',()=>{stopBot();showView('welcome-view');openLobby();});
 $('learn-free').addEventListener('click',()=>startLearning(0));
 $('learn-game-modes').addEventListener('click',event=>{const button=event.target.closest('[data-learning-stage]');if(button)startLearning(Number(button.dataset.learningStage));});
-window.addEventListener('resize',()=>{syncMobileGameHeader();positionLearningScoreArrow();positionLearningControls();alignHandWithControls();positionMobileCallNotice();});
+window.addEventListener('resize',()=>{syncMobileGameHeader();positionLearningScoreArrow();positionLearningControls();alignHandWithControls();positionMobileCallNotice();if(state.room)positionDealerDeck($,state.room.dealer||(state.room.mode==='2v2'?'player4':otherPlayer(state.room.mano||'player1')),state.playerId,state.room.mode==='2v2');});
 function indicateLearningMessageClose(event){
   const dialog=event.currentTarget;
   if(!dialog.open)return;
@@ -3912,6 +3916,7 @@ function openCreditJoin(code,room){
   if(!teams){teams=document.createElement('label');teams.id='join-credit-team-row';teams.textContent='Elegí tu equipo';const select=document.createElement('select');select.id='join-credit-team';select.className='table-mode-select';teams.append(select);$('join-credit-form').insertBefore(teams,$('join-credit-password-row'));}
   teams.hidden=room.mode!=='2v2';
   if(room.mode==='2v2')$('join-credit-team').innerHTML=['player1','player2'].map((t,i)=>{const names=TEAM_SEATS.filter(p=>playerTeam(p)===t&&room.players?.[p]).map(p=>room.players[p].name);return '<option value="'+t+'" '+(names.length===2?'disabled':'')+'>Equipo '+(i+1)+' · '+escapeHtml(names.join(' + ')||'Disponible')+'</option>';}).join('');
+  if(room.mode==='2v2'){const select=$('join-credit-team'),choice=[...select.options].find(option=>!option.disabled&&option.value===state.joinTeam)||[...select.options].find(option=>!option.disabled);if(choice)select.value=choice.value;}
   $('join-credit-password-row').hidden=!room.creditMatch.hasPassword;
   $('join-credit-password').value='';setPasswordVisible('join-credit-password',false);$('join-credit-error').textContent='';
   const wallet=credits.wallet();$('join-credit-submit').disabled=!wallet||(wallet.balance<room.creditMatch.stake)||wallet.locked>0;

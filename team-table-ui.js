@@ -4,16 +4,30 @@ export function teamSeatsFor(viewer){const i=TEAM_SEATS.indexOf(viewer);return [
 export function dealerPosition(dealer,viewer,teams=false){
  return teams?['self','right','partner','left'][teamSeatsFor(viewer).indexOf(dealer)]:(dealer===viewer?'self':'partner');
 }
+export function dealerDeckPose(seat,teams,width,height){
+ const spots=teams?{self:[79,54],right:[77,17],partner:[23,17],left:[21,54]}:{self:[82,44],partner:[18,44]};
+ const [left,top]=spots[seat]||spots.self;
+ const dx=(50-left)*width/100,dy=(44-top)*height/100,length=Math.hypot(dx,dy)||1;
+ const sampleAngle=Math.atan2(dx,-dy)*180/Math.PI;
+ return {left,top,sampleAngle,deckAngle:sampleAngle+90,inwardX:dx/length,inwardY:dy/length};
+}
 export function positionDealerDeck($,dealer,viewer,teams=false){
- const seat=dealerPosition(dealer,viewer,teams)||'self';
- const spots={self:[90,72],partner:[22,14],left:[16,48],right:[84,16]};
- const [left,top]=spots[seat],felt=$('felt-area');
+ const seat=dealerPosition(dealer,viewer,teams)||'self',felt=$('felt-area');
+ const bounds=felt.getBoundingClientRect(),pose=dealerDeckPose(seat,teams,bounds.width,bounds.height);
+ const offset=($('muestra-card').offsetHeight||84)*.22;
  for(const id of ['deck-stack','muestra-card']){
   const el=$(id);if(el.parentElement!==felt)felt.append(el);
   el.dataset.dealerPosition=seat;
-  el.style.left=id==='deck-stack'?left+'%':`calc(${left}% - var(--team-card-width, 58px) * .65)`;
-  el.style.top=top+'%';el.style.right='auto';el.style.transform='translate(-50%,-50%)';
+  const sample=id==='muestra-card';
+  el.style.left=sample?`calc(${pose.left}% + ${pose.inwardX*offset}px)`:pose.left+'%';
+  el.style.top=sample?`calc(${pose.top}% + ${pose.inwardY*offset}px)`:pose.top+'%';
+  el.style.right='auto';el.style.transform=`translate(-50%,-50%) rotate(${sample?pose.sampleAngle:pose.deckAngle}deg)`;
+  el.style.zIndex=sample?'3':'4';el.style.transformOrigin='50% 50%';
  }
+}
+export function renderTeamLobbySeats(code,room,safe,disabled=false){
+ const group=(team,index)=>`<div class="lobby-team" role="group" aria-label="Equipo ${index}">${TEAM_SEATS.filter(p=>playerTeam(p)===team).map(p=>room.players?.[p]?`<span class="lobby-team-name" title="${safe(room.players[p].name)}">${safe(room.players[p].name)}</span>`:`<button class="lobby-team-join" data-room="${safe(code)}" data-seat="player" data-team="${team}" aria-label="Entrar al equipo ${index}" ${disabled?'disabled':''}>Entrar</button>`).join('<span class="lobby-team-dash" aria-hidden="true">–</span>')}</div>`;
+ return `<div class="lobby-team-row">${group('player1',1)}<span class="lobby-team-versus">vs</span>${group('player2',2)}</div>`;
 }
 export function installTeamTable({$,getState,command,runAction,renderPlayerHand,orderedHand,cardImageStyle,cardAccessibleName,escapeHtml,renderTally,syncHeader,setTurnBadge,syncControls,gameTime,hasFlor,speakCall=()=>{}}){
  let scope='',known=new Set(),noticeKey='',declareKey='',partnerMatch='',partnerVisibleUntil=0,partnerTimer=null;
@@ -52,7 +66,7 @@ export function installTeamTable({$,getState,command,runAction,renderPlayerHand,
    const faceUp=i===2&&partnerVisible&&s.partnerHand?.length===count;
    const fan=Array.from({length:count},(_,j)=>`<i class="${faceUp?'sprite-card teammate-card':'opponent-card-back'}" style="--fan-index:${j-(count-1)/2};${faceUp?cardImageStyle(s.partnerHand[j]):''}"${faceUp?` aria-label="${safe(cardAccessibleName(s.partnerHand[j]))}"`:''}></i>`).join('');
    const backs=i===0?'':i===2?`<button class="team-backs team-partner-cards" type="button" aria-label="Ver cartas del compañero durante 3 segundos" aria-pressed="${faceUp}" ${count?'':'disabled'}>${fan}</button>`:`<div class="team-backs">${fan}</div>`;
-   const status=[i===2?'COMPAÑERO':'',r.mano===q?'MANO':'',r.folded?.[q]?'AL MAZO':''].filter(Boolean).join(' · ');
+   const status=r.folded?.[q]?'AL MAZO':'';
    el.innerHTML=`${i===0?(status?`<span class="team-self-status">${status}</span>`:''):`<span class="team-player-name">${safe(person?.name||'Jugador')}${status?`<small>${status}</small>`:''}</span>`}${backs}<div class="team-speech hidden"></div>`;
    if(i===2)el.querySelector('.team-partner-cards').onclick=()=>{showPartner();render();};
   }
