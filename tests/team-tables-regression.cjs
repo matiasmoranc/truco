@@ -11,6 +11,21 @@ const act=(l,uid,command,now=1000,requestId='r'+now+uid+command.kind)=>tableOper
 function databaseRoundTrip(value){if(value===null)return undefined;if(Array.isArray(value)){if(!value.length)return undefined;return value.map(databaseRoundTrip);}if(value&&typeof value==='object'){const entries=Object.entries(value).map(([k,v])=>[k,databaseRoundTrip(v)]).filter(([,v])=>v!==undefined);return entries.length?Object.fromEntries(entries):undefined;}return value;}
 const card=(suit,rank)=>({id:({'♦':'oro','♥':'copa','♠':'espada','♣':'basto'})[suit]+'-'+rank,suit,rank,label:String(rank)});
 function started(){const l=full(),s=l.matches.m1.session;Object.assign(s.room,{status:'started',mano:'player1',dealer:'player4',turn:'player1',handNumber:1,muestra:card('♦',6),playedBy:{},folded:{},envidoClosed:true});s.hands={player1:[card('♠',1),card('♥',4),card('♣',6)],player2:[card('♣',1),card('♠',4),card('♥',6)],player3:[card('♣',3),card('♥',1),card('♠',6)],player4:[card('♠',3),card('♣',4),card('♥',7)]};s.originals=structuredClone(s.hands);s.truth={player1:6,player2:6,player3:6,player4:7};return l;}
+test('An unannounced flower allows playing and cannot be claimed or auto-announced afterward',()=>{
+ let l=started(),s=l.matches.m1.session;
+ s.room.envidoClosed=false;
+ s.hands.player1=[card('♦',2),card('♠',7),card('♠',1)];
+ s.originals.player1=structuredClone(s.hands.player1);
+ l=act(l,'a',{kind:'play',cardId:'espada-7'},1000);
+ s=l.matches.m1.session;
+ assert.equal(s.hands.player1.length,2);
+ assert.equal(s.room.turn,'player2');
+ assert.equal(s.room.flors.player1,undefined);
+ assert.throws(()=>act(l,'a',{kind:'call',value:'flor'},1001),/No podés cantar flor/);
+ l=act(l,'b',{kind:'call',value:'envido'},1002);
+ assert.equal(l.matches.m1.session.room.pendingBet.type,'envido');
+ assert.equal(l.matches.m1.session.room.flors.player1,undefined);
+});
 test('2v2 reserves each participant once, starts only with four and hides private hands',()=>{let l=make();l=join(l,'b');l=join(l,'c');assert.equal(l.matches.m1.status,'waiting');assert.equal(publicTable(l.matches.m1).mode,'2v2');assert.equal(publicTable(l.matches.m1).creditMatch.pot,8);assert.deepEqual(reservationAlerts(l,500),[]);assert.deepEqual(join(l,'b'),l);l=join(l,'d');assert.equal(l.matches.m1.status,'reserved');for(const uid of ['a','b','c','d'])assert.deepEqual(l.wallets[uid],{balance:8,locked:2});const pub=publicTable(l.matches.m1);assert.equal(pub.originals,undefined);assert.equal(pub.hands,undefined);assert.throws(()=>join(l,'e'));assert.equal(base().wallets.e.balance,10);validateAccounting(base(),recordHistory(base(),l,500));});
 test('Canceled and expired partial 2v2 tables refund ALL seated players once',()=>{for(const n of [1,2,3]){let l=make();for(const uid of ['b','c'].slice(0,n-1))l=join(l,uid);const expired=act(l,'a',{kind:'tick'},700000);for(const uid of ['a','b','c'].slice(0,n))assert.deepEqual(expired.wallets[uid],{balance:10,locked:0});assert.equal(expired.matches.m1.status,'refunded');assert.deepEqual(act(expired,'a',{kind:'cancel'},700001),act(expired,'a',{kind:'cancel'},700001));}});
 test('Four-player turns advance and a teammate can win the second trick for the team',()=>{let l=started();for(const [uid,id] of [['a','espada-1'],['b','basto-1'],['c','copa-1'],['d','basto-4']])l=act(l,uid,{kind:'play',cardId:id},1000);assert.equal(l.matches.m1.session.room.tricks[0].winner,'player1');l=act(l,'a',{kind:'tick'},3000);assert.equal(l.matches.m1.session.room.turn,'player1');for(const [uid,id] of [['a','copa-4'],['b','espada-4'],['c','basto-3'],['d','copa-7']])l=act(l,uid,{kind:'play',cardId:id},3100);l=act(l,'a',{kind:'tick'},5000);assert.equal(l.matches.m1.session.room.scores.player1,1);assert.equal(l.matches.m1.session.room.status,'revealing');});
