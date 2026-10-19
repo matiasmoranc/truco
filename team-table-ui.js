@@ -1,3 +1,9 @@
+export function teamPie(room,player){
+ const first=room.trickCards?.[0]?.playerId||room.resolvedTrickWinner||room.mano;
+ const i=TEAM_SEATS.indexOf(first),order=[...TEAM_SEATS.slice(i),...TEAM_SEATS.slice(0,i)];
+ return order.filter(q=>playerTeam(q)===playerTeam(player)&&!room.folded?.[q]).at(-1);
+}
+export function visibleTeamNotice(notice,room,now){return !!notice&&notice.handNumber===room.handNumber&&(notice.trickNo==null||notice.trickNo===room.trickNo)&&now-notice.time>=0&&now-notice.time<5000;}
 export const TEAM_SEATS=['player1','player2','player3','player4'];
 export const playerTeam=p=>['player1','player3'].includes(p)?'player1':'player2';
 export function teamSeatsFor(viewer){const i=TEAM_SEATS.indexOf(viewer);return [0,1,2,3].map(n=>TEAM_SEATS[(i+n)%4]);}
@@ -30,7 +36,7 @@ export function renderTeamLobbySeats(code,room,safe,disabled=false){
  return `<div class="lobby-team-row">${group('player1',1)}<span class="lobby-team-versus">vs</span>${group('player2',2)}</div>`;
 }
 export function installTeamTable({$,getState,command,runAction,renderPlayerHand,orderedHand,cardImageStyle,cardAccessibleName,escapeHtml,renderTally,syncHeader,setTurnBadge,syncControls,gameTime,hasFlor,speakCall=()=>{}}){
- let scope='',known=new Set(),noticeKey='',declareKey='',partnerMatch='',partnerVisibleUntil=0,partnerTimer=null;
+ let scope='',known=new Set(),noticeKey='',declareKey='',partnerMatch='',partnerVisibleUntil=0,partnerTimer=null,noticeTimer=null;
  function showPartner(){
   partnerVisibleUntil=Date.now()+3000;clearTimeout(partnerTimer);
   const s=getState(),key=s.roomCode+':'+s.room?.creditMatch?.id+':'+s.room?.matchNumber;
@@ -70,7 +76,10 @@ export function installTeamTable({$,getState,command,runAction,renderPlayerHand,
    el.innerHTML=`${i===0?(status?`<span class="team-self-status">${status}</span>`:''):`<span class="team-player-name">${safe(person?.name||'Jugador')}${status?`<small>${status}</small>`:''}</span>`}${backs}<div class="team-speech hidden"></div>`;
    if(i===2)el.querySelector('.team-partner-cards').onclick=()=>{showPartner();render();};
   }
-  if(r.callNotice&&r.callNotice.handNumber===r.handNumber&&r.callNotice.from&&r.callNotice.text!=='Se reparte'){const speech=$('team-seat-'+r.callNotice.from)?.querySelector('.team-speech');if(speech){speech.textContent=r.callNotice.spoken||r.callNotice.text;speech.classList.remove('hidden');}if(noticeKey!==r.callNotice.id){noticeKey=r.callNotice.id;speakCall(r.callNotice.spoken||'');}}
+  clearTimeout(noticeTimer);
+  const notices=[r.callNotice,r.teamSignal].filter(n=>visibleTeamNotice(n,r,gameTime())&&n.text!=='Se reparte');
+  for(const n of notices){const speech=$('team-seat-'+n.from)?.querySelector('.team-speech');if(speech){speech.textContent=n.spoken||n.text;speech.classList.remove('hidden');}if(n===r.callNotice&&noticeKey!==n.id){noticeKey=n.id;speakCall(n.spoken||'');}}
+  if(notices.length)noticeTimer=setTimeout(()=>{if(getState().room?.mode==='2v2')render();},Math.max(1,Math.min(...notices.map(n=>n.time+5000-gameTime()))));
   const drawing=r.status==='drawing';game.classList.toggle('drawing-mode',drawing);game.classList.toggle('reveal-mode',r.status==='revealing');$('opening-draw').classList.add('hidden');
   const playing=r.status==='started'&&!r.resolvingTrick&&!r.pendingNextHand;
   const myTurn=playing&&!pending&&r.turn===p&&!r.folded?.[p];if(!s.handGestureActive)renderPlayerHand(drawing?[]:orderedHand(),myTurn);
@@ -90,7 +99,11 @@ export function installTeamTable({$,getState,command,runAction,renderPlayerHand,
    if(!pending&&r.turn===p){const flower=hasFlor(r,s.hand);if(!r.flors?.[p]&&(r.playedBy?.[p]||0)===0&&flower)add('flor','FLOR');if(!flower&&!r.envidoClosed&&(r.playedBy?.[p]||0)===0&&r.trickNo===1){add('envido','ENVIDO');add('real','REAL');add('falta','FALTA');}if((!flower||r.flors?.[p])&&r.trucoLevel<4&&r.lastTrucoTeam!==mineTeam)add(r.trucoLevel===1?'truco':r.trucoLevel===2?'retruco':'vale4',r.trucoLevel===1?'TRUCO':r.trucoLevel===2?'RETRUCO':'VALE 4',true);}
    if(pending&&!pending.revealMode&&pending.responder===p){if(pending.type!=='flor'&&hasFlor(r,s.hand)&&!r.flors?.[p])add('flor','FLOR',true);add('yes',pending.type==='flor'&&hasFlor(r,s.hand)?'LA MÍA ES FLOR':'QUIERO',true);add('no','NO QUIERO');if(pending.type==='truco'){if(pending.stake<4)add('raise',pending.stake===2?'RETRUCO':'VALE 4');if(!r.envidoClosed&&(r.playedBy?.[p]||0)===0){add('envido','ENVIDO');add('real','REAL');add('falta','FALTA');}}if(pending.type==='envido'&&pending.called!=='falta'){add('raise-envido','ENVIDO');add('raise-real','REAL');add('raise-falta','FALTA');}if(pending.type==='flor'&&pending.called==='flor'){add('raise-conflor','CON FLOR ENVIDO');add('raise-faltaflor','CONTRA FLOR AL RESTO');}}
   }
+  if(playing&&!pending&&!r.folded?.[p]&&r.turn!==p&&playerTeam(r.turn)===mineTeam&&!r.folded?.[r.turn]&&teamPie(r,p)===p){
+   for(const [value,label] of [['veni','Vení'],['juga','Jugá'],['grita','Gritá']])buttons.push('<button class="pass-button team-signal-button" data-team-signal="'+value+'">'+label+'</button>');
+  }
   $('player-actions').classList.toggle('hidden',drawing||r.status==='complete');$('player-actions').innerHTML=buttons.length?'<div class="action-buttons compact-actions team-actions">'+buttons.join('')+'</div>':'';for(const b of $('player-actions').querySelectorAll('[data-team-action]'))b.onclick=e=>send(e.currentTarget,{kind:'call',value:b.dataset.teamAction});
+  for(const b of $('player-actions').querySelectorAll('[data-team-signal]'))b.onclick=e=>send(e.currentTarget,{kind:'team-signal',value:b.dataset.teamSignal});
   const time=r.turnClock?Math.max(0,Math.ceil((45000-(gameTime()-r.turnClock.startedAt))/1000)):null;setTurnBadge(drawing?'SORTEO':r.status==='revealing'||r.pendingNextHand||r.resolvingTrick?'NUEVA JUGADA':turn===p?(pending?'RESPONDÉ':'TU TURNO'):'Turno de '+(r.players[turn]?.name||'…'));
   const pause=$('round-pause-timer');pause.classList.add('hidden');renderEnd();syncControls();
  }

@@ -106,3 +106,17 @@ test('The response follows the mano after the dealer rotates, including flor',()
  l=act(l,'b',{kind:'call',value:'yes'},1002);
  assert.equal(l.matches.m1.session.room.pendingBet,null);
 });
+
+test('Only the team pie can send the three instructions during the teammate card turn',()=>{
+ let l=started(),r=l.matches.m1.session.room;
+ for(const value of ['veni','juga','grita']){l=act(l,'c',{kind:'team-signal',value},1100+value.length,'signal-'+value);r=l.matches.m1.session.room;assert.equal(r.teamSignal.from,'player3');assert.equal(r.teamSignal.to,'player1');assert.equal(r.turn,'player1');}
+ assert.throws(()=>act(l,'a',{kind:'team-signal',value:'veni'},1200));assert.throws(()=>act(l,'d',{kind:'team-signal',value:'juga'},1200));assert.throws(()=>act(l,'c',{kind:'team-signal',value:'otro'},1200));
+ l=act(l,'a',{kind:'call',value:'truco'},1300);assert.throws(()=>act(l,'c',{kind:'team-signal',value:'grita'},1301));
+});
+test('Pie rotates with each trick leader and dealing clears previous notices and signals',()=>{
+ const l=started(),s=l.matches.m1.session,r=s.room;r.trickNo=2;r.trickCards=[];r.resolvedTrickWinner='player3';r.turn='player3';
+ createTeamReferee(s,{now:2000}).action('player1',{kind:'team-signal',value:'veni'});assert.equal(r.teamSignal.to,'player3');
+ assert.throws(()=>createTeamReferee(s,{now:2001}).action('player3',{kind:'team-signal',value:'veni'}));
+ r.callNotice={handNumber:r.handNumber,text:'28 tantos'};r.status='revealing';r.endReveal={endsAt:2002};createTeamReferee(s,{now:2003}).advance();
+ assert.equal(r.callNotice,null);assert.equal(r.teamSignal,null);assert.equal(r.resolvedTrickWinner,null);
+});

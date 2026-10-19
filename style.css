@@ -1963,3 +1963,5 @@ input,textarea,[contenteditable=""],[contenteditable="true"]{-webkit-user-select
 .waiting-empty-place{display:grid;place-items:center;width:48px;height:70px;margin:0 auto;border:1px dashed #d8b87580;border-radius:6px;color:#d8b87599;font-size:26px}
 #waiting-view .invite-whatsapp .whatsapp-brand-icon{display:block;width:28px;height:28px;overflow:visible}
 @media(max-width:380px){.waiting-player-name{font-size:12px;padding:6px}.waiting-player.empty .waiting-player-name{font-size:11px}.waiting-player-cards{width:78px}.waiting-player-cards .opponent-card-back{width:43px;height:63px}.waiting-player-right{left:84%}.waiting-player-left{left:16%}}
+
+.team-seat .team-player-name{height:auto;min-height:0;width:fit-content;max-width:100%;margin:0 auto;padding:4px 8px;border-radius:7px;line-height:1.2}.team-signal-button{text-transform:none;letter-spacing:0;font-size:14px;min-height:40px}

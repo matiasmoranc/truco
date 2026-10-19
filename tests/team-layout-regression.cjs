@@ -58,3 +58,11 @@ test('Two-player and bot decks are to the right of the local or opposite dealer'
   assert.equal(dealerPosition(viewer==='player1'?'player2':'player1',viewer),'partner');
  }
 });
+
+test('Notices expire and never cross a hand or trick boundary',async()=>{
+ const {visibleTeamNotice,teamPie}=await ui;
+ const room={handNumber:2,trickNo:1,mano:'player1',trickCards:[]};const n={handNumber:2,trickNo:1,time:1000};
+ assert.equal(visibleTeamNotice(n,room,2000),true);assert.equal(visibleTeamNotice(n,room,6000),false);
+ assert.equal(visibleTeamNotice(n,{...room,handNumber:3},2000),false);assert.equal(visibleTeamNotice(n,{...room,trickNo:2},2000),false);
+ assert.equal(teamPie(room,'player1'),'player3');assert.equal(teamPie({...room,trickCards:[{playerId:'player3'}]},'player1'),'player1');
+});

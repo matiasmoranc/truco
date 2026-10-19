@@ -23,7 +23,7 @@ function createTeamReferee(s,{now=Date.now(),deckFactory=deck}={}){
  r.flors??={};r.timeoutCounts??={};r.playedBy??={};r.folded??={};r.feed??=[];s.hands??={};s.originals??={};s.truth??={};
  if(r.openingDraw)r.openingDraw.cards??={};
  const feed=text=>{r.feed=[{text,time:now},...(r.feed||[])].slice(0,12);};
- const notice=(p,text)=>{r.callNotice={id:crypto.randomUUID(),from:p,text,spoken:text,time:now,handNumber:r.handNumber};};
+ const notice=(p,text)=>{r.callNotice={id:crypto.randomUUID(),from:p,text,spoken:text,time:now,handNumber:r.handNumber,trickNo:r.trickNo};};
  const active=p=>!r.folded?.[p];
  const members=t=>ordered(r.mano||'player1').filter(p=>team(p)===t&&active(p));
  const responder=t=>members(t).at(0);
@@ -51,7 +51,7 @@ function createTeamReferee(s,{now=Date.now(),deckFactory=deck}={}){
  function deal(dealer=r.dealer||'player4'){
   const cards=deckFactory();r.dealer=dealer;r.mano=nextSeat(dealer);r.handNumber++;r.status='started';r.turn=r.mano;
   s.hands=Object.fromEntries(SEATS.map((p,i)=>[p,cards.slice(i*3,i*3+3)]));s.originals=structuredClone(s.hands);r.muestra=cards[12];s.truth=Object.fromEntries(SEATS.map(p=>[p,envido(s.hands[p],r.muestra)]));
-  Object.assign(r,{deckCount:27,trickNo:1,playedCount:0,tricks:[],trickCards:[],folded:{},playedBy:{},trucoLevel:1,lastTrucoTeam:null,pendingBet:null,pendingNextHand:null,resolvingTrick:false,resolutionEndsAt:null,flors:{},florSettled:false,florCompared:false,envidoClosed:false,envidoAudit:null,endReveal:null,handScoreEntries:[]});r.callNotice=null;feed('Nueva mano. Empieza '+r.players[r.mano].name+'.');
+  Object.assign(r,{deckCount:27,trickNo:1,playedCount:0,tricks:[],trickCards:[],folded:{},playedBy:{},trucoLevel:1,lastTrucoTeam:null,pendingBet:null,pendingNextHand:null,resolvingTrick:false,resolutionEndsAt:null,flors:{},florSettled:false,florCompared:false,envidoClosed:false,envidoAudit:null,endReveal:null,handScoreEntries:[],resolvedTrickWinner:null});r.callNotice=null;r.teamSignal=null;feed('Nueva mano. Empieza '+r.players[r.mano].name+'.');
  }
  function clock(){const p=r.pendingBet?.revealMode?r.pendingBet.revealTurn:r.pendingBet?.responder||r.turn;const key=r.status==='started'&&!r.resolvingTrick&&!r.pendingNextHand&&p?`${r.handNumber}:${r.trickNo}:${r.playedCount}:${p}:${r.pendingBet?.id||''}:${r.pendingBet?.revealTurn||''}`:null;if(!key)r.turnClock=null;else if(r.turnClock?.key!==key)r.turnClock={key,player:p,startedAt:now};}
  function fold(p){r.folded??={};r.folded[p]=true;notice(p,'Me voy al mazo');feed(r.players[p].name+' se fue al mazo.');const t=team(p);if(!members(t).length){const b=r.pendingBet,w=opponent(t);if(b&&b.type!=='truco'){award(w,(b.revealMode?b.stake:b.accepted)||(['envido','flor'].includes(b.type)?b.type==='flor'?3:1:0),'El rival se fue al mazo.');}r.pendingNextHand={id:'fold:'+crypto.randomUUID(),winner:w,foldPoints:r.trucoLevel,endsAt:now+3000};r.pendingBet=null;r.turn=null;}else if(r.pendingBet?.revealTurn===p){declare(p,0,true);}else if(r.pendingBet?.responder===p){r.pendingBet.responder=responder(t,r.pendingBet.type==='flor');if(!r.pendingBet.responder)resolveSide(false);}else if(r.turn===p){r.turn=nextActive(p);completeTrick();}if(r.turn===p)r.turn=nextActive(p);}
@@ -109,15 +109,22 @@ function createTeamReferee(s,{now=Date.now(),deckFactory=deck}={}){
  }
  function advance(){
   if(r.status==='drawing'){deal('player4');r.openingDraw=null;delete s.drawPool;}
-  if(r.status==='started'&&r.resolvingTrick&&now>=r.resolutionEndsAt){const w=settledTricks(r.tricks,r.mano);r.resolvingTrick=false;r.resolutionEndsAt=null;if(w)finish(w,r.trucoLevel);else{r.trickCards=[];r.trickNo++;r.turn=active(r.resolvedTrickWinner)?r.resolvedTrickWinner:nextActive(r.resolvedTrickWinner);}}
+  if(r.status==='started'&&r.resolvingTrick&&now>=r.resolutionEndsAt){const w=settledTricks(r.tricks,r.mano);r.resolvingTrick=false;r.resolutionEndsAt=null;if(w)finish(w,r.trucoLevel);else{r.trickCards=[];r.trickNo++;r.callNotice=null;r.teamSignal=null;r.turn=active(r.resolvedTrickWinner)?r.resolvedTrickWinner:nextActive(r.resolvedTrickWinner);}}
   if(r.status==='started'&&r.pendingNextHand&&now>=r.pendingNextHand.endsAt){const b=r.pendingNextHand;finish(b.winner,b.foldPoints,'El equipo rival se retiró o no quiso.');}
   if(r.status==='complete'&&r.endReveal&&!r.endReveal.done&&now>=r.endReveal.endsAt)r.endReveal.done=true;
   if(r.status==='revealing'&&now>=r.endReveal.endsAt)deal(nextSeat(r.dealer));
   if(r.status==='started'&&r.turnClock&&now-r.turnClock.startedAt>=45000){const p=r.turnClock.player;r.timeoutCounts[p]=(r.timeoutCounts[p]||0)+1;if(r.timeoutCounts[p]>=3){finish(opponent(team(p)),r.targetPoints,'Inactividad.');r.endReveal.done=true;}else if(r.pendingBet?.responder===p&&!r.pendingBet.revealMode)call(p,'no');else if(r.pendingBet?.revealMode)declare(p,s.truth[p],false);else fold(p);}
   clock();return s;
  }
+ function signal(p,value){
+  const labels={veni:'Vení',juga:'Jugá',grita:'Gritá'};
+  const leader=r.trickCards[0]?.playerId||r.resolvedTrickWinner||r.mano;
+  const mates=ordered(leader).filter(q=>team(q)===team(p)&&active(q));
+  if(!labels[value]||r.pendingBet||mates.length!==2||mates.at(-1)!==p||r.turn!==mates[0])throw new Error('Solo el pie puede indicar cuando juega su compañero.');
+  r.teamSignal={id:crypto.randomUUID(),from:p,to:r.turn,text:labels[value],handNumber:r.handNumber,trickNo:r.trickNo,time:now};
+ }
  function action(p,c){if(!SEATS.includes(p))throw new Error('Jugador inválido.');advance();if(c.kind==='draw'){if(r.status!=='drawing'||r.openingDraw.cards[p])throw new Error('El sorteo cambió.');r.openingDraw.cards[p]=s.drawPool.shift();if(SEATS.every(q=>r.openingDraw.cards[q]))r.openingDraw.resolveAt=now+2000;return advance();}
-  if(r.status!=='started'||r.resolvingTrick||r.pendingNextHand)throw new Error('Esperá a que termine la pausa.');if(!active(p))throw new Error('Te fuiste al mazo en esta mano.');if(c.kind==='play')play(p,c.cardId);else if(c.kind==='call')call(p,c.value);else if(c.kind==='fold')fold(p);else if(c.kind==='declare')declare(p,c.value,c.good===true);else throw new Error('Acción inválida.');return advance();}
+  if(r.status!=='started'||r.resolvingTrick||r.pendingNextHand)throw new Error('Esperá a que termine la pausa.');if(!active(p))throw new Error('Te fuiste al mazo en esta mano.');if(c.kind==='team-signal')signal(p,c.value);else if(c.kind==='play')play(p,c.cardId);else if(c.kind==='call')call(p,c.value);else if(c.kind==='fold')fold(p);else if(c.kind==='declare')declare(p,c.value,c.good===true);else throw new Error('Acción inválida.');return advance();}
  return {action,advance,start:()=>{deal('player4');r.openingDraw=null;delete s.drawPool;clock();return s;}};
 }
 module.exports={SEATS,team,nextSeat,ordered,piece,strength,flower,florValue,envido,settledTricks,newTeamSession,createTeamReferee};
