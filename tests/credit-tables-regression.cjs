@@ -27,7 +27,7 @@ test('Repeated public rematches survive Firebase null omission and preserve byst
   assert.equal(Object.values(ledger.wallets).reduce((n,w)=>n+w.balance+w.locked,0),31);
  }
 });
-function begin(ledger){ledger=op(ledger,'a',{kind:'draw'},300);ledger=op(ledger,'b',{kind:'draw'},400);const m=ledger.matches.game1;m.session.room.openingDraw.cards.player1.rank=1;m.session.room.openingDraw.cards.player2.rank=7;return op(ledger,'a',{kind:'tick'},2400);}
+function begin(ledger){assert.equal(ledger.matches.game1.session.room.status,'started');return ledger;}
 const card=(suit,rank)=>({id:suit+'-'+rank,suit,rank,label:String(rank)});
 function fixture(){const session=newSession('ABCDE',{player1:{uid:'a',name:'Mati'},player2:{uid:'b',name:'Ricky'}},10,{id:'game1',stake:1,matchNumber:1},100);Object.assign(session.room,{status:'started',turn:'player1',mano:'player1',muestra:card('♠',6),handNumber:1,deckCount:33});session.hands={player1:[card('♦',1),card('♦',7),card('♣',3)],player2:[card('♥',1),card('♥',7),card('♣',2)]};session.originals=structuredClone(session.hands);session.truth={player1:28,player2:28};return session;}
 test('Creator chooses a whole stake within balance; only that amount is reserved',()=>{const ledger=create();assert.deepEqual(ledger.wallets.a,{balance:7,locked:5,lastGrantAt:1});for(const stake of [0,-1,1.5,13,NaN])assert.throws(()=>create(base(),{stake}));assert.equal(base().wallets.a.balance,12);});
@@ -35,12 +35,20 @@ test('Rival contributes the same stake even with a different total balance; repe
 test('Insufficient funds, existing reservation and wrong password do not charge the rival',()=>{const ledger=create(base(),{secret:passwordHash('clave')});assert.throws(()=>join(ledger,{password:'incorrecta'}));assert.equal(ledger.wallets.b.balance,7);const low=structuredClone(ledger);low.wallets.b.balance=4;assert.throws(()=>join(low,{password:'clave'}));const busy=structuredClone(ledger);busy.wallets.b.locked=1;assert.throws(()=>join(busy,{password:'clave'}));assert.equal(join(ledger,{password:'clave'}).wallets.b.locked,5);});
 test('Public projection never contains the password, deck, truth or private hands',()=>{const ledger=join(create(base(),{secret:passwordHash('secret-password')}),{password:'secret-password'});const room=publicTable(ledger.matches.game1),json=JSON.stringify(room);assert.equal(room.creditMatch.hasPassword,true);for(const secret of ['secret-password','drawPool','originals','truth','"hands"','"secret"'])assert.ok(!json.includes(secret),secret);});
 test('Cancel or expire a waiting table refunds exactly once; other users cannot cancel',()=>{const ledger=create();assert.throws(()=>op(ledger,'c',{kind:'cancel'}));const canceled=op(ledger,'a',{kind:'cancel'});assert.equal(canceled.wallets.a.balance,12);assert.equal(canceled.wallets.a.locked,0);assert.equal(op(canceled,'a',{kind:'cancel'},500).wallets.a.balance,12);const expired=op(ledger,'a',{kind:'tick'},600100);assert.equal(expired.wallets.a.balance,12);assert.equal(publicTable(expired.matches.game1).status,'closed');});
-test('Opening timeout refunds both stakes and no client can cancel an ongoing match',()=>{const timed=op(join(create()),'a',{kind:'tick'},30300);assert.equal(timed.wallets.a.balance,12);assert.equal(timed.wallets.b.balance,7);const live=begin(join(create()));assert.equal(live.matches.game1.session.room.status,'started');assert.throws(()=>op(live,'a',{kind:'cancel'},2500));});
+test('Joining starts immediately with unique cards and cannot be canceled as an opening draw',()=>{
+ const live=join(create()),r=live.matches.game1.session.room;
+ assert.equal(r.status,'started');assert.equal(r.dealer,'player2');assert.equal(r.turn,'player1');
+ const s=live.matches.game1.session;assert.equal(new Set([...s.hands.player1,...s.hands.player2,r.muestra].map(c=>c.id)).size,7);
+ assert.equal(r.openingDraw,null);assert.equal(s.drawPool,undefined);
+ assert.throws(()=>op(live,'a',{kind:'cancel'},2500));
+ assert.throws(()=>op(live,'a',{kind:'draw'},2500));
+});
+
 test('Server rejects forged cards, out-of-turn plays, wrong responder and outsiders',()=>{const s=fixture();assert.throws(()=>createReferee(s,{now:200}).action('player1',{kind:'play',cardId:'forged'}));assert.throws(()=>createReferee(s,{now:200}).action('player2',{kind:'play',cardId:s.hands.player2[0].id}));createReferee(s,{now:200}).action('player1',{kind:'call',value:'truco'});assert.throws(()=>createReferee(s,{now:201}).action('player1',{kind:'call',value:'yes'}));assert.throws(()=>op(join(create()),'c',{kind:'draw'}));});
 test('Rejected truco preserves NO QUIERO for three seconds before the server redeals',()=>{const s=fixture();createReferee(s,{now:200}).action('player1',{kind:'call',value:'truco'});createReferee(s,{now:300}).action('player2',{kind:'call',value:'no'});assert.equal(s.room.scores.player1,0);createReferee(s,{now:3299}).advance();assert.equal(s.room.handNumber,1);createReferee(s,{now:3300}).advance();assert.equal(s.room.scores.player1,1);assert.equal(s.room.handNumber,2);});
 test('A full server match pays the pot once; rematch reserves a new stake and close refunds no settled money',()=>{let ledger=begin(join(create())),now=3000;for(let n=0;n<10&&ledger.matches.game1.status!=='settled';n++){ledger=op(ledger,'b',{kind:'fold'},now);ledger=op(ledger,'a',{kind:'tick'},now+3000);const room=ledger.matches.game1.session.room;if(room.status==='revealing')ledger=op(ledger,'a',{kind:'tick'},now+8000);now+=10000;}
  assert.equal(ledger.matches.game1.status,'settled');assert.equal(ledger.wallets.a.balance,17);assert.equal(ledger.wallets.b.balance,2);assert.equal(ledger.wallets.a.locked,0);assert.equal(op(ledger,'a',{kind:'tick'},now).wallets.a.balance,17);
- const requested=op(ledger,'a',{kind:'rematch',value:'request'},now+1);assert.throws(()=>op(requested,'b',{kind:'rematch',value:'accept'},now+2));const funded=structuredClone(requested);funded.wallets.b.balance=5;const again=op(funded,'b',{kind:'rematch',value:'accept'},now+3);assert.equal(again.wallets.a.balance,12);assert.equal(again.wallets.b.balance,0);assert.equal(again.wallets.a.locked,5);assert.notEqual(again.tables.ABCDE,'game1');assert.equal(again.matches[again.tables.ABCDE].session.room.status,'drawing');assert.throws(()=>op(again,'a',{kind:'draw'},now+4,{expectedMatchId:'game1'}));
+ const requested=op(ledger,'a',{kind:'rematch',value:'request'},now+1);assert.throws(()=>op(requested,'b',{kind:'rematch',value:'accept'},now+2));const funded=structuredClone(requested);funded.wallets.b.balance=5;const again=op(funded,'b',{kind:'rematch',value:'accept'},now+3);assert.equal(again.wallets.a.balance,12);assert.equal(again.wallets.b.balance,0);assert.equal(again.wallets.a.locked,5);assert.notEqual(again.tables.ABCDE,'game1');assert.equal(again.matches[again.tables.ABCDE].session.room.status,'started');assert.throws(()=>op(again,'a',{kind:'draw'},now+4,{expectedMatchId:'game1'}));
  const closed=op(ledger,'b',{kind:'cancel'},now+5);assert.equal(publicTable(closed.matches.game1).status,'closed');assert.equal(closed.wallets.a.balance,17);
 });
 test('A verified disconnection forfeits the match, while another match’s presence cannot forfeit it',()=>{const ledger=begin(join(create())),presence={player2:{uid:'b',matchNumber:1,online:false,disconnectedAt:1000}};const old=op(ledger,'a',{kind:'tick'},46000,{presence:{player2:{...presence.player2,matchNumber:2}}});assert.notEqual(old.matches.game1.status,'settled');const lost=op(ledger,'a',{kind:'tick'},46000,{presence});assert.equal(lost.matches.game1.winner,'a');assert.equal(lost.wallets.a.balance,17);});
@@ -52,12 +60,13 @@ test('Real envido chain cannot accept flor responses and declined stakes reflect
 test('Flor, con flor envido and contra flor al resto use the real three-card values',()=>{const s=fixture();s.hands={player1:[card('♠',2),card('♠',5),card('♥',6)],player2:[card('♥',3),card('♥',6),card('♥',7)]};s.originals=structuredClone(s.hands);createReferee(s,{now:200}).action('player1',{kind:'call',value:'flor'});createReferee(s,{now:300}).action('player2',{kind:'call',value:'raise-conflor'});assert.equal(s.room.pendingBet.stake,5);createReferee(s,{now:400}).action('player1',{kind:'call',value:'raise-faltaflor'});createReferee(s,{now:500}).action('player2',{kind:'call',value:'yes'});assert.equal(s.room.flors.player1,44);assert.equal(s.room.flors.player2,36);assert.equal(s.room.scores.player1,10);assert.equal(s.room.status,'revealing');});
 test('Three server inactivity strikes end a match and do not leave the timer stuck',()=>{const s=fixture();s.room.timeoutCounts={player1:2};createReferee(s,{now:200}).advance();createReferee(s,{now:45200}).advance();assert.equal(s.room.status,'complete');assert.equal(s.room.matchResult.reason,'inactivity');assert.equal(s.room.scores.player2,10);assert.equal(s.room.turnClock,null);});
 
-test('Abandoning the opening draw refunds both stakes and is idempotent',()=>{
- const ledger=join(create());const canceled=op(ledger,'a',{kind:'abandon'},300);
- assert.equal(canceled.matches.game1.status,'refunded');assert.equal(publicTable(canceled.matches.game1).status,'closed');
- assert.equal(canceled.wallets.a.balance,12);assert.equal(canceled.wallets.b.balance,7);assert.equal(canceled.wallets.a.locked,0);assert.equal(canceled.wallets.b.locked,0);
- assert.deepEqual(op(canceled,'a',{kind:'abandon'},400),canceled);
+test('Leaving immediately after the second player joins is an active-match forfeit',()=>{
+ const ledger=join(create()),ended=op(ledger,'a',{kind:'abandon'},300);
+ assert.equal(ended.matches.game1.status,'settled');assert.equal(ended.matches.game1.winner,'b');
+ assert.equal(ended.wallets.a.balance,7);assert.equal(ended.wallets.b.balance,12);
+ assert.deepEqual(op(ended,'a',{kind:'abandon'},400),ended);
 });
+
 test('Abandoning an active match awards the rival the target and whole pot exactly once',()=>{
  const ledger=begin(join(create()));const ended=op(ledger,'a',{kind:'abandon'},2500);
  assert.equal(ended.matches.game1.status,'settled');assert.equal(ended.matches.game1.session.room.matchResult.winner,'player2');assert.equal(ended.matches.game1.session.room.scores.player2,10);

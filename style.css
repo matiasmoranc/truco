@@ -1913,6 +1913,9 @@ input,textarea,[contenteditable=""],[contenteditable="true"]{-webkit-user-select
 .team-partner{left:50%;top:11%;width:140px}.team-right{left:86%;top:32%}.team-left{left:14%;top:32%}.team-self{left:50%;top:calc(72% - var(--team-hand-height)*.65 - 18px);width:140px}
 .team-backs{height:var(--team-card-height);position:relative;margin-top:10px}
 .team-backs .opponent-card-back{position:absolute;left:50%;top:0;width:var(--team-card-width);height:var(--team-card-height);transform:translateX(calc(-50% + var(--fan-index)*var(--team-card-width)*.36)) rotate(calc(var(--fan-index)*12deg));transform-origin:50% 85%;border-radius:4px}
+.team-partner-cards{display:block;width:100%;padding:0;border:0;background:none;pointer-events:auto;touch-action:manipulation}
+.team-partner-cards:focus-visible{outline:2px solid var(--gold);outline-offset:8px;border-radius:8px}
+.team-backs .teammate-card{position:absolute;left:50%;top:0;width:var(--team-card-width);height:var(--team-card-height);transform:translateX(calc(-50% + var(--fan-index)*var(--team-card-width)*.36)) rotate(calc(var(--fan-index)*12deg));transform-origin:50% 85%;border-radius:4px}
 .team-right .team-backs,.team-left .team-backs{transform:scale(.84);margin-top:2px}
 .team-speech{position:absolute;top:calc(100% + 10px);left:50%;transform:translateX(-50%);width:max-content;max-width:min(160px,42vw);padding:7px 10px;background:#ead39b;color:#103b2c;border:1px solid #c5a455;border-radius:10px;font-size:12px;font-weight:700;line-height:1.25;overflow-wrap:anywhere;z-index:15}
 .team-speech::before{content:'';position:absolute;top:-5px;left:calc(50% - 5px);width:8px;height:8px;background:#ead39b;transform:rotate(45deg);border-left:1px solid #c5a455;border-top:1px solid #c5a455}

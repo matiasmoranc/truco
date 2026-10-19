@@ -1,8 +1,27 @@
 export const TEAM_SEATS=['player1','player2','player3','player4'];
 export const playerTeam=p=>['player1','player3'].includes(p)?'player1':'player2';
 export function teamSeatsFor(viewer){const i=TEAM_SEATS.indexOf(viewer);return [0,1,2,3].map(n=>TEAM_SEATS[(i+n)%4]);}
+export function dealerPosition(dealer,viewer,teams=false){
+ return teams?['self','right','partner','left'][teamSeatsFor(viewer).indexOf(dealer)]:(dealer===viewer?'self':'partner');
+}
+export function positionDealerDeck($,dealer,viewer,teams=false){
+ const seat=dealerPosition(dealer,viewer,teams)||'self';
+ const spots={self:[90,72],partner:[22,14],left:[16,48],right:[84,16]};
+ const [left,top]=spots[seat],felt=$('felt-area');
+ for(const id of ['deck-stack','muestra-card']){
+  const el=$(id);if(el.parentElement!==felt)felt.append(el);
+  el.dataset.dealerPosition=seat;
+  el.style.left=id==='deck-stack'?left+'%':`calc(${left}% - var(--team-card-width, 58px) * .65)`;
+  el.style.top=top+'%';el.style.right='auto';el.style.transform='translate(-50%,-50%)';
+ }
+}
 export function installTeamTable({$,getState,command,runAction,renderPlayerHand,orderedHand,cardImageStyle,cardAccessibleName,escapeHtml,renderTally,syncHeader,setTurnBadge,syncControls,gameTime,hasFlor,speakCall=()=>{}}){
- let scope='',known=new Set(),noticeKey='',declareKey='';
+ let scope='',known=new Set(),noticeKey='',declareKey='',partnerMatch='',partnerVisibleUntil=0,partnerTimer=null;
+ function showPartner(){
+  partnerVisibleUntil=Date.now()+3000;clearTimeout(partnerTimer);
+  const s=getState(),key=s.roomCode+':'+s.room?.creditMatch?.id+':'+s.room?.matchNumber;
+  partnerTimer=setTimeout(()=>{const current=getState();if(current.room?.mode==='2v2'&&key===current.roomCode+':'+current.room.creditMatch?.id+':'+current.room.matchNumber){partnerVisibleUntil=0;render();}},3000);
+ }
  const safe=escapeHtml;
  const ensure=(id,tag,parent,cls)=>{let el=$(id);if(!el){el=document.createElement(tag);el.id=id;el.className=cls;parent.append(el);}return el;};
  const send=(button,c)=>runAction(button,()=>command(c));
@@ -24,19 +43,26 @@ export function installTeamTable({$,getState,command,runAction,renderPlayerHand,
   const layer=ensure('team-seats','div',felt,'team-seats');
   const pending=r.pendingBet,turn=pending?.revealMode?pending.revealTurn:pending?.responder||r.turn;
   const positions=['self','right','partner','left'];
+  const matchKey=s.roomCode+':'+r.creditMatch?.id+':'+r.matchNumber;
+  if(r.status==='started'&&r.handNumber===1&&s.partnerHand?.length&&partnerMatch!==matchKey){partnerMatch=matchKey;showPartner();}
+  const partnerVisible=Date.now()<partnerVisibleUntil;
   for(let i=0;i<4;i++){
    const q=seats[i],person=r.players[q],el=ensure('team-seat-'+q,'section',layer,'team-seat');el.className='team-seat team-'+positions[i]+(turn===q?' is-turn':'')+(r.folded?.[q]?' is-folded':'');el.dataset.player=q;
-   const count=r.status==='drawing'?0:r.handCounts?.[q]||0,backs=i===0?'':`<div class="team-backs">${Array.from({length:count},(_,j)=>`<i class="opponent-card-back" style="--fan-index:${j-(count-1)/2}"></i>`).join('')}</div>`;
+   const count=r.status==='drawing'?0:r.handCounts?.[q]||0;
+   const faceUp=i===2&&partnerVisible&&s.partnerHand?.length===count;
+   const fan=Array.from({length:count},(_,j)=>`<i class="${faceUp?'sprite-card teammate-card':'opponent-card-back'}" style="--fan-index:${j-(count-1)/2};${faceUp?cardImageStyle(s.partnerHand[j]):''}"${faceUp?` aria-label="${safe(cardAccessibleName(s.partnerHand[j]))}"`:''}></i>`).join('');
+   const backs=i===0?'':i===2?`<button class="team-backs team-partner-cards" type="button" aria-label="Ver cartas del compañero durante 3 segundos" aria-pressed="${faceUp}" ${count?'':'disabled'}>${fan}</button>`:`<div class="team-backs">${fan}</div>`;
    const status=[i===2?'COMPAÑERO':'',r.mano===q?'MANO':'',r.folded?.[q]?'AL MAZO':''].filter(Boolean).join(' · ');
    el.innerHTML=`${i===0?(status?`<span class="team-self-status">${status}</span>`:''):`<span class="team-player-name">${safe(person?.name||'Jugador')}${status?`<small>${status}</small>`:''}</span>`}${backs}<div class="team-speech hidden"></div>`;
+   if(i===2)el.querySelector('.team-partner-cards').onclick=()=>{showPartner();render();};
   }
   if(r.callNotice&&r.callNotice.handNumber===r.handNumber&&r.callNotice.from&&r.callNotice.text!=='Se reparte'){const speech=$('team-seat-'+r.callNotice.from)?.querySelector('.team-speech');if(speech){speech.textContent=r.callNotice.spoken||r.callNotice.text;speech.classList.remove('hidden');}if(noticeKey!==r.callNotice.id){noticeKey=r.callNotice.id;speakCall(r.callNotice.spoken||'');}}
-  const drawing=r.status==='drawing';game.classList.toggle('drawing-mode',drawing);game.classList.toggle('reveal-mode',r.status==='revealing');$('opening-draw').classList.toggle('hidden',!drawing);
-  if(drawing){const d=r.openingDraw,chosen=!!d.cards?.[p];$('opening-draw').innerHTML=`<div class="draw-prompt"><h2>${chosen?'Esperando a los demás':'Sorteo del repartidor'}</h2><p>Los cuatro sacan una carta. Reparte la mayor.</p></div><button class="draw-deck" id="draw-deck" ${chosen?'disabled':''} aria-label="Sacar carta"></button><div class="team-draw-results">${TEAM_SEATS.map(q=>`<div><span>${safe(r.players[q].name)}</span>${d.cards?.[q]?`<i class="sprite-card" style="${cardImageStyle(d.cards[q])}"></i>`:'<small>Esperando…</small>'}</div>`).join('')}</div>`;if(!chosen)$('draw-deck').onclick=e=>send(e.currentTarget,{kind:'draw'});}
+  const drawing=r.status==='drawing';game.classList.toggle('drawing-mode',drawing);game.classList.toggle('reveal-mode',r.status==='revealing');$('opening-draw').classList.add('hidden');
   const playing=r.status==='started'&&!r.resolvingTrick&&!r.pendingNextHand;
   const myTurn=playing&&!pending&&r.turn===p&&!r.folded?.[p];if(!s.handGestureActive)renderPlayerHand(drawing?[]:orderedHand(),myTurn);
   $('fold-hand').classList.toggle('hidden',!playing||!!r.folded?.[p]);$('fold-hand').textContent='IRSE AL MAZO';
   const sample=r.muestra;$('deck-stack').classList.toggle('hidden',drawing||!sample);$('muestra-card').classList.toggle('hidden',drawing||!sample);$('muestra-card').classList.toggle('sprite-card',!!sample);if(sample){$('muestra-card').style.cssText=cardImageStyle(sample);$('muestra-card').setAttribute('aria-label',cardAccessibleName(sample)+', muestra');}
+  positionDealerDeck($,r.dealer||'player4',p,true);
   const cards=$('trick-cards'),nextScope=[s.roomCode,r.matchNumber,r.handNumber].join(':'),same=scope===nextScope;const old=new Map([...cards.children].map(n=>[n.dataset.playedKey,n]));const keys=new Set();
   for(const item of r.trickCards||[]){const key=item.playerId+':'+item.card.id;keys.add(key);let el=old.get(key);if(!el){el=document.createElement('div');el.dataset.playedKey=key;cards.append(el);el.className='sprite-card team-played team-played-'+positions[seats.indexOf(item.playerId)];el.style.cssText=cardImageStyle(item.card);el.setAttribute('aria-label',r.players[item.playerId].name+': '+cardAccessibleName(item.card));
     if(same&&!known.has(key)&&!matchMedia('(prefers-reduced-motion: reduce)').matches){const origin=item.playerId===p?$('hand'):$('team-seat-'+item.playerId),a=origin.getBoundingClientRect(),b=el.getBoundingClientRect();el.animate([{translate:`${a.left+a.width/2-b.left-b.width/2}px ${a.top+a.height/2-b.top-b.height/2}px`,opacity:.5},{translate:'0 0',opacity:1}],{duration:500,easing:'cubic-bezier(.22,.61,.36,1)'});}}
@@ -48,7 +74,7 @@ export function installTeamTable({$,getState,command,runAction,renderPlayerHand,
   const add=(value,label,primary=false)=>buttons.push(`<button class="${primary?'call-button':'pass-button'}" data-team-action="${value}">${label}</button>`);
   if(playing&&!r.folded?.[p]){
    if(!pending&&r.turn===p){const flower=hasFlor(r,s.hand);if(!r.flors?.[p]&&(r.playedBy?.[p]||0)===0&&flower)add('flor','FLOR');if(!flower&&!r.envidoClosed&&(r.playedBy?.[p]||0)===0&&r.trickNo===1){add('envido','ENVIDO');add('real','REAL');add('falta','FALTA');}if((!flower||r.flors?.[p])&&r.trucoLevel<4&&r.lastTrucoTeam!==mineTeam)add(r.trucoLevel===1?'truco':r.trucoLevel===2?'retruco':'vale4',r.trucoLevel===1?'TRUCO':r.trucoLevel===2?'RETRUCO':'VALE 4',true);}
-   if(pending&&!pending.revealMode&&pending.responder===p){if(pending.type!=='flor'&&hasFlor(r,s.hand)&&!r.flors?.[p])add('flor','FLOR',true);add('yes',pending.type==='flor'?'LA MÍA ES FLOR':'QUIERO',true);add('no','NO QUIERO');if(pending.type==='truco'){if(pending.stake<4)add('raise',pending.stake===2?'RETRUCO':'VALE 4');if(!r.envidoClosed&&(r.playedBy?.[p]||0)===0){add('envido','ENVIDO');add('real','REAL');add('falta','FALTA');}}if(pending.type==='envido'&&pending.called!=='falta'){add('raise-envido','ENVIDO');add('raise-real','REAL');add('raise-falta','FALTA');}if(pending.type==='flor'&&pending.called==='flor'){add('raise-conflor','CON FLOR ENVIDO');add('raise-faltaflor','CONTRA FLOR AL RESTO');}}
+   if(pending&&!pending.revealMode&&pending.responder===p){if(pending.type!=='flor'&&hasFlor(r,s.hand)&&!r.flors?.[p])add('flor','FLOR',true);add('yes',pending.type==='flor'&&hasFlor(r,s.hand)?'LA MÍA ES FLOR':'QUIERO',true);add('no','NO QUIERO');if(pending.type==='truco'){if(pending.stake<4)add('raise',pending.stake===2?'RETRUCO':'VALE 4');if(!r.envidoClosed&&(r.playedBy?.[p]||0)===0){add('envido','ENVIDO');add('real','REAL');add('falta','FALTA');}}if(pending.type==='envido'&&pending.called!=='falta'){add('raise-envido','ENVIDO');add('raise-real','REAL');add('raise-falta','FALTA');}if(pending.type==='flor'&&pending.called==='flor'){add('raise-conflor','CON FLOR ENVIDO');add('raise-faltaflor','CONTRA FLOR AL RESTO');}}
   }
   $('player-actions').classList.toggle('hidden',drawing||r.status==='complete');$('player-actions').innerHTML=buttons.length?'<div class="action-buttons compact-actions team-actions">'+buttons.join('')+'</div>':'';for(const b of $('player-actions').querySelectorAll('[data-team-action]'))b.onclick=e=>send(e.currentTarget,{kind:'call',value:b.dataset.teamAction});
   const time=r.turnClock?Math.max(0,Math.ceil((45000-(gameTime()-r.turnClock.startedAt))/1000)):null;setTurnBadge(drawing?'SORTEO':r.status==='revealing'||r.pendingNextHand||r.resolvingTrick?'NUEVA JUGADA':turn===p?(pending?'RESPONDÉ':'TU TURNO'):'Turno de '+(r.players[turn]?.name||'…'));

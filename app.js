@@ -5,7 +5,7 @@ import { installActivity } from './activity.js?v=20261010-adminstats32';
 import { installCredits } from './credits.js?v=20261015-startup';
 import { installAccount } from './account.js?v=20261016-android-google';
 import { initializeGameAuth } from './auth-init.js?v=20261016-android-google';
-import {installTeamTable,TEAM_SEATS,playerTeam} from './team-table-ui.js?v=20261018-teams1';
+import {installTeamTable,TEAM_SEATS,playerTeam,positionDealerDeck} from './team-table-ui.js?v=20261019-partner-peek';
 const FIREBASE_VERSION = '12.4.0';
 const $ = (id) => document.getElementById(id);
 const views = ['welcome-view', 'invite-view', 'setup-view', 'waiting-view', 'game-view', 'config-view', 'learn-view', 'scorer-view'];
@@ -960,7 +960,9 @@ function syncPrivateHand(){
     state.renderedHandNumber=handNumber;state.handGestureActive=false;handGesture=null;
     state.cardLaunchOrigin=null;state.launchingCardId=null;
   }
-  state.hand=privateHandMatchesRoom(state.privateDeal,state.room)?(state.privateDeal.hand||[]):[];
+  const matches=privateHandMatchesRoom(state.privateDeal,state.room);
+  state.hand=matches?(state.privateDeal.hand||[]):[];
+  state.partnerHand=matches&&state.room.mode==='2v2'?(state.privateDeal.partnerHand||[]):[];
 }
 function watchPrivateHand() {
   const subscriptionKey=`${state.roomCode}:${state.uid}`;
@@ -1104,23 +1106,10 @@ async function drawOpeningCard(){
     },{applyLocally:false});
   }finally{drawInFlight=false;renderGame();}
 }
-async function finishOpeningDraw(){
-  const draw=state.room?.openingDraw?.cards;
-  if(state.room?.status!=='drawing'||!draw?.player1||!draw?.player2||finishingDraw)return;
+async function finishOpeningDraw() {
+  if(state.room?.status!=='drawing'||finishingDraw||state.room.managedCredits)return;
   finishingDraw=true;
-  const code=state.roomCode,room=state.room,deadline=room.openingDraw?.endsAt;
-  try{
-    await new Promise(resolve=>setTimeout(resolve,2000));
-    if(state.roomCode!==code||state.room?.status!=='drawing'||state.room.openingDraw?.endsAt!==deadline)return;
-    if(Number(draw.player1.rank)===Number(draw.player2.rank)){
-      if(state.localGame){state.room.openingDraw=newOpeningDraw();localFeed('Empate en el saque. Vuelvan a tocar el mazo.');renderGame();}
-      else await writeRoom({openingDraw:newOpeningDraw(),feed:topFeed(state.room,'Empate en el saque. Vuelvan a tocar el mazo.')});
-      return;
-    }
-    const dealer=Number(draw.player1.rank)>Number(draw.player2.rank)?'player1':'player2';
-    if(state.localGame){state.room.dealer=dealer;state.room.mano=otherPlayer(dealer);state.room.turn=state.room.mano;state.room.status='started';state.hand=[...state.localHands[state.playerId]];localFeed(`${state.room.players[dealer].name} reparte. Empieza ${state.room.players[state.room.mano].name}.`);}
-    else await dealOpeningHand(dealer);
-  }finally{finishingDraw=false;if(state.localGame)renderGame();}
+  try{await dealOpeningHand('player2');}finally{finishingDraw=false;}
 }
 async function dealOpeningHand(dealer) {
   const code=state.roomCode,drawDeadline=state.room.openingDraw?.endsAt;
@@ -1163,7 +1152,7 @@ async function dealOpeningHand(dealer) {
   await fb.update(fb.ref(fb.db),privatePatches);
   await fb.runTransaction(fb.ref(fb.db,`rooms/${code}/public`),room=>{
     if(room===null)return null;
-    if(room.status!=='drawing'||room.openingDraw?.endsAt!==drawDeadline||!room.openingDraw?.cards?.player1||!room.openingDraw?.cards?.player2)return;
+    if(room.status!=='drawing'||room.openingDraw?.endsAt!==drawDeadline)return;
     return {...room,...publicChanges};
   },{applyLocally:false});
 }
@@ -2153,17 +2142,9 @@ function renderGame() {
   mobileMarker.classList.toggle('hidden',drawing);
   $('opening-draw').classList.toggle('hidden',!drawing);
   if(drawing){
-    const cards=room.openingDraw?.cards||{},canDraw=!cards[state.playerId];
-    const dealer=cards.player1&&cards.player2&&Number(cards.player1.rank)!==Number(cards.player2.rank)
-      ?(Number(cards.player1.rank)>Number(cards.player2.rank)?'player1':'player2'):null;
-    const mano=dealer?otherPlayer(dealer):null;
-    const bothChosen=!!(cards.player1&&cards.player2);
-    const prompt=bothChosen?'Los dos eligieron su carta':cards[state.playerId]?'Ya elegiste tu carta':'Elegí tu carta';
-    const hint=bothChosen?(dealer?'':'Empataron. Van a sacar otra carta.') :cards[state.playerId]?'Esperando que el otro jugador toque el mazo.':'Tocá el mazo para sortear quién reparte.';
-    $('opening-draw').innerHTML=`<div class="draw-prompt"><h2>${prompt}</h2>${hint?`<p>${hint}</p>`:''}</div><div id="opening-timer" class="opening-timer" role="timer" aria-label="Tiempo para elegir carta"></div><button class="draw-deck" id="draw-deck" ${canDraw?'':'disabled'} aria-label="Sacar carta para sortear repartidor"></button><div class="draw-results">${['player1','player2'].map(player=>`<div class="draw-result ${dealer===player?'draw-winner':''}"><span>${escapeHtml(players[player]?.name||player)}${dealer===player?' · REPARTE':mano===player?' · EMPIEZA':''}</span>${cards[player]?`<div class="draw-card sprite-card ${cards[player].justDrawn?'draw-card-new':''}" style="${cardImageStyle(cards[player])}" aria-label="${cardAccessibleName(cards[player])}"></div>`:`<p>Esperando carta</p>`}</div>`).join('')}</div>`;
-    if(canDraw)$('draw-deck').addEventListener('click',event=>runLiveAction(event.currentTarget,drawOpeningCard));
-    renderOpponentHand(room);
-    $('hand').innerHTML='';$('player-actions').classList.add('hidden');$('fold-hand').classList.add('hidden');$('fold-hand').disabled=true;$('trick-cards').innerHTML='';$('deck-stack').classList.add('hidden');$('muestra-card').classList.add('hidden');$('envido-picker').classList.add('hidden');renderOpeningTimer();syncLiveControls();return;
+    $('opening-draw').classList.add('hidden');
+    if(isCoordinator())finishOpeningDraw().catch(error=>toast(firebaseError(error)));
+    return;
   }
   clearTimeout(openingTimerHandle);openingTimerHandle=null;
   $('tally-1').innerHTML=renderTally(room.scores?.player1||0,targetPoints(room));$('tally-2').innerHTML=renderTally(room.scores?.player2||0,targetPoints(room));
@@ -2196,6 +2177,7 @@ function renderGame() {
   $('muestra-card').setAttribute('aria-label',sample?`${cardAccessibleName(sample)}, muestra`:'Muestra');
   $('muestra-card').innerHTML=sharedTable&&sample?`<span class="sr-only">${cardAccessibleName(sample)}, muestra</span>`:'';
   $('deck-stack').classList.toggle('hidden',!sharedTable);
+  positionDealerDeck($,room.dealer||otherPlayer(room.mano||'player1'),state.playerId);
   const visibleFeed=(room.feed||[]).filter(({text=''})=>!/\bjug[oó]/i.test(text));
   $('round-feed').innerHTML=visibleFeed.slice(0,7).map(({text})=>`<div class="feed-item"><i></i><span>${escapeHtml(text)}</span></div>`).join('');
   $('fold-hand').classList.remove('hidden');
@@ -2307,7 +2289,7 @@ async function respondRematch(action){
           const deck=shuffleDeck();state.localHands={player1:deck.slice(0,3),player2:deck.slice(3,6)};
           state.localOriginalHands=structuredClone(state.localHands);
           state.localTruth={player1:handEnvido(state.localHands.player1,deck[6]),player2:handEnvido(state.localHands.player2,deck[6])};
-          state.room.muestra=deck[6];state.finalEvidenceKey=null;state.verifiedEnvido=null;
+          state.room.muestra=deck[6];state.room.status='started';state.room.dealer='player2';state.room.mano='player1';state.room.turn='player1';state.room.deckCount=33;state.room.openingDraw=null;state.hand=[...state.localHands[player]];state.finalEvidenceKey=null;state.verifiedEnvido=null;
         }else Object.assign(state.room,changes);
       }
     }else{
@@ -2692,7 +2674,7 @@ async function startLocalBotGame() {
   state.localGame=true;state.roomCode='BOT1';state.playerId=role;const deck=shuffleDeck();
   state.localHands={player1:deck.slice(0,3),player2:deck.slice(3,6)};state.localOriginalHands=structuredClone(state.localHands);state.hand=[...state.localHands[role]];
   state.room={deviceMode,status:'started',targetPoints:30,muestra:deck[6],table:{name:'La mesa'},players:{player1:{name:cleanName($('player-name').value,'Jugador')},player2:{name:'Bot'}},scores:{player1:0,player2:0},handNumber:1,deckCount:34,turn:'player1',mano:'player1',trickNo:1,trickCards:[],tricks:[],feed:[],playedCount:0,trucoLevel:1,lastTrucoCaller:null,pendingBet:null,flors:{},envidoClosed:false};
-  state.room.status='drawing';state.room.openingDraw=newOpeningDraw();state.hand=[];
+  state.room.dealer='player2';state.room.openingDraw=null;
   state.localTruth={player1:handEnvido(state.localHands.player1,deck[6]),player2:handEnvido(state.localHands.player2,deck[6])};
   $('game-room-code').textContent='CONTRA BOT';renderGame();showView('game-view');return true;
 }

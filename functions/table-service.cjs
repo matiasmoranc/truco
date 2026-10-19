@@ -118,4 +118,12 @@ function publicTable(m){
  room.creditResult=m.status==='settled'?{winnerUid:m.winner,pot:m.stake*2,stake:m.stake}:null;return room;
 }
 function publicWaitingClosed(m){return {status:'closed',managedCredits:true,creditMatch:{id:m.id,stake:m.stake},players:m.players,createdAt:m.createdAt};}
-module.exports={passwordHash,passwordMatches,createTable,joinTable,tableOperation,publicTable,tableFor};
+function privateTableHand(m,player){
+ const data={creditMatchId:m.id,revision:m.revision,handNumber:m.session?.room.handNumber||1,hand:m.session?.hands?.[player]||[]};
+ if(m.mode==='2v2'){
+  const partner={player1:'player3',player2:'player4',player3:'player1',player4:'player2'}[player];
+  data.partnerHand=m.session?.hands?.[partner]||[];
+ }
+ return data;
+}
+module.exports={privateTableHand,passwordHash,passwordMatches,createTable,joinTable,tableOperation,publicTable,tableFor};

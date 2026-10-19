@@ -4,7 +4,7 @@ const {initializeApp}=require('firebase-admin/app');
 const {getDatabase}=require('firebase-admin/database');
 const {onCall,HttpsError}=require('firebase-functions/v2/https');
 const {onSchedule}=require('firebase-functions/v2/scheduler');
-const {createTable,joinTable,tableOperation,publicTable,passwordHash,tableFor}=require('./table-service.cjs');
+const {createTable,joinTable,tableOperation,publicTable,privateTableHand,passwordHash,tableFor}=require('./table-service.cjs');
 const {recordHistory}=require('./history-service.cjs');
 const {validateAccounting}=require('./accounting-guard.cjs');
 const {loadedTransaction}=require('./loaded-transaction.cjs');
@@ -45,7 +45,7 @@ async function publish(ledger,code){
  if(collision&&!published.committed)throw new Error('Ese código ya está en uso.');
  await Promise.all(Object.entries(m.players).map(async([player,person])=>{
   if(!person)return;
-  const data={creditMatchId:m.id,revision:m.revision,handNumber:room.handNumber||1,hand:m.session?.hands?.[player]||[]};
+  const data=privateTableHand(m,player);
   await db.ref('hands/'+code+'/'+person.uid).transaction(current=>Number(current?.revision)>m.revision?undefined:data);
  }));
  return {code,room,player1:m.player1,player2:m.player2};

@@ -494,17 +494,9 @@ function turnTimeoutChanges(room){
 }
 function save(){session.hands=state.localHands;session.originals=state.localOriginalHands;session.truth=state.localTruth;return session;}
 function clock(){const key=turnClockKey();if(!key){state.room.turnClock=null;return;}if(state.room.turnClock?.key!==key)state.room.turnClock={key,startedAt:now};}
-function dealOpening(){const room=state.room,draw=room.openingDraw;
- if(draw.cards.player1.rank===draw.cards.player2.rank){session.drawPool=deckFactory();room.openingDraw={cards:{},endsAt:now+30000};localFeed('Empate en el saque. Vuelvan a tocar el mazo.');return;}
- const dealer=draw.cards.player1.rank>draw.cards.player2.rank?'player1':'player2';
- room.mano=dealer;room.status='started';room.handNumber=0;room.scores={player1:0,player2:0};localDealAfterHand();
-}
 function advance(){const room=state.room;
- if(room.status==='drawing'){
-  const draw=room.openingDraw;draw.cards??={};
-  if(draw.cards.player1&&draw.cards.player2){if(now>=draw.resolveAt)dealOpening();}
-  else if(now>=draw.endsAt){room.status='closed';room.closeReason='draw-timeout';}
- }
+ if(room.status==='drawing')start();
+
  if(room.resolvingTrick&&now>=room.resolutionEndsAt){
   const winner=settleHand(room.tricks,room);room.resolvingTrick=false;room.resolutionEndsAt=null;room.handComplete=false;room.trickCards=[];
   if(winner)localFinishHand(winner,room.trucoLevel||1);else{room.turn=room.resolvedTrickWinner||room.mano;room.trickNo++;}
@@ -538,11 +530,13 @@ function action(player,command){
  }
  advance();return save();
 }
-return {action,advance};
+function start(){state.room.mano='player2';state.room.status='started';state.room.handNumber=0;localDealAfterHand();state.room.openingDraw=null;delete session.drawPool;clock();return save();}
+return {action,advance,start};
 }
 function serverDeck(){const cards=[];for(const [suit,name] of [['♦','oro'],['♥','copa'],['♠','espada'],['♣','basto']])for(const rank of [1,2,3,4,5,6,7,10,11,12])cards.push({id:name+'-'+rank,rank,suit,red:['♦','♥'].includes(suit),label:String(rank)});for(let i=cards.length-1;i>0;i--){const j=crypto.randomInt(i+1);[cards[i],cards[j]]=[cards[j],cards[i]];}return cards;}
 function newSession(code,players,targetPoints,creditMatch,now=Date.now()){
  if(![10,20,30,40,50,60].includes(targetPoints))throw new Error('Puntaje inválido.');
- return {code,hands:{},originals:{},truth:{},drawPool:serverDeck(),room:{managedCredits:true,creditMatch,deviceMode:'two',status:'drawing',createdAt:now,matchNumber:creditMatch.matchNumber||1,targetPoints,table:players.player1,players,scores:{player1:0,player2:0},handNumber:1,trickNo:1,playedCount:0,tricks:[],trickCards:[],feed:[],trucoLevel:1,flors:{},timeoutCounts:{},openingDraw:{cards:{},endsAt:now+30000}}};
+ const session={code,hands:{},originals:{},truth:{},drawPool:serverDeck(),room:{managedCredits:true,creditMatch,deviceMode:'two',status:'drawing',createdAt:now,matchNumber:creditMatch.matchNumber||1,targetPoints,table:players.player1,players,scores:{player1:0,player2:0},handNumber:1,trickNo:1,playedCount:0,tricks:[],trickCards:[],feed:[],trucoLevel:1,flors:{},timeoutCounts:{},openingDraw:{cards:{},endsAt:now+30000}}};
+ return createReferee(session,{now}).start();
 }
 module.exports={createReferee,newSession};

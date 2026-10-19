@@ -12,7 +12,7 @@ function extract(name){const a=app.indexOf('function '+name+'('),b=app.indexOf('
   await page.route('**/app.js?*',route=>route.fulfill({body:'',contentType:'text/javascript'}));
   await page.goto(origin+'/index.html');
   await page.evaluate(async helpers=>{
-   document.documentElement.classList.remove('page-loading');document.getElementById('startup-loading').hidden=true;document.getElementById('auth-gate').remove();
+   document.documentElement.classList.remove('page-loading');document.getElementById('startup-loading').hidden=true;document.getElementById('auth-gate').remove();document.getElementById('app').removeAttribute('inert');
    for(const id of ['welcome-view','invite-view','setup-view','waiting-view','learn-view'])document.getElementById(id).classList.remove('active');document.getElementById('game-view').classList.add('active');
    const $=id=>document.getElementById(id),card=(suit,rank)=>({id:suit+'-'+rank,suit,rank,label:String(rank)});
    globalThis.state={playerId:'player3',roomCode:'ABCDE',hand:[card('♠',1),card('♥',7),card('♣',3)],room:{mode:'2v2',status:'started',mano:'player1',turn:'player2',targetPoints:20,handNumber:1,matchNumber:1,players:Object.fromEntries(['Matias','Nico','Pinar93','Lucía'].map((name,i)=>['player'+(i+1),{name,uid:'u'+i}])),scores:{player1:4,player2:7},handCounts:{player1:3,player2:2,player3:3,player4:3},trucoLevel:1,envidoClosed:false,playedBy:{player2:1},muestra:card('♦',6),trickCards:[{playerId:'player2',card:card('♣',7)}],callNotice:{id:'1',handNumber:1,from:'player4',spoken:'TRUCO'},pendingBet:{type:'truco',responder:'player3',stake:2}}};
