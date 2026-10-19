@@ -11,7 +11,7 @@ export function dealerPosition(dealer,viewer,teams=false){
  return teams?['self','right','partner','left'][teamSeatsFor(viewer).indexOf(dealer)]:(dealer===viewer?'self':'partner');
 }
 export function dealerDeckPose(seat,teams,width,height){
- const spots=teams?{self:[79,54],right:[77,17],partner:[23,17],left:[21,54]}:{self:[82,44],partner:[18,44]};
+ const spots=teams?{self:[75,52],right:[73,21],partner:[27,21],left:[25,52]}:{self:[82,44],partner:[18,44]};
  const [left,top]=spots[seat]||spots.self;
  const dx=(50-left)*width/100,dy=(44-top)*height/100,length=Math.hypot(dx,dy)||1;
  const sampleAngle=Math.atan2(dx,-dy)*180/Math.PI;
@@ -36,7 +36,7 @@ export function renderTeamLobbySeats(code,room,safe,disabled=false){
  return `<div class="lobby-team-row">${group('player1',1)}<span class="lobby-team-versus">vs</span>${group('player2',2)}</div>`;
 }
 export function installTeamTable({$,getState,command,runAction,renderPlayerHand,orderedHand,cardImageStyle,cardAccessibleName,escapeHtml,renderTally,syncHeader,setTurnBadge,syncControls,gameTime,hasFlor,speakCall=()=>{}}){
- let scope='',known=new Set(),noticeKey='',declareKey='',partnerMatch='',partnerVisibleUntil=0,partnerTimer=null,noticeTimer=null;
+ let scope='',known=new Set(),noticeKey='',declareKey='',partnerMatch='',partnerVisibleUntil=0,partnerTimer=null,noticeTimer=null,partnerFaceScope='',partnerWasFaceUp=false;
  function showPartner(){
   partnerVisibleUntil=Date.now()+3000;clearTimeout(partnerTimer);
   const s=getState(),key=s.roomCode+':'+s.room?.creditMatch?.id+':'+s.room?.matchNumber;
@@ -70,10 +70,14 @@ export function installTeamTable({$,getState,command,runAction,renderPlayerHand,
    const q=seats[i],person=r.players[q],el=ensure('team-seat-'+q,'section',layer,'team-seat');el.className='team-seat team-'+positions[i]+(turn===q?' is-turn':'')+(r.folded?.[q]?' is-folded':'');el.dataset.player=q;
    const count=r.status==='drawing'?0:r.handCounts?.[q]||0;
    const faceUp=i===2&&partnerVisible&&s.partnerHand?.length===count;
+   const faceScope=[s.roomCode,r.matchNumber,r.handNumber,q].join(':');
+   const flip=i===2&&partnerFaceScope===faceScope&&partnerWasFaceUp!==!!faceUp;
+   if(i===2){partnerFaceScope=faceScope;partnerWasFaceUp=!!faceUp;}
    const fan=Array.from({length:count},(_,j)=>`<i class="${faceUp?'sprite-card teammate-card':'opponent-card-back'}" style="--fan-index:${j-(count-1)/2};${faceUp?cardImageStyle(s.partnerHand[j]):''}"${faceUp?` aria-label="${safe(cardAccessibleName(s.partnerHand[j]))}"`:''}></i>`).join('');
    const backs=i===0?'':i===2?`<button class="team-backs team-partner-cards" type="button" aria-label="Ver cartas del compañero durante 3 segundos" aria-pressed="${faceUp}" ${count?'':'disabled'}>${fan}</button>`:`<div class="team-backs">${fan}</div>`;
    const status=r.folded?.[q]?'AL MAZO':'';
    el.innerHTML=`${i===0?(status?`<span class="team-self-status">${status}</span>`:''):`<span class="team-player-name">${safe(person?.name||'Jugador')}${status?`<small>${status}</small>`:''}</span>`}${backs}<div class="team-speech hidden"></div>`;
+   if(i===2&&flip&&!matchMedia('(prefers-reduced-motion: reduce)').matches)for(const card of el.querySelectorAll('.team-backs>i'))card.animate([{rotate:'y 90deg',opacity:.3,scale:'.94'},{rotate:'y 0deg',opacity:1,scale:'1'}],{duration:280,easing:'ease-out'});
    if(i===2)el.querySelector('.team-partner-cards').onclick=()=>{showPartner();render();};
   }
   clearTimeout(noticeTimer);
