@@ -96,3 +96,12 @@ export function installTeamTable({$,getState,command,runAction,renderPlayerHand,
  }
  return {render,renderEnd};
 }
+
+export function renderWaitingSeats(room,viewer,safe){
+ const teams=room.mode==='2v2',players=room.players||{};
+ const me=viewer||'player1',seats=teams?teamSeatsFor(me):[me,me==='player1'?'player2':'player1'];
+ const positions=teams?['self','right','partner','left']:['self','partner'];
+ return seats.map((key,i)=>{const player=players[key],team=playerTeam(key)==='player1'?'1':'2';
+  return '<div class="waiting-player waiting-player-'+positions[i]+' '+(player?'occupied':'empty')+'"><span class="waiting-player-name">'+safe(player?.name||'Lugar disponible')+'</span>'+(teams?'<small>Equipo '+team+'</small>':'')+'<div class="waiting-player-cards" aria-hidden="true">'+(player?[-1,0,1].map(n=>'<span class="opponent-card-back" style="--fan-index:'+n+'"></span>').join(''):'<span class="waiting-empty-place">+</span>')+'</div></div>';
+ }).join('');
+}

@@ -1948,3 +1948,18 @@ input,textarea,[contenteditable=""],[contenteditable="true"]{-webkit-user-select
 .game.team-mode #end-hand-reveal{position:absolute;top:26%;left:12%;width:76%;max-height:45%;overflow:auto;transform:none;display:flex;gap:10px;flex-wrap:wrap;background:#103c2ef5;border:1px solid #e8c98388;padding:12px;border-radius:14px;z-index:25}
 .game.team-mode #end-hand-reveal section{flex:1 1 40%;font-size:11px;text-align:center}.game.team-mode #end-hand-reveal section>div{display:flex;justify-content:center;gap:2px;margin-top:6px}.game.team-mode #end-hand-reveal i{display:block;width:38px;height:59px;border-radius:3px}
 @media(min-width:901px){.game.team-mode{--team-card-width:78px;--team-hand-width:125px}.team-seat{font-size:15px;width:160px}.team-player-name small{font-size:11px}.team-partner{top:10%;width:190px}.team-left{left:20%}.team-right{left:80%}.team-self{top:87%}.team-speech{font-size:14px;max-width:220px}.game.team-mode.player-mode .player-controls{width:min(800px,90%)}.game.team-mode.player-mode.two-device-mode #trick-cards{left:50%}.game.team-mode.player-mode.two-device-mode .deck-stack{right:19%}.game.team-mode.player-mode.two-device-mode .muestra-card{right:calc(19% + var(--team-card-width)*.65)}.game.team-mode.player-mode #envido-picker{left:calc(50% - 300px);right:auto;width:480px}}
+
+/* Waiting seats follow each player's position around the table. */
+#waiting-view .waiting-content{width:100%;max-width:760px;padding:20px 16px 12px}
+#waiting-view #room-status{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important}
+#waiting-view .waiting-table{display:block;position:relative;width:100%;height:clamp(400px,70dvh,620px);margin:12px 0 0;border-radius:45%;background:radial-gradient(ellipse at center,#29553c55,transparent 68%)}
+.waiting-player{position:absolute;display:flex;align-items:center;flex-direction:column;width:30%;max-width:170px;text-align:center;transform:translate(-50%,-50%)}
+.waiting-player-self{left:50%;top:83%}.waiting-player-partner{left:50%;top:17%}.waiting-player-right{left:83%;top:50%}.waiting-player-left{left:17%;top:50%}
+.waiting-player-name{display:block;max-width:100%;padding:7px 10px;border:1px solid #76c38b55;border-radius:9px;background:#103b2dcc;color:#f0edda;font-size:14px;font-weight:700;overflow-wrap:anywhere}
+.waiting-player small{margin-top:4px;font-size:10px;color:#e8c983;letter-spacing:.05em}
+.waiting-player-cards{position:relative;width:90px;height:89px;margin-top:12px}
+.waiting-player-cards .opponent-card-back{position:absolute;left:50%;top:0;width:48px;height:70px;transform:translateX(calc(-50% + var(--fan-index)*17px)) rotate(calc(var(--fan-index)*12deg));transform-origin:50% 85%}
+.waiting-player.empty .waiting-player-name{border-style:dashed;color:#d4d9cb;background:transparent;font-size:12px;font-weight:500}
+.waiting-empty-place{display:grid;place-items:center;width:48px;height:70px;margin:0 auto;border:1px dashed #d8b87580;border-radius:6px;color:#d8b87599;font-size:26px}
+#waiting-view .invite-whatsapp .whatsapp-brand-icon{display:block;width:28px;height:28px;overflow:visible}
+@media(max-width:380px){.waiting-player-name{font-size:12px;padding:6px}.waiting-player.empty .waiting-player-name{font-size:11px}.waiting-player-cards{width:78px}.waiting-player-cards .opponent-card-back{width:43px;height:63px}.waiting-player-right{left:84%}.waiting-player-left{left:16%}}

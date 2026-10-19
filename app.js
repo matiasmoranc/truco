@@ -5,7 +5,7 @@ import { installActivity } from './activity.js?v=20261010-adminstats32';
 import { installCredits } from './credits.js?v=20261015-startup';
 import { installAccount } from './account.js?v=20261016-android-google';
 import { initializeGameAuth } from './auth-init.js?v=20261016-android-google';
-import {installTeamTable,TEAM_SEATS,playerTeam,positionDealerDeck,renderTeamLobbySeats} from './team-table-ui.js?v=20261019-round-deck';
+import {installTeamTable,TEAM_SEATS,playerTeam,positionDealerDeck,renderTeamLobbySeats,renderWaitingSeats} from './team-table-ui.js?v=20261019-waiting-table';
 const FIREBASE_VERSION = '12.4.0';
 const $ = (id) => document.getElementById(id);
 const views = ['welcome-view', 'invite-view', 'setup-view', 'waiting-view', 'game-view', 'config-view', 'learn-view', 'scorer-view'];
@@ -986,9 +986,8 @@ function renderWaiting() {
   const players = state.room.players || {};
   const ready = !!(state.room.table && roomSeats().every(p=>players[p]));
   $('room-status').textContent = ready?'Todo listo':'Esperando rival';
-  const seatData = roomSeats().map(p=>[p,state.room.mode==='2v2'?'EQUIPO '+(playerTeam(p)==='player1'?'1':'2'):p==='player1'?'JUGADOR 1':'JUGADOR 2',players[p]]);
-  $('seats').innerHTML = seatData.map(([key,label,value]) => `<div class="seat ${value?'seat-occupied':'seat-free'}"><span class="seat-name"><small>${label}</small><strong>${escapeHtml(value?.name || 'Lugar disponible')}</strong></span><span class="seat-state ${value?'ready':''}">${value?'Listo':'Libre'}</span></div>`).join('');
-  if(state.room.mode==='2v2')$('room-status').textContent='2 vs 2 · '+Object.keys(players).length+' de 4 jugadores';
+  $('seats').className='seats waiting-table'+(state.room.mode==='2v2'?' waiting-table-teams':'');
+  $('seats').innerHTML=renderWaitingSeats(state.room,state.playerId,escapeHtml);
   if(ready&&isCoordinator()&&!state.room.managedCredits)startGame().catch(error=>toast(firebaseError(error),true));
   $('game-room-code').textContent = 'MESA ABIERTA';
 }
