@@ -1965,3 +1965,8 @@ input,textarea,[contenteditable=""],[contenteditable="true"]{-webkit-user-select
 @media(max-width:380px){.waiting-player-name{font-size:12px;padding:6px}.waiting-player.empty .waiting-player-name{font-size:11px}.waiting-player-cards{width:78px}.waiting-player-cards .opponent-card-back{width:43px;height:63px}.waiting-player-right{left:84%}.waiting-player-left{left:16%}}
 
 .team-seat .team-player-name{height:auto;min-height:0;width:fit-content;max-width:100%;margin:0 auto;padding:4px 8px;border-radius:7px;line-height:1.2}.team-signal-button{text-transform:none;letter-spacing:0;font-size:14px;min-height:40px}
+
+/* Leave room for the tally and dealer deck above the side players. */
+.game.team-mode .team-left,.game.team-mode .team-right{top:39%}
+.game.team-mode .team-left .team-backs,.game.team-mode .team-right .team-backs{transform:scale(.72)}
+.game.team-mode .muestra-card{touch-action:none;cursor:grab}.game.team-mode .muestra-card.dragging{cursor:grabbing}

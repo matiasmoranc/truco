@@ -20,14 +20,14 @@ export function dealerDeckPose(seat,teams,width,height){
 export function positionDealerDeck($,dealer,viewer,teams=false){
  const seat=dealerPosition(dealer,viewer,teams)||'self',felt=$('felt-area');
  const bounds=felt.getBoundingClientRect(),pose=dealerDeckPose(seat,teams,bounds.width,bounds.height);
- const offset=($('muestra-card').offsetHeight||84)*.22;
+ const offset=($('muestra-card').offsetHeight||84)*.34;
  for(const id of ['deck-stack','muestra-card']){
   const el=$(id);if(el.parentElement!==felt)felt.append(el);
   el.dataset.dealerPosition=seat;
   const sample=id==='muestra-card';
   el.style.left=sample?`calc(${pose.left}% + ${pose.inwardX*offset}px)`:pose.left+'%';
   el.style.top=sample?`calc(${pose.top}% + ${pose.inwardY*offset}px)`:pose.top+'%';
-  el.style.right='auto';el.style.transform=`translate(-50%,-50%) rotate(${sample?pose.sampleAngle:pose.deckAngle}deg)`;
+  el.style.right='auto';el.style.transform=`translate(calc(-50% + ${sample?'var(--muestra-dx,0px)':'0px'}),calc(-50% + ${sample?'var(--muestra-dy,0px)':'0px'})) rotate(${sample?pose.sampleAngle:pose.deckAngle}deg)`;
   el.style.zIndex=sample?'3':'4';el.style.transformOrigin='50% 50%';
  }
 }
@@ -84,7 +84,7 @@ export function installTeamTable({$,getState,command,runAction,renderPlayerHand,
   const playing=r.status==='started'&&!r.resolvingTrick&&!r.pendingNextHand;
   const myTurn=playing&&!pending&&r.turn===p&&!r.folded?.[p];if(!s.handGestureActive)renderPlayerHand(drawing?[]:orderedHand(),myTurn);
   $('fold-hand').classList.toggle('hidden',!playing||!!r.folded?.[p]);$('fold-hand').textContent='IRSE AL MAZO';
-  const sample=r.muestra;$('deck-stack').classList.toggle('hidden',drawing||!sample);$('muestra-card').classList.toggle('hidden',drawing||!sample);$('muestra-card').classList.toggle('sprite-card',!!sample);if(sample){$('muestra-card').style.cssText=cardImageStyle(sample);$('muestra-card').setAttribute('aria-label',cardAccessibleName(sample)+', muestra');}
+  const sample=r.muestra;$('deck-stack').classList.toggle('hidden',drawing||!sample);$('muestra-card').classList.toggle('hidden',drawing||!sample);$('muestra-card').classList.toggle('sprite-card',!!sample);if(sample){const el=$('muestra-card'),key=s.roomCode+':'+r.matchNumber+':'+r.handNumber;const dx=el.dataset.dragHand===key?el.style.getPropertyValue('--muestra-dx'):'0px',dy=el.dataset.dragHand===key?el.style.getPropertyValue('--muestra-dy'):'0px';el.dataset.dragHand=key;el.style.cssText=cardImageStyle(sample);el.style.setProperty('--muestra-dx',dx);el.style.setProperty('--muestra-dy',dy);$('muestra-card').setAttribute('aria-label',cardAccessibleName(sample)+', muestra');}
   positionDealerDeck($,r.dealer||'player4',p,true);
   const cards=$('trick-cards'),nextScope=[s.roomCode,r.matchNumber,r.handNumber].join(':'),same=scope===nextScope;const old=new Map([...cards.children].map(n=>[n.dataset.playedKey,n]));const keys=new Set();
   for(const item of r.trickCards||[]){const key=item.playerId+':'+item.card.id;keys.add(key);let el=old.get(key);if(!el){el=document.createElement('div');el.dataset.playedKey=key;cards.append(el);el.className='sprite-card team-played team-played-'+positions[seats.indexOf(item.playerId)];el.style.cssText=cardImageStyle(item.card);el.setAttribute('aria-label',r.players[item.playerId].name+': '+cardAccessibleName(item.card));
@@ -115,6 +115,6 @@ export function renderWaitingSeats(room,viewer,safe){
  const me=viewer||'player1',seats=teams?teamSeatsFor(me):[me,me==='player1'?'player2':'player1'];
  const positions=teams?['self','right','partner','left']:['self','partner'];
  return seats.map((key,i)=>{const player=players[key],team=playerTeam(key)==='player1'?'1':'2';
-  return '<div class="waiting-player waiting-player-'+positions[i]+' '+(player?'occupied':'empty')+'"><span class="waiting-player-name">'+safe(player?.name||'Lugar disponible')+'</span>'+(teams?'<small>Equipo '+team+'</small>':'')+'<div class="waiting-player-cards" aria-hidden="true">'+(player?[-1,0,1].map(n=>'<span class="opponent-card-back" style="--fan-index:'+n+'"></span>').join(''):'<span class="waiting-empty-place">+</span>')+'</div></div>';
+  return '<div class="waiting-player waiting-player-'+positions[i]+' '+(player?'occupied':'empty')+'"><span class="waiting-player-name">'+safe(player?.name||'Lugar disponible')+'</span>'+'<div class="waiting-player-cards" aria-hidden="true">'+(player?[-1,0,1].map(n=>'<span class="opponent-card-back" style="--fan-index:'+n+'"></span>').join(''):'<span class="waiting-empty-place">+</span>')+'</div></div>';
  }).join('');
 }

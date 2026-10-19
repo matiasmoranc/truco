@@ -5,7 +5,7 @@ import { installActivity } from './activity.js?v=20261010-adminstats32';
 import { installCredits } from './credits.js?v=20261015-startup';
 import { installAccount } from './account.js?v=20261016-android-google';
 import { initializeGameAuth } from './auth-init.js?v=20261016-android-google';
-import {installTeamTable,TEAM_SEATS,playerTeam,positionDealerDeck,renderTeamLobbySeats,renderWaitingSeats} from './team-table-ui.js?v=20261019-pie-notices';
+import {installTeamTable,TEAM_SEATS,playerTeam,positionDealerDeck,renderTeamLobbySeats,renderWaitingSeats} from './team-table-ui.js?v=20261019-table-spacing';
 const FIREBASE_VERSION = '12.4.0';
 const $ = (id) => document.getElementById(id);
 const views = ['welcome-view', 'invite-view', 'setup-view', 'waiting-view', 'game-view', 'config-view', 'learn-view', 'scorer-view'];
@@ -3224,7 +3224,7 @@ $('abandon-accept').addEventListener('click',async()=>{
   finally{abandoningMatch=false;$('abandon-accept').disabled=false;$('abandon-cancel').disabled=false;$('abandon-accept').textContent='Aceptar';}
 });
 function limitMuestraOffset(x,y){
-  const distance=Math.hypot(x,y),scale=distance>15?15/distance:1;
+  const distance=Math.hypot(x,y),scale=distance>10?10/distance:1;
   return {x:x*scale,y:y*scale};
 }
 $('muestra-card').addEventListener('pointerdown',(event)=>{
