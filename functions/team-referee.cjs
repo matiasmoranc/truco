@@ -26,7 +26,7 @@ function createTeamReferee(s,{now=Date.now(),deckFactory=deck}={}){
  const notice=(p,text)=>{r.callNotice={id:crypto.randomUUID(),from:p,text,spoken:text,time:now,handNumber:r.handNumber,trickNo:r.trickNo};};
  const active=p=>!r.folded?.[p];
  const members=t=>ordered(r.mano||'player1').filter(p=>team(p)===t&&active(p));
- const responder=t=>members(t).at(0);
+ const responder=t=>members(t).at(-1);
  function resume(bet){r.pendingBet=bet||null;if(bet&&!active(bet.responder))bet.responder=responder(opponent(bet.callerTeam),bet.type==='flor');}
  const rest=()=>Math.max(1,r.targetPoints-Math.max(...Object.values(r.scores)));
  const envidoStake=(kind,base=0)=>kind==='falta'?(Math.max(...Object.values(r.scores))<r.targetPoints/2?r.targetPoints:rest()):base+(kind==='real'?3:2)>rest()?2:base+(kind==='real'?3:2);
