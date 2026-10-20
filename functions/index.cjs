@@ -39,14 +39,14 @@ async function publish(ledger,code){
  let collision=false;
  const published=await db.ref('rooms/'+code+'/public').transaction(current=>{
   collision=!!(current&&!current.managedCredits);if(collision)return undefined;
-  if(current?.managedCredits&&Number(current.revision)>m.revision)return undefined;
+  if(current?.managedCredits&&Number(current.revision)>=m.revision)return undefined;
   return {...room,...(current?.connectionPresence?{connectionPresence:current.connectionPresence}:{})};
  });
  if(collision&&!published.committed)throw new Error('Ese código ya está en uso.');
  await Promise.all(Object.entries(m.players).map(async([player,person])=>{
   if(!person)return;
   const data=privateTableHand(m,player);
-  await db.ref('hands/'+code+'/'+person.uid).transaction(current=>Number(current?.revision)>m.revision?undefined:data);
+  await db.ref('hands/'+code+'/'+person.uid).transaction(current=>Number(current?.revision)>=m.revision?undefined:data);
  }));
  return {code,room,player1:m.player1,player2:m.player2};
 }
@@ -71,15 +71,15 @@ exports.creditCreateTable=onCall(options,async request=>{
  }
 });
 exports.creditJoinTable=onCall(options,async request=>{
- const user=await identity(request);await rateLimit(user.uid);const {code,password,team}=request.data||{};const now=Date.now();
+ const [user]=await Promise.all([identity(request),request.auth?rateLimit(request.auth.uid):Promise.resolve()]);const {code,password,team}=request.data||{};const now=Date.now();
  let table;try{table=tableFor((await db.ref('creditEconomy').get()).val()||{},code);}catch(error){throw new HttpsError('failed-precondition',error.message||'La mesa ya no está disponible.');}
- for(const person of Object.values(table.players||{}))if(await usersBlockEachOther(db,user.uid,person.uid))throw new HttpsError('failed-precondition','No pueden entrar a la misma mesa porque uno bloqueó al otro.');
+ if((await Promise.all(Object.values(table.players||{}).map(person=>usersBlockEachOther(db,user.uid,person.uid)))).some(Boolean))throw new HttpsError('failed-precondition','No pueden entrar a la misma mesa porque uno bloqueó al otro.');
  const ledger=await mutate(current=>joinTable(current,{...user,code,password,team,now}));return publish(ledger,code);
 });
 exports.creditTableAction=onCall(options,async request=>{
- const started=Date.now(),user=await identity(request);const {code,command,requestId,expectedMatchId}=request.data||{};
- if(!command||typeof command.kind!=='string'||!requestId||['__proto__','constructor','prototype'].includes(requestId)||!/^[a-zA-Z0-9_-]{1,100}$/.test(requestId)){await rateLimit(user.uid,120,'actions');throw new HttpsError('invalid-argument','Jugada inválida.');}
- const [,presenceSnapshot]=await Promise.all([rateLimit(user.uid,120,'actions'),db.ref('rooms/'+code+'/public/connectionPresence').get()]);
+ const started=Date.now();const {code,command,requestId,expectedMatchId}=request.data||{};
+ if(!command||typeof command.kind!=='string'||!requestId||['__proto__','constructor','prototype'].includes(requestId)||!/^[a-zA-Z0-9_-]{1,100}$/.test(requestId)){await identity(request);await rateLimit(request.auth.uid,120,'actions');throw new HttpsError('invalid-argument','Jugada inválida.');}
+ const [user,,presenceSnapshot]=await Promise.all([identity(request),request.auth?rateLimit(request.auth.uid,120,'actions'):Promise.resolve(),db.ref('rooms/'+code+'/public/connectionPresence').get()]);
  if(command.kind==='rematch'){
   let currentMatch;try{currentMatch=tableFor((await db.ref('creditEconomy').get()).val()||{},code);}catch(error){throw new HttpsError('failed-precondition',error.message||'La partida ya no está disponible.');}
   const people=Object.values(currentMatch.players||{});for(let a=0;a<people.length;a++)for(let b=a+1;b<people.length;b++)if(await usersBlockEachOther(db,people[a].uid,people[b].uid))throw new HttpsError('failed-precondition','No pueden iniciar una revancha porque hay jugadores bloqueados.');

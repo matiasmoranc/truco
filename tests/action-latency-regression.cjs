@@ -12,7 +12,7 @@ test('Card actions and ticks return without a second wallet network round trip',
  const h=apiHarness();for(const kind of ['call','play','declare','fold','tick'])assert.equal((await h.context.creditApi('creditTableAction',{command:{kind}})).ok,true);
  assert.equal(h.syncs(),0);assert.equal(h.calls.length,5);
 });
-test('Creating and joining still confirm spendable balances before continuing',async()=>{
+test('Creating and joining refresh wallet balances in the background',async()=>{
  const h=apiHarness();for(const name of ['creditCreateTable','creditJoinTable'])await h.context.creditApi(name,{});assert.equal(h.syncs(),2);
 });
 test('Background ticks yield to foreground actions without delaying a user call behind a tick',async()=>{
@@ -25,3 +25,5 @@ test('Background ticks yield to foreground actions without delaying a user call 
  await context.creditCommand({kind:'call',value:'envido'});assert.deepEqual(calls,['call','call']);
  context.creditTickPending=false;await context.creditCommand({kind:'tick'});assert.deepEqual(calls,['call','call','tick']);assert.equal(context.creditTickPending,false);
 });
+
+test('Joining returns even while the wallet refresh is still pending',{timeout:1000},async()=>{const h=apiHarness();h.context.credits.sync=()=>new Promise(()=>{});assert.equal((await h.context.creditApi('creditJoinTable',{})).ok,true);});

@@ -1,5 +1,5 @@
 export function teamPie(room,player){
- const first=room.trickCards?.[0]?.playerId||room.resolvedTrickWinner||room.mano;
+ const first=room.mano;
  const i=TEAM_SEATS.indexOf(first),order=[...TEAM_SEATS.slice(i),...TEAM_SEATS.slice(0,i)];
  return order.filter(q=>playerTeam(q)===playerTeam(player)&&!room.folded?.[q]).at(-1);
 }

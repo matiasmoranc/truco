@@ -118,7 +118,7 @@ function createTeamReferee(s,{now=Date.now(),deckFactory=deck}={}){
  }
  function signal(p,value){
   const labels={veni:'Vení',juga:'Jugá',grita:'Gritá'};
-  const leader=r.trickCards[0]?.playerId||r.resolvedTrickWinner||r.mano;
+  const leader=r.mano;
   const mates=ordered(leader).filter(q=>team(q)===team(p)&&active(q));
   if(!labels[value]||r.pendingBet||mates.length!==2||mates.at(-1)!==p||r.turn!==mates[0])throw new Error('Solo el pie puede indicar cuando juega su compañero.');
   r.teamSignal={id:crypto.randomUUID(),from:p,to:r.turn,text:labels[value],handNumber:r.handNumber,trickNo:r.trickNo,time:now};
