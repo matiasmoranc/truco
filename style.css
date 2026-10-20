@@ -1978,3 +1978,5 @@ input,textarea,[contenteditable=""],[contenteditable="true"]{-webkit-user-select
 .game.player-mode.two-device-mode:not(.team-mode)[data-deck-side="left"] .played-card.is-opponent-play{left:67%}
 .game.player-mode.two-device-mode:not(.team-mode)[data-deck-side="right"] .played-card.is-own-play{left:33%}
 .game.player-mode.two-device-mode:not(.team-mode)[data-deck-side="right"] .played-card.is-opponent-play{left:45%}
+
+#welcome-view .home-section-title h2{font-size:21px;line-height:1.2;margin:0}#welcome-view .home-lobby-heading{margin-bottom:0}#welcome-view .open-room-list{margin-top:8px}.compact-room-privacy.is-private svg{stroke:#f07878}.lobby-team-row .lobby-team-name{max-width:100%}

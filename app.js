@@ -5,7 +5,7 @@ import { installActivity } from './activity.js?v=20261010-adminstats32';
 import { installCredits } from './credits.js?v=20261015-startup';
 import { installAccount } from './account.js?v=20261016-android-google';
 import { initializeGameAuth } from './auth-init.js?v=20261016-android-google';
-import {installTeamTable,TEAM_SEATS,playerTeam,positionDealerDeck,renderTeamLobbySeats,renderWaitingSeats} from './team-table-ui.js?v=20261019-duel-tricks';
+import {installTeamTable,TEAM_SEATS,playerTeam,positionDealerDeck,renderTeamLobbySeats,renderWaitingSeats} from './team-table-ui.js?v=20261019-lobby-unified';
 const FIREBASE_VERSION = '12.4.0';
 const $ = (id) => document.getElementById(id);
 const views = ['welcome-view', 'invite-view', 'setup-view', 'waiting-view', 'game-view', 'config-view', 'learn-view', 'scorer-view'];
@@ -898,11 +898,11 @@ function renderLobby(rooms) {
     const actions=[];
     if(room.mode!=='2v2'&&roomSeats(room).some(p=>!players[p]))actions.push(['player','Entrar']);
     const joinDisabled=!!(room.managedCredits&&!roomSeatForUid(room,state.uid)&&((credits.wallet()?.balance??0)<room.creditMatch.stake||(credits.wallet()?.locked??0)>0));
-    const teamSeats=room.mode==='2v2'?renderTeamLobbySeats(code,room,escapeHtml,joinDisabled):'';
+    const teamSeats=room.mode==='2v2'?renderTeamLobbySeats(code,room,escapeHtml,joinDisabled):`<div class="lobby-team-row"><div class="lobby-team"><span class="lobby-team-name">${escapeHtml(title)}</span></div><span class="lobby-team-versus">vs</span><div class="lobby-team">${actions.map(([key,label])=>`<button class="lobby-team-join" data-room="${code}" data-seat="${key}" ${joinDisabled?'disabled':''}>${label}</button>`).join('')}</div></div>`;
     const privateTable=!!(room.managedCredits&&room.creditMatch.hasPassword);
     const coins='<svg viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v5c0 4 16 4 16 0V5M4 10v5c0 4 16 4 16 0v-5M4 15v4c0 4 16 4 16 0v-4"/></svg>';
     const lock='<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="'+(privateTable?'M8 10V6a4 4 0 0 1 8 0v4':'M8 10V6a4 4 0 0 1 8 0')+'"/><path d="M12 14v3"/></svg>';
-    return `<article class="lobby-card compact-room ${room.mode==='2v2'?'has-team-seats':''}"><div class="compact-room-owner"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21v-2a8 8 0 0 1 16 0v2"/></svg><h3>${escapeHtml(title)}${room.mode==='2v2'?'<small class="room-mode-label">2 vs 2 · '+Object.keys(players).length+'/4</small>':''}</h3></div><div class="compact-room-stat"><strong>${targetPoints(room)}</strong><span>puntos</span></div><div class="compact-room-stat">${coins}<strong>${room.managedCredits?escapeHtml(String(room.creditMatch.stake)):'0'}</strong></div><div class="compact-room-privacy ${privateTable?'is-private':'is-public'}">${lock}<strong>${privateTable?'Privada':'Pública'}</strong></div><div class="lobby-join-options">${actions.map(([key,label])=>`<button class="button lobby-player-button" data-room="${code}" data-seat="${key}" ${room.managedCredits&&!roomSeatForUid(room,state.uid)&&((credits.wallet()?.balance??0)<room.creditMatch.stake||(credits.wallet()?.locked??0)>0)?'disabled':''}>${label}</button>`).join('')}</div>${teamSeats}</article>`;
+    return `<article class="lobby-card compact-room has-team-seats"><div class="compact-room-owner"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21v-2a8 8 0 0 1 16 0v2"/></svg><h3>${escapeHtml(title)}</h3></div><div class="compact-room-stat"><strong>${targetPoints(room)}</strong><span>puntos</span></div><div class="compact-room-stat">${coins}<strong>${room.managedCredits?escapeHtml(String(room.creditMatch.stake)):'0'}</strong></div><div class="compact-room-privacy ${privateTable?'is-private':'is-public'}" role="img" aria-label="${privateTable?'Mesa privada':'Mesa pública'}" title="${privateTable?'Mesa privada':'Mesa pública'}">${lock}</div><div class="lobby-join-options">${actions.map(([key,label])=>`<button class="button lobby-player-button" data-room="${code}" data-seat="${key}" ${room.managedCredits&&!roomSeatForUid(room,state.uid)&&((credits.wallet()?.balance??0)<room.creditMatch.stake||(credits.wallet()?.locked??0)>0)?'disabled':''}>${label}</button>`).join('')}</div>${teamSeats}</article>`;
   }).join('');
 }
 function joinOpenRoom(code, seat, team=null) {
