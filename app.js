@@ -5,7 +5,7 @@ import { installActivity } from './activity.js?v=20261010-adminstats32';
 import { installCredits } from './credits.js?v=20261015-startup';
 import { installAccount } from './account.js?v=20261016-android-google';
 import { initializeGameAuth } from './auth-init.js?v=20261016-android-google';
-import {installTeamTable,TEAM_SEATS,playerTeam,positionDealerDeck,renderTeamLobbySeats,renderWaitingSeats} from './team-table-ui.js?v=20261019-fixed-pie-fast';
+import {installTeamTable,TEAM_SEATS,playerTeam,positionDealerDeck,renderTeamLobbySeats,renderWaitingSeats} from './team-table-ui.js?v=20261019-duel-tricks';
 const FIREBASE_VERSION = '12.4.0';
 const $ = (id) => document.getElementById(id);
 const views = ['welcome-view', 'invite-view', 'setup-view', 'waiting-view', 'game-view', 'config-view', 'learn-view', 'scorer-view'];
@@ -2164,6 +2164,7 @@ function renderGame() {
   if(!state.handGestureActive)renderPlayerHand(visibleHand,myTurn);
   animateFoldedHand();
 
+  $('game-view').dataset.deckSide=(room.dealer||otherPlayer(room.mano||'player1'))===state.playerId?'right':'left';
   renderPlayedCards(room);
   renderOpponentHand(room);
   const sample=room.muestra;

@@ -1972,3 +1972,9 @@ input,textarea,[contenteditable=""],[contenteditable="true"]{-webkit-user-select
 .game.team-mode .muestra-card{touch-action:none;cursor:grab}.game.team-mode .muestra-card.dragging{cursor:grabbing}
 
 .game .muestra-card.sprite-card{touch-action:none;cursor:grab}.game .muestra-card.sprite-card.dragging{cursor:grabbing}
+
+/* Played cards sit inward from the deck on the opposite half of a duel. */
+.game.player-mode.two-device-mode:not(.team-mode)[data-deck-side="left"] .played-card.is-own-play{left:55%}
+.game.player-mode.two-device-mode:not(.team-mode)[data-deck-side="left"] .played-card.is-opponent-play{left:67%}
+.game.player-mode.two-device-mode:not(.team-mode)[data-deck-side="right"] .played-card.is-own-play{left:33%}
+.game.player-mode.two-device-mode:not(.team-mode)[data-deck-side="right"] .played-card.is-opponent-play{left:45%}
