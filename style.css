@@ -1989,5 +1989,7 @@ input,textarea,[contenteditable=""],[contenteditable="true"]{-webkit-user-select
 #welcome-view .compact-room .lobby-team-row{margin-top:8px;padding-top:8px}
 #welcome-view .compact-room .lobby-team-name{display:flex;align-items:center;justify-content:center;min-height:36px;padding:7px 8px;border:1px solid #d8b87580;border-radius:8px;background:#e8c98316;font-size:12px;font-weight:700;line-height:1.2}
 @media(max-width:380px){#welcome-view .compact-room.has-team-seats{padding:10px 7px}#welcome-view .compact-room .lobby-team-name{padding:6px;font-size:11px}}
-
 #welcome-view .compact-room.has-team-seats{background:#0b3025}
+
+#welcome-view .compact-room .compact-room-stat,#welcome-view .compact-room .compact-room-privacy{min-height:34px;gap:1px}#welcome-view .compact-room .compact-room-stat strong{line-height:1}#welcome-view .compact-room .compact-room-stat span{line-height:1}
+#welcome-view .home-tools-row #learn-game,#welcome-view .home-tools-row #open-scorer{height:48px;min-height:48px;padding:8px 12px;gap:9px}#welcome-view .home-tools-row .home-action-icon{width:22px;height:22px;flex-basis:22px}
