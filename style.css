@@ -1980,3 +1980,14 @@ input,textarea,[contenteditable=""],[contenteditable="true"]{-webkit-user-select
 .game.player-mode.two-device-mode:not(.team-mode)[data-deck-side="right"] .played-card.is-opponent-play{left:45%}
 
 #welcome-view .home-section-title h2{font-size:21px;line-height:1.2;margin:0}#welcome-view .home-lobby-heading{margin-bottom:0}#welcome-view .open-room-list{margin-top:8px}.compact-room-privacy.is-private svg{stroke:#f07878}.lobby-team-row .lobby-team-name{max-width:100%}
+
+/* Compact two-row lobby cards retain all table information. */
+#welcome-view .compact-room.has-team-seats{padding:10px}
+#welcome-view .compact-room .compact-room-stat,#welcome-view .compact-room .compact-room-privacy{min-height:44px}
+#welcome-view .compact-room>.compact-room-stat:nth-child(3){flex-direction:row;gap:6px}
+#welcome-view .compact-room>.compact-room-stat:nth-child(3) svg{margin:0;width:21px;height:21px;flex-shrink:0}
+#welcome-view .compact-room .lobby-team-row{margin-top:8px;padding-top:8px}
+#welcome-view .compact-room .lobby-team-name{display:flex;align-items:center;justify-content:center;min-height:36px;padding:7px 8px;border:1px solid #d8b87580;border-radius:8px;background:#e8c98316;font-size:12px;font-weight:700;line-height:1.2}
+@media(max-width:380px){#welcome-view .compact-room.has-team-seats{padding:10px 7px}#welcome-view .compact-room .lobby-team-name{padding:6px;font-size:11px}}
+
+#welcome-view .compact-room.has-team-seats{background:#0b3025}
