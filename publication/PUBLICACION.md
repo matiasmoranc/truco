@@ -4,7 +4,7 @@ Estado al 14/10/2026: preparación técnica en curso. Ninguna aprobación ni env
 
 ## Primero: cerrar la versión que se enviará
 
-El juego usa créditos gratuitos; cada rival aporta la misma cantidad y el ganador recibe ambos aportes. No hay compras ni canje por dinero/premios. Declarar esa mecánica en reglas, cuestionarios y notas. La política de recompensas AdMob exige recompensas no transferibles: la compatibilidad de la recompensa con los aportes entre jugadores sigue pendiente. No alcanza cambiar el nombre o el texto de la recompensa.
+El juego usa créditos gratuitos; cada participante aporta la misma cantidad; en 1 vs 1 el ganador recibe el pozo y en 2 vs 2 cada ganador recibe la mitad del pozo de cuatro aportes. No hay compras ni canje por dinero/premios. Declarar esa mecánica en reglas, cuestionarios y notas. La versión actual se prepara sin anuncios ni SDK de AdMob; no declarar recompensas publicitarias en su ficha.
 
 La primera versión está fijada sin anuncios. TRUCO_ADS_MODE=off es obligatorio en builds locales y de Codemagic. Se retiró el plugin AdMob y se limpian sus permisos y metadatos. No habilitar anuncios reales ni compras sin otra versión y revisión adicional.
 
@@ -60,3 +60,7 @@ Fuentes oficiales (consultadas 14/10/2026):
 - https://support.google.com/admob/answer/7313578
 - https://support.google.com/admob/answer/10564477
 - https://docs.codemagic.io/yaml-code-signing/signing-android/
+
+## Actualización funcional 19/10/2026
+
+Las descripciones y capturas deben reflejar mesas de 1 vs 1 y 2 vs 2, elección de equipo desde el lobby, reparto sin sorteo y las funciones del compañero descritas en ../REGLAS.md. Publicar Hosting no actualiza los binarios instalados: verificar la build antes de enviar una ficha a las tiendas.

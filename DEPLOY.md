@@ -80,3 +80,7 @@ Referencias:
 - https://github.com/google-github-actions/auth
 - https://cloud.google.com/iam/docs/workload-identity-federation-with-deployment-pipelines
 - https://firebase.google.com/docs/projects/iam/permissions
+
+## Cambios de juego y textos (19/10/2026)
+
+Las reglas actuales están en REGLAS.md y las páginas públicas reglas.html, privacidad.html, soporte.html y eliminar-cuenta.html. Publicar solo Hosting alcanza para textos y diseño. Cambios del árbitro, del pie o de acciones requieren también functions. Los comandos sobre main requieren que los cambios estén incorporados allí; para una rama de trabajo, actualizar explícitamente esa rama antes de desplegar. La publicación móvil necesita una build nueva.

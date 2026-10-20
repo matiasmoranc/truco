@@ -3352,7 +3352,7 @@ function learningGuidance(){
     if(bet.type==='flor'){const points=Number(bet.stake)||3,declined=declinedFlorPoints(bet);return [bet.single&&!roomHasFlor(room,original)?'Si no tenés flor, el rival gana 3 puntos.':'Si aceptás, el que sume más tantos de flor gana '+points+' puntos. Si no aceptás, el rival gana '+declined+' '+(declined===1?'punto':'puntos')+'.'];}
   }
   if(bet)return ['Esperá la respuesta del bot. No hay límite de tiempo.'];
-  if(roomHasFlor(room,original)&&!room.florSettled&&!room.flors?.player1)return ['Tenés FLOR de '+florValue(original,muestra)+' tantos. Cantala antes de tirar; con flor no se juega envido.',explainFlor(original,muestra).explanation];
+  if(roomHasFlor(room,original)&&!room.florSettled&&!room.flors?.player1)return ['Tenés FLOR de '+florValue(original,muestra)+' tantos. Si querés cantarla, hacelo antes de tirar. Podés jugar sin declararla; después de tu primera carta ya no podés reclamarla. Con flor declarada no se juega envido.',explainFlor(original,muestra).explanation];
   if(room.resolvingTrick||room.pendingNextHand||room.status==='revealing')return ['Mirá las cartas y el resultado de la ronda. Cerrá este mensaje para continuar.'];
   const guidance=[];
   if(canCallFirstRoundEnvido(room,'player1',state.hand))guidance.push('Tenés '+handEnvido(original,muestra)+' tantos. Podés cantar ENVIDO antes de tirar tu primera carta.');

@@ -4,9 +4,9 @@ Decisión del titular: publicar primero sin anuncios. Preparación del 14 de oct
 
 ## Contenido de la versión
 
-- Juego gratuito de truco uruguayo para dos jugadores, práctica contra el bot y aprendizaje.
+- Juego gratuito de truco uruguayo para dos o cuatro jugadores en equipos, práctica contra el bot y aprendizaje.
 - Google y Apple según plataforma; sesión y créditos compartidos con la web.
-- Recarga gratuita de 5 créditos a saldo cero y sin reservas, una vez por día de Uruguay. El ganador recibe los aportes de ambos. Sin compras, retiros ni premios canjeables.
+- Recarga gratuita de 5 créditos a saldo cero y sin reservas, una vez por día de Uruguay. En 1 vs 1 el ganador recibe ambos aportes; en 2 vs 2 cada ganador recibe la mitad del pozo de cuatro aportes. Sin compras, retiros ni premios canjeables.
 - Chat con filtro, silencio para la partida, reportes y bloqueos persistentes.
 - Estadísticas, cuenta, eliminación y páginas públicas de ayuda.
 - Sin SDK AdMob, anuncios de prueba/reales, compras ni suscripciones. Las builds rechazan cualquier TRUCO_ADS_MODE distinto de off.
@@ -57,3 +57,7 @@ Mantener `rewardedAds/liveEnabled = false`. Los clientes no pueden modificar esa
 - Correcciones probadas y todos los campos obligatorios de las consolas completos.
 
 Fuentes oficiales: https://developer.apple.com/app-store/review/guidelines/ ; https://developer.apple.com/app-store/app-privacy-details/ ; https://support.google.com/googleplay/android-developer/answer/10787469 ; https://support.google.com/googleplay/android-developer/answer/14151465
+
+## Actualización funcional 19/10/2026
+
+Las descripciones y capturas deben reflejar mesas de 1 vs 1 y 2 vs 2, elección de equipo desde el lobby, reparto sin sorteo y las funciones del compañero descritas en ../REGLAS.md. Publicar Hosting no actualiza los binarios instalados: verificar la build antes de enviar una ficha a las tiendas.

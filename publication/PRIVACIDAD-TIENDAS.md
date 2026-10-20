@@ -1,6 +1,6 @@
 # Inventario para App Privacy y Seguridad de los datos
 
-Revisión de código: 14/10/2026. Es un borrador técnico, no un formulario enviado. La clasificación final debe corresponder a la build y sus SDK y a la configuración de Firebase realmente usada. No declarar que no se recopilan datos.
+Revisión de código: 19/10/2026. Es un borrador técnico, no un formulario enviado. La clasificación final debe corresponder a la build y sus SDK y a la configuración de Firebase realmente usada. No declarar que no se recopilan datos.
 
 ## Datos del juego
 
@@ -44,3 +44,7 @@ Fuentes oficiales consultadas:
 - https://developers.google.com/admob/android/privacy/play-data-disclosure
 - https://support.google.com/googleplay/android-developer/answer/10787469
 - https://support.google.com/googleplay/android-developer/answer/13327111
+
+## Mesas de cuatro
+
+El estado público incluye equipo y asiento, turnos, cartas jugadas, cantos e indicaciones del pie. El canal privado de cada participante contiene su mano y la de su compañero. La vista de tres segundos es una regla visual; no elimina del dispositivo los datos ya recibidos. Las manos rivales quedan fuera de esos canales. La invitación a WhatsApp es una acción del usuario con un enlace de mesa. Reflejar estas funciones en los formularios aplicables y verificar el binario que se envía.

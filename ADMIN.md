@@ -33,3 +33,7 @@ Usuarios totales Google/Apple, activos ahora y usuarios únicos diarios. Activos
 Volvé a descargar el proyecto y desplegá functions,database para habilitar playerActivity y activityCleanup. Ninguna estadística histórica anterior se puede reconstruir con precisión.
 
 Los indicadores Activos ahora y Usuarios únicos hoy abren la lista filtrada de cuentas existentes. En Usuarios y créditos se puede volver a mostrar todos. Las filas muestran nombre y saldo, y al desplegarlas aparecen datos y acciones. Para habilitar estos filtros desplegá la función adminConsole después de descargar esta versión.
+
+## Funciones del juego vigentes (19/10/2026)
+
+El juego incluye 1 vs 1, 2 vs 2, bot y aprendizaje. Consultar REGLAS.md para reparto, mano y pie, privacidad de cartas del compañero y créditos por equipo. Verificar estas modalidades en la build o intervención administrativa correspondiente; no asumir que una actualización de Hosting actualiza las apps instaladas.
