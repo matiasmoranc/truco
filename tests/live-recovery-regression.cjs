@@ -2,7 +2,7 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs');
 const source=fs.readFileSync('app.js','utf8');
 function fn(name){const start=new RegExp('^(?:async )?function '+name+'\\(','m').exec(source).index,open=source.indexOf('{',start);let n=1,end=open+1;for(;n;end++){if(source[end]==='{')n++;if(source[end]==='}')n--;}return source.slice(start,end);}
-function harness(){const c={state:{roomCode:'ABCDE',playerId:'player1',room:{managedCredits:true,creditMatch:{id:'m'},revision:4,handNumber:2,status:'started',turn:'player1'},hand:[{id:'a'}]},liveActionsBlocked:()=>false,syncLiveControls(){},renderConnectionNotice(){},renderGame(){},refreshLiveConnection:async()=>{},console:{error(){}},syncPrivateHand(){}};vm.createContext(c);vm.runInContext(['isOlderRoom','applyActionReceipt','reconcilePendingPlay','playManagedCard'].map(fn).join('\n'),c);return c;}
+function harness(){const c={state:{roomCode:'ABCDE',playerId:'player1',room:{managedCredits:true,creditMatch:{id:'m'},revision:4,handNumber:2,status:'started',turn:'player1'},hand:[{id:'a'}]},liveActionsBlocked:()=>false,syncLiveControls(){},renderConnectionNotice(){},animatePlayedHandCard(){},removeCardFlight(){},renderGame(){},refreshLiveConnection:async()=>{},console:{error(){}},syncPrivateHand(){}};vm.createContext(c);vm.runInContext(['isOlderRoom','applyActionReceipt','reconcilePendingPlay','playManagedCard'].map(fn).join('\n'),c);return c;}
 test('Delayed action replies cannot roll back a newer turn or rematch',()=>{const c=harness();c.applyActionReceipt({room:{managedCredits:true,creditMatch:{id:'m'},revision:3,turn:'player1'}},'ABCDE');assert.equal(c.state.room.revision,4);c.state.room.matchNumber=2;c.applyActionReceipt({room:{managedCredits:true,creditMatch:{id:'old'},matchNumber:1,revision:99}},'ABCDE');assert.equal(c.state.room.creditMatch.id,'m');});
 test('An action receipt applies the public turn and only the caller private hand together',()=>{const c=harness();let rendered=0;c.renderGame=()=>rendered++;c.applyActionReceipt({room:{...c.state.room,revision:5,turn:'player2'},privateHand:{revision:5,creditMatchId:'m',hand:[]}},'ABCDE');assert.equal(c.state.room.turn,'player2');assert.equal(c.state.privateDeal.revision,5);assert.equal(rendered,1);c.applyActionReceipt({room:{...c.state.room,revision:6}},'OTHER');assert.equal(c.state.room.revision,5);});
 test('Realtime acknowledgment releases a play without waiting for a slow callable response',async()=>{const c=harness();let done;c.creditCommand=()=>new Promise(resolve=>done=resolve);const pending=c.playManagedCard({id:'a'});assert.equal(c.state.playActionInFlight,true);c.state.room.trickCards=[{playerId:'player1',card:{id:'a'}}];c.reconcilePendingPlay();assert.equal(c.state.playActionInFlight,true);c.state.hand=[];c.reconcilePendingPlay();assert.equal(c.state.playActionInFlight,false);const newer={cardId:'b'};c.state.playActionToken=newer;c.state.playActionInFlight=true;done();await pending;assert.equal(c.state.playActionToken,newer);assert.equal(c.state.playActionInFlight,true);});
@@ -27,4 +27,19 @@ test('Public-first and private-first updates keep the remaining cards visible th
 });
 test('Lobby redraws keep Entering until the entry intent is cleared',()=>{
  const make=()=>({dataset:{room:'ABCDE',seat:'player'},textContent:'Entrar',disabled:false,setAttribute(){},removeAttribute(){}});let buttons=[make()];const c={state:{joinIntent:{code:'ABCDE',seat:'player'}},document:{querySelectorAll:()=>buttons}};vm.createContext(c);vm.runInContext(fn('syncLobbyJoinFeedback'),c);c.syncLobbyJoinFeedback();assert.equal(buttons[0].textContent,'Entrando…');buttons=[make()];c.syncLobbyJoinFeedback();assert.equal(buttons[0].textContent,'Entrando…');assert.equal(buttons[0].disabled,true);c.state.joinIntent=null;c.syncLobbyJoinFeedback();assert.equal(buttons[0].textContent,'Entrar');assert.equal(buttons[0].disabled,false);
+});
+
+test('A legal online card starts its flight before a delayed server reply, without changing authoritative turn',async()=>{
+ const c=harness();let finish;const events=[];c.animatePlayedHandCard=(card)=>events.push('flight:'+card.id);c.creditCommand=()=>{events.push('request');return new Promise(resolve=>finish=resolve);};
+ const pending=c.playManagedCard({id:'a'});assert.deepEqual(events,['flight:a','request']);assert.equal(c.state.room.turn,'player1');assert.equal(c.state.playActionInFlight,true);
+ await c.playManagedCard({id:'a'});assert.equal(events.length,2);finish();await pending;
+});
+
+test('Room and private hands publish concurrently and preserve newer revisions',async()=>{
+ const backend=fs.readFileSync('functions/index.cjs','utf8');const start=backend.indexOf('async function publish('),end=backend.indexOf('exports.creditCreateTable=',start);
+ const writes=[],resolvers=[];const room={managedCredits:true,revision:4,players:{player1:{uid:'u1'},player2:{uid:'u2'}}};
+ const c={db:{ref:path=>path},tableFor:()=>room,publicTable:m=>m,privateTableHand:(_m,p)=>({revision:4,seat:p}),loadedTransaction:(path,update)=>{writes.push({path,update});return new Promise(resolve=>resolvers.push(resolve));}};
+ vm.createContext(c);vm.runInContext(backend.slice(start,end),c);const pending=c.publish({},'ABCDE');assert.equal(writes.length,3);
+ assert.equal(writes[0].update({managedCredits:true,revision:5}),undefined);assert.equal(writes[1].update({revision:5}),undefined);
+ resolvers.forEach(resolve=>resolve({committed:true}));assert.equal((await pending).code,'ABCDE');
 });

@@ -45,17 +45,18 @@ async function mutate(update,allowEmpty=false,context={}){
 async function publish(ledger,code){
  const m=tableFor(ledger,code),room=publicTable(m);
  let collision=false;
- const published=await db.ref('rooms/'+code+'/public').transaction(current=>{
+ const publicWrite=loadedTransaction(db.ref('rooms/'+code+'/public'),current=>{
   collision=!!(current&&!current.managedCredits);if(collision)return undefined;
   if(current?.managedCredits&&Number(current.revision)>=m.revision)return undefined;
   return {...room,...(current?.connectionPresence?{connectionPresence:current.connectionPresence}:{})};
  });
- if(collision&&!published.committed)throw new Error('Ese código ya está en uso.');
- await Promise.all(Object.entries(m.players).map(async([player,person])=>{
+ const handWrites=Object.entries(m.players).map(async([player,person])=>{
   if(!person)return;
   const data=privateTableHand(m,player);
-  await db.ref('hands/'+code+'/'+person.uid).transaction(current=>Number(current?.revision)>=m.revision?undefined:data);
- }));
+  await loadedTransaction(db.ref('hands/'+code+'/'+person.uid),current=>Number(current?.revision)>=m.revision?undefined:data);
+ });
+ const [published]=await Promise.all([publicWrite,...handWrites]);
+ if(collision&&!published.committed)throw new Error('Ese código ya está en uso.');
  return {code,room,player1:m.player1,player2:m.player2};
 }
 exports.creditCreateTable=onCall(options,async request=>{

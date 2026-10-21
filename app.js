@@ -772,7 +772,8 @@ async function enterRoom() {
     let joinedRoom;
     if(request.joining){
       const code=request.code,roomRef=fb.ref(fb.db,`rooms/${code}/public`);
-      const snap=await fb.get(roomRef);
+      const cached=state.lobbyRooms?.[code]?.public;
+      const snap=cached?.managedCredits?{exists:()=>true,val:()=>cached}:await fb.get(roomRef);
       if(!snap.exists()){if($('join-credit-dialog').open)throw new Error('La invitación ya no está disponible.');toast('La invitación ya no está disponible.',true);await openLobby();return;}
       let room=snap.val(),seat=roomSeatForUid(room,state.uid);
       if(room.status==='closed'||roomExpired(room)){if($('join-credit-dialog').open)throw new Error('La mesa ya está cerrada.');toast('La mesa ya está cerrada.',true);await openLobby();return;}
@@ -1785,9 +1786,10 @@ function reconcilePendingPlay(){
 async function playManagedCard(card){
   if(liveActionsBlocked()||state.liveAction||state.playActionInFlight||state.room.status!=='started'||state.room.resolvingTrick||state.room.pendingNextHand||state.room.turn!==state.playerId||state.room.pendingBet||!state.hand.some(c=>c.id===card.id))return;
   const token={code:state.roomCode,hand:state.room.handNumber,cardId:card.id};
-  state.playActionToken=token;state.playActionInFlight=true;state.pendingCardId=card.id;syncLiveControls();renderConnectionNotice();
+  state.playActionToken=token;state.playActionInFlight=true;state.pendingCardId=card.id;syncLiveControls();
+  const origin=state.cardLaunchOrigin;state.cardLaunchOrigin=null;animatePlayedHandCard(card,origin);
   try{await creditCommand({kind:'play',cardId:card.id});}
-  catch(error){console.error('[truco:play]',error);if(state.roomCode===token.code)void refreshLiveConnection();}
+  catch(error){console.error('[truco:play]',error);if(state.roomCode===token.code){removeCardFlight();void refreshLiveConnection();}}
   finally{if(state.playActionToken===token){state.playActionToken=null;state.playActionInFlight=false;state.pendingCardId=null;}if(state.roomCode===token.code){renderGame();syncLiveControls();}}
 }
 async function playCard(card) {
