@@ -4039,7 +4039,18 @@ $('join-credit-dialog').addEventListener('cancel',event=>{if(state.joinSubmittin
 $('join-credit-dialog').addEventListener('close',()=>{state.joinPassword='';state.joinConfirmed=false;});
 $('join-credit-password').addEventListener('input',()=>{$('join-credit-error').textContent='';});
 $('table-visibility').addEventListener('change',()=>{$('table-password-row').hidden=$('table-visibility').value!=='password';});
-setInterval(()=>{if(state.room?.managedCredits&&state.firebaseConnected===true&&navigator.onLine!==false&&document.visibilityState==='visible'&&state.room.status!=='closed')creditCommand({kind:'tick'}).catch(()=>{});},2000);
+function managedTickDue(room,now=gameTime()){
+  if(!room?.managedCredits||room.status==='closed')return false;
+  if(room.status==='waiting')return now-Number(room.createdAt)>=600000;
+  if(room.status==='drawing'||room.status==='timed-out')return true;
+  if(room.resolvingTrick&&now>=Number(room.resolutionEndsAt))return true;
+  if(room.pendingNextHand&&now>=Number(room.pendingNextHand.endsAt))return true;
+  if(['revealing','complete'].includes(room.status)&&room.endReveal&&!room.endReveal.done&&now>=Number(room.endReveal.endsAt))return true;
+  if(room.status==='complete'&&!room.endReveal)return true;
+  if(room.status==='started'&&room.turnClock&&now-Number(room.turnClock.startedAt)>=45000)return true;
+  return Object.entries(room.connectionPresence||{}).some(([seat,p])=>p?.online===false&&p.uid===room.players?.[seat]?.uid&&Number(p.matchNumber)===Number(room.matchNumber||1)&&Number.isFinite(p.disconnectedAt)&&now-p.disconnectedAt>=45000);
+}
+setInterval(()=>{if(state.firebaseConnected===true&&navigator.onLine!==false&&document.visibilityState==='visible'&&managedTickDue(state.room))creditCommand({kind:'tick'}).catch(()=>{});},2000);
 
 function updateStakeControl(){
   const wallet=credits.wallet(),maximum=Math.max(0,Math.floor(wallet?.balance||0));
