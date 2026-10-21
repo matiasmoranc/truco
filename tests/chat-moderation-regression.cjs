@@ -22,7 +22,7 @@ test('Browser and server filters stay in sync',()=>{
 
 test('Blocking either account prevents the pair from joining a future table',async()=>{
  const blocks={'userBlocks/a/b':{blocked:true,name:'Ricky',blockedAt:123},'userBlocks/c/a':true};
- const db={ref:path=>({get:async()=>({val:()=>blocks[path]??null})})};
+ const db={ref:path=>({once:async()=>({val:()=>blocks[path]??null})})};
  assert.equal(await usersBlockEachOther(db,'a','b'),true);
  assert.equal(await usersBlockEachOther(db,'a','c'),true);
  assert.equal(await usersBlockEachOther(db,'b','a'),true);
