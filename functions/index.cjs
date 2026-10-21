@@ -84,7 +84,7 @@ async function createTableRequest(request){
   throw new HttpsError('aborted','No pudimos confirmar la mesa. Revisá el lobby antes de volver a intentar.');
  }finally{console.info('Table entry timing',{kind:'create',...stages,totalMs:Date.now()-started});}
 }
-exports.creditCreateTable=onCall(options,createTableRequest);
+exports.creditCreateTable=onCall(options,request=>gameDatabase.run(restDb,()=>createTableRequest(request)));
 async function joinTableRequest(request){
  const started=Date.now(),stages={}, {code,password,team}=request.data||{};
  if(!request.auth)await identity(request);
@@ -98,7 +98,7 @@ async function joinTableRequest(request){
   return {...result,privateHand:seat?privateTableHand(m,seat):null,timing:{...stages,totalMs:Date.now()-started}};
  }finally{console.info('Table entry timing',{kind:'join',...stages,totalMs:Date.now()-started});}
 }
-exports.creditJoinTable=onCall(options,joinTableRequest);
+exports.creditJoinTable=onCall(options,request=>gameDatabase.run(restDb,()=>joinTableRequest(request)));
 async function tableActionRequest(request){
  const started=Date.now(),stages={};const {code,command,requestId,expectedMatchId}=request.data||{};
  if(!command||typeof command.kind!=='string'||!requestId||['__proto__','constructor','prototype'].includes(requestId)||!/^[a-zA-Z0-9_-]{1,100}$/.test(requestId)){await identity(request);await rateLimit(request.auth.uid,120,'actions');throw new HttpsError('invalid-argument','Jugada inválida.');}
@@ -119,7 +119,7 @@ async function tableActionRequest(request){
  const seat=Object.keys(m.players).find(p=>m.players[p]?.uid===user.uid);
  return {...result,privateHand:seat?privateTableHand(m,seat):null};
 }
-exports.creditTableAction=onCall(options,tableActionRequest);
+exports.creditTableAction=onCall(options,request=>gameDatabase.run(restDb,()=>tableActionRequest(request)));
 exports.creditGame=onCall({...options,concurrency:16,memory:'512MiB'},request=>gameDatabase.run(restDb,async()=>{
  const auth=request.auth,provider=auth?.token?.firebase?.sign_in_provider;
  if(!auth||!['google.com','apple.com','password'].includes(provider))throw new HttpsError('unauthenticated','Iniciá sesión con tu cuenta.');

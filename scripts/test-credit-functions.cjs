@@ -10,7 +10,7 @@ const functions=require('../functions/index.cjs'),serverRequire=require('node:mo
 const db=getDatabase();
 
 const request=(uid,data)=>({auth:{uid,token:{firebase:{sign_in_provider:'google.com'}}},data});
-const call=(name,uid,data)=>['creditCreateTable','creditJoinTable','creditTableAction'].includes(name)?functions.creditGame.run(request(uid,{operation:name,payload:data})):functions[name].run(request(uid,data));
+const call=(name,uid,data)=>['creditCreateTable','creditJoinTable','creditTableAction'].includes(name)&&seq%2?functions.creditGame.run(request(uid,{operation:name,payload:data})):functions[name].run(request(uid,data));
 let seq=0;
 (async()=>{
  console.log('Checking callable server against the local emulator…');
