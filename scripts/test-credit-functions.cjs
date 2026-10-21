@@ -25,7 +25,7 @@ let seq=0;
  const joined=races.find(x=>x.status==='fulfilled').value,peer=joined.player2,code=created.code,id=joined.room.creditMatch.id;
  await assert.rejects(()=>call('creditTableAction',peer==='b'?'c':'b',{code,command:{kind:'tick'},requestId:'outsider-tick',expectedMatchId:id}),/No pertenecés/);
  const action=(uid,command)=>call('creditTableAction',uid,{code,command,expectedMatchId:id,requestId:'e2e-'+(++seq)});
- assert.equal(joined.room.status,'started');assert.equal(joined.room.openingDraw,null);
+ assert.equal(joined.room.status,'started');assert.equal(joined.room.openingDraw??null,null);
  assert.equal(joined.privateHand.hand.length,3);
  for(let n=0;n<10&&(await db.ref('creditEconomy/matches/'+id+'/status').get()).val()!=='settled';n++){
   await action(peer,{kind:'fold'});
@@ -63,3 +63,4 @@ let seq=0;
  }finally{auth.getUser=oldGet;auth.deleteUser=oldDelete;}
  await db.ref().set(null);process.exit(0);
 })().catch(error=>{console.error(error);process.exit(1);});
+
