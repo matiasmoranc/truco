@@ -43,3 +43,16 @@ test('Room and private hands publish concurrently and preserve newer revisions',
  assert.equal(writes[0].update({managedCredits:true,revision:5}),undefined);assert.equal(writes[1].update({revision:5}),undefined);
  resolvers.forEach(resolve=>resolve({committed:true}));assert.equal((await pending).code,'ABCDE');
 });
+
+test('Confirmed departure closes the dialog even if its callable acknowledgment times out',async()=>{
+ for(const confirmed of ['lobby','finished','other-room','unconfirmed']){
+  const nodes={},c={state:{roomCode:'ABCDE',room:{managedCredits:true,matchNumber:1}},abandoningMatch:false,matchFinished:r=>r.status==='complete',firebaseError:()=> 'timeout',returnToLobby(){c.left=true;},$:(id)=>nodes[id]??=( {textContent:'',disabled:false,addEventListener(_event,fn){this.click=fn;},close(){this.closed=true;}} )};
+  c.creditCommand=async()=>{if(confirmed==='lobby'){c.state.room=null;c.state.roomCode=null;}if(confirmed==='finished')c.state.room.status='complete';if(confirmed==='other-room')c.state.roomCode='OTHER';throw Error('deadline');};
+  vm.createContext(c);vm.runInContext(source.slice(source.indexOf("$('abandon-accept').addEventListener"),source.indexOf('function limitMuestraOffset(')),c);
+  await nodes['abandon-accept'].click();
+  assert.equal(!!nodes['abandon-dialog']?.closed,confirmed!=='unconfirmed');
+  assert.equal(!!c.left,confirmed==='finished'||confirmed==='lobby');
+  assert.equal(nodes['abandon-accept'].disabled,false);
+  if(confirmed==='unconfirmed')assert.equal(nodes['abandon-error'].textContent,'timeout');
+ }
+});

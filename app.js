@@ -3299,7 +3299,13 @@ $('abandon-accept').addEventListener('click',async()=>{
       if(!result.committed)throw new Error('La partida cambió. Volvé a intentarlo.');
     }
     $('abandon-dialog').close();if(state.roomCode===code)returnToLobby();
-  }catch(error){$('abandon-error').textContent=firebaseError(error);}
+  }catch(error){
+    // The room listener can confirm departure before a delayed callable fails.
+    // Do not leave an obsolete error dialog over the already confirmed lobby.
+    if(state.roomCode!==code||!state.room||matchFinished(state.room)){
+      $('abandon-dialog').close();if(!state.room||state.roomCode===code)returnToLobby();
+    }else $('abandon-error').textContent=firebaseError(error);
+  }
   finally{abandoningMatch=false;$('abandon-accept').disabled=false;$('abandon-cancel').disabled=false;$('abandon-accept').textContent='Aceptar';}
 });
 function limitMuestraOffset(x,y){
@@ -4123,4 +4129,5 @@ document.querySelectorAll('[data-visibility]').forEach(button=>button.addEventLi
   $('table-visibility').dispatchEvent(new Event('change'));
   document.querySelectorAll('[data-visibility]').forEach(option=>option.setAttribute('aria-pressed',String(option===button)));
 }));
+
 
