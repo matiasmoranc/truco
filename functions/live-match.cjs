@@ -21,7 +21,7 @@ function liveUpdate(match,parameters){
 }
 async function tryLiveAction(db,parameters){
  if(!LIVE.has(parameters.command.kind))return null;
- const id=(await db.ref('creditEconomy/tables/'+parameters.code).get()).val();
+ const id=(await db.ref('creditEconomy/tables/'+parameters.code).once('value')).val();
  if(typeof id!=='string')return null;
  let unchanged=false;
  const result=await loadedTransaction(db.ref('creditEconomy/matches/'+id),current=>{

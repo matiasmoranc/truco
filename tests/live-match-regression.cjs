@@ -34,7 +34,7 @@ test('Only a pending response blocks an otherwise valid card; answering uses the
 test('Database fast path only touches the table pointer and current match, including transaction retries',async()=>{
  const l=fixture(),m=l.matches.m,p={code:'ABCDE',uid:'a',command:{kind:'play',cardId:m.session.hands.player1[0].id},requestId:'play',expectedMatchId:'m',now:300},paths=[];
  let value=structuredClone(m),active=false;
- const db={ref(path){paths.push(path);if(path.endsWith('/tables/ABCDE'))return {get:async()=>({val:()=> 'm'})};
+ const db={ref(path){paths.push(path);if(path.endsWith('/tables/ABCDE'))return {once:async()=>({val:()=> 'm'})};
  assert.equal(path,'creditEconomy/matches/m');
  return {on(_event,fn){active=true;queueMicrotask(fn);},off(){active=false;},async transaction(update){
  assert.equal(active,true);const first=update(value);assert.equal(value.session.hands.player1.length,3);
@@ -52,7 +52,7 @@ test('Database fast path only touches the table pointer and current match, inclu
 test('An already confirmed request returns its current snapshot without writing or invoking accounting',async()=>{
  const l=fixture(),m=l.matches.m;m.requests.confirmed=true;
  let written=false;
- const db={ref(path){if(path.endsWith('/tables/ABCDE'))return {get:async()=>({val:()=> 'm'})};
+ const db={ref(path){if(path.endsWith('/tables/ABCDE'))return {once:async()=>({val:()=> 'm'})};
  return {on(_event,fn){queueMicrotask(fn);},off(){},async transaction(update){
  const next=update(m);written=next!==undefined;
  return {committed:written,snapshot:{val:()=>next||m}};
