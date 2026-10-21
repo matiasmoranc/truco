@@ -64,7 +64,7 @@ function tableOperation(ledger,{code,uid,command,requestId,expectedMatchId,prese
  }
  if(command.kind==='cancel'){
   if(m.status==='waiting'){if(player!=='player1')fail('No podés cerrar esta mesa.');cancelWaiting(next,m,now);return next;}
-  if(m.status==='settled'||m.status==='refunded'){m.closedAt=now;if(m.session)m.session.room.status='closed';m.revision++;return next;}
+  if(m.status==='settled'||m.status==='refunded'){m.closedAt=now;if(m.session){m.session.room.status='closed';m.session.room.closeReason??='match-left';}m.revision++;return next;}
   if(command.reason==='draw-cancel'&&m.session?.room.status==='drawing'){m.session.room.status='closed';m.session.room.closeReason='draw-cancel';return finishAccounting(next,m,now);}
   fail('La partida está en juego. Podés irte al mazo.');
  }

@@ -1,0 +1,13 @@
+{
+  "name": "truco-live-tables",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "test": "node --test test/table-engine.test.js"
+  },
+  "devDependencies": {
+    "wrangler": "4.145.0"
+  }
+}

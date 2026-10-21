@@ -4,7 +4,7 @@ const source=fs.readFileSync('app.js','utf8');
 function extract(name){const start=new RegExp('^(?:async )?function '+name+'\\(','m').exec(source).index,open=source.indexOf('{',start);let depth=1,end=open+1;for(;depth;end++){if(source[end]==='{')depth++;else if(source[end]==='}')depth--;}return source.slice(start,end);}
 function apiHarness(){
  let syncs=0;const calls=[];
- const context={firebaseServices:async()=>({auth:{app:{}}}),loadCreditFunctions:async()=>({getFunctions:(_app,region)=>{assert.equal(region,'us-central1');return {};},httpsCallable:(_fn,name)=>async data=>{calls.push({name,data});return {data:{ok:true}};}}),credits:{sync:async()=>{syncs++;return true;}}};
+ const context={liveTableApi:async(name,data)=>{calls.push({name,data,live:true});return {ok:true};},firebaseServices:async()=>({auth:{app:{}}}),loadCreditFunctions:async()=>({getFunctions:(_app,region)=>{assert.equal(region,'us-central1');return {};},httpsCallable:(_fn,name)=>async data=>{calls.push({name,data});return {data:{ok:true}};}}),credits:{sync:async()=>{syncs++;return true;}}};
  vm.createContext(context);vm.runInContext(extract('creditApi'),context);
  return {context,calls,syncs:()=>syncs};
 }
@@ -27,3 +27,10 @@ test('Background ticks yield to foreground actions without delaying a user call 
 });
 
 test('Joining returns even while the wallet refresh is still pending',{timeout:1000},async()=>{const h=apiHarness();h.context.credits.sync=()=>new Promise(()=>{});assert.equal((await h.context.creditApi('creditJoinTable',{})).ok,true);});
+
+test('Table calls go to the live table server; other calls stay on Cloud Functions',async()=>{
+ const h=apiHarness();
+ for(const name of ['creditCreateTable','creditJoinTable','creditTableAction'])await h.context.creditApi(name,{});
+ await h.context.creditApi('playerActivity',{});
+ assert.deepEqual(h.calls.map(c=>[c.name,!!c.live]),[['creditCreateTable',true],['creditJoinTable',true],['creditTableAction',true],['playerActivity',false]]);
+});

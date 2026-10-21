@@ -1,0 +1,28 @@
+name = "truco-live"
+main = "src/index.js"
+compatibility_date = "2025-09-01"
+# The shared referee modules use node:crypto (randomInt, scrypt, timingSafeEqual).
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+FIREBASE_PROJECT_ID = "truco-6553d"
+FIREBASE_DATABASE_URL = "https://truco-6553d-default-rtdb.firebaseio.com"
+# Browser origins allowed to open sockets. Native apps send capacitor:// or https://localhost.
+ALLOWED_ORIGINS = "https://trucouruguayo.uy,https://truco-6553d.web.app,https://truco-6553d.firebaseapp.com,capacitor://localhost,https://localhost"
+
+# Secrets (set with `npx wrangler secret put NAME`, never committed):
+#   FIREBASE_SERVICE_ACCOUNT  JSON key of a service account with Realtime Database access
+#   INTERNAL_SECRET           shared secret for Cloud Functions -> Worker admin calls
+
+[[durable_objects.bindings]]
+name = "TABLES"
+class_name = "TableRoom"
+
+[[durable_objects.bindings]]
+name = "LOBBY"
+class_name = "Lobby"
+
+# SQLite-backed Durable Objects are available on the Workers free plan.
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["TableRoom", "Lobby"]

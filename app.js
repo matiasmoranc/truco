@@ -6,6 +6,7 @@ import { installCredits } from './credits.js?v=20261015-startup';
 import { installAccount } from './account.js?v=20261016-android-google';
 import { initializeGameAuth } from './auth-init.js?v=20261016-android-google';
 import {installTeamTable,TEAM_SEATS,playerTeam,positionDealerDeck,renderTeamLobbySeats,renderWaitingSeats} from './team-table-ui.js?v=20261019-lobby-unified';
+import {createLiveTables,LiveError} from './live-tables.js?v=20261021-live1';
 const FIREBASE_VERSION = '12.4.0';
 const $ = (id) => document.getElementById(id);
 const views = ['welcome-view', 'invite-view', 'setup-view', 'waiting-view', 'game-view', 'config-view', 'learn-view', 'scorer-view'];
@@ -263,7 +264,56 @@ async function sendMatchChat(event){
 }
 function showView(id) { document.documentElement.classList.remove('opening-invitation'); views.forEach((name) => $(name).classList.toggle('active', name === id)); if(id!=='game-view')closeMatchChat(true); if(id==='welcome-view')requestAnimationFrame(showLobbyOnboarding); }
 function liveActionsBlocked(){
-  return !!(state.room&&!state.localGame&&(navigator.onLine===false||state.firebaseConnected!==true||state.connectionReady!==true));
+  return !!(state.room&&!state.localGame&&(navigator.onLine===false||!roomTransportConnected()||state.connectionReady!==true));
+}
+// Credit tables live on the table server socket; the old RTDB rooms used Firebase.
+function roomTransportConnected(){
+  return state.room?.managedCredits?state.liveConnected===true:state.firebaseConnected===true;
+}
+let liveTablesClient=null;
+function liveTables(){
+  return liveTablesClient??=createLiveTables({token:async()=>{
+    const user=state.firebase?.auth?.currentUser;
+    if(!user)throw new Error('Iniciá sesión con tu cuenta.');
+    return user.getIdToken();
+  }});
+}
+function liveSnapshot(value){return {exists:()=>value!=null,val:()=>value??null};}
+const TABLE_CODE_ALPHABET='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+async function liveTableApi(name,data){
+  await firebaseServices();
+  const live=liveTables();
+  if(name==='creditCreateTable'){
+    // The table server owns one object per code; a taken code is retried with a new one.
+    for(let attempt=0;attempt<5;attempt++){
+      const code=Array.from(crypto.getRandomValues(new Uint32Array(5)),n=>TABLE_CODE_ALPHABET[n%TABLE_CODE_ALPHABET.length]).join('');
+      try{return await live.call(code,'create',data);}
+      catch(error){live.closeTable(code);if(error.code!=='code-taken')throw error;}
+    }
+    throw new Error('No pudimos crear la mesa. Volvé a intentar.');
+  }
+  const {code,...rest}=data;
+  return live.call(code,name==='creditJoinTable'?'join':'act',rest);
+}
+// Socket state of the current table drives the reconnection banner and resync.
+let liveConnectionWatch=null;
+function watchLiveConnection(code){
+  if(liveConnectionWatch?.code===code)return;
+  liveConnectionWatch?.stop();
+  const live=liveTables();
+  state.liveConnected=live.tableConnected(code);
+  const stop=live.onTableConnection(code,connected=>{
+    if(state.roomCode!==code)return;
+    state.liveConnected=connected;
+    state.connectionEpoch=(state.connectionEpoch||0)+1;state.connectionReady=false;
+    if(connected)refreshLiveConnection();
+    if(state.room){renderTurnTimer();syncLiveControls();}
+  });
+  liveConnectionWatch={code,stop};
+}
+function stopLiveTable(){
+  liveConnectionWatch?.stop();liveConnectionWatch=null;state.liveConnected=false;
+  liveTablesClient?.closeAllTables();
 }
 function syncLiveControls(){
   const blocked=liveActionsBlocked(),busy=!!(state.liveAction||state.playActionInFlight||state.foldInFlight);
@@ -275,17 +325,19 @@ function syncLiveControls(){
   for(const card of $('hand').querySelectorAll('.hand-card'))card.disabled=blocked||busy;
 }
 async function refreshLiveConnection(){
-  if(!state.room||state.localGame||state.firebaseConnected!==true)return;
+  if(!state.room||state.localGame||!roomTransportConnected())return;
   const code=state.roomCode,epoch=state.connectionEpoch||0,key=code+':'+epoch;
   if(state.connectionSyncKey===key)return;
   state.connectionSyncKey=key;state.connectionReady=false;
   try{
     const fb=state.firebase,player=state.playerId;
-    const [publicSnap,privateSnap]=await Promise.all([
-      fb.get(fb.ref(fb.db,'rooms/'+code+'/public')),
-      fb.get(fb.ref(fb.db,'hands/'+code+'/'+state.uid))
-    ]);
-    if(state.localGame||state.roomCode!==code||(state.connectionEpoch||0)!==epoch||state.firebaseConnected!==true)return;
+    const [publicSnap,privateSnap]=state.room.managedCredits
+      ?await liveTables().readTable(code).then(({room,hand})=>[liveSnapshot(room),liveSnapshot(hand)])
+      :await Promise.all([
+        fb.get(fb.ref(fb.db,'rooms/'+code+'/public')),
+        fb.get(fb.ref(fb.db,'hands/'+code+'/'+state.uid))
+      ]);
+    if(state.localGame||state.roomCode!==code||(state.connectionEpoch||0)!==epoch||!roomTransportConnected())return;
     const room=publicSnap.val();
     if(!room||room.status==='closed'){returnToLobby('La mesa ya no está disponible.');return;}
     if(roomSeatForUid(room,state.uid)!==player){returnToLobby('Tu lugar ya no está disponible.');return;}
@@ -293,12 +345,12 @@ async function refreshLiveConnection(){
     if(['started','timed-out'].includes(room.status)&&!privateHandMatchesRoom(deal,room))throw new Error('hand-sync-pending');
     state.room=room;state.privateDeal=deal||null;syncPrivateHand();
     await syncRoomPresence();
-    if(state.roomCode!==code||state.localGame||(state.connectionEpoch||0)!==epoch||state.firebaseConnected!==true)return;
+    if(state.roomCode!==code||state.localGame||(state.connectionEpoch||0)!==epoch||!roomTransportConnected())return;
     if(['started','timed-out'].includes(state.room.status)&&!privateHandMatchesRoom(state.privateDeal,state.room))throw new Error('hand-sync-pending');
     state.connectionReady=true;renderGame();publishChatMute();
   }catch(error){
     console.warn('[truco:resync]',error);
-    if(state.roomCode===code&&(state.connectionEpoch||0)===epoch&&state.firebaseConnected===true){
+    if(state.roomCode===code&&(state.connectionEpoch||0)===epoch&&roomTransportConnected()){
       clearTimeout(state.connectionSyncRetry);
       state.connectionSyncRetry=setTimeout(refreshLiveConnection,1000);
     }
@@ -597,7 +649,7 @@ function advanceLobbyWelcome(){
 function resetAccountRoom(){
   activity.stop();
   credits.stop();
-  stopRoomPresence();stopBot();forgetRoomSeat();
+  stopRoomPresence();stopLiveTable();stopBot();forgetRoomSeat();
   state.roomWatchVersion=(state.roomWatchVersion||0)+1;
   state.navigationEpoch=(state.navigationEpoch||0)+1;
   if(state.unsubscribe)state.unsubscribe();
@@ -703,7 +755,7 @@ async function restoreRoom(code){
   try{
     const fb=await firebaseServices();
     if(epoch!==(state.navigationEpoch||0))return false;
-    const snapshot=await fb.get(fb.ref(fb.db,'rooms/'+code+'/public'));
+    const snapshot=liveSnapshot((await liveTables().readTable(code)).room);
     if(epoch!==(state.navigationEpoch||0))return false;
     const room=snapshot.val(),saved=savedRoomSeat();
     const seat=roomSeatForUid(room,state.uid);
@@ -769,7 +821,8 @@ async function enterRoom() {
     let joinedRoom;
     if(request.joining){
       const code=request.code,roomRef=fb.ref(fb.db,`rooms/${code}/public`);
-      const snap=await fb.get(roomRef);
+      // The lobby already holds open tables; invitations ask the table itself.
+      const snap=liveSnapshot(liveTables().lobbyRoom(code)||(await liveTables().readTable(code)).room);
       if(!snap.exists()){if($('join-credit-dialog').open)throw new Error('La invitación ya no está disponible.');toast('La invitación ya no está disponible.',true);await openLobby();return;}
       let room=snap.val(),seat=roomSeatForUid(room,state.uid);
       if(room.status==='closed'||roomExpired(room)){if($('join-credit-dialog').open)throw new Error('La mesa ya está cerrada.');toast('La mesa ya está cerrada.',true);await openLobby();return;}
@@ -861,9 +914,7 @@ async function openLobby() {
     showView('welcome-view');
     $('open-room-list').innerHTML = '<p class="muted">Buscando mesas abiertas…</p>';
     if (state.lobbyUnsubscribe) state.lobbyUnsubscribe();
-    state.lobbyUnsubscribe = fb.onValue(fb.ref(fb.db, 'rooms'), (snapshot) => {state.lobbyRooms=snapshot.val()||{};renderLobby(state.lobbyRooms);}, (error) => {
-      console.error(error); $('open-room-list').innerHTML = '<p class="muted">No pudimos cargar las mesas. Revisá las reglas de Firebase.</p>';
-    });
+    state.lobbyUnsubscribe = liveTables().watchLobby((rooms) => {state.lobbyRooms=rooms||{};renderLobby(state.lobbyRooms);});
   } catch (error) {
     console.error(error);
     $('open-room-list').innerHTML = '<p class="muted">No pudimos cargar las mesas. Revisá la conexión y las reglas de Firebase.</p>';
@@ -914,6 +965,7 @@ function joinOpenRoom(code, seat, team=null) {
   enterRoom();
 }
 function firebaseError(error) {
+  if (error instanceof LiveError) return error.message;
   if (error?.code === 'auth/operation-not-allowed') return 'Activá el inicio de sesión anónimo en Firebase y volvé a intentar.';
   if (error?.code?.includes('permission-denied')) return 'Firebase rechazó el acceso. Revisá las reglas de la base.';
   if (error?.message?.includes('Failed to fetch')) return 'No se pudo conectar con Firebase. Revisá la configuración y la conexión.';
@@ -924,7 +976,7 @@ function watchRoom() {
   const fb = state.firebase,code=state.roomCode;
   const version=(state.roomWatchVersion||0)+1;state.roomWatchVersion=version;
   if (state.unsubscribe) state.unsubscribe();
-  state.unsubscribe = fb.onValue(fb.ref(fb.db, `rooms/${code}/public`), (snapshot) => {
+  const onRoom = (snapshot) => {
     if(code!==state.roomCode||version!==state.roomWatchVersion)return;
     if (!snapshot.exists()) { if(state.unsubscribe){state.unsubscribe();state.unsubscribe=null;}console.warn('[truco:room] unavailable',{code});returnToLobby('La mesa ya no está disponible.');return; }
     const incoming=snapshot.val();
@@ -949,7 +1001,18 @@ function watchRoom() {
     if (['drawing','started','revealing','complete','timed-out'].includes(state.room.status)) { showView('game-view'); if(state.room.status!=='drawing')watchPrivateHand(); renderGame(); }
     if(isCoordinator()&&state.room.status==='drawing')finishOpeningDraw().catch(error=>toast(firebaseError(error)));
     else if (state.room.status === 'waiting') { renderWaiting(); if (!$('waiting-view').classList.contains('active')) showView('waiting-view'); }
-  },error=>{if(code!==state.roomCode||version!==state.roomWatchVersion)return;console.error('[truco:room] subscription failed',{code,error});toast(firebaseError(error),true);});
+  };
+  if(state.room?.managedCredits){
+    watchLiveConnection(code);
+    // Room and private hand arrive together; apply the hand first so one render sees both.
+    state.unsubscribe=liveTables().watchTable(code,({room,hand})=>{
+      if(code!==state.roomCode||version!==state.roomWatchVersion)return;
+      if(state.privateUnsubscribe&&state.privateHandKey===`${code}:${state.uid}`&&Number(room?.matchNumber||1)===Number(state.room?.matchNumber||1)){state.privateDeal=hand||null;state.privateDealJson=JSON.stringify(hand??null);}
+      onRoom(liveSnapshot(room));
+    });
+    return;
+  }
+  state.unsubscribe = fb.onValue(fb.ref(fb.db, `rooms/${code}/public`), onRoom, error=>{if(code!==state.roomCode||version!==state.roomWatchVersion)return;console.error('[truco:room] subscription failed',{code,error});toast(firebaseError(error),true);});
 }
 function privateHandMatchesRoom(deal,room){
   if(room?.managedCredits&&deal?.creditMatchId!==room.creditMatch?.id)return false;
@@ -974,6 +1037,17 @@ function watchPrivateHand() {
   if(state.privateUnsubscribe)state.privateUnsubscribe();
   state.privateHandKey=subscriptionKey;
   const fb = state.firebase;
+  if(state.room?.managedCredits){
+    state.privateDealJson=null;
+    const apply=({hand})=>{
+      if(state.privateHandKey!==subscriptionKey)return;
+      // Already applied by the room listener for this same message.
+      const key=JSON.stringify(hand??null);if(key===state.privateDealJson)return;state.privateDealJson=key;
+      state.privateDeal=hand||null;syncPrivateHand();renderGame();
+    };
+    state.privateUnsubscribe=liveTables().watchTable(state.roomCode,apply);
+    return;
+  }
   state.privateUnsubscribe = fb.onValue(fb.ref(fb.db, `hands/${state.roomCode}/${state.uid}`), (snapshot) => {
     if(state.privateHandKey!==subscriptionKey)return;
     state.privateDeal=snapshot.val();
@@ -1024,7 +1098,7 @@ function returnToLobby(message=''){
   opponentPlaySnapshot={scope:null,keys:new Set()};
   state.cancelingWaitingRoom=null;
   removeCardFlight();
-  stopRoomPresence();
+  stopRoomPresence();stopLiveTable();
   stopBot();
   clearTimeout(openingTimerHandle);openingTimerHandle=null;
   state.roomWatchVersion=(state.roomWatchVersion||0)+1;
@@ -1989,6 +2063,8 @@ function stopRoomPresence(){
   }
 }
 async function syncRoomPresence(){
+  // The table server tracks presence from the open socket itself.
+  if(state.room?.managedCredits)return;
   if(state.localGame||!state.firebase||!state.room||!roomSeats().includes(state.playerId)||state.firebaseConnected!==true)return;
   const room=state.room,code=state.roomCode,player=state.playerId,uid=state.uid,matchNumber=Number(room.matchNumber||1);
   if(room.players?.[player]?.uid!==uid)return;
@@ -3889,6 +3965,11 @@ function loadCreditFunctions(){
   return creditFunctionsPromise??=import('https://www.gstatic.com/firebasejs/12.4.0/firebase-functions.js').catch(error=>{creditFunctionsPromise=null;throw error;});
 }
 async function creditApi(name,data){
+  if(['creditCreateTable','creditJoinTable','creditTableAction'].includes(name)){
+    const result=await liveTableApi(name,data);
+    if(name!=='creditTableAction')void credits.sync().catch(error=>console.error('[truco:wallet-sync]',error));
+    return result;
+  }
   const fb=await firebaseServices();
   const {getFunctions,httpsCallable}=await loadCreditFunctions();
   const result=(await httpsCallable(getFunctions(fb.auth.app,'us-central1'),name)(data)).data;
@@ -3941,7 +4022,7 @@ $('join-credit-dialog').addEventListener('cancel',event=>{if(state.joinSubmittin
 $('join-credit-dialog').addEventListener('close',()=>{state.joinPassword='';state.joinConfirmed=false;});
 $('join-credit-password').addEventListener('input',()=>{$('join-credit-error').textContent='';});
 $('table-visibility').addEventListener('change',()=>{$('table-password-row').hidden=$('table-visibility').value!=='password';});
-setInterval(()=>{if(state.room?.managedCredits&&state.firebaseConnected===true&&navigator.onLine!==false&&document.visibilityState==='visible'&&state.room.status!=='closed')creditCommand({kind:'tick'}).catch(()=>{});},2000);
+// Turn, pause and disconnection timers run on the table server (Durable Object alarms).
 
 function updateStakeControl(){
   const wallet=credits.wallet(),maximum=Math.max(0,Math.floor(wallet?.balance||0));

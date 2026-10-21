@@ -24,7 +24,7 @@ function operation(ledger,m,{uid,command:c,requestId,expectedMatchId,presence,no
   if(r.status==='drawing'){r.status='closed';return refund(ledger,m,now);}
   const t=opposite(team(p));Object.assign(r,{status:'complete',scores:{...r.scores,[t]:m.targetPoints},matchResult:{winner:t,loser:p,reason:'abandon'},endReveal:{done:true},turn:null,turnClock:null,pendingBet:null,pendingNextHand:null,resolvingTrick:false});
  }else if(c.kind==='cancel'){
-  if(['settled','refunded'].includes(m.status)){m.closedAt=now;r.status='closed';}
+  if(['settled','refunded'].includes(m.status)){m.closedAt=now;r.status='closed';r.closeReason??='match-left';}
   else if(r.status==='drawing'){r.status='closed';return refund(ledger,m,now);}else fail('La partida está en juego.');
  }else if(c.kind==='rematch'){
   if(m.status!=='settled')fail('Primero debe terminar la partida.');

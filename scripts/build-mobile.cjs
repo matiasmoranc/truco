@@ -7,7 +7,7 @@ const root = path.resolve(__dirname, '..');
   const stage = path.join(root, '.mobile-web');
   await fs.rm(stage, { recursive: true, force: true });
   await fs.mkdir(stage, { recursive: true });
-  for (const file of ['index.html','style.css','app.js','team-table-ui.js','account.js','auth-init.js','activity.js','credits.js','scorer.js','player-panel.js','firebase-config.js','chat-moderation.js','favicon.svg']) {
+  for (const file of ['index.html','style.css','app.js','team-table-ui.js','account.js','auth-init.js','activity.js','credits.js','scorer.js','player-panel.js','firebase-config.js','live-tables.js','chat-moderation.js','favicon.svg']) {
     let content = await fs.readFile(path.join(root, file), 'utf8');
     if (file === 'index.html') {
       content = content.replace(/src="\.\/app\.js[^" ]*"/, 'src="./mobile/entry.js"');

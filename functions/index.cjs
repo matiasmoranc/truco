@@ -13,6 +13,9 @@ const {reservationAlerts,repairReservation,personalHistory}=require('./player-se
 const {usersBlockEachOther}=require('./user-blocks.cjs');
 initializeApp();const db=getDatabase();
 const options={region:'us-central1',maxInstances:5,timeoutSeconds:30};
+const {defineSecret}=require('firebase-functions/params');
+const liveInternalSecret=defineSecret('LIVE_INTERNAL_SECRET');
+const {closeLiveTable}=require('./live-server.cjs');
 Object.assign(exports,require('./ad-rewards.cjs').createRewardFunctions({db,identity,rateLimit,options}));
 async function identity(request){
  const auth=request.auth,provider=auth?.token?.firebase?.sign_in_provider;
@@ -98,7 +101,7 @@ exports.creditExpireTables=onSchedule({schedule:'every 1 minutes',region:'us-cen
  const r=await loadedTransaction(db.ref('creditEconomy'),current=>{
   if(!current)return undefined;let next=current;changed=[];
   for(const code of Object.keys(current.tables||{})){
-   const old=tableFor(next,code);if(!['waiting','reserved'].includes(old.status))continue;
+   const old=tableFor(next,code);if(!['waiting','reserved'].includes(old.status)||old.live==='cloudflare')continue;
    const before=JSON.stringify(old);next=tableOperation(next,{code,uid:old.player1,command:{kind:'tick'},presence:rooms[code]?.public?.connectionPresence,now});if(before!==JSON.stringify(tableFor(next,code)))changed.push(code);
   }return validateAccounting(current,recordHistory(current,next,now));
  });
@@ -149,7 +152,7 @@ exports.deleteMyAccount=onCall({...options,timeoutSeconds:120},async request=>{
 exports.finishAccountDeletions=onSchedule({schedule:'every 5 minutes',region:'us-central1',timeoutSeconds:120,maxInstances:1},async()=>{
  for(const [uid,job] of Object.entries((await db.ref('accountDeletionJobs').get()).val()||{}))await completeSelfDeletion(uid,job);
 });
-exports.adminConsole=onCall(options,async request=>{
+exports.adminConsole=onCall({...options,secrets:[liveInternalSecret]},async request=>{
  const actor=await adminIdentity(request),data=request.data||{},action=data.action;
  if(action==='repair-reservation'){
   if(!validKey(data.uid))throw new HttpsError('invalid-argument','Usuario inválido.');
@@ -221,6 +224,16 @@ exports.adminConsole=onCall(options,async request=>{
   let failure;const result=await loadedTransaction(db.ref(),root=>{failure=null;if(!root)return undefined;try{return closeLegacyTable(root,{...data,actor,now:Date.now()});}catch(error){failure=error.message;return undefined;}});
   if(!result.committed)throw new HttpsError('failed-precondition',failure||'No se pudo cerrar la mesa.');
   return {ok:true};
+ }
+ if(action==='close-table'){
+  const id=(await db.ref('creditEconomy/tables/'+data.code).get()).val();
+  const live=id&&(await db.ref('creditEconomy/matches/'+id+'/live').get()).val()==='cloudflare';
+  if(live){
+   let outcome;
+   try{outcome=await closeLiveTable({code:data.code,actor,requestId:data.requestId,reason:data.reason,secret:liveInternalSecret.value()});}
+   catch(error){throw new HttpsError('unavailable',error.message);}
+   if(outcome.closed)return {ok:true};
+  }
  }
  if(['credits','close-table'].includes(action)){
   if(action==='credits'){if(!validKey(data.uid))throw new HttpsError('invalid-argument','Usuario inválido.');await getAuth().getUser(data.uid);}

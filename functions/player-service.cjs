@@ -12,7 +12,9 @@ function reservationAlerts(ledger,now){
   else for(const m of current){
    const expired=m.status==='waiting'&&now-m.createdAt>=600000;
    const complete=['complete','closed'].includes(m.session?.room?.status);
-   if(expired||complete)alerts.push({uid,locked:w.locked,code:m.code,id:m.id,reason:expired?'Mesa vencida sin rival.':'Partida finalizada pendiente de liquidación.',repairable:true});
+   // The table server owns live matches; the ledger copy has no game to tick.
+   if(m.live==='cloudflare'){if(expired)alerts.push({uid,locked:w.locked,code:m.code,id:m.id,reason:'Mesa del servidor de juego sin cerrar. Cerrala desde Mesas.',repairable:false});}
+   else if(expired||complete)alerts.push({uid,locked:w.locked,code:m.code,id:m.id,reason:expired?'Mesa vencida sin rival.':'Partida finalizada pendiente de liquidación.',repairable:true});
    else if(w.locked!==m.stake)alerts.push({uid,locked:w.locked,code:m.code,id:m.id,reason:'La reserva no coincide con la apuesta.',repairable:false});
   }
  }

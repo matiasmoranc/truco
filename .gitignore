@@ -11,3 +11,8 @@ ios/
 artifacts/
 gha-creds-*.json
 **/gha-creds-*.json
+
+# Cloudflare local secrets and state
+.dev.vars
+cloudflare/node_modules/
+cloudflare/.wrangler/
