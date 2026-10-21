@@ -688,13 +688,14 @@ function rememberRoomSeat(){
 }
 function attachLiveRoom(code,seat,room){
   state.privateUnsubscribe?.();state.privateUnsubscribe=null;state.privateHandKey=null;state.privateDeal=null;
+  state.preparingRoom=code;$('game-view').classList.add('table-preparing');
   state.roomCode=code;state.playerId=seat;state.joining=false;state.invitationEntry=false;
   state.localGame=false;state.hand=[];state.room=room;state.restorePending=null;state.connectionReady=false;
   state.lobbyUnsubscribe?.();state.lobbyUnsubscribe=null;
   rememberRoomSeat();
   showView(['drawing','started','revealing','complete','timed-out'].includes(room.status)?'game-view':'waiting-view');
   watchRoom();
-  if(room.status==='waiting')renderWaiting();
+  if(room.status==='waiting'){renderWaiting();state.preparingRoom=null;state.joinIntent=null;}
   refreshLiveConnection();
 }
 async function restoreRoom(code){
@@ -904,16 +905,34 @@ function renderLobby(rooms) {
     const lock='<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="'+(privateTable?'M8 10V6a4 4 0 0 1 8 0v4':'M8 10V6a4 4 0 0 1 8 0')+'"/><path d="M12 14v3"/></svg>';
     return `<article class="lobby-card compact-room has-team-seats"><div class="compact-room-owner"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21v-2a8 8 0 0 1 16 0v2"/></svg><h3>${escapeHtml(title)}</h3></div><div class="compact-room-stat"><strong>${targetPoints(room)}</strong><span>puntos</span></div><div class="compact-room-stat">${coins}<strong>${room.managedCredits?escapeHtml(String(room.creditMatch.stake)):'0'}</strong></div><div class="compact-room-privacy ${privateTable?'is-private':'is-public'}" role="img" aria-label="${privateTable?'Mesa privada':'Mesa pública'}" title="${privateTable?'Mesa privada':'Mesa pública'}">${lock}</div><div class="lobby-join-options">${actions.map(([key,label])=>`<button class="button lobby-player-button" data-room="${code}" data-seat="${key}" ${room.managedCredits&&!roomSeatForUid(room,state.uid)&&((credits.wallet()?.balance??0)<room.creditMatch.stake||(credits.wallet()?.locked??0)>0)?'disabled':''}>${label}</button>`).join('')}</div>${teamSeats}</article>`;
   }).join('');
+  syncLobbyJoinFeedback();
+}
+function syncLobbyJoinFeedback(){
+  const intent=state.joinIntent;
+  for(const button of document.querySelectorAll('#open-room-list [data-room]')){
+    if(intent){
+      if(button.dataset.joinWasDisabled==null)button.dataset.joinWasDisabled=String(button.disabled);
+      button.disabled=true;
+      if(button.dataset.room===intent.code&&button.dataset.seat===intent.seat&&(!intent.team||button.dataset.team===intent.team)){
+        if(button.dataset.joinLabel==null)button.dataset.joinLabel=button.textContent;
+        button.textContent='Entrando…';button.setAttribute('aria-busy','true');
+      }
+    }else if(button.dataset.joinWasDisabled!=null){
+      button.disabled=button.dataset.joinWasDisabled==='true';delete button.dataset.joinWasDisabled;
+      if(button.dataset.joinLabel!=null){button.textContent=button.dataset.joinLabel;delete button.dataset.joinLabel;}
+      button.removeAttribute('aria-busy');
+    }
+  }
 }
 function joinOpenRoom(code, seat, team=null) {
-  if(state.enteringRoom||state.joinSubmitting)return;
+  if(state.enteringRoom||state.joinSubmitting||state.joinIntent)return;
+  state.joinIntent={code,seat,team};
   state.joinTeam=['player1','player2'].includes(team)?team:null;
   state.joining = true; state.selectedRoom = code;
   const name = cleanName($('player-name').value||savedPlayerName(), 'Jugador');
   $('player-name').value = name;
-  const buttons=[...document.querySelectorAll('#open-room-list [data-room]')];
-  for(const button of buttons){button.dataset.joinWasDisabled=String(button.disabled);button.disabled=true;if(button.dataset.room===code&&button.dataset.seat===seat&&(!team||button.dataset.team===team)){button.dataset.joinLabel=button.textContent;button.textContent='Entrando…';button.setAttribute('aria-busy','true');}}
-  void enterRoom().finally(()=>{for(const button of buttons){if(button.dataset.joinLabel){button.textContent=button.dataset.joinLabel;delete button.dataset.joinLabel;}button.removeAttribute('aria-busy');button.disabled=button.dataset.joinWasDisabled==='true';delete button.dataset.joinWasDisabled;}});
+  syncLobbyJoinFeedback();
+  void enterRoom().finally(()=>{if(state.roomCode!==code||!state.room){state.joinIntent=null;syncLobbyJoinFeedback();}});
 }
 function firebaseError(error) {
   if (error?.code === 'auth/operation-not-allowed') return 'Activá el inicio de sesión anónimo en Firebase y volvé a intentar.';
@@ -949,7 +968,7 @@ function watchRoom() {
       }
     }
     if (isCoordinator()) scheduleTableResolution();
-    if (['drawing','started','revealing','complete','timed-out'].includes(state.room.status)) { showView('game-view'); if(state.room.status!=='drawing')watchPrivateHand(); renderGame(); }
+    if (['drawing','started','revealing','complete','timed-out'].includes(state.room.status)) { if(!$('game-view').classList.contains('active')){state.preparingRoom=code;$('game-view').classList.add('table-preparing');}showView('game-view'); if(state.room.status!=='drawing')watchPrivateHand(); renderGame(); }
     if(isCoordinator()&&state.room.status==='drawing')finishOpeningDraw().catch(error=>toast(firebaseError(error)));
     else if (state.room.status === 'waiting') { renderWaiting(); if (!$('waiting-view').classList.contains('active')) showView('waiting-view'); }
   },error=>{if(code!==state.roomCode||version!==state.roomWatchVersion)return;console.error('[truco:room] subscription failed',{code,error});toast(firebaseError(error),true);});
@@ -963,13 +982,17 @@ function privateHandMatchesRoom(deal,room){
 function syncPrivateHand(){
   if(state.localGame)return;
   const handNumber=state.room?.handNumber||1;
+  const sameHand=state.renderedHandNumber===handNumber;
   if(state.renderedHandNumber!==handNumber){
     state.renderedHandNumber=handNumber;state.handGestureActive=false;handGesture=null;
     state.cardLaunchOrigin=null;state.launchingCardId=null;
   }
   const matches=privateHandMatchesRoom(state.privateDeal,state.room);
-  state.hand=matches?(state.privateDeal.hand||[]):[];
-  state.partnerHand=matches&&state.room.mode==='2v2'?(state.privateDeal.partnerHand||[]):[];
+  const deal=state.privateDeal,room=state.room;
+  const sameDeal=!!deal&&Number(deal.handNumber||1)===Number(room?.handNumber||1)&&(!room?.managedCredits||deal.creditMatchId===room.creditMatch?.id);
+  const played=new Set((room?.trickCards||[]).filter(item=>item.playerId===state.playerId).map(item=>item.card.id));
+  state.hand=(matches||(sameDeal&&Number(deal.revision)>=Number(room.revision))?deal.hand||[]:sameHand?state.hand:[]).filter(card=>!played.has(card.id));
+  state.partnerHand=(matches||sameDeal)&&state.room.mode==='2v2'?(state.privateDeal.partnerHand||[]):[];
   reconcilePendingPlay();
 }
 function watchPrivateHand() {
@@ -2055,12 +2078,10 @@ function renderConnectionNotice(){
   if(!el){el=document.createElement('div');el.id='connection-notice';el.className='connection-notice hidden';el.setAttribute('role','status');$('game-view').append(el);}
   const room=state.room,playing=room&&room.status!=='closed'&&!state.localGame;
   const info=playing&&disconnectedPlayer(room),ownOffline=liveActionsBlocked();
-  const sending=!!(state.liveAction||state.playActionInFlight||state.foldInFlight);
-  el.classList.toggle('hidden',!playing||(!info&&!ownOffline&&!sending));
+  el.classList.toggle('hidden',!playing||(!info&&!ownOffline));
   syncLiveControls();
   if(!playing)return null;
   if(ownOffline){el.textContent='Reconectando…';return null;}
-  if(sending&&!info){el.textContent='Enviando jugada…';return null;}
   if(info){
     const mine=info.player===state.playerId,name=room.players?.[info.player]?.name||'El rival';
     el.textContent=mine?'Reconectando…':name+' perdió la conexión. Tiene '+info.seconds+' s para volver.';
@@ -2129,10 +2150,21 @@ function renderTurnTimer(){
   turnTimerHandle=setTimeout(renderTurnTimer,200);
 }
 
+function finishRoomPreparation(){
+  if(!state.preparingRoom||state.preparingRoom!==state.roomCode||state.room?.status==='waiting')return;
+  if(state.room?.status==='started'&&!privateHandMatchesRoom(state.privateDeal,state.room))return;
+  const code=state.roomCode;
+  requestAnimationFrame(()=>{
+    if(state.roomCode!==code||state.preparingRoom!==code)return;
+    positionMobileTable();
+    positionDealerDeck($,state.room.dealer||(state.room.mode==='2v2'?'player4':otherPlayer(state.room.mano||'player1')),state.playerId,state.room.mode==='2v2');
+    requestAnimationFrame(()=>{if(state.roomCode!==code||state.preparingRoom!==code)return;state.preparingRoom=null;state.joinIntent=null;$('game-view').classList.remove('table-preparing');});
+  });
+}
 function renderGame() {
   if (!state.room||state.botActing) return;
   $('game-view').classList.toggle('team-mode',state.room.mode==='2v2');
-  if(state.room.mode==='2v2'){syncPrivateHand();syncMatchChat();renderCallNotice();teamTable.render();renderTurnTimer();return;}
+  if(state.room.mode==='2v2'){syncPrivateHand();syncMatchChat();renderCallNotice();teamTable.render();renderTurnTimer();finishRoomPreparation();return;}
   $('opponent-hand').classList.remove('hidden');
   $('team-seats')?.remove();
   syncMatchChat();
@@ -2245,7 +2277,7 @@ function renderGame() {
   alignHandWithControls();
   actions.querySelectorAll('[data-action]').forEach((button)=>button.addEventListener('click',()=>runLiveAction(button,()=>{const act=button.dataset.action;if(state.localGame)return localAction(act);if(['yes','no','raise'].includes(act)||act.startsWith('raise-'))return answerBet(act);if(act==='reveal')return revealEnvido();if(act==='flor')return callFlor();return callBet(act);})));
   setTurnBadge(roundPauseInfo(room)?'ESPERÁ':pending?(pending.responder===state.playerId?'RESPONDÉ':'ESPERANDO'):myTurn?'TU TURNO':'ESPERÁ');$('turn-badge').classList.toggle('waiting-turn',!myTurn||!!pending);
-  renderMatchEnd();syncLiveControls();
+  renderMatchEnd();syncLiveControls();finishRoomPreparation();
 }
 function matchEndKey(room=state.room){
   return [state.roomCode,room?.matchNumber||1,room?.rematch?.id||'',room?.rematch?.status||''].join(':');

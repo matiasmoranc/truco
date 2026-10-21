@@ -2013,3 +2013,5 @@ input,textarea,[contenteditable=""],[contenteditable="true"]{-webkit-user-select
 .game.player-mode.two-device-mode:not(.team-mode)[data-deck-side] .played-card.is-opponent-play{left:calc(var(--duel-play-center) + var(--board-deckWidth,58px)*.18);top:calc(50% - var(--board-deckHeight,84px)*.65)}
 .game.player-mode.two-device-mode #deck-stack{touch-action:none;user-select:none;-webkit-user-select:none}
 .game.player-mode.two-device-mode .hand-card{transition:none}
+
+.game.table-preparing .game-layout{visibility:hidden}

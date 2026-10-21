@@ -14,3 +14,17 @@ test('Sample drag works when the finger starts over the overlapping deck and rem
  vm.runInContext(source.slice(source.indexOf('function limitMuestraOffset('),source.indexOf('// Prevent browser zoom')),c);
  const event={pointerId:1,button:0,clientX:100,clientY:100,preventDefault(){},stopPropagation(){}};events.deck.pointerdown(event);events.sample.pointermove({...event,clientX:130,clientY:140});assert.equal(Math.hypot(parseFloat(values['--muestra-dx']),parseFloat(values['--muestra-dy'])),10);events.sample.pointerup(event);assert.equal(sample._drag,null);
 });
+test('Public-first and private-first updates keep the remaining cards visible throughout a play',()=>{
+ for(const privateFirst of [false,true]){
+  const room={managedCredits:true,creditMatch:{id:'m'},revision:1,handNumber:1,handCounts:{player1:3},trickCards:[]},cards=['a','b','c'].map(id=>({id}));
+  const c={state:{room,playerId:'player1',renderedHandNumber:1,privateDeal:{creditMatchId:'m',revision:1,handNumber:1,hand:cards},hand:cards},handGesture:null,reconcilePendingPlay(){}};vm.createContext(c);vm.runInContext([fn('privateHandMatchesRoom'),fn('syncPrivateHand')].join('\n'),c);
+  const publicUpdate=()=>Object.assign(room,{revision:2,handCounts:{player1:2},trickCards:[{playerId:'player1',card:cards[0]}]});
+  const privateUpdate=()=>c.state.privateDeal={creditMatchId:'m',revision:2,handNumber:1,hand:cards.slice(1)};
+  (privateFirst?privateUpdate:publicUpdate)();c.syncPrivateHand();assert.deepEqual(Array.from(c.state.hand,x=>x.id),['b','c']);
+  (privateFirst?publicUpdate:privateUpdate)();c.syncPrivateHand();assert.deepEqual(Array.from(c.state.hand,x=>x.id),['b','c']);
+  room.handNumber=2;room.handCounts.player1=3;c.syncPrivateHand();assert.equal(c.state.hand.length,0);
+ }
+});
+test('Lobby redraws keep Entering until the entry intent is cleared',()=>{
+ const make=()=>({dataset:{room:'ABCDE',seat:'player'},textContent:'Entrar',disabled:false,setAttribute(){},removeAttribute(){}});let buttons=[make()];const c={state:{joinIntent:{code:'ABCDE',seat:'player'}},document:{querySelectorAll:()=>buttons}};vm.createContext(c);vm.runInContext(fn('syncLobbyJoinFeedback'),c);c.syncLobbyJoinFeedback();assert.equal(buttons[0].textContent,'Entrando…');buttons=[make()];c.syncLobbyJoinFeedback();assert.equal(buttons[0].textContent,'Entrando…');assert.equal(buttons[0].disabled,true);c.state.joinIntent=null;c.syncLobbyJoinFeedback();assert.equal(buttons[0].textContent,'Entrar');assert.equal(buttons[0].disabled,false);
+});

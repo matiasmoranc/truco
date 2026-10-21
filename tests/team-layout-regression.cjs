@@ -44,7 +44,7 @@ test('Lobby lists both teammates and inline join buttons with the correct team',
 test('Selecting a lobby team preserves that choice and repeated clicks cannot switch an in-flight join',()=>{
  const app=fs.readFileSync(path.join(__dirname,'../app.js'),'utf8');
  const fn=app.slice(app.indexOf('function joinOpenRoom('),app.indexOf('function firebaseError('));
- const input={value:'Juan'},context={document:{querySelectorAll:()=>[]},state:{},$:()=>input,cleanName:s=>s,savedPlayerName:()=>'',enterRoom(){context.calls++;return Promise.resolve();},calls:0};
+ const input={value:'Juan'},context={syncLobbyJoinFeedback(){},document:{querySelectorAll:()=>[]},state:{},$:()=>input,cleanName:s=>s,savedPlayerName:()=>'',enterRoom(){context.calls++;return Promise.resolve();},calls:0};
  require('node:vm').runInNewContext(fn+';joinOpenRoom("ABCDE","player","player2");',context);
  assert.equal(context.state.joinTeam,'player2');assert.equal(context.calls,1);
  context.state.enteringRoom=true;
