@@ -261,7 +261,7 @@ async function sendMatchChat(event){
     if(key===chatContextKey()){$('chat-error').textContent='No se pudo enviar. Volvé a intentar.';$('chat-error').classList.remove('hidden');}
   }finally{if(key===chatContextKey()){matchChat.sending=false;renderChatComposer();}}
 }
-function showView(id) { document.documentElement.classList.remove('opening-invitation'); views.forEach((name) => $(name).classList.toggle('active', name === id)); if(id!=='game-view')closeMatchChat(true); if(id==='welcome-view')requestAnimationFrame(showLobbyOnboarding); }
+function showView(id) { if(id!=='game-view'){state.preparingRoom=null;$('game-view').classList.remove('table-preparing');}document.documentElement.classList.remove('opening-invitation'); views.forEach((name) => $(name).classList.toggle('active', name === id)); if(id!=='game-view')closeMatchChat(true); if(id==='welcome-view')requestAnimationFrame(showLobbyOnboarding); }
 function liveActionsBlocked(){
   return !!(state.room&&!state.localGame&&(navigator.onLine===false||state.firebaseConnected!==true||state.connectionReady!==true));
 }
