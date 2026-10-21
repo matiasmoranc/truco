@@ -105,7 +105,7 @@ exports.creditJoinTable=onCall(options,request=>gameDatabase.run(gameTransport,(
 async function tableActionRequest(request){
  const started=Date.now(),stages={};const {code,command,requestId,expectedMatchId}=request.data||{};
  if(!command||typeof command.kind!=='string'||!requestId||['__proto__','constructor','prototype'].includes(requestId)||!/^[a-zA-Z0-9_-]{1,100}$/.test(requestId)){await identity(request);await rateLimit(request.auth.uid,120,'actions');throw new HttpsError('invalid-argument','Jugada inválida.');}
- const [user,,presenceSnapshot]=await Promise.all([measured(stages,'identityMs',actionIdentity(request)),request.auth?measured(stages,'rateLimitMs',rateLimit(request.auth.uid,command.kind==='tick'?60:120,command.kind==='tick'?'ticks':'actions')):Promise.resolve(),command.kind==='tick'?db.ref('rooms/'+code+'/public/connectionPresence').once('value'):Promise.resolve(null)]);
+ const [user,presenceSnapshot]=await Promise.all([measured(stages,'identityMs',actionIdentity(request)),command.kind==='tick'?db.ref('rooms/'+code+'/public/connectionPresence').once('value'):Promise.resolve(null)]);
  if(command.kind==='rematch'){
   let currentMatch;try{currentMatch=tableFor((await db.ref('creditEconomy').once('value')).val()||{},code);}catch(error){throw new HttpsError('failed-precondition',error.message||'La partida ya no está disponible.');}
   const people=Object.values(currentMatch.players||{});for(let a=0;a<people.length;a++)for(let b=a+1;b<people.length;b++)if(await usersBlockEachOther(db,people[a].uid,people[b].uid))throw new HttpsError('failed-precondition','No pueden iniciar una revancha porque hay jugadores bloqueados.');
@@ -113,8 +113,11 @@ async function tableActionRequest(request){
  // Membership and match identity are checked atomically by tableOperation,
  // including ticks; do not pre-read the entire historical ledger for a tick.
  const now=Date.now(),presence=presenceSnapshot?.val();
- const parameters={code,uid:user.uid,command,requestId:command.kind==='tick'?null:requestId,expectedMatchId,presence,now};
- const live=await tryLiveAction(db,parameters);
+ const parameters={code,uid:user.uid,command,requestId:command.kind==='tick'?null:requestId,expectedMatchId,presence,now,enforceRateLimit:true};
+ let live;try{live=await tryLiveAction(db,parameters);}catch(error){if(error.code==='resource-exhausted')throw new HttpsError(error.code,error.message);throw error;}
+ // Ordinary moves share their abuse counter with the atomic match update.
+ // Invalid moves and accounting transitions retain the global limiter.
+ if(!live)await measured(stages,'rateLimitMs',rateLimit(user.uid,command.kind==='tick'?60:120,command.kind==='tick'?'ticks':'actions'));
  const ledger=live||await mutate(current=>tableOperation(current,parameters),false,{code,uid:user.uid,kind:command.kind,requestId});
  const saved=Date.now(),m=tableFor(ledger,code);
  const result=ledger.liveUnchanged?{code,room:publicTable(m),player1:m.player1,player2:m.player2}:await publish(ledger,code);

@@ -5,6 +5,7 @@ const LIVE=new Set(['play','call','declare','fold','team-signal','tick','chat','
 // No wallets or historical matches are loaded by this path. Any transition
 // requiring accounting is retried atomically by the existing ledger operation.
 function liveUpdate(match,parameters){
+ if(match&&match.code!==parameters.code)return null;
  if(match&&['settled','refunded'].includes(match.status)&&parameters.command.kind==='tick'){
   if(parameters.expectedMatchId&&parameters.expectedMatchId!==match.id)return null;
   if(!Object.values(match.players||{}).some(person=>person?.uid===parameters.uid))return null;
@@ -21,14 +22,24 @@ function liveUpdate(match,parameters){
 }
 async function tryLiveAction(db,parameters){
  if(!LIVE.has(parameters.command.kind))return null;
- const id=(await db.ref('creditEconomy/tables/'+parameters.code).once('value')).val();
+ const expected=parameters.expectedMatchId;
+ if(expected!=null&&(typeof expected!=='string'||!/^[a-zA-Z0-9_-]{1,100}$/.test(expected)))return null;
+ const id=expected||(await db.ref('creditEconomy/tables/'+parameters.code).once('value')).val();
  if(typeof id!=='string')return null;
- let unchanged=false;
+ let unchanged=false,limited=false;
  const result=await loadedTransaction(db.ref('creditEconomy/matches/'+id),current=>{
-  unchanged=false;const next=liveUpdate(current,parameters);if(!next)return undefined;
+  unchanged=false;limited=false;const next=liveUpdate(current,parameters);if(!next)return undefined;
   unchanged=JSON.stringify(next)===JSON.stringify(current);
+  if(!unchanged&&parameters.enforceRateLimit){
+   const bucket=parameters.command.kind==='tick'?'ticks':'actions',limit=bucket==='ticks'?60:120;
+   const previous=current.actionLimits?.[parameters.uid]?.[bucket];
+   const record=previous&&parameters.now-previous.start<60000?{...previous}:{start:parameters.now,count:0};
+   if(record.count>=limit){limited=true;return undefined;}
+   record.count++;next.actionLimits??={};next.actionLimits[parameters.uid]??={};next.actionLimits[parameters.uid][bucket]=record;
+  }
   return unchanged?undefined:next;
  });
+ if(limited){const error=new Error('Demasiadas acciones. Esperá un momento.');error.code='resource-exhausted';throw error;}
  if(!result.committed&&!unchanged)return null;
  return {tables:{[parameters.code]:id},matches:{[id]:result.snapshot.val()},liveUnchanged:unchanged};
 }

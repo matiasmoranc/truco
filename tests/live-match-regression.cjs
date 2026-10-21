@@ -31,7 +31,7 @@ test('Only a pending response blocks an otherwise valid card; answering uses the
  assert.equal(accepted.session.room.trucoLevel,2);assert.equal(accepted.session.room.turn,'player1');
  assert.deepEqual(accepted.session.hands,called.session.hands);
 });
-test('Database fast path only touches the table pointer and current match, including transaction retries',async()=>{
+test('Database fast path only touches the expected current match, including transaction retries',async()=>{
  const l=fixture(),m=l.matches.m,p={code:'ABCDE',uid:'a',command:{kind:'play',cardId:m.session.hands.player1[0].id},requestId:'play',expectedMatchId:'m',now:300},paths=[];
  let value=structuredClone(m),active=false;
  const db={ref(path){paths.push(path);if(path.endsWith('/tables/ABCDE'))return {once:async()=>({val:()=> 'm'})};
@@ -45,9 +45,9 @@ test('Database fast path only touches the table pointer and current match, inclu
  }};}};
  const result=await tryLiveAction(db,p);assert.equal(active,false);
  assert.equal(result.matches.m.session.hands.player1.length,2);
- assert.deepEqual(paths,['creditEconomy/tables/ABCDE','creditEconomy/matches/m']);
+ assert.deepEqual(paths,['creditEconomy/matches/m']);
  assert.equal(await tryLiveAction(db,{...p,command:{kind:'abandon'}}),null);
- assert.equal(paths.length,2,'abandonment is handled by the atomic settlement path');
+ assert.equal(paths.length,1,'abandonment is handled by the atomic settlement path');
 });
 test('An already confirmed request returns its current snapshot without writing or invoking accounting',async()=>{
  const l=fixture(),m=l.matches.m;m.requests.confirmed=true;
@@ -59,6 +59,27 @@ test('An already confirmed request returns its current snapshot without writing 
  }};}};
  const result=await tryLiveAction(db,{code:'ABCDE',uid:'a',command:{kind:'play',cardId:m.session.hands.player1[0].id},requestId:'confirmed',expectedMatchId:'m',now:300});
  assert.equal(written,false);assert.equal(result.liveUnchanged,true);assert.deepEqual(result.matches.m,m);
+});
+test('Expected match identifiers cannot select another table or escape the match path',async()=>{
+ const m=fixture().matches.m,paths=[];
+ const db={ref(path){paths.push(path);return {on(_event,fn){queueMicrotask(fn);},off(){},async transaction(update){const next=update(m);return {committed:next!==undefined,snapshot:{val:()=>next||m}};}};}};
+ const p={code:'WRONG',uid:'a',command:{kind:'play',cardId:m.session.hands.player1[0].id},requestId:'one',expectedMatchId:'m',now:300};
+ assert.equal(await tryLiveAction(db,p),null);assert.equal(m.session.hands.player1.length,3);
+ assert.equal(await tryLiveAction(db,{...p,expectedMatchId:'../wallets'}),null);
+ assert.deepEqual(paths,['creditEconomy/matches/m']);
+});
+test('Live action limits commit with the move, survive retries, and do not charge duplicate requests',async()=>{
+ let m=fixture().matches.m,attempts=0;
+ const db={ref(){return {on(_event,fn){queueMicrotask(fn);},off(){},async transaction(update){
+  attempts++;update(m);const next=update(m);if(next)m=next;
+  return {committed:next!==undefined,snapshot:{val:()=>m}};
+ }};}};
+ const p={code:'ABCDE',uid:'a',command:{kind:'play',cardId:m.session.hands.player1[0].id},requestId:'one',expectedMatchId:'m',now:300,enforceRateLimit:true};
+ await tryLiveAction(db,p);assert.equal(m.actionLimits.a.actions.count,1);
+ assert.equal((await tryLiveAction(db,p)).liveUnchanged,true);assert.equal(m.actionLimits.a.actions.count,1);
+ m=fixture().matches.m;p.command.cardId=m.session.hands.player1[0].id;m.actionLimits={a:{actions:{start:200,count:120}}};
+ await assert.rejects(tryLiveAction(db,p),{code:'resource-exhausted'});assert.equal(m.session.hands.player1.length,3);
+ m.actionLimits.a.actions.start=-60000;await tryLiveAction(db,{...p,now:301});assert.equal(m.actionLimits.a.actions.count,1);assert.equal(attempts,4);
 });
 for(const mode of ['1v1','2v2'])test(mode+' terminal state falls back without changing a wallet or match',()=>{
  const l=fixture(mode),m=l.matches.m,before=structuredClone(m);
@@ -94,3 +115,6 @@ for(const mode of ['1v1','2v2'])test(mode+' complete game keeps credits outside 
  l=tableOperation(l,{code:'ABCDE',uid:'a',command:{kind:'tick'},now:now+10000});
  assert.deepEqual(l.wallets,settled);
 });
+
+
+
