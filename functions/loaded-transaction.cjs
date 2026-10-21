@@ -1,5 +1,6 @@
 'use strict';
 async function loadedTransaction(ref,update){
+ if(ref.atomicUpdate)return ref.atomicUpdate(update);
  // get() alone does not keep the SDK transaction cache populated. Keep the
  // listener attached until completion, including all concurrent-write retries.
  let listener,attempts=0,loadedAt;const started=Date.now();

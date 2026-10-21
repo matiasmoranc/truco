@@ -12,7 +12,10 @@ const {tryLiveAction}=require('./live-match.cjs');
 const {hasStartedMatch}=require('./match-start.cjs');
 const {reservationAlerts,repairReservation,personalHistory}=require('./player-service.cjs');
 const {usersBlockEachOther}=require('./user-blocks.cjs');
-initializeApp();const db=getDatabase();
+initializeApp();const sdkDb=getDatabase();
+const {AsyncLocalStorage}=require('node:async_hooks'),gameDatabase=new AsyncLocalStorage();
+const restDb=require('./rest-database.cjs').createRestDatabase({baseUrl:sdkDb.ref().toString(),getAccessToken:()=>require('firebase-admin/app').getApp().options.credential.getAccessToken()});
+const db=new Proxy(sdkDb,{get(target,key){const selected=gameDatabase.getStore()||target,value=selected[key];return typeof value==='function'?value.bind(selected):value;}});
 const options={region:'us-central1',maxInstances:5,timeoutSeconds:30};
 Object.assign(exports,require('./ad-rewards.cjs').createRewardFunctions({db,identity,rateLimit,options}));
 async function identity(request){
@@ -117,16 +120,13 @@ async function tableActionRequest(request){
  return {...result,privateHand:seat?privateTableHand(m,seat):null};
 }
 exports.creditTableAction=onCall(options,tableActionRequest);
-const ledgerWarmup=require('./database-warmup.cjs').createLedgerWarmup(db);
-const gameConnection=require('./connection-lifecycle.cjs').createConnectionLifecycle(db);
-exports.creditGame=onCall({...options,concurrency:16,memory:'512MiB'},request=>gameConnection(async()=>{
+exports.creditGame=onCall({...options,concurrency:16,memory:'512MiB'},request=>gameDatabase.run(restDb,async()=>{
  const auth=request.auth,provider=auth?.token?.firebase?.sign_in_provider;
  if(!auth||!['google.com','apple.com','password'].includes(provider))throw new HttpsError('unauthenticated','Iniciá sesión con tu cuenta.');
  const operation=request.data?.operation;
- if(operation==='warm'){await Promise.all([actionIdentity(request),ledgerWarmup.warm()]);return {ready:true};}
+ if(operation==='warm'){await actionIdentity(request);return {ready:true};}
  const handlers={creditCreateTable:createTableRequest,creditJoinTable:joinTableRequest,creditTableAction:tableActionRequest};
  if(!Object.hasOwn(handlers,operation))throw new HttpsError('invalid-argument','Operación inválida.');
- if(operation!=='creditTableAction')void ledgerWarmup.warm().catch(error=>console.warn('Entry cache warmup failed',error.message));
  return handlers[operation]({...request,auth:request.auth,data:request.data.payload});
 }));
 exports.creditExpireTables=onSchedule({schedule:'every 1 minutes',region:'us-central1',maxInstances:1},async()=>{
