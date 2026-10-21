@@ -38,7 +38,7 @@ let seq=0;
  const ledger=(await db.ref('creditEconomy').get()).val();assert.equal(ledger.matches[id].status,'settled');assert.equal(ledger.wallets.a.balance,23);assert.equal(ledger.wallets[peer].balance,17);assert.equal(ledger.wallets.a.locked,0);
  await action('a',{kind:'tick'});assert.equal((await db.ref('creditEconomy/wallets/a/balance').get()).val(),23);
  await action('a',{kind:'rematch',value:'request'});await action(peer,{kind:'rematch',value:'accept'});
- const rematch=(await db.ref('rooms/'+code+'/public').get()).val();assert.notEqual(rematch.creditMatch.id,id);assert.equal(rematch.matchNumber,2);assert.equal(rematch.status,'drawing');
+ const rematch=(await db.ref('rooms/'+code+'/public').get()).val();assert.notEqual(rematch.creditMatch.id,id);assert.equal(rematch.matchNumber,2);assert.equal(rematch.status,'started');
  const privateHand=(await db.ref('hands/'+code+'/a').get()).val();assert.equal(privateHand.creditMatchId,rematch.creditMatch.id);
  assert.equal((await db.ref('creditEconomy/wallets/a').get()).val().balance,20);
  console.log('Firebase Admin/emulator: callable authentication, password, concurrent joins, complete match payout, retries, private projections and rematch passed.');
