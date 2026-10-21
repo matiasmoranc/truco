@@ -30,7 +30,7 @@ async function actionIdentity(request){
  // Names and credit eligibility were checked when joining this match.
  return {uid:auth.uid};
 }
-async function rateLimit(uid,limit=15,bucket='tables'){const now=Date.now();const r=await db.ref('creditRateLimits/'+uid+'/'+bucket).transaction(current=>{if(!current||now-current.start>=60000)return {start:now,count:1};if(current.count>=limit)return undefined;return {...current,count:current.count+1};});if(!r.committed)throw new HttpsError('resource-exhausted','Esperá un minuto antes de volver a intentar.');}
+async function rateLimit(uid,limit=15,bucket='tables'){const now=Date.now();const r=await loadedTransaction(db.ref('creditRateLimits/'+uid+'/'+bucket),current=>{if(!current||now-current.start>=60000)return {start:now,count:1};if(current.count>=limit)return undefined;return {...current,count:current.count+1};});if(!r.committed)throw new HttpsError('resource-exhausted','Esperá un minuto antes de volver a intentar.');}
 async function mutate(update,allowEmpty=false,context={}){
  let failure=null;
  try{
@@ -87,7 +87,7 @@ exports.creditJoinTable=onCall(options,async request=>{
 exports.creditTableAction=onCall(options,async request=>{
  const started=Date.now();const {code,command,requestId,expectedMatchId}=request.data||{};
  if(!command||typeof command.kind!=='string'||!requestId||['__proto__','constructor','prototype'].includes(requestId)||!/^[a-zA-Z0-9_-]{1,100}$/.test(requestId)){await identity(request);await rateLimit(request.auth.uid,120,'actions');throw new HttpsError('invalid-argument','Jugada inválida.');}
- const [user,,presenceSnapshot]=await Promise.all([actionIdentity(request),request.auth?rateLimit(request.auth.uid,120,'actions'):Promise.resolve(),command.kind==='tick'?db.ref('rooms/'+code+'/public/connectionPresence').get():Promise.resolve(null)]);
+ const [user,,presenceSnapshot]=await Promise.all([actionIdentity(request),request.auth?rateLimit(request.auth.uid,command.kind==='tick'?60:120,command.kind==='tick'?'ticks':'actions'):Promise.resolve(),command.kind==='tick'?db.ref('rooms/'+code+'/public/connectionPresence').get():Promise.resolve(null)]);
  if(command.kind==='rematch'){
   let currentMatch;try{currentMatch=tableFor((await db.ref('creditEconomy').get()).val()||{},code);}catch(error){throw new HttpsError('failed-precondition',error.message||'La partida ya no está disponible.');}
   const people=Object.values(currentMatch.players||{});for(let a=0;a<people.length;a++)for(let b=a+1;b<people.length;b++)if(await usersBlockEachOther(db,people[a].uid,people[b].uid))throw new HttpsError('failed-precondition','No pueden iniciar una revancha porque hay jugadores bloqueados.');

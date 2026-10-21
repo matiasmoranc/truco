@@ -261,7 +261,7 @@ async function sendMatchChat(event){
     if(key===chatContextKey()){$('chat-error').textContent='No se pudo enviar. Volvé a intentar.';$('chat-error').classList.remove('hidden');}
   }finally{if(key===chatContextKey()){matchChat.sending=false;renderChatComposer();}}
 }
-function showView(id) { if(id!=='game-view'){state.preparingRoom=null;$('game-view').classList.remove('table-preparing');}document.documentElement.classList.remove('opening-invitation'); views.forEach((name) => $(name).classList.toggle('active', name === id)); if(id!=='game-view')closeMatchChat(true); if(id==='welcome-view')requestAnimationFrame(showLobbyOnboarding); }
+function showView(id) { if(!$(id).classList.contains('active'))clearToast(); if(id!=='game-view'){state.preparingRoom=null;$('game-view').classList.remove('table-preparing');}document.documentElement.classList.remove('opening-invitation'); views.forEach((name) => $(name).classList.toggle('active', name === id)); if(id!=='game-view')closeMatchChat(true); if(id==='welcome-view')requestAnimationFrame(showLobbyOnboarding); }
 function liveActionsBlocked(){
   return !!(state.room&&!state.localGame&&(navigator.onLine===false||state.firebaseConnected!==true||state.connectionReady!==true));
 }
@@ -343,8 +343,9 @@ function renderPointsPicker(){
 }
 function toast(message, global = false, duration = 2400) {
   const el = $(global ? 'global-toast' : 'toast'); el.textContent = message; el.classList.add('show');
-  clearTimeout(el._timer); el._timer = setTimeout(() => el.classList.remove('show'), duration);
+  clearTimeout(el._timer); el._timer = setTimeout(() => {el.classList.remove('show');el.textContent='';}, duration);
 }
+function clearToast(){const el=$('toast');clearTimeout(el._timer);el.classList.remove('show');el.textContent='';}
 function makeCode() { return Array.from({length:5}, () => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random()*32)]).join(''); }
 const callSeen=new Map();
 const receivedCallNotices=new Map();
@@ -2023,31 +2024,41 @@ function disconnectedPlayer(room,now=gameTime()){
   }
   return null;
 }
-function stopRoomPresence(){
+function stopRoomPresence({offline=true}={}){
   const previous=roomPresenceContext;roomPresenceContext=null;presenceWriteSerial++;
   if(previous){
-    previous.disconnect.cancel().catch(console.error);
-    state.firebase.set(previous.ref,{uid:previous.uid,matchNumber:previous.matchNumber,session:previous.session,online:false,disconnectedAt:state.firebase.serverTimestamp()}).catch(console.error);
+    const canceled=Promise.resolve(previous.ready).then(()=>previous.disconnect.cancel()).catch(console.error);
+    const tasks=[canceled];
+    const room=state.room,same=state.roomCode===previous.code&&Number(room?.matchNumber||1)===previous.matchNumber&&room?.createdAt===previous.createdAt;
+    if(offline&&same&&['drawing','started','revealing','timed-out'].includes(room.status))tasks.push(canceled.then(()=>{
+      if(state.roomCode!==previous.code||Number(state.room?.matchNumber||1)!==previous.matchNumber)return;
+      return state.firebase.set(previous.ref,{uid:previous.uid,matchNumber:previous.matchNumber,session:previous.session,online:false,disconnectedAt:state.firebase.serverTimestamp()});
+    }).catch(console.error));
+    return Promise.all(tasks);
   }
+  return Promise.resolve();
 }
 async function syncRoomPresence(){
   if(state.localGame||!state.firebase||!state.room||!roomSeats().includes(state.playerId)||state.firebaseConnected!==true)return;
   const room=state.room,code=state.roomCode,player=state.playerId,uid=state.uid,matchNumber=Number(room.matchNumber||1);
+  if(!['drawing','started','revealing','timed-out'].includes(room.status)){if(roomPresenceContext)await stopRoomPresence({offline:false});return;}
   if(room.players?.[player]?.uid!==uid)return;
   const key=[code,room.createdAt,matchNumber,player,uid].join(':');
   if(roomPresenceContext?.key===key)return;
-  stopRoomPresence();
+  const stopped=stopRoomPresence({offline:false});
   const fb=state.firebase,ref=fb.ref(fb.db,'rooms/'+code+'/public/connectionPresence/'+player),disconnect=fb.onDisconnect(ref);
-  const serial=++presenceWriteSerial,session=crypto.randomUUID(),context={key,ref,disconnect,uid,matchNumber,session};
+  const serial=++presenceWriteSerial,session=crypto.randomUUID(),context={key,ref,disconnect,uid,matchNumber,session,code,createdAt:room.createdAt};
   roomPresenceContext=context;
-  try{
+  context.ready=(async()=>{try{
+    await stopped;
+    if(serial!==presenceWriteSerial||state.firebaseConnected!==true||state.roomCode!==code)return;
     await disconnect.set({uid,matchNumber,session,online:false,disconnectedAt:fb.serverTimestamp()});
-    if(serial!==presenceWriteSerial||state.firebaseConnected!==true||state.roomCode!==code){await disconnect.cancel();return;}
+    if(serial!==presenceWriteSerial||state.firebaseConnected!==true||state.roomCode!==code)return;
     await fb.set(ref,{uid,matchNumber,session,online:true});
   }catch(error){
-    console.error('[truco:presence]',error);
+    if(serial===presenceWriteSerial&&state.roomCode===code)console.error('[truco:presence]',error);
     if(roomPresenceContext===context)roomPresenceContext=null;
-  }
+  }})();await context.ready;
 }
 function disconnectMatchChanges(room,loser){
   const winner=otherPlayer(loser),message=(room.players?.[loser]?.name||'El rival')+' no volvió a conectarse y pierde la partida.';
