@@ -1993,3 +1993,28 @@ input,textarea,[contenteditable=""],[contenteditable="true"]{-webkit-user-select
 
 #welcome-view .compact-room .compact-room-stat,#welcome-view .compact-room .compact-room-privacy{min-height:34px;gap:1px}#welcome-view .compact-room .compact-room-stat strong{line-height:1}#welcome-view .compact-room .compact-room-stat span{line-height:1}
 #welcome-view .home-tools-row #learn-game,#welcome-view .home-tools-row #open-scorer{height:48px;min-height:48px;padding:8px 12px;gap:9px}#welcome-view .home-tools-row .home-action-icon{width:22px;height:22px;flex-basis:22px}
+
+.game.team-mode.player-mode.two-device-mode .mobile-score{--team-tally-column:22px;width:58px;gap:3px}
+.game.team-mode.player-mode.two-device-mode .mobile-score-head{display:grid;grid-template-columns:var(--team-tally-column) var(--team-tally-column);gap:14px;width:58px;height:20px;flex:0 0 20px;transform:none}
+.game.team-mode.player-mode.two-device-mode .mobile-score-head h2{font-size:14px;text-align:center;margin:0}
+.game.team-mode.player-mode.two-device-mode .mobile-score-grid{grid-template-columns:var(--team-tally-column) 1px var(--team-tally-column);gap:6.5px;width:58px;height:calc(100% - 23px)}
+.game.team-mode.player-mode.two-device-mode .mobile-tally .score-sticks{width:100%!important;height:100%!important}
+
+.game.player-mode.two-device-mode:not(.team-mode)[data-deck-side="left"]{--duel-play-center:61%}
+.game.player-mode.two-device-mode:not(.team-mode)[data-deck-side="right"]{--duel-play-center:39%}
+.game.player-mode.two-device-mode:not(.team-mode)[data-deck-side] .played-card.is-own-play{left:calc(var(--duel-play-center) - var(--board-deckWidth,58px)*.62);top:calc(50% + var(--board-deckHeight,84px)*.25)}
+.game.player-mode.two-device-mode:not(.team-mode)[data-deck-side] .played-card.is-opponent-play{left:calc(var(--duel-play-center) + var(--board-deckWidth,58px)*.62);top:calc(50% - var(--board-deckHeight,84px)*.25)}
+.game.team-mode .mobile-tally .score-sticks g{transform:translateX(24px)}
+
+.game.player-mode.two-device-mode .center-table{pointer-events:none}.game.player-mode.two-device-mode #muestra-card{pointer-events:auto;touch-action:none;-webkit-user-select:none;user-select:none}
+
+/* Separate duel plays vertically, each toward the player who played it. */
+.game.player-mode.two-device-mode:not(.team-mode)[data-deck-side] .played-card.is-own-play{left:calc(var(--duel-play-center) - var(--board-deckWidth,58px)*.18);top:calc(50% + var(--board-deckHeight,84px)*.65)}
+.game.player-mode.two-device-mode:not(.team-mode)[data-deck-side] .played-card.is-opponent-play{left:calc(var(--duel-play-center) + var(--board-deckWidth,58px)*.18);top:calc(50% - var(--board-deckHeight,84px)*.65)}
+.game.player-mode.two-device-mode #deck-stack{touch-action:none;user-select:none;-webkit-user-select:none}
+.game.player-mode.two-device-mode .hand-card{transition:none}
+
+.game.table-preparing .game-layout{visibility:hidden}
+
+/* Keep an explicit loading state when restoring a seat without a server receipt. */
+.game.table-preparing::after{content:"Preparando mesa…";position:absolute;inset:80px 0 0;display:grid;place-items:center;color:#e9ce89;font-size:16px;pointer-events:none}

@@ -85,7 +85,7 @@ export class TableRoom extends DurableObject{
    const user=await this.identity(uid);
    await this.engine.create(user,{id:crypto.randomUUID(),stake,targetPoints,mode,secret});
    this.engine.setOnline(uid,true);
-   await this.commit();return this.result();
+   await this.commit();return this.result(uid);
   }
   if(message.t==='join'){
    this.rateLimit(uid,'seat',SEATINGS_PER_MINUTE);
@@ -97,7 +97,7 @@ export class TableRoom extends DurableObject{
     await this.engine.join(user,{password:message.password||'',team:message.team});
    }
    this.engine.setOnline(uid,true);
-   await this.commit();return this.result();
+   await this.commit();return this.result(uid);
   }
   if(message.t==='act'){
    this.rateLimit(uid,'act',ACTIONS_PER_MINUTE);
@@ -108,12 +108,13 @@ export class TableRoom extends DurableObject{
     for(let a=0;a<people.length;a++)for(let b=a+1;b<people.length;b++)if(await usersBlockEachOther(this.db,people[a].uid,people[b].uid))throw new Error('No pueden iniciar una revancha porque hay jugadores bloqueados.');
    }
    await this.engine.act(uid,{command,requestId,expectedMatchId});
-   await this.commit();return this.result();
+   await this.commit();return this.result(uid);
   }
   throw new Error('Mensaje desconocido.');
  }
 
- result(){const m=this.engine.match;return {code:this.code,room:this.engine.publicRoom(),player1:m?.player1||null,player2:m?.player2||null};}
+ // Entry receipt: the caller gets its private hand with the room, so the table renders without another round trip.
+ result(uid){const m=this.engine.match;return {code:this.code,room:this.engine.publicRoom(),privateHand:this.engine.handFor(uid),player1:m?.player1||null,player2:m?.player2||null};}
 
  async identity(uid){
   const cached=this.identities.get(uid);

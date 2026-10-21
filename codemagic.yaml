@@ -78,6 +78,8 @@ workflows:
       - name: Configurar Firebase y firma de distribucion
         script: |
           set -e
+          export ANDROID_VERSION_CODE="${PROJECT_BUILD_NUMBER:?Falta el numero de compilacion de Codemagic}"
+          echo "ANDROID_VERSION_CODE=$ANDROID_VERSION_CODE" >> "$CM_ENV"
           node scripts/prepare-android-release.cjs
           cd android
           ./gradlew signingReport

@@ -109,3 +109,7 @@ El preparador rechaza credenciales faltantes, versión inválida, proyecto/paque
 El workflow ejecuta las pruebas y verifica el paquete sin anuncios antes de firmar. prepare-ios.py configura cifrado estándar exento y limpia los metadatos publicitarios. Revisar los manifests y el reporte de privacidad de Capacitor, Firebase y Google Sign-In en el IPA real. No se incluye Google Mobile Ads ni UMP.
 
 El proyecto permite iPad: hacen falta pruebas de orientación y capturas de iPad si se conserva ese soporte. No se ha limitado a iPhone ni se han creado capturas artificiales.
+
+## Funciones del juego vigentes (19/10/2026)
+
+El juego incluye 1 vs 1, 2 vs 2, bot y aprendizaje. Consultar REGLAS.md para reparto, mano y pie, privacidad de cartas del compañero y créditos por equipo. Verificar estas modalidades en la build o intervención administrativa correspondiente; no asumir que una actualización de Hosting actualiza las apps instaladas.

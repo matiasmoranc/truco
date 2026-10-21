@@ -10,7 +10,7 @@ const functions=require('../functions/index.cjs'),serverRequire=require('node:mo
 const db=getDatabase();
 
 const request=(uid,data)=>({auth:{uid,token:{firebase:{sign_in_provider:'google.com'}}},data});
-const call=(name,uid,data)=>functions[name].run(request(uid,data));
+const call=(name,uid,data)=>['creditCreateTable','creditJoinTable','creditTableAction'].includes(name)&&seq%2?functions.creditGame.run(request(uid,{operation:name,payload:data})):functions[name].run(request(uid,data));
 let seq=0;
 (async()=>{
  console.log('Checking callable server against the local emulator…');
@@ -25,9 +25,8 @@ let seq=0;
  const joined=races.find(x=>x.status==='fulfilled').value,peer=joined.player2,code=created.code,id=joined.room.creditMatch.id;
  await assert.rejects(()=>call('creditTableAction',peer==='b'?'c':'b',{code,command:{kind:'tick'},requestId:'outsider-tick',expectedMatchId:id}),/No pertenecés/);
  const action=(uid,command)=>call('creditTableAction',uid,{code,command,expectedMatchId:id,requestId:'e2e-'+(++seq)});
- await action('a',{kind:'draw'});await action(peer,{kind:'draw'});
- await db.ref('creditEconomy/matches/'+id+'/session/room/openingDraw').update({'cards/player1/rank':1,'cards/player2/rank':7,resolveAt:Date.now()-1});
- await action('a',{kind:'tick'});
+ assert.equal(joined.room.status,'started');assert.equal(joined.room.openingDraw??null,null);
+ assert.equal(joined.privateHand.hand.length,3);
  for(let n=0;n<10&&(await db.ref('creditEconomy/matches/'+id+'/status').get()).val()!=='settled';n++){
   await action(peer,{kind:'fold'});
   await db.ref('creditEconomy/matches/'+id+'/session/room/pendingNextHand/endsAt').set(Date.now()-1);
@@ -38,7 +37,7 @@ let seq=0;
  const ledger=(await db.ref('creditEconomy').get()).val();assert.equal(ledger.matches[id].status,'settled');assert.equal(ledger.wallets.a.balance,23);assert.equal(ledger.wallets[peer].balance,17);assert.equal(ledger.wallets.a.locked,0);
  await action('a',{kind:'tick'});assert.equal((await db.ref('creditEconomy/wallets/a/balance').get()).val(),23);
  await action('a',{kind:'rematch',value:'request'});await action(peer,{kind:'rematch',value:'accept'});
- const rematch=(await db.ref('rooms/'+code+'/public').get()).val();assert.notEqual(rematch.creditMatch.id,id);assert.equal(rematch.matchNumber,2);assert.equal(rematch.status,'drawing');
+ const rematch=(await db.ref('rooms/'+code+'/public').get()).val();assert.notEqual(rematch.creditMatch.id,id);assert.equal(rematch.matchNumber,2);assert.equal(rematch.status,'started');
  const privateHand=(await db.ref('hands/'+code+'/a').get()).val();assert.equal(privateHand.creditMatchId,rematch.creditMatch.id);
  assert.equal((await db.ref('creditEconomy/wallets/a').get()).val().balance,20);
  console.log('Firebase Admin/emulator: callable authentication, password, concurrent joins, complete match payout, retries, private projections and rematch passed.');
@@ -64,3 +63,4 @@ let seq=0;
  }finally{auth.getUser=oldGet;auth.deleteUser=oldDelete;}
  await db.ref().set(null);process.exit(0);
 })().catch(error=>{console.error(error);process.exit(1);});
+

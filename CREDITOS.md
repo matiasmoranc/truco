@@ -1,15 +1,15 @@
 # Mesas con créditos gratuitos
 
-Los créditos son virtuales, sin dinero ni premios canjeables. No hay compras. La web no muestra publicidad; las apps móviles tienen una integración de anuncios recompensados en modo de prueba, sin acreditación al saldo real. Ver ANUNCIOS.md.
+Los créditos son virtuales, sin dinero ni premios canjeables. No hay compras. La versión actual de web y apps se prepara sin publicidad ni SDK de AdMob. Ver ANUNCIOS.md.
 
 ## Funcionamiento
 
 - Reclamo manual de 5 créditos por día de Uruguay (UTC−3), sólo con saldo 0 y sin créditos reservados. Tener 1 crédito no permite reclamar otros 2.
 - El creador elige una apuesta entera de 1 o más, dentro de su saldo disponible, y una mesa pública o con clave de 4 a 64 caracteres.
 - La apuesta del creador se reserva al crear la mesa. El rival debe tener al menos ese monto disponible y aporta exactamente lo mismo. Sus saldos totales pueden ser diferentes.
-- El ganador recibe ambas apuestas, sin descuento. La revancha necesita saldo suficiente de ambos y usa un recibo nuevo.
-- Cancelar la espera devuelve la apuesta. Una mesa sin rival vence a los 10 minutos. Si no se completa el sorteo en 30 segundos, se devuelven ambos aportes.
-- Durante el partido, el árbitro aplica los tiempos de inactividad y la desconexión con 45 segundos de gracia. El cierre de la pantalla de resultado envía a ambos al lobby.
+- En 1 vs 1 el ganador recibe ambos aportes. En 2 vs 2 cada integrante del equipo ganador recibe la mitad del pozo de cuatro aportes. La revancha necesita confirmación y saldo suficiente de todos los participantes y usa un recibo nuevo.
+- Cancelar la espera devuelve la apuesta. Una mesa sin rival vence a los 10 minutos. No hay sorteo inicial: la partida comienza al completarse los dos o cuatro lugares. En mesas de cuatro, cancelar o vencer la espera devuelve los aportes de todos los que entraron.
+- Durante el partido, el árbitro aplica los tiempos de inactividad y la desconexión con 45 segundos de gracia. El cierre de la pantalla de resultado envía a los participantes al lobby.
 - Bot y aprendizaje siguen sin usar créditos.
 
 ## Activar las mesas
@@ -31,15 +31,15 @@ Esto publica el archivo completo `firebase.database.rules.json` y estas funcione
 - `creditTableAction`: aplica jugadas, cantos, mensajes, tiempos y revanchas desde el servidor.
 - `creditExpireTables`: avanza tiempos y devuelve reservas aunque ningún navegador siga abierto.
 
-El código de GitHub Pages se publica por separado mediante el flujo existente. Si las funciones no están desplegadas, el navegador no inventa una reserva ni una acreditación.
+El dominio trucouruguayo.uy se publica con Firebase Hosting; un despliegue en GitHub Pages no actualiza ese dominio. Si las funciones no están desplegadas, el navegador no inventa una reserva ni una acreditación.
 
 ## Autoridad y privacidad
 
-`functions/game-referee.cjs` ejecuta en el servidor las mismas reglas probadas del juego. `scripts/build-credit-referee.cjs` lo genera desde las funciones compartidas de `app.js` y los archivos `functions/referee-*.cjs`. Regenerarlo después de cambiar esas reglas.
+`functions/game-referee.cjs` ejecuta las reglas de 1 vs 1 y `functions/team-referee.cjs` las de 2 vs 2 en el servidor. `scripts/build-credit-referee.cjs` lo genera desde las funciones compartidas de `app.js` y los archivos `functions/referee-*.cjs`. Regenerarlo después de cambiar esas reglas.
 
 `creditEconomy` conserva recibos y partidas privadas. Las billeteras y el recibo cambian juntos mediante una transacción. Repetir una entrada, jugada o resultado no duplica cargos ni pagos. El navegador no puede escribir ganadores, cambiar cartas privadas ni quitar `managedCredits`. Sólo puede actualizar su propia presencia y reclamar el aporte diario protegido por las reglas.
 
-La clave se guarda únicamente como hash con sal aleatoria. La lista pública contiene el monto y la indicación «Con clave», nunca la clave, el hash, el mazo ni las manos privadas. Cada jugador sólo lee sus propias cartas hasta que se revelan al final de la mano.
+La clave se guarda únicamente como hash con sal aleatoria. La lista pública contiene el monto y la indicación «Con clave», nunca la clave, el hash, el mazo ni las manos privadas. En 1 vs 1 cada jugador recibe sus cartas privadas. En 2 vs 2 el canal privado incluye también las cartas de su compañero para la vista de tres segundos; las manos rivales no se incluyen. Ver REGLAS.md.
 
 ## Validación
 

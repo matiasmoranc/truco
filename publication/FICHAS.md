@@ -27,14 +27,14 @@ Creá una mesa pública o con clave, elegí los puntos de la partida y compartí
 
 ¿Querés aprender? Practicá contra el bot y usá las ayudas y la guía de cartas para entender las piezas de la muestra y cómo sumar los puntos.
 
-• Truco uruguayo para dos jugadores.
+• Truco uruguayo para dos o cuatro jugadores en equipos.
 • Partidas con muestra, envido, flor, truco, retruco y vale cuatro.
 • Mesas públicas o con clave e invitaciones para jugar con amigos.
 • Práctica contra el bot con ayudas durante el juego.
 • Estadísticas personales y chat durante las partidas.
 • Opciones para reportar mensajes y bloquear jugadores.
 
-Los créditos son virtuales y gratuitos: no tienen valor monetario y no se canjean por dinero ni premios. Podés reclamar 5 créditos diarios cuando tu saldo llega a cero y no tenés créditos reservados. En las mesas entre personas, ambos aportan la misma cantidad y el ganador recibe los dos aportes. El aprendizaje y las partidas contra el bot no usan créditos.
+Los créditos son virtuales y gratuitos: no tienen valor monetario y no se canjean por dinero ni premios. Podés reclamar 5 créditos diarios cuando tu saldo llega a cero y no tenés créditos reservados. En las mesas entre personas, todos aportan la misma cantidad: en 1 vs 1 el ganador recibe el pozo y en 2 vs 2 cada ganador recibe la mitad del pozo de cuatro aportes. El aprendizaje y las partidas contra el bot no usan créditos.
 
 Necesitás conexión a internet y una cuenta de Google o Apple compatible con tu dispositivo. Esta versión no contiene anuncios, compras de créditos ni suscripciones.
 
@@ -49,9 +49,9 @@ No agregar referencias a dinero, casinos o premios reales que la app no ofrece. 
 
 ## Notas para revisión (base)
 
-Truco Uruguayo is a two-player card game with the Uruguayan rules and a face-up sample card (muestra). It includes online matches, bot practice, a card guide, player statistics and an in-match chat.
+Truco Uruguayo is a card game for two players or four players in teams with the Uruguayan rules and a face-up sample card (muestra). It includes online matches, bot practice, a card guide, player statistics and an in-match chat.
 
-Credits are free virtual game units. There are no purchases, cash withdrawals or redeemable prizes in this version. A player with a zero balance and no reserved credits can claim five units per Uruguay calendar day. In online matches, both players commit the same number of virtual units and the winner receives both contributions. Bot practice does not use credits.
+Credits are free virtual game units. There are no purchases, cash withdrawals or redeemable prizes in this version. A player with a zero balance and no reserved credits can claim five units per Uruguay calendar day. In online matches, each participant commits the same number of virtual units; the winner takes the pot in 1 vs 1 and each winning teammate receives half the four contributions in 2 vs 2. Bot practice does not use credits.
 
 Account deletion is available from Mi cuenta → Eliminar mi cuenta. It requires reauthentication; the Apple flow also requests token revocation. Privacy and support are linked from the lobby and the account menu. The chat includes filtering, message reporting and player blocking; players can unblock users from Mi cuenta → Jugadores bloqueados.
 
@@ -81,3 +81,7 @@ Fuentes:
 - https://developer.apple.com/help/app-store-connect/reference/app-information/screenshot-specifications/
 - https://support.google.com/googleplay/android-developer/answer/1078870
 - https://developer.apple.com/app-store/review/guidelines/
+
+## Actualización funcional 19/10/2026
+
+Las descripciones y capturas deben reflejar mesas de 1 vs 1 y 2 vs 2, elección de equipo desde el lobby, reparto sin sorteo y las funciones del compañero descritas en ../REGLAS.md. Publicar Hosting no actualiza los binarios instalados: verificar la build antes de enviar una ficha a las tiendas.

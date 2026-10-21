@@ -12,8 +12,8 @@ test('Three cards become two tilted cards, then one centered upright card',()=>{
  const {c,container,animations}=setup();c.renderPlayerHand(cards,true);const [a,b,d]=container.children;
  assert.deepEqual(container.children.map(n=>n.vars['--hand-fan-angle']),['-12deg','0deg','12deg']);assert.equal(animations.length,0);
  c.state.launchingCardId='a';c.renderPlayerHand(cards,false);
- assert.deepEqual(container.children,[b,d]);assert.deepEqual(container.children.map(n=>n.vars['--hand-fan-angle']),['-7.5deg','7.5deg']);assert.equal(animations.length,2);assert.ok(animations.every(a=>a.options.duration===500));
- c.state.launchingCardId='b';c.renderPlayerHand(cards.slice(1),false);assert.equal(container.children.length,1);assert.equal(container.children[0],d);assert.equal(d.vars['--hand-fan-angle'],'0deg');assert.equal(d.vars['--hand-fan-y'],'0px');assert.equal(animations.at(-1).options.duration,500);
+ assert.deepEqual(container.children,[b,d]);assert.deepEqual(container.children.map(n=>n.vars['--hand-fan-angle']),['-7.5deg','7.5deg']);assert.equal(animations.length,2);assert.ok(animations.every(a=>a.options.duration===180));
+ c.state.launchingCardId='b';c.renderPlayerHand(cards.slice(1),false);assert.equal(container.children.length,1);assert.equal(container.children[0],d);assert.equal(d.vars['--hand-fan-angle'],'0deg');assert.equal(d.vars['--hand-fan-y'],'0px');assert.equal(animations.at(-1).options.duration,180);
 });
 test('Server snapshots and turn changes preserve cards and do not restart centering',()=>{
  const {c,container,animations}=setup();c.renderPlayerHand(cards,true);c.state.launchingCardId='a';c.renderPlayerHand(cards,false);const nodes=[...container.children],count=animations.length;
