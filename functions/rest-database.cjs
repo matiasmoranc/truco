@@ -8,7 +8,7 @@ function createRestDatabase({baseUrl,getAccessToken,fetchImpl=fetch,emulatorHost
   if(emulatorHost)url.searchParams.set('ns',namespace);
   const token=emulatorHost?'owner':(await getAccessToken()).access_token;
   if(!token)throw Error('Database authentication unavailable');
-  const headers={Authorization:'Bearer '+token};if(readEtag)headers['X-Firebase-ETag']='true';if(etag)headers['if-match']=etag;if(body!==undefined)headers['Content-Type']='application/json';
+  const headers={Authorization:'Bearer '+token,Connection:'close'};if(readEtag)headers['X-Firebase-ETag']='true';if(etag)headers['if-match']=etag;if(body!==undefined)headers['Content-Type']='application/json';
   const response=await fetchImpl(url,{method,headers,body:body===undefined?undefined:JSON.stringify(body),signal:AbortSignal.timeout(8000)});
   if(!response.ok&&response.status!==412)throw Error('Database request failed ('+response.status+')');
   return {status:response.status,value:await response.json(),etag:response.headers.get('etag')};
@@ -16,13 +16,15 @@ function createRestDatabase({baseUrl,getAccessToken,fetchImpl=fetch,emulatorHost
  function snapshot(value){return {val:()=>structuredClone(value),exists:()=>value!==null&&value!==undefined};}
  function ref(path=''){
   async function atomicUpdate(update){
-   let current=await request(path,{readEtag:true});
+   const started=Date.now();let readMs=0,computeMs=0,writeMs=0,attempts=0;
+   let at=Date.now(),current=await request(path,{readEtag:true});readMs+=Date.now()-at;
+   const timing=()=>{if(Date.now()-started>200)console.info('Game REST transaction timing',{scope:path.split('/')[0]||'root',readMs,computeMs,writeMs,attempts,totalMs:Date.now()-started});};
    for(let attempt=0;attempt<25;attempt++){
-    const next=update(structuredClone(current.value));
-    if(next===undefined)return {committed:false,snapshot:snapshot(current.value)};
+    attempts++;at=Date.now();const next=update(structuredClone(current.value));computeMs+=Date.now()-at;
+    if(next===undefined){timing();return {committed:false,snapshot:snapshot(current.value)};}
     if(!current.etag)throw Error('Database did not return an ETag');
-    const written=await request(path,{method:'PUT',etag:current.etag,body:next});
-    if(written.status!==412)return {committed:true,snapshot:snapshot(written.value)};
+    at=Date.now();const written=await request(path,{method:'PUT',etag:current.etag,body:next});writeMs+=Date.now()-at;
+    if(written.status!==412){timing();return {committed:true,snapshot:snapshot(written.value)};}
     current=written.etag?written:await request(path,{readEtag:true});
    }
    throw Error('Database transaction contention; retry the action');
