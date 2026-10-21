@@ -698,9 +698,9 @@ function attachLiveRoom(code,seat,room,privateHand=null){
   showView(['drawing','started','revealing','complete','timed-out'].includes(room.status)?'game-view':'waiting-view');
   const confirmed=room.players?.[seat]?.uid===state.uid&&(room.status==='waiting'||privateHandMatchesRoom(privateHand,room));
   state.connectionReady=confirmed&&state.firebaseConnected===true;
-  watchRoom();
+  watchRoom();watchPrivateHand();
   if(room.status==='waiting'){renderWaiting();state.preparingRoom=null;state.joinIntent=null;}
-  else {watchPrivateHand();renderGame();}
+  else {renderGame();}
   if(confirmed){void syncRoomPresence();}else void refreshLiveConnection();
 }
 async function restoreRoom(code){
@@ -1017,7 +1017,7 @@ function watchPrivateHand() {
     const deal=snapshot.val();
     if(deal?.creditMatchId===state.privateDeal?.creditMatchId&&Number(deal?.revision)<Number(state.privateDeal?.revision))return;
     state.privateDeal=deal;
-    syncPrivateHand();renderGame();
+    syncPrivateHand();if(state.room?.status!=='waiting')renderGame();
   },error=>{if(state.privateHandKey!==subscriptionKey)return;console.error('[truco:hand] subscription failed',error);toast(firebaseError(error),true);});
 }
 function renderWaiting() {
