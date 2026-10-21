@@ -1,7 +1,7 @@
 'use strict';
 // Live tables run on the Cloudflare table server (cloudflare/). Cloud Functions
 // only reach it to close a table from the administrator panel.
-const LIVE_SERVER_URL='https://truco-live.REPLACE-WITH-ACCOUNT.workers.dev';
+const LIVE_SERVER_URL='https://truco-live.mati-moran-castro.workers.dev';
 
 // Returns {closed:true} when the live table handled it, or {missing:true} when
 // the table server no longer holds that table and the ledger must be closed directly.

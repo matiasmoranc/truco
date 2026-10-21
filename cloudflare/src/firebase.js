@@ -31,7 +31,8 @@ export async function verifyIdToken(token,projectId,env,now=Date.now()){
  if(env?.DEV_MODE==='1'&&typeof token==='string'&&/^dev:[A-Za-z0-9_-]{1,64}$/.test(token))return {uid:token.slice(4),exp:now+3600000};
  if(typeof token!=='string'||token.length>4096)throw new Error('Iniciá sesión con tu cuenta.');
  const parts=token.split('.');if(parts.length!==3)throw new Error('Iniciá sesión con tu cuenta.');
- const header=jsonPart(parts[0]),payload=jsonPart(parts[1]);
+ let header,payload;
+ try{header=jsonPart(parts[0]);payload=jsonPart(parts[1]);}catch{throw new Error('Iniciá sesión con tu cuenta.');}
  if(header.alg!=='RS256')throw new Error('Sesión inválida.');
  const valid=await crypto.subtle.verify('RSASSA-PKCS1-v1_5',await signingKey(header.kid),b64urlDecode(parts[2]),encoder.encode(parts[0]+'.'+parts[1]));
  const seconds=now/1000;

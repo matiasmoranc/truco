@@ -4,7 +4,7 @@
 // Locally, scripts/serve-local.cjs forwards /live to `wrangler dev`.
 export const LIVE_SERVER_URL=['localhost','127.0.0.1'].includes(globalThis.location?.hostname)&&!globalThis.trucoNative?.isNative
   ?globalThis.location.origin+'/live'
-  :'https://truco-live.REPLACE-WITH-ACCOUNT.workers.dev';
+  :'https://truco-live.mati-moran-castro.workers.dev';
 
 const CALL_TIMEOUT_MS=15000,PING_MS=25000,MAX_BACKOFF_MS=5000;
 
