@@ -34,3 +34,14 @@ test('Both waiting room modes publish the match number required by presence rule
  const {createTable,publicTable}=require('../functions/table-service.cjs');
  for(const mode of ['1v1','2v2']){const ledger=createTable({wallets:{a:{balance:10,locked:0}}},{mode,code:'ABCDE',id:'m',uid:'a',name:'A',stake:1,targetPoints:10,now:1});assert.equal(publicTable(ledger.matches.m).matchNumber,1);}
 });
+test('Incomplete team tables do not initialize match chat against empty seats',()=>{
+ const c={state:{playerId:'player1',room:{mode:'2v2',status:'waiting',players:{player1:{uid:'a'},player2:{uid:'b'}}}},roomSeats:()=>['player1','player2','player3','player4']};
+ vm.createContext(c);vm.runInContext(fn('chatAvailable'),c);assert.equal(c.chatAvailable(),false);
+ c.state.room.status='started';assert.equal(c.chatAvailable(),false);
+ c.state.room.players.player3={uid:'c'};c.state.room.players.player4={uid:'d'};assert.equal(c.chatAvailable(),true);
+});
+test('Reconnecting while waiting renders the waiting room without retrying a broken game render',async()=>{
+ const room={status:'waiting',players:{player1:{uid:'a'}},handNumber:0},events=[];
+ const c={state:{room,roomCode:'ABCDE',playerId:'player1',uid:'a',firebaseConnected:true,connectionEpoch:1,firebase:{db:{},ref:(_,path)=>path,get:async path=>({val:()=>path.startsWith('rooms/')?room:null})}},roomSeatForUid:()=> 'player1',syncPrivateHand(){},syncRoomPresence:async()=>{},syncLiveControls(){},privateHandMatchesRoom:()=>true,renderGame:()=>assert.fail('Waiting is not a game'),publishChatMute:()=>assert.fail('Waiting should not send gameplay commands'),renderWaiting:()=>events.push('waiting'),console:{warn:()=>assert.fail('No resync failure expected')}};
+ vm.createContext(c);vm.runInContext(fn('refreshLiveConnection'),c);await c.refreshLiveConnection();assert.equal(c.state.connectionReady,true);assert.deepEqual(events,['waiting']);
+});

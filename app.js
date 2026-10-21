@@ -45,7 +45,7 @@ let chatMuted=false;
 let chatPlayerBlocked=false;
 
 const matchChat={key:null,messages:[],seen:new Set(),reported:new Set(),reporting:false,open:false,unread:0,sending:false,noticeTimers:new Map(),signature:''};
-function chatAvailable(){return !!(state.room&&!state.localGame&&roomSeats().includes(state.playerId)&&state.room.players?.player1&&state.room.players?.player2&&state.room.status!=='closed');}
+function chatAvailable(){return !!(state.room&&!state.localGame&&roomSeats().includes(state.playerId)&&roomSeats().every(p=>state.room.players?.[p]?.uid)&&!['waiting','closed'].includes(state.room.status));}
 function chatPeerId(){return state.room?.mode==='2v2'?($('chat-block-target')?.value||roomSeats().find(p=>p!==state.playerId)):otherPlayer(state.playerId);}
 function peerChatMuted(room=state.room){
   if(room?.mode==='2v2')return false;
@@ -203,7 +203,7 @@ function syncMatchChat(){
     if(state.room.mode==='2v2'){
       let select=$('chat-block-target');
       if(!select){select=document.createElement('select');select.id='chat-block-target';select.className='table-mode-select';select.setAttribute('aria-label','Jugador para bloquear');document.querySelector('.chat-options-panel').prepend(select);select.addEventListener('change',()=>loadPersistentChatBlock(chatContextKey()));}
-      select.innerHTML=roomSeats().filter(p=>p!==state.playerId).map(p=>'<option value="'+p+'">'+escapeHtml(state.room.players[p].name)+'</option>').join('');
+      select.innerHTML=roomSeats().filter(p=>p!==state.playerId&&state.room.players?.[p]).map(p=>'<option value="'+p+'">'+escapeHtml(state.room.players[p].name||'Jugador')+'</option>').join('');
     }
     if($('chat-block-target'))$('chat-block-target').hidden=state.room.mode!=='2v2';
     chatPlayerBlocked=false;matchChat.reporting=false;
@@ -295,7 +295,8 @@ async function refreshLiveConnection(){
     await syncRoomPresence();
     if(state.roomCode!==code||state.localGame||(state.connectionEpoch||0)!==epoch||state.firebaseConnected!==true)return;
     if(['started','timed-out'].includes(state.room.status)&&!privateHandMatchesRoom(state.privateDeal,state.room))throw new Error('hand-sync-pending');
-    state.connectionReady=true;renderGame();publishChatMute();
+    state.connectionReady=true;
+    if(state.room.status==='waiting')renderWaiting();else{renderGame();publishChatMute();}
   }catch(error){
     console.warn('[truco:resync]',error);
     if(state.roomCode===code&&(state.connectionEpoch||0)===epoch&&state.firebaseConnected===true){
