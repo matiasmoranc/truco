@@ -688,17 +688,20 @@ function rememberRoomSeat(){
   setRoomUrl(state.roomCode);
   try{localStorage.setItem('truco-last-seat',JSON.stringify({code:state.roomCode,role:state.playerId,uid:state.uid,createdAt:state.room?.createdAt}));}catch{}
 }
-function attachLiveRoom(code,seat,room){
-  state.privateUnsubscribe?.();state.privateUnsubscribe=null;state.privateHandKey=null;state.privateDeal=null;
+function attachLiveRoom(code,seat,room,privateHand=null){
+  state.privateUnsubscribe?.();state.privateUnsubscribe=null;state.privateHandKey=null;state.privateDeal=privateHand;
   state.preparingRoom=code;$('game-view').classList.add('table-preparing');
   state.roomCode=code;state.playerId=seat;state.joining=false;state.invitationEntry=false;
   state.localGame=false;state.hand=[];state.room=room;state.restorePending=null;state.connectionReady=false;
   state.lobbyUnsubscribe?.();state.lobbyUnsubscribe=null;
   rememberRoomSeat();
   showView(['drawing','started','revealing','complete','timed-out'].includes(room.status)?'game-view':'waiting-view');
+  const confirmed=room.players?.[seat]?.uid===state.uid&&(room.status==='waiting'||privateHandMatchesRoom(privateHand,room));
+  state.connectionReady=confirmed&&state.firebaseConnected===true;
   watchRoom();
   if(room.status==='waiting'){renderWaiting();state.preparingRoom=null;state.joinIntent=null;}
-  refreshLiveConnection();
+  else {watchPrivateHand();renderGame();}
+  if(confirmed){void syncRoomPresence();}else void refreshLiveConnection();
 }
 async function restoreRoom(code){
   if(!/^[A-Z2-9]{5}$/.test(code||'')||!firebaseConfigValid(state.config))return false;
@@ -747,7 +750,7 @@ async function enterRoom() {
   if(!account.isReady())return;
   if(state.enteringRoom)return;
   if(!state.joining&&!$('play-bot').checked){
-    if(!await credits.sync()){toast('Esperá a confirmar tus créditos disponibles.',true);return;}
+    // The wallet subscription is already live; the server checks the reservation atomically.
     const wallet=credits.wallet(),stake=Number($('table-stake').value);
     if(!wallet){toast('Esperá a que carguen tus créditos.',true);return;}
     if(wallet.locked>0){toast('Ya tenés una apuesta reservada. Volvé a tu mesa.',true);return;}
@@ -755,9 +758,9 @@ async function enterRoom() {
   }
   const entryEpoch=state.navigationEpoch;
   state.enteringRoom=true;$('enter-room').disabled=true;
-  const cardsReady=await prepareCardImages();
-  state.enteringRoom=false;$('enter-room').disabled=false;
-  if(!cardsReady||state.navigationEpoch!==entryEpoch)return;
+  // Do not serialize the entry request behind all thirteen image decodes.
+  void prepareCardImages();
+  if(state.navigationEpoch!==entryEpoch){state.enteringRoom=false;$('enter-room').disabled=false;return;}
   if(state.invitationEntry&&!$('player-name').value.trim()){showInvitationForm();$('invite-name').focus();return;}
   const name=cleanName($('player-name').value,'Jugador');
   if(!state.joining&&$('play-bot').checked){await startBotGame(name);return;}
@@ -769,7 +772,7 @@ async function enterRoom() {
   console.info('[truco:join] begin',{joining:request.joining,code:request.code||null});
   try{
     const fb=await firebaseServices();
-    let joinedRoom;
+    let joinedRoom,joinedHand=null;
     if(request.joining){
       const code=request.code,roomRef=fb.ref(fb.db,`rooms/${code}/public`);
       const cached=state.lobbyRooms?.[code]?.public;
@@ -780,7 +783,7 @@ async function enterRoom() {
       if(room.managedCredits){
         if(!seat&&(room.creditMatch.hasPassword||(room.mode==='2v2'&&!state.joinTeam))&&!state.joinConfirmed){openCreditJoin(code,room);return;}
         const result=await creditApi('creditJoinTable',{code,password:state.joinPassword||'',...(room.mode==='2v2'?{team:state.joinConfirmed?$('join-credit-team').value:state.joinTeam}:{})});
-        room=result.room;seat=roomSeatForUid(room,state.uid);state.joinPassword='';state.joinConfirmed=false;
+        room=result.room;joinedHand=result.privateHand||null;seat=roomSeatForUid(room,state.uid);state.joinPassword='';state.joinConfirmed=false;
         if(!seat)throw new Error('La mesa ya no tiene lugares disponibles.');
       }
       // Existing players may reconnect even after the automatic start.
@@ -798,11 +801,11 @@ async function enterRoom() {
     }else{
       const stake=Number($('table-stake').value),visibility=$('table-visibility').value;
       const result=await creditApi('creditCreateTable',{stake,targetPoints:normalizeTargetPoints($('target-points').value),mode:$('table-mode').value,visibility,password:visibility==='password'?$('table-password').value:''});
-      joinedRoom=result.room;state.roomCode=result.code;state.playerId='player1';
+      joinedRoom=result.room;joinedHand=result.privateHand||null;state.roomCode=result.code;state.playerId='player1';
     }
     if($('join-credit-dialog').open)$('join-credit-dialog').close();
     rememberPlayerName(name);
-    attachLiveRoom(state.roomCode,state.playerId,joinedRoom);
+    attachLiveRoom(state.roomCode,state.playerId,joinedRoom,joinedHand);
     console.info('[truco:join] seated',{code:state.roomCode,role:state.playerId,status:joinedRoom.status});
   }catch(error){
     console.error('[truco:join] failed',error);
@@ -3963,9 +3966,11 @@ function loadCreditFunctions(){
   return creditFunctionsPromise??=import('https://www.gstatic.com/firebasejs/12.4.0/firebase-functions.js').catch(error=>{creditFunctionsPromise=null;throw error;});
 }
 async function creditApi(name,data){
+  const started=performance.now();
   const fb=await firebaseServices();
   const {getFunctions,httpsCallable}=await loadCreditFunctions();
   const result=(await httpsCallable(getFunctions(fb.auth.app,'us-central1'),name,{timeout:20000})(data)).data;
+  if(data?.command?.kind!=='tick')console.info('[truco:request]',{operation:data?.command?.kind||name,elapsedMs:Math.round(performance.now()-started),server:result?.timing});
   // The wallet subscription supplies balance changes. A refresh must never
   // hold a played card/call (or every background tick) behind another request.
   if(['creditCreateTable','creditJoinTable'].includes(name))void credits.sync().catch(error=>console.error('[truco:wallet-sync]',error));

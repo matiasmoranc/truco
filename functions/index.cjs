@@ -42,6 +42,7 @@ async function mutate(update,allowEmpty=false,context={}){
   return result.snapshot.val();
  }catch(error){console.error('Accounting operation rejected',{...context,error:error.message});throw new HttpsError('failed-precondition',error.message||'La mesa cambió. Volvé a intentar.');}
 }
+function measured(stages,key,task){const at=Date.now();return Promise.resolve(task).finally(()=>{stages[key]=Date.now()-at;});}
 async function publish(ledger,code){
  const m=tableFor(ledger,code),room=publicTable(m);
  let collision=false;
@@ -60,15 +61,16 @@ async function publish(ledger,code){
  return {code,room,player1:m.player1,player2:m.player2};
 }
 exports.creditCreateTable=onCall(options,async request=>{
- const user=await identity(request);await rateLimit(user.uid);
+ const started=Date.now(),stages={};
+ const [user]=await Promise.all([measured(stages,'identityMs',identity(request)),request.auth?measured(stages,'rateLimitMs',rateLimit(request.auth.uid)):Promise.resolve()]);
  const {stake,targetPoints,visibility,password,mode='1v1'}=request.data||{};
  if(!['public','password'].includes(visibility))throw new HttpsError('invalid-argument','Elegí mesa pública o con clave.');
  let secret;try{secret=visibility==='password'?passwordHash(password):null;}catch(e){throw new HttpsError('invalid-argument',e.message);}
  const alphabet='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';const code=Array.from({length:5},()=>alphabet[crypto.randomInt(alphabet.length)]).join('');
  if((await db.ref('rooms/'+code+'/public').once('value')).exists())throw new HttpsError('aborted','Volvé a intentar crear la mesa.');
  const id=crypto.randomUUID(),now=Date.now();
- const ledger=await mutate(current=>createTable(current,{...user,code,id,stake,targetPoints,mode,secret,now}));
- try{return await publish(ledger,code);}catch(error){
+ const ledger=await measured(stages,'accountingMs',mutate(current=>createTable(current,{...user,code,id,stake,targetPoints,mode,secret,now})));
+ try{const result=await measured(stages,'projectionMs',publish(ledger,code));return {...result,privateHand:privateTableHand(tableFor(ledger,code),'player1'),timing:{...stages,totalMs:Date.now()-started}};}catch(error){
   // Recover a reservation if a legacy room claimed the same code before publish.
   // Retain the receipt and let a later create choose a different code.
   if(error.message==='Ese código ya está en uso.')await mutate(current=>{
@@ -77,18 +79,25 @@ exports.creditCreateTable=onCall(options,async request=>{
    delete refunded.tables[code];return refunded;
   });
   throw new HttpsError('aborted','No pudimos confirmar la mesa. Revisá el lobby antes de volver a intentar.');
- }
+ }finally{console.info('Table entry timing',{kind:'create',...stages,totalMs:Date.now()-started});}
 });
 exports.creditJoinTable=onCall(options,async request=>{
- const [user]=await Promise.all([identity(request),request.auth?rateLimit(request.auth.uid):Promise.resolve()]);const {code,password,team}=request.data||{};const now=Date.now();
- let table;try{table=tableFor((await db.ref('creditEconomy').once('value')).val()||{},code);}catch(error){throw new HttpsError('failed-precondition',error.message||'La mesa ya no está disponible.');}
- if((await Promise.all(Object.values(table.players||{}).map(person=>usersBlockEachOther(db,user.uid,person.uid)))).some(Boolean))throw new HttpsError('failed-precondition','No pueden entrar a la misma mesa porque uno bloqueó al otro.');
- const ledger=await mutate(current=>joinTable(current,{...user,code,password,team,now}));return publish(ledger,code);
+ const started=Date.now(),stages={}, {code,password,team}=request.data||{};
+ if(!request.auth)await identity(request);
+ if(typeof code!=='string'||!/^[A-Z2-9]{5}$/.test(code))throw new HttpsError('invalid-argument','Mesa inválida.');
+ const readTable=async()=>{const id=(await db.ref('creditEconomy/tables/'+code).once('value')).val();if(typeof id!=='string')throw new HttpsError('failed-precondition','La mesa ya no está disponible.');const match=(await db.ref('creditEconomy/matches/'+id).once('value')).val();return tableFor({tables:{[code]:id},matches:{[id]:match}},code);};
+ try{
+  const [user,,table]=await Promise.all([measured(stages,'identityMs',identity(request)),request.auth?measured(stages,'rateLimitMs',rateLimit(request.auth.uid)):Promise.resolve(),measured(stages,'lookupMs',readTable())]);
+  if((await measured(stages,'blocksMs',Promise.all(Object.values(table.players||{}).filter(person=>person?.uid).map(person=>usersBlockEachOther(db,user.uid,person.uid))))).some(Boolean))throw new HttpsError('failed-precondition','No pueden entrar a la misma mesa porque uno bloqueó al otro.');
+  const ledger=await measured(stages,'accountingMs',mutate(current=>joinTable(current,{...user,code,password,team,now:Date.now()})));
+  const result=await measured(stages,'projectionMs',publish(ledger,code)),m=tableFor(ledger,code),seat=Object.keys(m.players).find(p=>m.players[p]?.uid===user.uid);
+  return {...result,privateHand:seat?privateTableHand(m,seat):null,timing:{...stages,totalMs:Date.now()-started}};
+ }finally{console.info('Table entry timing',{kind:'join',...stages,totalMs:Date.now()-started});}
 });
 exports.creditTableAction=onCall(options,async request=>{
- const started=Date.now();const {code,command,requestId,expectedMatchId}=request.data||{};
+ const started=Date.now(),stages={};const {code,command,requestId,expectedMatchId}=request.data||{};
  if(!command||typeof command.kind!=='string'||!requestId||['__proto__','constructor','prototype'].includes(requestId)||!/^[a-zA-Z0-9_-]{1,100}$/.test(requestId)){await identity(request);await rateLimit(request.auth.uid,120,'actions');throw new HttpsError('invalid-argument','Jugada inválida.');}
- const [user,,presenceSnapshot]=await Promise.all([actionIdentity(request),request.auth?rateLimit(request.auth.uid,command.kind==='tick'?60:120,command.kind==='tick'?'ticks':'actions'):Promise.resolve(),command.kind==='tick'?db.ref('rooms/'+code+'/public/connectionPresence').once('value'):Promise.resolve(null)]);
+ const [user,,presenceSnapshot]=await Promise.all([measured(stages,'identityMs',actionIdentity(request)),request.auth?measured(stages,'rateLimitMs',rateLimit(request.auth.uid,command.kind==='tick'?60:120,command.kind==='tick'?'ticks':'actions')):Promise.resolve(),command.kind==='tick'?db.ref('rooms/'+code+'/public/connectionPresence').once('value'):Promise.resolve(null)]);
  if(command.kind==='rematch'){
   let currentMatch;try{currentMatch=tableFor((await db.ref('creditEconomy').once('value')).val()||{},code);}catch(error){throw new HttpsError('failed-precondition',error.message||'La partida ya no está disponible.');}
   const people=Object.values(currentMatch.players||{});for(let a=0;a<people.length;a++)for(let b=a+1;b<people.length;b++)if(await usersBlockEachOther(db,people[a].uid,people[b].uid))throw new HttpsError('failed-precondition','No pueden iniciar una revancha porque hay jugadores bloqueados.');
@@ -101,7 +110,7 @@ exports.creditTableAction=onCall(options,async request=>{
  const ledger=live||await mutate(current=>tableOperation(current,parameters),false,{code,uid:user.uid,kind:command.kind,requestId});
  const saved=Date.now(),m=tableFor(ledger,code);
  const result=ledger.liveUnchanged?{code,room:publicTable(m),player1:m.player1,player2:m.player2}:await publish(ledger,code);
- if(command.kind!=='tick')console.info('Game action timing',{kind:command.kind,path:live?'match':'accounting',validationMs:now-started,transactionMs:saved-now,projectionMs:Date.now()-saved,totalMs:Date.now()-started});
+ if(command.kind!=='tick')console.info('Game action timing',{kind:command.kind,path:live?'match':'accounting',...stages,validationMs:now-started,transactionMs:saved-now,projectionMs:Date.now()-saved,totalMs:Date.now()-started});
  const seat=Object.keys(m.players).find(p=>m.players[p]?.uid===user.uid);
  return {...result,privateHand:seat?privateTableHand(m,seat):null};
 });
