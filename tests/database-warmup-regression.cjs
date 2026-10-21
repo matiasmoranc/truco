@@ -11,7 +11,7 @@ test('Failed connection warmup can be retried without retaining the failed subsc
 const fs=require('node:fs'),vm=require('node:vm'),source=fs.readFileSync('functions/index.cjs','utf8');
 function gateway(){const a=source.indexOf('exports.creditGame=onCall('),b=source.indexOf('exports.creditExpireTables=',a);return source.slice(a,b);}
 test('One game service routes the original authenticated payload without altering commands',async()=>{
- const seen=[],c={gameDatabase:{run:(_db,task)=>task()},restDb:{},exports:{},onCall:(_o,f)=>f,options:{},HttpsError:Error,ledgerWarmup:{warm:async()=>{}},actionIdentity:async()=>{},createTableRequest:async r=>{seen.push(r);return 'create';},joinTableRequest:async r=>{seen.push(r);return 'join';},tableActionRequest:async r=>{seen.push(r);return 'action';},console};vm.createContext(c);vm.runInContext(gateway(),c);
+ const seen=[],c={gameDatabase:{run:(_db,task)=>task()},restDb:{},gameTransport:{},warmGameDatabase:async()=>{},exports:{},onCall:(_o,f)=>f,options:{},HttpsError:Error,ledgerWarmup:{warm:async()=>{}},actionIdentity:async()=>{},createTableRequest:async r=>{seen.push(r);return 'create';},joinTableRequest:async r=>{seen.push(r);return 'join';},tableActionRequest:async r=>{seen.push(r);return 'action';},console};vm.createContext(c);vm.runInContext(gateway(),c);
  const auth={uid:'a',token:{firebase:{sign_in_provider:'google.com'}}},payload={code:'ABCDE',command:{kind:'play',cardId:'a'}};
  for(const operation of ['creditCreateTable','creditJoinTable','creditTableAction'])await c.exports.creditGame({auth,data:{operation,payload}});
  assert.equal(seen.length,3);for(const r of seen){assert.equal(r.auth,auth);assert.equal(r.data,payload);}

@@ -15,6 +15,9 @@ const {usersBlockEachOther}=require('./user-blocks.cjs');
 initializeApp();const sdkDb=getDatabase();
 const {AsyncLocalStorage}=require('node:async_hooks'),gameDatabase=new AsyncLocalStorage();
 const restDb=require('./rest-database.cjs').createRestDatabase({baseUrl:require('firebase-admin/app').getApp().options.databaseURL||sdkDb.ref().toString(),getAccessToken:()=>require('firebase-admin/app').getApp().options.credential.getAccessToken()});
+const gameTransport=process.env.TRUCO_GAME_TRANSPORT==='rest'?restDb:sdkDb;
+const ledgerWarmup=require('./database-warmup.cjs').createLedgerWarmup(sdkDb);
+const warmGameDatabase=()=>gameTransport===sdkDb?ledgerWarmup.warm():Promise.resolve();
 const db=new Proxy(sdkDb,{get(target,key){const selected=gameDatabase.getStore()||target,value=selected[key];return typeof value==='function'?value.bind(selected):value;}});
 const options={region:'us-central1',maxInstances:5,timeoutSeconds:30};
 Object.assign(exports,require('./ad-rewards.cjs').createRewardFunctions({db,identity,rateLimit,options}));
@@ -84,7 +87,7 @@ async function createTableRequest(request){
   throw new HttpsError('aborted','No pudimos confirmar la mesa. Revisá el lobby antes de volver a intentar.');
  }finally{console.info('Table entry timing',{kind:'create',...stages,totalMs:Date.now()-started});}
 }
-exports.creditCreateTable=onCall(options,request=>gameDatabase.run(restDb,()=>createTableRequest(request)));
+exports.creditCreateTable=onCall(options,request=>gameDatabase.run(gameTransport,()=>createTableRequest(request)));
 async function joinTableRequest(request){
  const started=Date.now(),stages={}, {code,password,team}=request.data||{};
  if(!request.auth)await identity(request);
@@ -98,7 +101,7 @@ async function joinTableRequest(request){
   return {...result,privateHand:seat?privateTableHand(m,seat):null,timing:{...stages,totalMs:Date.now()-started}};
  }finally{console.info('Table entry timing',{kind:'join',...stages,totalMs:Date.now()-started});}
 }
-exports.creditJoinTable=onCall(options,request=>gameDatabase.run(restDb,()=>joinTableRequest(request)));
+exports.creditJoinTable=onCall(options,request=>gameDatabase.run(gameTransport,()=>joinTableRequest(request)));
 async function tableActionRequest(request){
  const started=Date.now(),stages={};const {code,command,requestId,expectedMatchId}=request.data||{};
  if(!command||typeof command.kind!=='string'||!requestId||['__proto__','constructor','prototype'].includes(requestId)||!/^[a-zA-Z0-9_-]{1,100}$/.test(requestId)){await identity(request);await rateLimit(request.auth.uid,120,'actions');throw new HttpsError('invalid-argument','Jugada inválida.');}
@@ -119,14 +122,15 @@ async function tableActionRequest(request){
  const seat=Object.keys(m.players).find(p=>m.players[p]?.uid===user.uid);
  return {...result,privateHand:seat?privateTableHand(m,seat):null};
 }
-exports.creditTableAction=onCall(options,request=>gameDatabase.run(restDb,()=>tableActionRequest(request)));
-exports.creditGame=onCall({...options,concurrency:16,memory:'512MiB'},request=>gameDatabase.run(restDb,async()=>{
+exports.creditTableAction=onCall(options,request=>gameDatabase.run(gameTransport,()=>tableActionRequest(request)));
+exports.creditGame=onCall({...options,concurrency:16,memory:'512MiB'},request=>gameDatabase.run(gameTransport,async()=>{
  const auth=request.auth,provider=auth?.token?.firebase?.sign_in_provider;
  if(!auth||!['google.com','apple.com','password'].includes(provider))throw new HttpsError('unauthenticated','Iniciá sesión con tu cuenta.');
  const operation=request.data?.operation;
- if(operation==='warm'){await actionIdentity(request);return {ready:true};}
+ if(operation==='warm'){await Promise.all([actionIdentity(request),warmGameDatabase()]);return {ready:true};}
  const handlers={creditCreateTable:createTableRequest,creditJoinTable:joinTableRequest,creditTableAction:tableActionRequest};
  if(!Object.hasOwn(handlers,operation))throw new HttpsError('invalid-argument','Operación inválida.');
+ if(operation!=='creditTableAction')void warmGameDatabase().catch(error=>console.warn('Entry cache warmup failed',error.message));
  return handlers[operation]({...request,auth:request.auth,data:request.data.payload});
 }));
 exports.creditExpireTables=onSchedule({schedule:'every 1 minutes',region:'us-central1',maxInstances:1},async()=>{
