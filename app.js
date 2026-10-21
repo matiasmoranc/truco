@@ -632,7 +632,7 @@ async function firebaseServices() {
       state.firebaseConnected=snapshot.val()===true;
       credits.refresh();
       state.connectionEpoch=(state.connectionEpoch||0)+1;state.connectionReady=false;
-      if(state.firebaseConnected){roomPresenceContext=null;presenceWriteSerial++;syncRoomPresence();retryRoomRestore();refreshLiveConnection();}
+      if(state.firebaseConnected){warmGameConnection();roomPresenceContext=null;presenceWriteSerial++;syncRoomPresence();retryRoomRestore();refreshLiveConnection();}
       if(state.room)renderTurnTimer();
     },error=>console.error('[truco:connection]',error));
     console.info('[truco:connection] authentication ready');
@@ -809,6 +809,10 @@ async function enterRoom() {
     console.info('[truco:join] seated',{code:state.roomCode,role:state.playerId,status:joinedRoom.status});
   }catch(error){
     console.error('[truco:join] failed',error);
+    if(/deadline-exceeded|unavailable|internal/.test(error.code||'')){
+      const recoveredCode=request.joining?request.code:Object.entries(state.lobbyRooms||{}).find(([,item])=>item.public&&['waiting','started','revealing'].includes(item.public.status)&&roomSeatForUid(item.public,state.uid))?.[0];
+      if(recoveredCode&&await restoreRoom(recoveredCode))return;
+    }
     state.joinPassword='';state.joinConfirmed=false;
     if($('join-credit-dialog').open){
       const message=firebaseError(error);
@@ -866,6 +870,7 @@ async function openLobby() {
     const fb = await firebaseServices();
     if(navigationEpoch!==(state.navigationEpoch||0))return;
     showView('welcome-view');
+    warmGameConnection();
     $('open-room-list').innerHTML = '<p class="muted">Buscando mesas abiertas…</p>';
     if (state.lobbyUnsubscribe) state.lobbyUnsubscribe();
     state.lobbyUnsubscribe = fb.onValue(fb.ref(fb.db, 'rooms'), (snapshot) => {state.lobbyRooms=snapshot.val()||{};renderLobby(state.lobbyRooms);}, (error) => {
@@ -3035,10 +3040,10 @@ function animateOpponentCard(card,playerId,target,key){
   const dx=destination.left+destination.width/2-(rect.left+rect.width/2),dy=destination.top+destination.height/2-(rect.top+rect.height/2);
   const landingTransform=getComputedStyle(target).transform,landingMatrix=landingTransform==='none'?null:new DOMMatrixReadOnly(landingTransform);
   const landingAngle=landingMatrix?Math.atan2(landingMatrix.b,landingMatrix.a)*180/Math.PI:0;
-  const duration=matchMedia('(prefers-reduced-motion: reduce)').matches?100:420;
+  const duration=matchMedia('(prefers-reduced-motion: reduce)').matches?100:260;
   const animation=flight.animate([{transform:`translate3d(0,0,0) rotate(${angle}deg) scale(1)`},{transform:`translate3d(${dx}px,${dy}px,0) rotate(${landingAngle}deg) scale(${target.offsetWidth/width},${target.offsetHeight/height})`}],{duration,easing:'cubic-bezier(.22,.61,.36,1)',fill:'forwards'});
-  front.animate([{opacity:0},{opacity:0,offset:.4},{opacity:1,offset:.6},{opacity:1}],{duration,fill:'forwards'});
-  back.animate([{opacity:1},{opacity:1,offset:.4},{opacity:0,offset:.6},{opacity:0}],{duration,fill:'forwards'});
+  front.animate([{opacity:0},{opacity:1,offset:.3},{opacity:1}],{duration,fill:'forwards'});
+  back.animate([{opacity:1},{opacity:0,offset:.3},{opacity:0}],{duration,fill:'forwards'});
   opponentFlights.set(key,{node:flight,target,animation});
   animation.finished.then(()=>{if(opponentFlights.get(key)?.node===flight)clearOpponentFlight(key);}).catch(()=>{});
 }
@@ -3260,7 +3265,7 @@ $('dismiss-score-details').addEventListener('click',()=>$('score-details').close
 $('score-details').addEventListener('click',event=>{if(event.target===$('score-details'))$('score-details').close();});
 $('play-bot').addEventListener('change',updateBotSetup);
 $('points-picker-trigger').addEventListener('click',()=>{const menu=$('points-picker-menu'),opening=menu.classList.contains('hidden');menu.classList.toggle('hidden',!opening);$('points-picker-trigger').setAttribute('aria-expanded',String(opening));});
-$('create-room').addEventListener('click',()=>{configureSetup();void credits.sync();});
+$('create-room').addEventListener('click',()=>{warmGameConnection();configureSetup();});
 $('open-room-list').addEventListener('click',(event)=>{const button=event.target.closest('[data-room][data-seat]');if(button)joinOpenRoom(button.dataset.room,button.dataset.seat,button.dataset.team);});
 
 $('back-home').addEventListener('click',()=>{showView('welcome-view');openLobby();});
@@ -3965,12 +3970,17 @@ await initializePage();
 function loadCreditFunctions(){
   return creditFunctionsPromise??=import('https://www.gstatic.com/firebasejs/12.4.0/firebase-functions.js').catch(error=>{creditFunctionsPromise=null;throw error;});
 }
+function warmGameConnection(){
+ if(!state.uid||state.firebaseConnected!==true||Date.now()-(state.gameWarmAt||0)<60000)return;
+ state.gameWarmAt=Date.now();void creditApi('creditGame',{operation:'warm'}).catch(error=>{state.gameWarmAt=0;console.warn('[truco:warmup]',error.code||error.message);});
+}
 async function creditApi(name,data){
   const started=performance.now();
   const fb=await firebaseServices();
   const {getFunctions,httpsCallable}=await loadCreditFunctions();
-  const result=(await httpsCallable(getFunctions(fb.auth.app,'us-central1'),name,{timeout:20000})(data)).data;
-  if(data?.command?.kind!=='tick')console.info('[truco:request]',{operation:data?.command?.kind||name,elapsedMs:Math.round(performance.now()-started),server:result?.timing});
+  const gameOperation=['creditCreateTable','creditJoinTable','creditTableAction'].includes(name);
+  const result=(await httpsCallable(getFunctions(fb.auth.app,'us-central1'),gameOperation?'creditGame':name,{timeout:20000})(gameOperation?{operation:name,payload:data}:data)).data;
+  if(data?.command?.kind!=='tick')console.info('[truco:request]',JSON.stringify({operation:data?.command?.kind||name,elapsedMs:Math.round(performance.now()-started),server:result?.timing}));
   // The wallet subscription supplies balance changes. A refresh must never
   // hold a played card/call (or every background tick) behind another request.
   if(['creditCreateTable','creditJoinTable'].includes(name))void credits.sync().catch(error=>console.error('[truco:wallet-sync]',error));

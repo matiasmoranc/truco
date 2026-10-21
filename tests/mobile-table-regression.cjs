@@ -46,7 +46,7 @@ test('Opponent flight reveals the public card and releases the landing card afte
  Object.assign(c,{opponentFlights:new Map(),document:{createElement:node,body},$:()=>({lastElementChild:back}),getComputedStyle:()=>({transform:'none'}),matchMedia:()=>({matches:false}),createPlayedCard:node});
  vm.runInContext(extract('clearOpponentFlight','animateOpponentCard')+extract('animateOpponentCard','removeCardFlight').replace('let activeCardFlight=null;',''),c);
  c.animateOpponentCard({id:'a'},'player2',target,'player2:a');
- assert.equal(target.style.visibility,'hidden');assert.equal(c.opponentFlights.size,1);assert.equal(animations[0].options.duration,420);
+ assert.equal(target.style.visibility,'hidden');assert.equal(c.opponentFlights.size,1);assert.ok(animations[0].options.duration<=300);assert.ok(animations[1].frames.find(frame=>frame.opacity===1).offset*animations[1].options.duration<=100);
  assert.match(animations[0].frames[1].transform,/200px/);assert.equal(animations[1].frames[0].opacity,0);
  finish();await Promise.resolve();await Promise.resolve();
  assert.equal(c.opponentFlights.size,0);assert.equal(target.style.visibility,'');assert.equal(body.flight.removed,true);

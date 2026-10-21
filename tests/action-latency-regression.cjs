@@ -42,3 +42,8 @@ test('A missing or mismatched entry receipt keeps controls blocked and uses auth
   vm.createContext(c);vm.runInContext([extract('privateHandMatchesRoom'),extract('attachLiveRoom')].join('\n'),c);c.attachLiveRoom('ABCDE','player1',{managedCredits:true,status:'started',players:{player1:{uid:'u'}},creditMatch:{id:'m'},handCounts:{player1:3}},deal);assert.equal(state.connectionReady,false);assert.equal(resync,1);
  }
 });
+
+test('Lobby warmup is non-blocking, bounded and safe before any module-tail variables initialize',async()=>{
+ let calls=0,finish;const state={uid:'a',firebaseConnected:true};const c={state,creditApi:()=>{calls++;return new Promise(resolve=>finish=resolve);},console:{warn(){}}};vm.createContext(c);vm.runInContext(extract('warmGameConnection'),c);
+ assert.equal(c.warmGameConnection(),undefined);assert.equal(calls,1);c.warmGameConnection();assert.equal(calls,1);finish();await Promise.resolve();
+});
