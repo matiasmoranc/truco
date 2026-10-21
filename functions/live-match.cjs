@@ -2,6 +2,15 @@
 const {tableOperation}=require('./table-service.cjs');
 const {loadedTransaction}=require('./loaded-transaction.cjs');
 const LIVE=new Set(['play','call','declare','fold','team-signal','tick','chat','mute']);
+async function withMatchPreload(db,request,run){
+ const auth=request.auth,id=request.data?.expectedMatchId,kind=request.data?.command?.kind;
+ if(!auth||!['google.com','apple.com','password'].includes(auth.token?.firebase?.sign_in_provider)||!LIVE.has(kind)||typeof id!=='string'||!/^[a-zA-Z0-9_-]{1,100}$/.test(id))return run();
+ const ref=db.ref('creditEconomy/matches/'+id);
+ if(typeof ref.on!=='function')return run();
+ const listener=()=>{};
+ // Only preload data here. Authorization must finish before any mutation.
+ try{ref.on('value',listener,()=>{});return await run();}finally{ref.off('value',listener);}
+}
 // No wallets or historical matches are loaded by this path. Any transition
 // requiring accounting is retried atomically by the existing ledger operation.
 function liveUpdate(match,parameters){
@@ -43,4 +52,4 @@ async function tryLiveAction(db,parameters){
  if(!result.committed&&!unchanged)return null;
  return {tables:{[parameters.code]:id},matches:{[id]:result.snapshot.val()},liveUnchanged:unchanged};
 }
-module.exports={liveUpdate,tryLiveAction};
+module.exports={liveUpdate,tryLiveAction,withMatchPreload};

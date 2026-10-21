@@ -1,7 +1,18 @@
 'use strict';
 const {test}=require('node:test'),assert=require('node:assert/strict');
 const {createTable,joinTable,tableOperation}=require('../functions/table-service.cjs');
-const {liveUpdate,tryLiveAction}=require('../functions/live-match.cjs');
+const {liveUpdate,tryLiveAction,withMatchPreload}=require('../functions/live-match.cjs');
+test('Match preload overlaps identity validation, releases on rejection, and never writes',async()=>{
+ let listening=false,removed=0;
+ const db={ref(path){assert.equal(path,'creditEconomy/matches/m');return {on(){listening=true;},off(){listening=false;removed++;}};}};
+ const request={auth:{uid:'a',token:{firebase:{sign_in_provider:'password'}}},data:{expectedMatchId:'m',command:{kind:'play'}}};
+ await assert.rejects(withMatchPreload(db,request,async()=>{assert.equal(listening,true);throw new Error('blocked');}),/blocked/);
+ assert.equal(listening,false);assert.equal(removed,1);
+ assert.equal(await withMatchPreload(db,request,async()=>{assert.equal(listening,true);return 'ok';}),'ok');
+ assert.equal(listening,false);assert.equal(removed,2);
+ await withMatchPreload({ref(){throw new Error('must not read');}},{...request,auth:null},async()=>{});
+ await withMatchPreload({ref(){throw new Error('must not read');}},{...request,data:{...request.data,expectedMatchId:'../wallets'}},async()=>{});
+});
 function fixture(mode='1v1'){
  let l={wallets:Object.fromEntries(['a','b','c','d'].map(uid=>[uid,{balance:10,locked:0}]))};
  l=createTable(l,{code:'ABCDE',id:'m',uid:'a',name:'a',mode,stake:1,targetPoints:10,now:100});

@@ -8,7 +8,7 @@ const {createTable,joinTable,tableOperation,publicTable,privateTableHand,passwor
 const {recordHistory}=require('./history-service.cjs');
 const {validateAccounting}=require('./accounting-guard.cjs');
 const {loadedTransaction}=require('./loaded-transaction.cjs');
-const {tryLiveAction}=require('./live-match.cjs');
+const {tryLiveAction,withMatchPreload}=require('./live-match.cjs');
 const {hasStartedMatch}=require('./match-start.cjs');
 const {reservationAlerts,repairReservation,personalHistory}=require('./player-service.cjs');
 const {usersBlockEachOther}=require('./user-blocks.cjs');
@@ -103,6 +103,9 @@ async function joinTableRequest(request){
 }
 exports.creditJoinTable=onCall(options,request=>gameDatabase.run(gameTransport,()=>joinTableRequest(request)));
 async function tableActionRequest(request){
+ return withMatchPreload(db,request,()=>tableActionCore(request));
+}
+async function tableActionCore(request){
  const started=Date.now(),stages={};const {code,command,requestId,expectedMatchId}=request.data||{};
  if(!command||typeof command.kind!=='string'||!requestId||['__proto__','constructor','prototype'].includes(requestId)||!/^[a-zA-Z0-9_-]{1,100}$/.test(requestId)){await identity(request);await rateLimit(request.auth.uid,120,'actions');throw new HttpsError('invalid-argument','Jugada inválida.');}
  const [user,presenceSnapshot]=await Promise.all([measured(stages,'identityMs',actionIdentity(request)),command.kind==='tick'?db.ref('rooms/'+code+'/public/connectionPresence').once('value'):Promise.resolve(null)]);
