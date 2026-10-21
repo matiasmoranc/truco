@@ -68,6 +68,8 @@ for(const mode of ['1v1','2v2'])test(mode+' terminal state falls back without ch
  assert.deepEqual(m,terminal);assert.equal(l.wallets.a.locked,1);
  const settled=tableOperation(l,{code:'ABCDE',uid:'a',command:{kind:'tick'},now:500});
  assert.equal(settled.matches.m.status,'settled');
+ assert.deepEqual(liveUpdate(settled.matches.m,{code:'ABCDE',uid:'a',command:{kind:'tick'},now:501}),settled.matches.m);
+ assert.equal(liveUpdate(settled.matches.m,{code:'ABCDE',uid:'stranger',command:{kind:'tick'},now:501}),null);
  assert.deepEqual(tableOperation(settled,{code:'ABCDE',uid:'a',command:{kind:'tick'},now:501}).wallets,settled.wallets);
  assert.equal(before.status,'reserved');
 });

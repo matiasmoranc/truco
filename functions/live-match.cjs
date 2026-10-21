@@ -5,6 +5,11 @@ const LIVE=new Set(['play','call','declare','fold','team-signal','tick','chat','
 // No wallets or historical matches are loaded by this path. Any transition
 // requiring accounting is retried atomically by the existing ledger operation.
 function liveUpdate(match,parameters){
+ if(match&&['settled','refunded'].includes(match.status)&&parameters.command.kind==='tick'){
+  if(parameters.expectedMatchId&&parameters.expectedMatchId!==match.id)return null;
+  if(!Object.values(match.players||{}).some(person=>person?.uid===parameters.uid))return null;
+  return structuredClone(match);
+ }
  if(!match||match.status!=='reserved'||!['started','revealing','timed-out'].includes(match.session?.room?.status))return null;
  const {code}=parameters;
  const ledger={tables:{[code]:match.id},matches:{[match.id]:match}};
