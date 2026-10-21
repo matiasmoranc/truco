@@ -1,14 +1,32 @@
 'use strict';
 // Short server requests use REST rather than a socket that can be suspended
 // between invocations. ETags preserve the database's atomic compare-and-set.
-function createRestDatabase({baseUrl,getAccessToken,fetchImpl=fetch,emulatorHost=process.env.FIREBASE_DATABASE_EMULATOR_HOST}){
+function directRequest(url,options){
+ const started=Date.now(),stages={};
+ return new Promise((resolve,reject)=>{
+  const client=require(url.protocol==='http:'?'node:http':'node:https');
+  const req=client.request(url,{method:options.method,headers:options.headers,agent:false,family:4,signal:options.signal},res=>{
+   stages.headersMs=Date.now()-started;const chunks=[];let bytes=0;
+   res.on('data',chunk=>{bytes+=chunk.length;chunks.push(chunk);});res.on('error',reject);
+   res.on('end',()=>{if(Date.now()-started>200)console.info('Game database HTTP timing',{...stages,totalMs:Date.now()-started,bytes});const body=Buffer.concat(chunks).toString('utf8');resolve({ok:res.statusCode>=200&&res.statusCode<300,status:res.statusCode,headers:{get:key=>res.headers[key.toLowerCase()]||null},json:async()=>JSON.parse(body)});});
+  });
+  req.on('socket',socket=>{socket.once('lookup',()=>{stages.dnsMs=Date.now()-started;});socket.once('connect',()=>{stages.connectMs=Date.now()-started;});socket.once('secureConnect',()=>{stages.tlsMs=Date.now()-started;});});
+  req.on('error',reject);if(options.body!==undefined)req.write(options.body);req.end();
+ });
+}
+function createRestDatabase({baseUrl,getAccessToken,fetchImpl=directRequest,emulatorHost=process.env.FIREBASE_DATABASE_EMULATOR_HOST}){
  const origin=new URL(baseUrl),namespace=origin.searchParams.get('ns')||origin.hostname.split('.')[0];
+ let cachedToken,tokenExpires=0,tokenPending;
+ async function accessToken(){
+  if(emulatorHost)return 'owner';if(cachedToken&&Date.now()<tokenExpires)return cachedToken;
+  return tokenPending??=(async()=>{const value=await getAccessToken();if(!value.access_token)throw Error('Database authentication unavailable');cachedToken=value.access_token;tokenExpires=Date.now()+Math.max(0,Number(value.expires_in||0)-60)*1000;return cachedToken;})().finally(()=>{tokenPending=null;});
+ }
  async function request(path,{method='GET',etag,body,readEtag=false}={}){
   const url=new URL(path.split('/').filter(Boolean).map(encodeURIComponent).join('/')+'.json',emulatorHost?'http://'+emulatorHost+'/':origin.origin+'/');
   if(emulatorHost)url.searchParams.set('ns',namespace);
-  const token=emulatorHost?'owner':(await getAccessToken()).access_token;
+  const tokenStarted=Date.now(),token=await accessToken();if(Date.now()-tokenStarted>200)console.info('Game database token timing',{elapsedMs:Date.now()-tokenStarted});
   if(!token)throw Error('Database authentication unavailable');
-  const headers={Authorization:'Bearer '+token,Connection:'close'};if(readEtag)headers['X-Firebase-ETag']='true';if(etag)headers['if-match']=etag;if(body!==undefined)headers['Content-Type']='application/json';
+  const headers={Authorization:'Bearer '+token,Connection:'close'};if(readEtag)headers['X-Firebase-ETag']='true';if(etag)headers['if-match']=etag;if(body!==undefined){headers['Content-Type']='application/json';headers['Content-Length']=String(Buffer.byteLength(JSON.stringify(body)));}
   const response=await fetchImpl(url,{method,headers,body:body===undefined?undefined:JSON.stringify(body),signal:AbortSignal.timeout(8000)});
   if(!response.ok&&response.status!==412)throw Error('Database request failed ('+response.status+')');
   return {status:response.status,value:await response.json(),etag:response.headers.get('etag')};
