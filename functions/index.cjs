@@ -14,7 +14,7 @@ const {reservationAlerts,repairReservation,personalHistory}=require('./player-se
 const {usersBlockEachOther}=require('./user-blocks.cjs');
 initializeApp();const sdkDb=getDatabase();
 const {AsyncLocalStorage}=require('node:async_hooks'),gameDatabase=new AsyncLocalStorage();
-const restDb=require('./rest-database.cjs').createRestDatabase({baseUrl:sdkDb.ref().toString(),getAccessToken:()=>require('firebase-admin/app').getApp().options.credential.getAccessToken()});
+const restDb=require('./rest-database.cjs').createRestDatabase({baseUrl:require('firebase-admin/app').getApp().options.databaseURL||sdkDb.ref().toString(),getAccessToken:()=>require('firebase-admin/app').getApp().options.credential.getAccessToken()});
 const db=new Proxy(sdkDb,{get(target,key){const selected=gameDatabase.getStore()||target,value=selected[key];return typeof value==='function'?value.bind(selected):value;}});
 const options={region:'us-central1',maxInstances:5,timeoutSeconds:30};
 Object.assign(exports,require('./ad-rewards.cjs').createRewardFunctions({db,identity,rateLimit,options}));

@@ -2,7 +2,7 @@
 // Short server requests use REST rather than a socket that can be suspended
 // between invocations. ETags preserve the database's atomic compare-and-set.
 function createRestDatabase({baseUrl,getAccessToken,fetchImpl=fetch,emulatorHost=process.env.FIREBASE_DATABASE_EMULATOR_HOST}){
- const origin=new URL(baseUrl),namespace=origin.hostname.split('.')[0];
+ const origin=new URL(baseUrl),namespace=origin.searchParams.get('ns')||origin.hostname.split('.')[0];
  async function request(path,{method='GET',etag,body,readEtag=false}={}){
   const url=new URL(path.split('/').filter(Boolean).map(encodeURIComponent).join('/')+'.json',emulatorHost?'http://'+emulatorHost+'/':origin.origin+'/');
   if(emulatorHost)url.searchParams.set('ns',namespace);
