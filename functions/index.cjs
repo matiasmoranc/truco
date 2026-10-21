@@ -8,6 +8,7 @@ const {createTable,joinTable,tableOperation,publicTable,privateTableHand,passwor
 const {recordHistory}=require('./history-service.cjs');
 const {validateAccounting}=require('./accounting-guard.cjs');
 const {loadedTransaction}=require('./loaded-transaction.cjs');
+const {tryLiveAction}=require('./live-match.cjs');
 const {hasStartedMatch}=require('./match-start.cjs');
 const {reservationAlerts,repairReservation,personalHistory}=require('./player-service.cjs');
 const {usersBlockEachOther}=require('./user-blocks.cjs');
@@ -21,6 +22,13 @@ async function identity(request){
  if(access.val()===true)throw new HttpsError('permission-denied','Tu cuenta está bloqueada.');
  const name=snap.val();
  if(typeof name!=='string'||!name)throw new HttpsError('failed-precondition','Guardá tu nombre de usuario primero.');return {uid:auth.uid,name};
+}
+async function actionIdentity(request){
+ const auth=request.auth,provider=auth?.token?.firebase?.sign_in_provider;
+ if(!auth||!['google.com','apple.com','password'].includes(provider))throw new HttpsError('unauthenticated','Iniciá sesión con tu cuenta.');
+ if((await db.ref('userAccess/'+auth.uid+'/blocked').get()).val()===true)throw new HttpsError('permission-denied','Tu cuenta está bloqueada.');
+ // Names and credit eligibility were checked when joining this match.
+ return {uid:auth.uid};
 }
 async function rateLimit(uid,limit=15,bucket='tables'){const now=Date.now();const r=await db.ref('creditRateLimits/'+uid+'/'+bucket).transaction(current=>{if(!current||now-current.start>=60000)return {start:now,count:1};if(current.count>=limit)return undefined;return {...current,count:current.count+1};});if(!r.committed)throw new HttpsError('resource-exhausted','Esperá un minuto antes de volver a intentar.');}
 async function mutate(update,allowEmpty=false,context={}){
@@ -79,18 +87,21 @@ exports.creditJoinTable=onCall(options,async request=>{
 exports.creditTableAction=onCall(options,async request=>{
  const started=Date.now();const {code,command,requestId,expectedMatchId}=request.data||{};
  if(!command||typeof command.kind!=='string'||!requestId||['__proto__','constructor','prototype'].includes(requestId)||!/^[a-zA-Z0-9_-]{1,100}$/.test(requestId)){await identity(request);await rateLimit(request.auth.uid,120,'actions');throw new HttpsError('invalid-argument','Jugada inválida.');}
- const [user,,presenceSnapshot]=await Promise.all([identity(request),request.auth?rateLimit(request.auth.uid,120,'actions'):Promise.resolve(),db.ref('rooms/'+code+'/public/connectionPresence').get()]);
+ const [user,,presenceSnapshot]=await Promise.all([actionIdentity(request),request.auth?rateLimit(request.auth.uid,120,'actions'):Promise.resolve(),command.kind==='tick'?db.ref('rooms/'+code+'/public/connectionPresence').get():Promise.resolve(null)]);
  if(command.kind==='rematch'){
   let currentMatch;try{currentMatch=tableFor((await db.ref('creditEconomy').get()).val()||{},code);}catch(error){throw new HttpsError('failed-precondition',error.message||'La partida ya no está disponible.');}
   const people=Object.values(currentMatch.players||{});for(let a=0;a<people.length;a++)for(let b=a+1;b<people.length;b++)if(await usersBlockEachOther(db,people[a].uid,people[b].uid))throw new HttpsError('failed-precondition','No pueden iniciar una revancha porque hay jugadores bloqueados.');
  }
  // Membership and match identity are checked atomically by tableOperation,
  // including ticks; do not pre-read the entire historical ledger for a tick.
- const now=Date.now(),presence=presenceSnapshot.val();
- const ledger=await mutate(current=>tableOperation(current,{code,uid:user.uid,command,requestId:command.kind==='tick'?null:requestId,expectedMatchId,presence,now}),false,{code,uid:user.uid,kind:command.kind,requestId});
- const saved=Date.now(),result=await publish(ledger,code);
- if(command.kind!=='tick')console.info('Game action timing',{kind:command.kind,validationMs:now-started,transactionMs:saved-now,projectionMs:Date.now()-saved,totalMs:Date.now()-started});
- const m=tableFor(ledger,code),seat=Object.keys(m.players).find(p=>m.players[p]?.uid===user.uid);
+ const now=Date.now(),presence=presenceSnapshot?.val();
+ const parameters={code,uid:user.uid,command,requestId:command.kind==='tick'?null:requestId,expectedMatchId,presence,now};
+ const live=await tryLiveAction(db,parameters);
+ const ledger=live||await mutate(current=>tableOperation(current,parameters),false,{code,uid:user.uid,kind:command.kind,requestId});
+ const saved=Date.now(),m=tableFor(ledger,code);
+ const result=ledger.liveUnchanged?{code,room:publicTable(m),player1:m.player1,player2:m.player2}:await publish(ledger,code);
+ if(command.kind!=='tick')console.info('Game action timing',{kind:command.kind,path:live?'match':'accounting',validationMs:now-started,transactionMs:saved-now,projectionMs:Date.now()-saved,totalMs:Date.now()-started});
+ const seat=Object.keys(m.players).find(p=>m.players[p]?.uid===user.uid);
  return {...result,privateHand:seat?privateTableHand(m,seat):null};
 });
 exports.creditExpireTables=onSchedule({schedule:'every 1 minutes',region:'us-central1',maxInstances:1},async()=>{
