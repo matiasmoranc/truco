@@ -17,7 +17,7 @@ test('Creating and joining refresh wallet balances in the background',async()=>{
 });
 test('Background ticks yield to foreground actions without delaying a user call behind a tick',async()=>{
  const calls=[],state={roomCode:'ABCDE',room:{creditMatch:{id:'m'}},liveAction:{},playActionInFlight:false,foldInFlight:false};
- const context={state,creditTickPending:false,liveActionsBlocked:()=>false,crypto:{randomUUID:()=> 'request'},creditApi:async(name,data)=>{calls.push(data.command.kind);},toast(){},firebaseError:e=>e.message};
+ const context={state,creditTickPending:false,applyActionReceipt(){},liveActionsBlocked:()=>false,crypto:{randomUUID:()=> 'request'},creditApi:async(name,data)=>{calls.push(data.command.kind);},toast(){},firebaseError:e=>e.message};
  vm.createContext(context);vm.runInContext(extract('creditCommand'),context);
  await context.creditCommand({kind:'tick'});assert.equal(calls.length,0);
  await context.creditCommand({kind:'call',value:'truco'});assert.deepEqual(calls,['call']);

@@ -90,7 +90,8 @@ exports.creditTableAction=onCall(options,async request=>{
  const ledger=await mutate(current=>tableOperation(current,{code,uid:user.uid,command,requestId:command.kind==='tick'?null:requestId,expectedMatchId,presence,now}),false,{code,uid:user.uid,kind:command.kind,requestId});
  const saved=Date.now(),result=await publish(ledger,code);
  if(command.kind!=='tick')console.info('Game action timing',{kind:command.kind,validationMs:now-started,transactionMs:saved-now,projectionMs:Date.now()-saved,totalMs:Date.now()-started});
- return result;
+ const m=tableFor(ledger,code),seat=Object.keys(m.players).find(p=>m.players[p]?.uid===user.uid);
+ return {...result,privateHand:seat?privateTableHand(m,seat):null};
 });
 exports.creditExpireTables=onSchedule({schedule:'every 1 minutes',region:'us-central1',maxInstances:1},async()=>{
  const now=Date.now();let changed=[];

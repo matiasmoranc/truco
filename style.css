@@ -2007,3 +2007,9 @@ input,textarea,[contenteditable=""],[contenteditable="true"]{-webkit-user-select
 .game.team-mode .mobile-tally .score-sticks g{transform:translateX(24px)}
 
 .game.player-mode.two-device-mode .center-table{pointer-events:none}.game.player-mode.two-device-mode #muestra-card{pointer-events:auto;touch-action:none;-webkit-user-select:none;user-select:none}
+
+/* Separate duel plays vertically, each toward the player who played it. */
+.game.player-mode.two-device-mode:not(.team-mode)[data-deck-side] .played-card.is-own-play{left:calc(var(--duel-play-center) - var(--board-deckWidth,58px)*.18);top:calc(50% + var(--board-deckHeight,84px)*.65)}
+.game.player-mode.two-device-mode:not(.team-mode)[data-deck-side] .played-card.is-opponent-play{left:calc(var(--duel-play-center) + var(--board-deckWidth,58px)*.18);top:calc(50% - var(--board-deckHeight,84px)*.65)}
+.game.player-mode.two-device-mode #deck-stack{touch-action:none;user-select:none;-webkit-user-select:none}
+.game.player-mode.two-device-mode .hand-card{transition:none}

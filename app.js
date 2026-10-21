@@ -911,7 +911,9 @@ function joinOpenRoom(code, seat, team=null) {
   state.joining = true; state.selectedRoom = code;
   const name = cleanName($('player-name').value||savedPlayerName(), 'Jugador');
   $('player-name').value = name;
-  enterRoom();
+  const buttons=[...document.querySelectorAll('#open-room-list [data-room]')];
+  for(const button of buttons){button.dataset.joinWasDisabled=String(button.disabled);button.disabled=true;if(button.dataset.room===code&&button.dataset.seat===seat&&(!team||button.dataset.team===team)){button.dataset.joinLabel=button.textContent;button.textContent='Entrando…';button.setAttribute('aria-busy','true');}}
+  void enterRoom().finally(()=>{for(const button of buttons){if(button.dataset.joinLabel){button.textContent=button.dataset.joinLabel;delete button.dataset.joinLabel;}button.removeAttribute('aria-busy');button.disabled=button.dataset.joinWasDisabled==='true';delete button.dataset.joinWasDisabled;}});
 }
 function firebaseError(error) {
   if (error?.code === 'auth/operation-not-allowed') return 'Activá el inicio de sesión anónimo en Firebase y volvé a intentar.';
@@ -928,6 +930,7 @@ function watchRoom() {
     if(code!==state.roomCode||version!==state.roomWatchVersion)return;
     if (!snapshot.exists()) { if(state.unsubscribe){state.unsubscribe();state.unsubscribe=null;}console.warn('[truco:room] unavailable',{code});returnToLobby('La mesa ya no está disponible.');return; }
     const incoming=snapshot.val();
+    if(isOlderRoom(incoming,state.room))return;
     if(Number(incoming.matchNumber||1)!==Number(state.room?.matchNumber||1)){
       state.privateUnsubscribe?.();state.privateUnsubscribe=null;state.privateHandKey=null;state.privateDeal=null;
       state.hand=[];state.handOrder=[];state.renderedHandNumber=null;state.finalEvidenceKey=null;state.verifiedEnvido=null;
@@ -967,6 +970,7 @@ function syncPrivateHand(){
   const matches=privateHandMatchesRoom(state.privateDeal,state.room);
   state.hand=matches?(state.privateDeal.hand||[]):[];
   state.partnerHand=matches&&state.room.mode==='2v2'?(state.privateDeal.partnerHand||[]):[];
+  reconcilePendingPlay();
 }
 function watchPrivateHand() {
   const subscriptionKey=`${state.roomCode}:${state.uid}`;
@@ -976,7 +980,9 @@ function watchPrivateHand() {
   const fb = state.firebase;
   state.privateUnsubscribe = fb.onValue(fb.ref(fb.db, `hands/${state.roomCode}/${state.uid}`), (snapshot) => {
     if(state.privateHandKey!==subscriptionKey)return;
-    state.privateDeal=snapshot.val();
+    const deal=snapshot.val();
+    if(deal?.creditMatchId===state.privateDeal?.creditMatchId&&Number(deal?.revision)<Number(state.privateDeal?.revision))return;
+    state.privateDeal=deal;
     syncPrivateHand();renderGame();
   },error=>{if(state.privateHandKey!==subscriptionKey)return;console.error('[truco:hand] subscription failed',error);toast(firebaseError(error),true);});
 }
@@ -1742,12 +1748,25 @@ async function foldHand(){
   }catch(error){console.error('[truco:fold]',error);toast(firebaseError(error));}
   finally{state.foldInFlight=false;renderGame();}
 }
-async function playCard(card) {
-  if(state.room?.mode==='2v2'){
-    if(liveActionsBlocked()||state.playActionInFlight||state.room.turn!==state.playerId||state.room.pendingBet)return;
-    state.playActionInFlight=true;syncLiveControls();
-    try{await creditCommand({kind:'play',cardId:card.id});}finally{state.playActionInFlight=false;renderGame();}return;
+function reconcilePendingPlay(){
+  const token=state.playActionToken,room=state.room;
+  if(!token||token.code!==state.roomCode||!room)return;
+  const dealt=room.handNumber!==token.hand;
+  const played=room.trickCards?.some(item=>item.playerId===state.playerId&&item.card.id===token.cardId);
+  if(dealt||(played&&!state.hand.some(card=>card.id===token.cardId))||room.status==='complete'){
+    state.playActionToken=null;state.playActionInFlight=false;state.pendingCardId=null;
   }
+}
+async function playManagedCard(card){
+  if(liveActionsBlocked()||state.liveAction||state.playActionInFlight||state.room.status!=='started'||state.room.resolvingTrick||state.room.pendingNextHand||state.room.turn!==state.playerId||state.room.pendingBet||!state.hand.some(c=>c.id===card.id))return;
+  const token={code:state.roomCode,hand:state.room.handNumber,cardId:card.id};
+  state.playActionToken=token;state.playActionInFlight=true;state.pendingCardId=card.id;syncLiveControls();renderConnectionNotice();
+  try{await creditCommand({kind:'play',cardId:card.id});}
+  catch(error){console.error('[truco:play]',error);if(state.roomCode===token.code)void refreshLiveConnection();}
+  finally{if(state.playActionToken===token){state.playActionToken=null;state.playActionInFlight=false;state.pendingCardId=null;}if(state.roomCode===token.code){renderGame();syncLiveControls();}}
+}
+async function playCard(card) {
+  if(state.room?.managedCredits){await playManagedCard(card);return;}
   if(liveActionsBlocked())return;
   syncPrivateHand();
   if(state.room?.turnClock?.key===turnClockKey()&&turnClockRemaining(state.room.turnClock).expired){renderTurnTimer();return;}
@@ -2036,10 +2055,12 @@ function renderConnectionNotice(){
   if(!el){el=document.createElement('div');el.id='connection-notice';el.className='connection-notice hidden';el.setAttribute('role','status');$('game-view').append(el);}
   const room=state.room,playing=room&&room.status!=='closed'&&!state.localGame;
   const info=playing&&disconnectedPlayer(room),ownOffline=liveActionsBlocked();
-  el.classList.toggle('hidden',!playing||(!info&&!ownOffline));
+  const sending=!!(state.liveAction||state.playActionInFlight||state.foldInFlight);
+  el.classList.toggle('hidden',!playing||(!info&&!ownOffline&&!sending));
   syncLiveControls();
   if(!playing)return null;
   if(ownOffline){el.textContent='Reconectando…';return null;}
+  if(sending&&!info){el.textContent='Enviando jugada…';return null;}
   if(info){
     const mine=info.player===state.playerId,name=room.players?.[info.player]?.name||'El rival';
     el.textContent=mine?'Reconectando…':name+' perdió la conexión. Tiene '+info.seconds+' s para volver.';
@@ -2980,10 +3001,11 @@ function handFanPose(count,index){
 function renderPlayerHand(cards,myTurn){
   const container=$('hand'),visible=cards.filter(card=>card.id!==state.launchingCardId);
   const oldNodes=[...container.children],oldKeys=oldNodes.map(node=>node.dataset.card),keys=visible.map(card=>card.id);
-  const changed=oldKeys.join('|')!==keys.join('|');
-  const before=new Map();
+  const changed=oldKeys.join('|')!==keys.join('|')||!!state.handDropPositions;
+  const before=state.handDropPositions||new Map();
+  state.handDropPositions=null;
   if(changed)for(const node of oldNodes){
-    before.set(node.dataset.card,{rect:node.getBoundingClientRect(),transform:getComputedStyle(node).transform});
+    if(!before.has(node.dataset.card))before.set(node.dataset.card,{rect:node.getBoundingClientRect(),transform:getComputedStyle(node).transform});
     node._centerAnimation?.cancel();
   }
   const existing=new Map(oldNodes.map(node=>[node.dataset.card,node]));
@@ -3007,7 +3029,7 @@ function renderPlayerHand(cards,myTurn){
     node.style.transform=prior.transform;
     const placed=node.getBoundingClientRect();node.style.removeProperty('transform');
     const dx=prior.rect.left-placed.left,dy=prior.rect.top-placed.top;
-    node._centerAnimation=node.animate([{transform:`translate(${dx}px,${dy}px) ${prior.transform==='none'?'':prior.transform}`},{transform:finalTransform}],{duration:500,easing:'cubic-bezier(.22,.61,.36,1)'});
+    node._centerAnimation=node.animate([{transform:`translate(${dx}px,${dy}px) ${prior.transform==='none'?'':prior.transform}`},{transform:finalTransform}],{duration:180,easing:'ease-out'});
     node._centerAnimation.finished.catch(()=>{});
   }
 }
@@ -3133,6 +3155,7 @@ function finishHandGesture(event,cancelled=false){
       return;
     }
     updateHandPreview(drag,dx);
+    state.handDropPositions=new Map(handCards().map(node=>[node.dataset.card,{rect:node.getBoundingClientRect(),transform:getComputedStyle(node).transform}]));
     saveHandOrder(drag.previewOrder||drag.originalOrder);
     clearHandPreview();renderGame();
     ignoreHandClickUntil=Date.now()+400;
@@ -3147,6 +3170,7 @@ handSurface.addEventListener('pointerdown',event=>{
   const card=event.target.closest('.hand-card');
   if(liveActionsBlocked()||state.liveAction||handGesture||state.playActionInFlight||!card||!state.hand.some(item=>item.id===card.dataset.card))return;
   if(event.button!=null&&event.button!==0)return;
+  for(const el of handCards())el._centerAnimation?.cancel();
   const originalOrder=orderedHand().map(item=>item.id);
   const slots=originalOrder.map(id=>{
     const el=handSurface.querySelector('[data-card="'+CSS.escape(id)+'"]'),r=el.getBoundingClientRect();
@@ -3228,18 +3252,22 @@ function limitMuestraOffset(x,y){
   const distance=Math.hypot(x,y),scale=distance>10?10/distance:1;
   return {x:x*scale,y:y*scale};
 }
-$('muestra-card').addEventListener('pointerdown',(event)=>{
+function beginMuestraDrag(event){
   const card=$('muestra-card'); if(card.classList.contains('hidden')) return;
-  card.setPointerCapture?.(event.pointerId); card.classList.add('dragging');
+  if(event.button!=null&&event.button!==0)return;
+  event.preventDefault();event.stopPropagation();
+  try{card.setPointerCapture?.(event.pointerId);}catch{}card.classList.add('dragging');
   card._drag={pointerId:event.pointerId,startX:event.clientX,startY:event.clientY,baseX:parseFloat(getComputedStyle(card).getPropertyValue('--muestra-dx'))||0,baseY:parseFloat(getComputedStyle(card).getPropertyValue('--muestra-dy'))||0};
-});
+}
+$('muestra-card').addEventListener('pointerdown',beginMuestraDrag);
+$('deck-stack').addEventListener('pointerdown',beginMuestraDrag);
 $('muestra-card').addEventListener('pointermove',(event)=>{
   const card=$('muestra-card'),drag=card._drag; if(!drag||drag.pointerId!==event.pointerId)return;
   const offset=limitMuestraOffset(drag.baseX+event.clientX-drag.startX,drag.baseY+event.clientY-drag.startY);
   card.style.setProperty('--muestra-dx',`${offset.x}px`);
   card.style.setProperty('--muestra-dy',`${offset.y}px`);
 });
-const endMuestraDrag=(event)=>{const card=$('muestra-card');if(card._drag?.pointerId===event.pointerId){card.releasePointerCapture?.(event.pointerId);card._drag=null;card.classList.remove('dragging');}};
+const endMuestraDrag=(event)=>{const card=$('muestra-card');if(card._drag?.pointerId===event.pointerId){try{card.releasePointerCapture?.(event.pointerId);}catch{}card._drag=null;card.classList.remove('dragging');}};
 $('muestra-card').addEventListener('pointerup',endMuestraDrag);
 $('muestra-card').addEventListener('pointercancel',endMuestraDrag);
 // Prevent browser zoom without discarding rapid button taps.
@@ -3891,11 +3919,20 @@ function loadCreditFunctions(){
 async function creditApi(name,data){
   const fb=await firebaseServices();
   const {getFunctions,httpsCallable}=await loadCreditFunctions();
-  const result=(await httpsCallable(getFunctions(fb.auth.app,'us-central1'),name)(data)).data;
+  const result=(await httpsCallable(getFunctions(fb.auth.app,'us-central1'),name,{timeout:20000})(data)).data;
   // The wallet subscription supplies balance changes. A refresh must never
   // hold a played card/call (or every background tick) behind another request.
   if(['creditCreateTable','creditJoinTable'].includes(name))void credits.sync().catch(error=>console.error('[truco:wallet-sync]',error));
   return result;
+}
+function isOlderRoom(incoming,current){
+  return !!(incoming?.managedCredits&&current?.managedCredits&&(Number(incoming.matchNumber||1)<Number(current.matchNumber||1)||(incoming.creditMatch?.id===current.creditMatch?.id&&Number(incoming.revision)<Number(current.revision))));
+}
+function applyActionReceipt(result,code){
+  if(state.roomCode!==code||!result?.room||isOlderRoom(result.room,state.room))return;
+  state.room={...result.room,...(state.room?.connectionPresence?{connectionPresence:state.room.connectionPresence}:{})};
+  if(result.privateHand&&Number(result.privateHand.revision)>=Number(state.privateDeal?.revision||0))state.privateDeal=result.privateHand;
+  syncPrivateHand();renderGame();
 }
 async function creditCommand(command){
   const code=state.roomCode,matchId=state.room?.creditMatch?.id;
@@ -3903,7 +3940,7 @@ async function creditCommand(command){
   if(liveActionsBlocked()&&command.kind!=='tick')throw new Error('Esperá a recuperar la conexión.');
   if(command.kind==='tick'&&(creditTickPending||state.liveAction||state.playActionInFlight||state.foldInFlight))return;
   if(command.kind==='tick')creditTickPending=true;
-  try{return await creditApi('creditTableAction',{code,command,expectedMatchId:matchId,requestId:crypto.randomUUID()});}
+  try{const result=await creditApi('creditTableAction',{code,command,expectedMatchId:matchId,requestId:crypto.randomUUID()});applyActionReceipt(result,code);return result;}
   catch(error){if(command.kind!=='tick')toast(firebaseError(error),true);throw error;}
   finally{if(command.kind==='tick')creditTickPending=false;}
 }
