@@ -10,7 +10,7 @@ FIREBASE_DATABASE_URL = "https://truco-6553d-default-rtdb.firebaseio.com"
 # Where credits live: "firebase" (creditEconomy in Realtime Database) or "bank" (Bank Durable Object).
 CREDITS_BACKEND = "bank"
 # Browser origins allowed to open sockets. Native apps send capacitor:// or https://localhost.
-ALLOWED_ORIGINS = "https://trucouruguayo.uy,https://truco-6553d.web.app,https://truco-6553d.firebaseapp.com,capacitor://localhost,https://localhost"
+ALLOWED_ORIGINS = "https://trucouruguayo.uy,https://matiasmoranc.github.io,https://truco-6553d.web.app,https://truco-6553d.firebaseapp.com,capacitor://localhost,https://localhost"
 
 # Secrets (set with `npx wrangler secret put NAME`, never committed):
 #   FIREBASE_SERVICE_ACCOUNT  JSON key of a service account with Realtime Database access
