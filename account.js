@@ -133,10 +133,14 @@ export function installAccount({ api, services, getState, rememberName, document
     provider.setCustomParameters({prompt:'select_account'});
     const user=fb.auth.currentUser;
     const android=/Android/i.test((navigator?.userAgentData?.platform||'')+' '+(navigator?.userAgent||''));
+    // iPadOS reports a Mac platform; touch points tell it apart from a desktop Mac.
+    const ios=/iPhone|iPad|iPod/i.test(navigator?.userAgent||'')||(navigator?.platform==='MacIntel'&&Number(navigator?.maxTouchPoints)>1);
     const sameOrigin=globalThis.location?.hostname===fb.auth.app?.options?.authDomain;
-    // Android account choosers may replace or discard the popup. Keep the
-    // complete redirect on the Hosting origin, so startup can recover it.
-    if(android&&sameOrigin&&!user?.isAnonymous){
+    // Android account choosers may replace or discard the popup, and iOS browsers
+    // such as Chrome open it as a separate tab without the sign-in state
+    // ("missing initial state"). Keep the complete redirect on the Hosting
+    // origin, so startup can recover it.
+    if((android||ios)&&sameOrigin&&!user?.isAnonymous){
       try{globalThis.sessionStorage?.setItem('truco-google-redirect-pending',String(Date.now()));}catch{}
       try{await fb.authSdk.signInWithRedirect(fb.auth,provider,fb.authSdk.browserPopupRedirectResolver);}
       catch(error){try{globalThis.sessionStorage?.removeItem('truco-google-redirect-pending');}catch{}throw error;}

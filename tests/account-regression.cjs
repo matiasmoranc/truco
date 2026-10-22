@@ -242,3 +242,18 @@ test('Invalid password cannot unlock gameplay and is cleared',async()=>{
  h.nodes['auth-email'].value='review@example.test';h.nodes['auth-password'].value='wrong';
  await h.submit('auth-email-form');assert.equal(h.account.isReady(),false);assert.equal(h.nodes['auth-password'].value,'');assert.match(h.nodes['auth-status'].textContent,/Correo o contraseña incorrectos/);
 });
+
+test('iPhone and iPad Google use the same-origin redirect; a desktop Mac keeps the popup',async()=>{
+ const devices=[
+  [{platform:'iPhone',userAgent:'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) CriOS/130 Mobile/15E148 Safari/604.1'},true],
+  [{platform:'MacIntel',maxTouchPoints:5,userAgent:'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Safari/605.1.15'},true],
+  [{platform:'MacIntel',maxTouchPoints:0,userAgent:'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Safari/605.1.15'},false]
+ ];
+ for(const [navigator,redirect] of devices){
+  const h=await harness(null,{name:'Mati'},navigator);let redirects=0,popups=0;const markers=new Map();
+  h.fb.auth.app={options:{authDomain:'trucouruguayo.uy'}};h.fb.authSdk.signInWithRedirect=async()=>{redirects++;};h.fb.authSdk.signInWithPopup=async()=>{popups++;return {user:google('popup')};};
+  globalThis.location={hostname:'trucouruguayo.uy'};globalThis.sessionStorage={setItem:(k,v)=>markers.set(k,v),removeItem:k=>markers.delete(k)};
+  try{await h.click('account-google');assert.equal(redirects,redirect?1:0,navigator.userAgent);assert.equal(popups,redirect?0:1,navigator.userAgent);assert.equal(markers.has('truco-google-redirect-pending'),redirect);}
+  finally{delete globalThis.location;delete globalThis.sessionStorage;}
+ }
+});
