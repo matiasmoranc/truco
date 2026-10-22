@@ -45,7 +45,7 @@ const chatModeration=globalThis.TrucoChatModeration;
 let chatMuted=false;
 let chatPlayerBlocked=false;
 
-const matchChat={key:null,messages:[],seen:new Set(),reported:new Set(),reporting:false,open:false,unread:0,sending:false,noticeTimers:new Map(),signature:''};
+const matchChat={key:null,messages:[],pendingOwn:[],seen:new Set(),reported:new Set(),reporting:false,open:false,unread:0,sending:false,noticeTimers:new Map(),signature:''};
 function chatAvailable(){return !!(state.room&&!state.localGame&&roomSeats().includes(state.playerId)&&roomSeats().every(p=>state.room.players?.[p]?.uid)&&!['waiting','closed'].includes(state.room.status));}
 function chatPeerId(){return state.room?.mode==='2v2'?($('chat-block-target')?.value||roomSeats().find(p=>p!==state.playerId)):otherPlayer(state.playerId);}
 function peerChatMuted(room=state.room){
@@ -195,6 +195,7 @@ function showChatNotice(message){
   const dismiss=()=>{clearTimeout(matchChat.noticeTimers.get(message.id));matchChat.noticeTimers.delete(message.id);notice.remove();};
   close.addEventListener('click',dismiss);content.append(name,text);notice.append(content,close);$('chat-notices').append(notice);
   matchChat.noticeTimers.set(message.id,setTimeout(dismiss,CHAT_NOTICE_MS));
+  return dismiss;
 }
 function syncMatchChat(){
   const available=chatAvailable();$('chat-toggle').classList.toggle('hidden',!available);
@@ -212,13 +213,16 @@ function syncMatchChat(){
     if($('chat-report-mode'))$('chat-report-mode').textContent='Reportar un mensaje';
     $('chat-report-hint')?.classList.add('hidden');
     const ownPreference=state.room.chatPreferences?.[state.playerId];chatMuted=!!(ownPreference?.muted&&ownPreference.uid===state.uid);
-    closeMatchChat(true);matchChat.key=key;matchChat.seen=new Set(messages.map(message=>message.id));matchChat.reported=new Set();matchChat.unread=0;matchChat.signature='';matchChat.sending=false;
+    closeMatchChat(true);matchChat.key=key;matchChat.seen=new Set(messages.map(message=>message.id));matchChat.reported=new Set();matchChat.unread=0;matchChat.signature='';matchChat.sending=false;matchChat.pendingOwn=[];
     $('chat-input').value='';$('chat-count').textContent='0/40';$('chat-send').disabled=false;$('chat-error').classList.add('hidden');
   }
   if(!fresh)for(const message of messages){
     if(matchChat.seen.has(message.id))continue;
     matchChat.seen.add(message.id);
     if(message.sender===state.playerId){
+      // Already shown when it was sent.
+      const pending=matchChat.pendingOwn.findIndex(item=>item.text===message.text);
+      if(pending>=0){matchChat.pendingOwn.splice(pending,1);continue;}
       if(!chatMuted&&!matchChat.open&&$('game-view').classList.contains('active'))showChatNotice(message);
       continue;
     }
@@ -237,29 +241,37 @@ function openMatchChat(){
   $('chat-backdrop').classList.remove('hidden');$('match-chat').classList.remove('hidden');$('chat-toggle').setAttribute('aria-expanded','true');
   $('chat-history').scrollTop=$('chat-history').scrollHeight;$('chat-close').focus();
 }
-async function sendMatchChat(event){
-  event.preventDefault();if(liveActionsBlocked()||!chatAvailable()||matchChat.sending||chatMuted||peerChatMuted()){renderChatComposer();return;}
-  const input=$('chat-input'),draft=input.value,text=draft.trim();
+// preset: a quick message sent without touching the typed draft.
+async function sendMatchChat(event,preset){
+  event?.preventDefault();if(liveActionsBlocked()||!chatAvailable()||matchChat.sending||chatMuted||peerChatMuted()){renderChatComposer();return;}
+  const input=$('chat-input'),draft=preset??input.value,text=draft.trim();
   if(!text||text.length>CHAT_LIMIT)return;
   const moderationReason=chatModeration?.blockedChatReason(text);
   if(moderationReason){$('chat-error').textContent=moderationReason==='threat'?'No se puede enviar una amenaza. Mantené el respeto en la mesa.':'No se pudo enviar el mensaje porque contiene lenguaje ofensivo. Mantené el respeto en la mesa.';$('chat-error').classList.remove('hidden');return;}
   const code=state.roomCode,key=chatContextKey(),sender=state.playerId,uid=state.uid,matchNumber=Number(state.room.matchNumber||1);
   matchChat.sending=true;$('chat-send').disabled=true;$('chat-error').classList.add('hidden');
+  // Close at once and show the message the way the rival sees it; the server copy is then skipped.
+  const own={id:`local-${Date.now()}`,sender,text};matchChat.pendingOwn.push(own);
+  closeMatchChat();const dismissOwn=showChatNotice(own);
+  if(preset==null){input.value='';$('chat-count').textContent='0/40';}
   try{
-    if(state.room?.managedCredits){await creditCommand({kind:'chat',text});if(input.value===draft){input.value='';$('chat-count').textContent='0/40';}return;}
+    if(state.room?.managedCredits){await creditCommand({kind:'chat',text});return;}
     const fb=state.firebase,messageRef=fb.push(fb.ref(fb.db,`rooms/${code}/public/chatMessages`));
     const result=await fb.runTransaction(fb.ref(fb.db,`rooms/${code}/public`),room=>{
       if(!room||room.status==='closed'||Number(room.matchNumber||1)!==matchNumber||room.players?.[sender]?.uid!==uid||!room.players?.[otherPlayer(sender)]||peerChatMuted(room))return;
       return {...room,chatMessages:{...(room.chatMessages||{}),[messageRef.key]:{sender,text,at:gameTime()}}};
     },{applyLocally:false});
     if(!result.committed){
-      if(key===chatContextKey()&&peerChatMuted(result.snapshot?.val())){state.room=result.snapshot.val();renderChatComposer();return;}
+      if(key===chatContextKey()&&peerChatMuted(result.snapshot?.val())){matchChat.pendingOwn=matchChat.pendingOwn.filter(item=>item!==own);dismissOwn();state.room=result.snapshot.val();renderChatComposer();return;}
       throw new Error('chat-unavailable');
     }
-    if(key===chatContextKey()&&input.value===draft){input.value='';$('chat-count').textContent='0/40';input.focus();}
   }catch(error){
     console.error('[truco:chat]',error);
-    if(key===chatContextKey()){$('chat-error').textContent='No se pudo enviar. Volvé a intentar.';$('chat-error').classList.remove('hidden');}
+    if(key===chatContextKey()){
+      matchChat.pendingOwn=matchChat.pendingOwn.filter(item=>item!==own);dismissOwn();
+      if(preset==null&&!input.value){input.value=draft;$('chat-count').textContent=`${draft.length}/${CHAT_LIMIT}`;}
+      openMatchChat();$('chat-error').textContent='No se pudo enviar. Volvé a intentar.';$('chat-error').classList.remove('hidden');
+    }
   }finally{if(key===chatContextKey()){matchChat.sending=false;renderChatComposer();}}
 }
 function showView(id) { if(!$(id).classList.contains('active'))clearToast(); if(id!=='game-view'){state.preparingRoom=null;$('game-view').classList.remove('table-preparing');}document.documentElement.classList.remove('opening-invitation'); views.forEach((name) => $(name).classList.toggle('active', name === id)); if(id!=='game-view')closeMatchChat(true); if(id==='welcome-view')requestAnimationFrame(showLobbyOnboarding); }
@@ -3485,8 +3497,37 @@ $('player-sound-toggle').addEventListener('click',()=>{
 document.addEventListener('click',event=>{if(event.isTrusted)unlockVoice();},{capture:true});
 document.addEventListener('touchend',event=>{if(event.isTrusted)unlockVoice();},{capture:true,passive:true});
 $('sound-toggle').addEventListener('click',()=>$('player-sound-toggle').click());
-$('chat-quick').addEventListener('click',event=>{const button=event.target.closest('[data-quick-message]');if(!button||button.disabled||chatMuted||peerChatMuted()||liveActionsBlocked())return;touchFeedback(button);$('chat-input').value=button.dataset.quickMessage;sendMatchChat(event);});
-$('chat-toggle').addEventListener('click',()=>matchChat.open?closeMatchChat():openMatchChat());
+$('chat-quick').addEventListener('click',event=>{const button=event.target.closest('[data-quick-message]');if(!button||button.disabled||chatMuted||peerChatMuted()||liveActionsBlocked())return;touchFeedback(button);sendMatchChat(event,button.dataset.quickMessage);});
+// Holding the chat button opens quick messages under it; the one under the finger on release is sent.
+const CHAT_HOLD_MS=380,chatHold={timer:null,open:false,pointer:null,suppressClick:false};
+document.body.append($('chat-hold-menu'));
+function chatHoldTarget(event){return document.elementFromPoint(event.clientX,event.clientY)?.closest('[data-hold-message]')||null;}
+function openChatHoldMenu(){
+  if(!chatAvailable()||chatMuted||peerChatMuted()||liveActionsBlocked()||matchChat.sending)return;
+  const rect=$('chat-toggle').getBoundingClientRect(),menu=$('chat-hold-menu');
+  menu.style.top=`${rect.bottom+8}px`;menu.style.right=`${Math.max(8,innerWidth-rect.right)}px`;
+  closeMatchChat();menu.classList.remove('hidden');chatHold.open=true;chatHold.suppressClick=true;navigator.vibrate?.(12);
+}
+function closeChatHoldMenu(){
+  clearTimeout(chatHold.timer);chatHold.timer=null;chatHold.open=false;chatHold.pointer=null;
+  $('chat-hold-menu').classList.add('hidden');for(const button of $('chat-hold-menu').querySelectorAll('button'))button.classList.remove('active');
+}
+$('chat-toggle').addEventListener('pointerdown',event=>{
+  if(event.button>0)return;
+  chatHold.pointer=event.pointerId;chatHold.suppressClick=false;clearTimeout(chatHold.timer);chatHold.timer=setTimeout(openChatHoldMenu,CHAT_HOLD_MS);
+});
+document.addEventListener('pointermove',event=>{
+  if(!chatHold.open||event.pointerId!==chatHold.pointer)return;
+  const target=chatHoldTarget(event);for(const button of $('chat-hold-menu').querySelectorAll('button'))button.classList.toggle('active',button===target);
+});
+document.addEventListener('pointerup',event=>{
+  if(event.pointerId!==chatHold.pointer)return;
+  const target=chatHold.open&&chatHoldTarget(event);closeChatHoldMenu();
+  if(target){touchFeedback(target);sendMatchChat(null,target.dataset.holdMessage);}
+});
+document.addEventListener('pointercancel',event=>{if(event.pointerId===chatHold.pointer)closeChatHoldMenu();});
+$('chat-toggle').addEventListener('contextmenu',event=>event.preventDefault());
+$('chat-toggle').addEventListener('click',()=>{if(chatHold.suppressClick){chatHold.suppressClick=false;return;}matchChat.open?closeMatchChat():openMatchChat();});
 $('chat-close').addEventListener('click',()=>{closeMatchChat();$('chat-toggle').focus();});
 $('chat-backdrop').addEventListener('click',()=>{closeMatchChat();$('chat-toggle').focus();});
 $('chat-form').addEventListener('submit',sendMatchChat);

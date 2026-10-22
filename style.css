@@ -2025,3 +2025,10 @@ input,textarea,[contenteditable=""],[contenteditable="true"]{-webkit-user-select
 .envido-picker.only-good::after,
 .envido-picker:has(.number-wheel.hidden)::after{content:none!important;display:none!important}
 .player-mode.declaring-envido .envido-picker.only-good #good-points{flex:0 1 220px}
+.game-topbar .chat-toggle{touch-action:none;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+.chat-hold-menu{position:fixed;z-index:8000;display:flex;flex-direction:column;align-items:stretch;gap:6px;min-width:180px;padding:8px;border:1px solid #d8e9df40;border-radius:18px;background:#143f32f2;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);box-shadow:0 10px 30px #00190f66;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;animation:chat-hold-pop .16s cubic-bezier(.2,.7,.3,1) both}
+.chat-hold-menu.hidden{display:none}
+.chat-hold-menu button{min-height:44px;padding:10px 16px;border:0;border-radius:12px;background:transparent;color:#f1f5ee;font:inherit;font-size:15px;font-weight:600;text-align:left}
+.chat-hold-menu button.active{background:#e8c983;color:#15251b}
+@keyframes chat-hold-pop{from{opacity:0;transform:translateY(-6px) scale(.96)}to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){.chat-hold-menu{animation:none}}
