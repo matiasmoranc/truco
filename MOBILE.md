@@ -93,7 +93,7 @@ Antes de una beta: probar Google y Apple en dispositivos reales, restauración d
 
 ## Android firmado para Google Play desde Codemagic
 
-El workflow manual **Truco Uruguayo - Android Google Play (AAB)** genera un AAB firmado. No lo sube ni lo envía a revisión automáticamente. Antes de ejecutarlo:
+El workflow manual **Truco Uruguayo - Android Google Play (AAB)** genera un AAB firmado y lo sube a la **prueba interna** de Play Console (no a producción ni a revisión pública). Antes de ejecutarlo:
 
 1. Crear/verificar Play Console y registrar la app `com.matiasmoranc.truco`.
 2. Crear o reutilizar una clave de **carga** para Android, conservar una copia segura y subirla a Codemagic → Code signing identities → Android keystores con referencia `truco_android_upload`. No usar ni subir a Google Play el certificado debug del APK de prueba.
@@ -101,6 +101,18 @@ El workflow manual **Truco Uruguayo - Android Google Play (AAB)** genera un AAB 
 4. Ejecutar el workflow desde main. Requiere Android SDK y JDK 21; el proyecto generado usa API 36. Revisar el AAB en artefactos.
 5. Subir el AAB a pruebas internas y activar Play App Signing. En Firebase registrar SHA-1 y SHA-256 de **App signing key certificate** que muestra Play Console, además de la clave de carga si se prueba por otra vía. Descargar de nuevo el JSON si cambia. La firma usada al instalar desde Play difiere de la clave de carga; sin estas huellas puede fallar Google.
 6. Probar una instalación desde Play. Después iniciar prueba cerrada si la cuenta lo requiere. Ver publication/PUBLICACION.md.
+
+### Subida automática a la prueba interna
+
+Una sola vez, para que Codemagic pueda subir el AAB:
+
+1. Google Cloud Console, proyecto `truco-6553d` → APIs y servicios → Biblioteca → habilitar **Google Play Android Developer API**.
+2. IAM y administración → Cuentas de servicio → **Crear cuenta de servicio** (por ejemplo `codemagic-play`), sin roles de Google Cloud. En la cuenta creada: Claves → Agregar clave → JSON. Se descarga un archivo.
+3. Play Console → **Usuarios y permisos** → Invitar a un usuario nuevo → el correo de la cuenta de servicio (termina en `iam.gserviceaccount.com`). En **Permisos de la app**, agregar Truco Uruguayo con **Publicar apps en segmentos de prueba** (y ver información de la app). Enviar la invitación.
+4. Codemagic → app truco → Environment variables → grupo `truco_android` → variable `GCLOUD_SERVICE_ACCOUNT_CREDENTIALS` con **todo el contenido** del JSON, marcada como **Secret**.
+5. Borrar el JSON descargado de la PC.
+
+Los permisos nuevos de Play Console pueden tardar en activarse. Si la primera subida falla por permisos, esperar y volver a ejecutar. El número de versión lo pone Codemagic (`PROJECT_BUILD_NUMBER`) y siempre crece.
 
 El preparador rechaza credenciales faltantes, versión inválida, proyecto/paquete Firebase incorrectos y falta de cliente Google antes de modificar archivos. Nunca imprime las contraseñas ni las escribe en Gradle: se leen de las variables de firma que entrega Codemagic. No hubo una build firmada Android en el entorno de esta auditoría.
 
