@@ -5,14 +5,14 @@ import { installActivity } from './activity.js?v=20261010-adminstats32';
 import { installCredits } from './credits.js?v=20261022-bank1';
 import { installAccount } from './account.js?v=20261016-android-google';
 import { initializeGameAuth } from './auth-init.js?v=20261016-android-google';
-import {installTeamTable,TEAM_SEATS,playerTeam,positionDealerDeck,renderTeamLobbySeats,renderWaitingSeats} from './team-table-ui.js?v=20261019-lobby-unified';
+import {installTeamTable,TEAM_SEATS,playerTeam,positionDealerDeck,renderTeamLobbySeats,renderWaitingSeats} from './team-table-ui.js?v=20261022-flor1';
 import {createLiveTables,LiveError} from './live-tables.js?v=20261022-clock1';
 const FIREBASE_VERSION = '12.4.0';
 const $ = (id) => document.getElementById(id);
 const views = ['welcome-view', 'invite-view', 'setup-view', 'waiting-view', 'game-view', 'config-view', 'learn-view', 'scorer-view'];
 const storageKey = 'truco-firebase-config';
 let state = { joining: false, config: null, firebase: null, roomCode: null, selectedRoom: null, uid: null, playerId: null, unsubscribe: null, privateUnsubscribe: null, lobbyUnsubscribe: null, room: null, hand: [], handOrder: [], handOrderKey: null, localGame: false, localHands: {}, nextAction: null, resolutionTimer: null, resolutionTimerKey: null, playActionInFlight: false, legacyRepairKey: null, emptyHandRepairKey: null };
-const teamTable=installTeamTable({$,getState:()=>state,command:creditCommand,runAction:runLiveAction,renderPlayerHand,orderedHand,cardImageStyle,cardAccessibleName,escapeHtml,renderTally:renderCompactTally,syncHeader:syncMobileGameHeader,setTurnBadge,syncControls:syncLiveControls,gameTime,hasFlor:roomHasFlor,speakCall});
+const teamTable=installTeamTable({$,getState:()=>state,command:creditCommand,runAction:runLiveAction,renderPlayerHand,orderedHand,cardImageStyle,cardAccessibleName,escapeHtml,renderTally:renderCompactTally,syncHeader:syncMobileGameHeader,setTurnBadge,syncControls:syncLiveControls,gameTime,hasFlor:roomHasFlor,florPoints:florValue,speakCall});
 function roomSeats(room=state.room){return room?.mode==='2v2'?TEAM_SEATS:['player1','player2'];}
 
 const opponentFlights=new Map();
@@ -1598,6 +1598,18 @@ async function revealEnvido(good=false,declaredNumber=null) {
   if(state.learning?.paused)return;
   if(state.room?.turnClock?.key===turnClockKey()&&turnClockRemaining(state.room.turnClock).expired){renderTurnTimer();return;}
   const room=state.room,bet=room?.pendingBet,player=state.playerId;
+  if(bet?.type==='flor'&&bet.revealMode&&bet.revealTurn===player&&state.localGame){
+    // Flower points are the real ones: only the order and son buenas are the player's choice.
+    const first=room.mano,second=otherPlayer(first),own=Number(room.flors?.[player]),number=Number(declaredNumber??($('envido-picker').dataset.value||0));
+    if(good&&player!==second){toast('El mano declara primero los puntos de su flor.');return;}
+    if(!good&&number!==own){toast('Declará los puntos de tu flor: '+own+'.');return;}
+    if(!good&&player===second&&number<=Number(bet.reveals?.[first])){toast('No superás la flor del rival: decí son buenas.');return;}
+    const reveals={...(bet.reveals||{})};if(!good)reveals[player]=number;
+    const text=good?`${room.players[player].name}: son buenas.`:`${room.players[player].name} canta ${number} de flor.`;
+    queueLearningAction(good?'good':'declare',bet);localFeed(text);const notice=makeCallNotice(text);if(notice)room.callNotice=notice;
+    if(player===first){room.pendingBet={...bet,reveals,revealTurn:second};renderGame();return;}
+    room.pendingBet={...bet,reveals};localResolveFlor(room.pendingBet,good||number<=Number(reveals[first])?first:second);renderGame();return;
+  }
   if(bet?.type!=='envido'||!bet.revealMode||bet.revealTurn!==player)return;
   const first=room.mano,second=otherPlayer(first),number=Number(declaredNumber??($('envido-picker').dataset.value||0));
   if(good&&player!==second)return;
@@ -2648,7 +2660,7 @@ function renderEnvidoPicker(room){
   const opponentPoints=bet.reveals?.[otherPlayer(state.playerId)],second=opponentPoints!=null,min=envidoPickerMinimum(room,state.playerId);
   const max=bet.type==='flor'?47:37;
   const key=`${max}:${room.handNumber}:${state.playerId}:${opponentPoints??'first'}`;
-  if(el.dataset.key===key)return;el.stopWheelHint?.();el.dataset.key=key;const initial=Math.min(max,Math.max(20,min));el.dataset.value=String(initial);
+  if(el.dataset.key===key)return;el.stopWheelHint?.();el.dataset.key=key;const own=bet.type==='flor'?Number(room.flors?.[state.playerId]):NaN;const initial=Number.isFinite(own)&&own>=min?own:Math.min(max,Math.max(20,min));el.dataset.value=String(initial);
   el.innerHTML=`<p>Arrastra los números para seleccionar</p><div class="number-wheel" role="listbox" aria-label="Tantos del 0 al ${max}">${Array.from({length:Math.max(0,max+1-min)},(_,index)=>{const number=min+index;return `<button role="option" aria-selected="${number===min}" ${number<min?'disabled':''} data-number="${number}">${number}</button>`;}).join('')}</div><div class="declaration-buttons">${min<=max?'<button id="declare-points" class="call-button">DECLARAR <span id="selected-points">'+min+'</span></button>':''}${second?'<button id="good-points" class="pass-button">SON BUENAS</button>':''}</div>`;
   if(min>max){el.querySelector('.number-wheel').classList.add('hidden');el.querySelector('p').textContent='El rival declaró el máximo de tantos.';$('good-points')?.addEventListener('click',()=>runLiveAction($('good-points'),()=>revealEnvido(true)));return;}
   const wheel=el.querySelector('.number-wheel');
@@ -2769,6 +2781,8 @@ function chooseBotDecision(room,hand,level,memory,random=Math.random){
   const evaluate=()=>assessment||(assessment=assessBotHand(room,hand,level,memory,random));
   if(bet?.revealMode){
     if(bet.revealTurn!==me)return null;
+    // Flower declarations use the flower's points; the bot only says son buenas when it does not beat the mano.
+    if(bet.type==='flor'){const value=Number(room.flors?.[me])||0;return {kind:'reveal',value,good:room.mano!==me&&value<=Number(bet.reveals?.[room.mano])};}
     return {kind:'reveal',value:tantos,good:room.mano!==me&&tantos<Number(bet.reveals?.[room.mano])};
   }
   if(bet&&bet.responder!==me)return null;
@@ -2886,9 +2900,10 @@ function localScore(player,points,description){
   localFeed(`${state.room.players[player].name} ${description} (+${amount}).`);
   if(state.room.scores[player]>=targetPoints(state.room)){state.room.status='complete';state.room.lastHandScore=buildHandSummary(before,state.room.scores,description,null);state.room.handScoreHistory=handScoreHistory(state.room,state.room.lastHandScore);}
 }
-function localResolveFlor(bet){
+// declared: the winner of the declarations, when the players already declared their flowers.
+function localResolveFlor(bet,declared=null){
   const values=state.room.flors||{};if(values.player1==null||values.player2==null)return;
-  const winner=values.player1===values.player2?(state.room.mano||'player1'):(values.player1>values.player2?'player1':'player2');
+  const winner=declared||(values.player1===values.player2?(state.room.mano||'player1'):(values.player1>values.player2?'player1':'player2'));
   localScore(winner,bet.stake||3,`gana las flores (${values.player1} a ${values.player2})`);
   state.room.florCompared=bet.called==='conflor'||bet.called==='falta';state.room.pendingBet=bet.suspendedBet||null;state.room.envidoClosed=true;state.room.florSettled=true;
 }
@@ -2946,7 +2961,11 @@ function localAnswerAction(answer){
   if(bet.type==='envido'){
     room.pendingBet={...bet,reveals:{},revealMode:true,revealTurn:room.mano};localFeed(`${room.players[player].name} quiere. Declara primero ${room.players[room.mano].name}.`);renderGame();return;
   }
-  if(bet.type==='flor'){localFeed(`${room.players[player].name} quiere.`);localResolveFlor(bet);renderGame();return;}
+  if(bet.type==='flor'){
+    // Two flowers in play: the mano declares first, then the other one beats it or says son buenas.
+    if(room.flors?.player1!=null&&room.flors?.player2!=null){room.pendingBet={...bet,reveals:{},revealMode:true,revealTurn:room.mano};localFeed(`${room.players[player].name} quiere. Declara primero ${room.players[room.mano].name}.`);renderGame();return;}
+    localFeed(`${room.players[player].name} quiere.`);localResolveFlor(bet);renderGame();return;
+  }
   room.trucoLevel=bet.stake;room.pendingBet=null;localFeed(`${room.players[player].name} dice QUIERO`);renderGame();
 }
 function localAction(action){

@@ -83,7 +83,11 @@ function createTeamReferee(s,{now=Date.now(),deckFactory=deck}={}){
     b.caller=p;b.callerTeam=team(p);b.responder=responder(opponent(team(p)),b.type==='flor');b.id=crypto.randomUUID();notice(p,b.type==='truco'?b.stake===3?'Retruco':'Vale cuatro':b.called==='conflor'?'Con flor envido':b.called==='falta'?(b.type==='flor'?'Contra flor al resto':'Falta envido'):b.called==='real'?'Real envido':'Envido');return;
    }
    if(b.type==='truco'){r.trucoLevel=b.stake;r.lastTrucoTeam=b.callerTeam;r.pendingBet=null;notice(p,'Quiero');}
-   else if(b.type==='flor')resolveSide(true);
+   else if(b.type==='flor'){
+    // Two or more flowers: declared from the mano, each one beats the best so far or says son buenas.
+    const order=ordered(r.mano).filter(q=>active(q)&&r.flors[q]!=null);
+    if(order.length<2)resolveSide(true);else{b.revealMode=true;b.reveals={};b.order=order;b.revealTurn=order[0];b.responder=order[0];notice(p,'Quiero');}
+   }
    else{b.revealMode=true;b.reveals={};b.order=ordered(r.mano).filter(active);b.revealTurn=b.order[0];b.responder=b.revealTurn;notice(p,'Quiero');}return;
   }
   if(b?!(b.type==='truco'&&b.responder===p&&['envido','real','falta'].includes(v)):r.turn!==p)throw new Error('Esperá tu turno.');
@@ -92,12 +96,26 @@ function createTeamReferee(s,{now=Date.now(),deckFactory=deck}={}){
   else if(['truco','retruco','vale4'].includes(v)){const wanted={truco:2,retruco:3,vale4:4}[v];if(b||wanted!==r.trucoLevel+1||wanted>4||r.lastTrucoTeam===team(p))throw new Error('Ese grito no está disponible.');r.pendingBet={id:crypto.randomUUID(),type:'truco',caller:p,callerTeam:team(p),responder:responder(opponent(team(p))),stake:wanted,called:v};}
   else throw new Error('Canto inválido.');notice(p,({truco:'Truco',retruco:'Retruco',vale4:'Vale cuatro',envido:'Envido',real:'Real envido',falta:'Falta envido'})[v]);
  }
+ // Flower points are the real ones; ties go to the earlier seat from the mano.
+ function declareFlor(p,n,good){
+  const b=r.pendingBet;b.reveals??={};
+  const best=Object.values(b.reveals).reduce((m,v)=>Math.max(m,v),-1),truth=florValue(s.originals[p],r.muestra);
+  if(good&&best<0)throw new Error('El mano declara primero los puntos de su flor.');
+  if(!good&&n!==truth)throw new Error('Declará los puntos de tu flor: '+truth+'.');
+  if(!good&&n<=best)throw new Error('No superás la flor declarada: decí son buenas.');
+  b.reveals[p]=good?-1:n;notice(p,good?'Son buenas':n+' de flor');
+  const next=b.order.slice(b.order.indexOf(p)+1).find(active);
+  if(next){b.revealTurn=next;b.responder=next;return;}
+  const winner=b.order.reduce((a,q)=>!a||(b.reveals[q]??-1)>(b.reveals[a]??-1)?q:a,null);
+  award(team(winner),b.stake,'Flor ganada.');r.florCompared=b.called!=='flor';r.florSettled=true;r.envidoClosed=true;resume(b.suspendedBet);checkWin();
+ }
  function resolveSide(accepted){const b=r.pendingBet;if(!b)return;let winner=b.callerTeam,n=b.accepted|| (b.type==='flor'?Object.keys(r.flors).filter(p=>team(p)===b.callerTeam).length*3:1);
   if(accepted){const eligible=ordered(r.mano).filter(p=>r.flors[p]!=null);const best=eligible.reduce((a,p)=>!a||florValue(s.originals[p],r.muestra)>florValue(s.originals[a],r.muestra)?p:a,null);winner=team(best);n=b.stake;r.florCompared=b.called!=='flor';}
   award(winner,n,accepted?'Flor ganada.':'El rival no quiso '+(b.type==='flor'?'la flor.':'el envido.'));if(b.type==='flor')r.florSettled=true;r.envidoClosed=true;resume(b.suspendedBet);checkWin();
  }
  function declare(p,n,good){
   const b=r.pendingBet;if(!b?.revealMode||b.revealTurn!==p)throw new Error('No te corresponde declarar.');
+  if(b.type==='flor'){declareFlor(p,n,good);return;}
   if(!good&&(!Number.isInteger(n)||n<0||n>37))throw new Error('Elegí un valor entre 0 y 37.');
   b.reveals??={};if(good&&!Object.values(b.reveals).some(v=>v>=0)&&active(p))throw new Error('El mano declara primero sus tantos.');
   b.reveals[p]=good?-1:n;notice(p,good?'Son buenas':n+' tantos');
