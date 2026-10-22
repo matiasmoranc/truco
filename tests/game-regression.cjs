@@ -275,3 +275,14 @@ test('A flor against a rival holding a flower still waits for the answer',()=>{
  vm.runInContext(extract('localAction'),c);c.localAction('flor');
  assert.equal(r.pendingBet.type,'flor');assert.equal(r.pendingBet.responder,'player2');assert.equal(r.scores.player1,0);
 });
+test('La mia es flor keeps playing and the higher flower takes the stake when the hand ends',()=>{
+ const c=harness(),r=room();r.scores={player1:0,player2:0};r.mano='player1';r.flors={player1:33,player2:28};
+ r.pendingBet={type:'flor',called:'flor',caller:'player2',responder:'player1',stake:3,accepted:0,suspendedBet:null};
+ c.state={room:r,playerId:'player1',localHands:{player1:[card('♥',3),card('♥',6),card('♥',7)],player2:[card('♠',3),card('♠',6),card('♠',7)]}};
+ vm.runInContext([extract('localAnswerAction'),extract('settleSingleFlor'),extract('scoringEntries'),extract('spokenCall')].join(String.fromCharCode(10)),c);c.localAnswerAction('yes');
+ assert.equal(r.pendingBet,null);assert.equal(r.florDeferred,3);assert.equal(r.scores.player1+r.scores.player2,0);
+ assert.equal(c.spokenCall('Jugador responde: la mía es flor.'),'La mía es flor');
+ assert.equal(JSON.stringify(c.settleSingleFlor(r,{player1:0,player2:0})),JSON.stringify({player1:3,player2:0}));
+ assert.match(c.scoringEntries(r,{player1:3,player2:0},'').map(e=>e.detail).join(' '),/La mía es flor/);
+ r.flors={player1:28,player2:28};assert.equal(JSON.stringify(c.settleSingleFlor(r,{player1:0,player2:0})),JSON.stringify({player1:3,player2:0}));
+});

@@ -106,7 +106,7 @@ test('The response follows the pie after the dealer rotates, including flor',()=
  l=act(l,'c',{kind:'call',value:'flor'},1000);
  assert.equal(l.matches.m1.session.room.pendingBet.responder,'player4');
  assert.throws(()=>act(l,'b',{kind:'call',value:'yes'},1001));
- l=act(l,'d',{kind:'call',value:'yes'},1002);
+ l=act(l,'d',{kind:'call',value:'raise-conflor'},1002);l=act(l,'c',{kind:'call',value:'yes'},1002);
  assert.equal(l.matches.m1.session.room.pendingBet.revealMode,true);
  l=declareFlowers(l,1003);
  assert.equal(l.matches.m1.session.room.pendingBet,null);
@@ -128,14 +128,25 @@ test('Pie remains fixed until dealing clears previous notices and signals',()=>{
 
 test('The responding pie does not change when another teammate leads the next trick',()=>{let l=started(),r=l.matches.m1.session.room;r.trickNo=2;r.resolvedTrickWinner='player4';r.turn='player1';l=act(l,'a',{kind:'call',value:'truco'},1500);assert.equal(l.matches.m1.session.room.pendingBet.responder,'player4');assert.throws(()=>act(l,'b',{kind:'call',value:'yes'},1501));l=act(l,'d',{kind:'call',value:'yes'},1502);assert.equal(l.matches.m1.session.room.pendingBet,null);});
 
-test('Accepted flowers in 2v2 are declared from the mano with their real points before anyone scores',()=>{
+test('Accepted con flor envido in 2v2 is declared from the mano with real points before anyone scores',()=>{
  let l=started(),s=l.matches.m1.session;s.room.turn='player3';
  s.hands.player3=[card('♣',1),card('♣',4),card('♣',6)];s.hands.player4=[card('♥',1),card('♥',4),card('♥',6)];s.originals=structuredClone(s.hands);
- l=act(l,'c',{kind:'call',value:'flor'},1000);l=act(l,'d',{kind:'call',value:'yes'},1001);
+ l=act(l,'c',{kind:'call',value:'flor'},1000);l=act(l,'d',{kind:'call',value:'raise-conflor'},1001);l=act(l,'c',{kind:'call',value:'yes'},1002);
  const room=l.matches.m1.session.room,first=room.pendingBet.revealTurn,uid=room.players[first].uid,truth=florValue(l.matches.m1.session.originals[first],room.muestra);
  assert.equal(room.pendingBet.order[0],first);assert.equal(room.scores.player1+room.scores.player2,0);
  assert.throws(()=>act(l,uid,{kind:'declare',good:true},1002),/mano/);
  assert.throws(()=>act(l,uid,{kind:'declare',value:truth+1},1003),/flor/);
  l=declareFlowers(l,1004);assert.equal(l.matches.m1.session.room.pendingBet,null);
  assert.equal(l.matches.m1.session.room.scores.player1+l.matches.m1.session.room.scores.player2>0,true);
+});
+test('La mia es flor in 2v2 keeps playing and the higher flower takes 3 points when the hand ends',()=>{
+ let l=started(),s=l.matches.m1.session;s.room.turn='player3';
+ s.hands.player3=[card('♣',1),card('♣',4),card('♣',6)];s.hands.player4=[card('♥',1),card('♥',4),card('♥',6)];s.originals=structuredClone(s.hands);
+ l=act(l,'c',{kind:'call',value:'flor'},1000);l=act(l,'d',{kind:'call',value:'yes'},1001);
+ let room=l.matches.m1.session.room;
+ assert.equal(room.pendingBet,null);assert.equal(room.callNotice.text,'La mía es flor');assert.equal(room.scores.player1+room.scores.player2,0);assert.equal(room.florDeferred,3);
+ const sess=l.matches.m1.session,best=['player3','player4'].reduce((a,p)=>florValue(sess.originals[p],room.muestra)>florValue(sess.originals[a],room.muestra)?p:a);
+ l=act(l,'a',{kind:'fold'},1002);l=act(l,'c',{kind:'fold'},1003);l=act(l,'b',{kind:'tick'},4200);room=l.matches.m1.session.room;
+ const groups=room.endReveal.groups;assert.equal(groups.length,1);assert.equal(groups[0].player,best);assert.match(groups[0].label,/FLOR · /);
+ assert.ok(room.handScoreEntries.some(e=>e.player===team(best)&&e.points===3&&/La mía es flor/.test(e.detail||e.reason||JSON.stringify(e))));
 });

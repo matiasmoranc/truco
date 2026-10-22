@@ -1237,9 +1237,9 @@ body { min-height:100dvh; }
 @media(max-width:640px){#learn-view .topbar{display:grid;grid-template-columns:1fr auto 1fr}#learn-view .topbar>.icon-button{justify-self:start}#learn-view .topbar>.mini-brand{justify-self:center}}
 
 
-.startup-loading{position:fixed;inset:0;z-index:10000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;background:#1b2a1f;color:#e4cf9c;text-align:center;padding:24px;box-sizing:border-box}
+.startup-loading{position:fixed;inset:0;z-index:10000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:28px;background:#1b2a1f;color:#e4cf9c;text-align:center;padding:24px;box-sizing:border-box}
 .startup-loading[hidden]{display:none}
-.startup-loading .startup-animation{display:block;width:min(480px,100vw,70vh);height:auto;aspect-ratio:1}
+.startup-loading .startup-animation{display:block;width:120px;height:120px;margin:0 auto}
 .startup-loading p{margin:0;font-family:'DM Sans',sans-serif;font-size:16px;line-height:1.4}
 .page-loading{overflow:hidden}
 .page-loading #app{visibility:hidden}
@@ -2032,8 +2032,8 @@ input,textarea,[contenteditable=""],[contenteditable="true"]{-webkit-user-select
 .chat-hold-menu button.active{background:#e8c983;color:#15251b}
 @keyframes chat-hold-pop{from{opacity:0;transform:translateY(-6px) scale(.96)}to{opacity:1;transform:none}}
 @media(prefers-reduced-motion:reduce){.chat-hold-menu{animation:none}}
-.flor-badge{display:grid;place-items:center;width:34px;height:34px;border:1.5px solid #fff4d0;border-radius:50%;background:#e8c983;color:#15251b;box-shadow:0 3px 10px #00180e66;pointer-events:none;animation:flor-badge-pop .32s cubic-bezier(.2,.8,.3,1.2) both}
-.flor-badge svg{width:23px;height:23px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.flor-badge{display:grid;place-items:center;width:34px;height:34px;color:#e8c983;filter:drop-shadow(0 2px 4px #00180e99);pointer-events:none;animation:flor-badge-pop .32s cubic-bezier(.2,.8,.3,1.2) both}
+.flor-badge svg{width:32px;height:32px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .flor-badge.hidden,.opponent-flor{display:none}
 .game.player-mode.two-device-mode .opponent-flor:not(.hidden){display:grid;position:absolute;top:var(--board-rivalCenter,84px);left:calc(50% + var(--board-deckWidth,58px)*1.15 + 34px);transform:translate(-50%,-50%);z-index:9}
 .game.drawing-mode .opponent-flor,.game.reveal-mode .opponent-flor,.game.team-mode .opponent-flor{display:none!important}
