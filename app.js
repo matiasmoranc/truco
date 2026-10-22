@@ -5,7 +5,7 @@ import { installActivity } from './activity.js?v=20261010-adminstats32';
 import { installCredits } from './credits.js?v=20261022-bank1';
 import { installAccount } from './account.js?v=20261016-android-google';
 import { initializeGameAuth } from './auth-init.js?v=20261016-android-google';
-import {installTeamTable,TEAM_SEATS,playerTeam,positionDealerDeck,renderTeamLobbySeats,renderWaitingSeats} from './team-table-ui.js?v=20261022-flor1';
+import {installTeamTable,TEAM_SEATS,playerTeam,positionDealerDeck,renderTeamLobbySeats,renderWaitingSeats} from './team-table-ui.js?v=20261022-good1';
 import {createLiveTables,LiveError} from './live-tables.js?v=20261022-clock1';
 const FIREBASE_VERSION = '12.4.0';
 const $ = (id) => document.getElementById(id);
@@ -2662,7 +2662,10 @@ function renderEnvidoPicker(room){
   const key=`${max}:${room.handNumber}:${state.playerId}:${opponentPoints??'first'}`;
   if(el.dataset.key===key)return;el.stopWheelHint?.();el.dataset.key=key;const own=bet.type==='flor'?Number(room.flors?.[state.playerId]):NaN;const initial=Number.isFinite(own)&&own>=min?own:Math.min(max,Math.max(20,min));el.dataset.value=String(initial);
   el.innerHTML=`<p>Arrastra los números para seleccionar</p><div class="number-wheel" role="listbox" aria-label="Tantos del 0 al ${max}">${Array.from({length:Math.max(0,max+1-min)},(_,index)=>{const number=min+index;return `<button role="option" aria-selected="${number===min}" ${number<min?'disabled':''} data-number="${number}">${number}</button>`;}).join('')}</div><div class="declaration-buttons">${min<=max?'<button id="declare-points" class="call-button">DECLARAR <span id="selected-points">'+min+'</span></button>':''}${second?'<button id="good-points" class="pass-button">SON BUENAS</button>':''}</div>`;
-  if(min>max){el.querySelector('.number-wheel').classList.add('hidden');el.querySelector('p').textContent='El rival declaró el máximo de tantos.';$('good-points')?.addEventListener('click',()=>runLiveAction($('good-points'),()=>revealEnvido(true)));return;}
+  // Nothing left to declare: the rival said the maximum, or this flower cannot beat theirs. Only SON BUENAS.
+  const cannotBeatFlower=bet.type==='flor'&&second&&Number.isFinite(own)&&own<min;
+  el.classList.toggle('only-good',min>max||cannotBeatFlower);
+  if(min>max||cannotBeatFlower){el.querySelector('.number-wheel').classList.add('hidden');$('declare-points')?.remove();el.querySelector('p').textContent=min>max?(bet.type==='flor'?'El rival declaró la flor más alta.':'El rival declaró el máximo de tantos.'):'Tu flor no supera la del rival.';$('good-points')?.addEventListener('click',()=>runLiveAction($('good-points'),()=>revealEnvido(true)));return;}
   const wheel=el.querySelector('.number-wheel');
   const step=()=>wheel.querySelector('[data-number]').getBoundingClientRect().width;
   let hintRunning=false,hintFrame=null;
