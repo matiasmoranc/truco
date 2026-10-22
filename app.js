@@ -6,7 +6,7 @@ import { installCredits } from './credits.js?v=20261022-bank1';
 import { installAccount } from './account.js?v=20261016-android-google';
 import { initializeGameAuth } from './auth-init.js?v=20261016-android-google';
 import {installTeamTable,TEAM_SEATS,playerTeam,positionDealerDeck,renderTeamLobbySeats,renderWaitingSeats} from './team-table-ui.js?v=20261019-lobby-unified';
-import {createLiveTables,LiveError} from './live-tables.js?v=20261022-bank1';
+import {createLiveTables,LiveError} from './live-tables.js?v=20261022-clock1';
 const FIREBASE_VERSION = '12.4.0';
 const $ = (id) => document.getElementById(id);
 const views = ['welcome-view', 'invite-view', 'setup-view', 'waiting-view', 'game-view', 'config-view', 'learn-view', 'scorer-view'];
@@ -491,7 +491,12 @@ function makeCallNotice(text,bet=state.room?.pendingBet){
 
 let roundPauseTimer=null;
 const roundPauseArrivals=new Map();
-function gameTime(){return Date.now()+(state.localGame?0:Number(state.serverTimeOffset)||0);}
+// Live tables set their deadlines with the table server clock; count down with that clock.
+function gameTime(){
+  if(state.localGame)return Date.now();
+  const live=state.room?.managedCredits?liveTablesClient?.clockOffset(state.roomCode):null;
+  return Date.now()+(live??(Number(state.serverTimeOffset)||0));
+}
 function roundPauseInfo(room=state.room){
   if(!room)return null;
   let key,endsAt,duration,label;

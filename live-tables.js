@@ -80,6 +80,8 @@ export function createLiveTables({url=LIVE_SERVER_URL,token}){
     entry.channel=new Channel(base+'/tables/'+code,token,message=>{
       if(message.t!=='state')return;
       entry.latest={room:message.room,hand:message.hand};
+      // Server time minus local time. Network delay only lowers a sample, so keep the highest recent one.
+      if(Number.isFinite(message.now)){entry.clockSamples=[...(entry.clockSamples||[]).slice(-9),message.now-Date.now()];entry.clockOffset=Math.max(...entry.clockSamples);}
       for(const listener of entry.listeners)listener(entry.latest);
     });
     tables.set(code,entry);return entry;
@@ -129,6 +131,8 @@ export function createLiveTables({url=LIVE_SERVER_URL,token}){
     async readTable(code){return firstState(table(code));},
     onTableConnection(code,listener){const entry=table(code);entry.channel.statusListeners.add(listener);return ()=>entry.channel.statusListeners.delete(listener);},
     tableConnected(code){return !!tables.get(code)?.channel.connected;},
+    // Milliseconds to add to Date.now() to get the table server's time (null until it reports).
+    clockOffset(code){return tables.get(code)?.clockOffset??null;},
     call(code,t,data){return table(code).channel.call(t,data);},
     closeTable(code){const entry=tables.get(code);if(!entry)return;entry.channel.close();tables.delete(code);},
     closeAllTables(){for(const key of [...tables.keys()])this.closeTable(key);},

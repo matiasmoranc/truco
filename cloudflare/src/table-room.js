@@ -141,7 +141,8 @@ export class TableRoom extends DurableObject{
   if(++entry.count>limit)throw new Error('Demasiadas acciones seguidas. Esperá un momento.');
  }
 
- sendState(ws,uid){send(ws,{t:'state',room:this.engine.publicRoom(),hand:this.engine.handFor(uid)});}
+ // now: the table's clock, so countdowns use the same time the deadlines were set with.
+ sendState(ws,uid){send(ws,{t:'state',room:this.engine.publicRoom(),hand:this.engine.handFor(uid),now:Date.now()});}
  sockets(){return this.ctx.getWebSockets();}
 
  // Persist, push the new state to every seat, refresh the lobby and re-arm the timer.
