@@ -17,8 +17,8 @@ class Snapshot {
  hasChildren(keys){return keys.every(key=>this.child(key).exists());}
 }
 const run=(expression,context)=>Function(...Object.keys(context),'return ('+expression+')')(...Object.values(context));
-function permitted(old,next,now,{uid='a',owner='a',provider='google.com',profile=true}={}) {
- const context={auth:uid?{uid,token:{firebase:{sign_in_provider:provider}}}:null,$uid:owner,now,data:new Snapshot(old),newData:new Snapshot(next),root:new Snapshot({profiles:profile?{[owner]:{name:'Mati'}}:{}})};
+function permitted(old,next,now,{uid='a',owner='a',provider='google.com',profile=true,frozen=false}={}) {
+ const context={auth:uid?{uid,token:{firebase:{sign_in_provider:provider}}}:null,$uid:owner,now,data:new Snapshot(old),newData:new Snapshot(next),root:new Snapshot({profiles:profile?{[owner]:{name:'Mati'}}:{},...(frozen?{creditFreeze:true}:{})})};
  if(!run(creditRules['.write'],context)||!run(creditRules['.validate'],context))return false;
  return Object.entries(next||{}).every(([key,value])=>{
   const rule=creditRules[key]||creditRules.$other;
@@ -158,4 +158,10 @@ test('With the credit bank active, balance and daily claim use the bank socket, 
  bank.claim=async()=>{throw new Error('Ya reclamaste los créditos de hoy.');};
  value={balance:0,locked:0,lastGrantAt:today};listener(value);await api.claim();
  assert.equal(api.wallet().lastGrantAt,today);assert.equal(await api.sync(),true);
+});
+
+test('While credits move to the bank, Firebase refuses every daily claim',()=>{
+ const grant={balance:5,locked:0,lastGrantAt:today};
+ assert.equal(permitted(null,grant,today),true);assert.equal(permitted(null,grant,today,{frozen:true}),false);
+ assert.equal(permitted({balance:0,locked:0,lastGrantAt:today-86400000},grant,today,{frozen:true}),false);
 });

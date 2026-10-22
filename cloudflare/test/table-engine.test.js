@@ -179,3 +179,10 @@ test('Leaving a finished match closes it with the match-left reason',async()=>{
  await engine.act('a',{command:{kind:'cancel'},requestId:'c1'});
  assert.equal(engine.publicRoom().status,'closed');assert.equal(engine.publicRoom().closeReason,'match-left');
 });
+
+test('In maintenance no table can move credits, and the ledger stays untouched',async()=>{
+ const {bank}=setup();const before=JSON.stringify(bank.economy);
+ const engine=createTableEngine({code:'ABCDE',bank:{prefetch:()=>null,apply:async()=>{throw new Error('Estamos actualizando los créditos. Volvé a intentar en unos minutos.');}}});
+ await assert.rejects(engine.create({uid:'a',name:'Mati'},{id:'g',stake:1,targetPoints:10,mode:'1v1'}),/actualizando/);
+ assert.equal(engine.match,null);assert.equal(JSON.stringify(bank.economy),before);
+});

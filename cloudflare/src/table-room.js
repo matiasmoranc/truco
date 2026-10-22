@@ -17,7 +17,10 @@ export class TableRoom extends DurableObject{
   super(ctx,env);
   this.db=env.DEV_MODE==='1'?createDevDatabase(()=>lobbyStub(env)):createDatabase(env);
   // Credits: the Bank Durable Object, or creditEconomy in Firebase (see CREDITS_BACKEND).
-  this.bank=env.CREDITS_BACKEND==='bank'?{prefetch:()=>null,apply:spec=>bankStub(env).apply(spec)}:createFirebaseBank(this.db);
+  // maintenance: while credits are copied, no table may move them anywhere.
+  this.bank=env.CREDITS_BACKEND==='bank'?{prefetch:()=>null,apply:spec=>bankStub(env).apply(spec)}
+   :env.CREDITS_BACKEND==='maintenance'?{prefetch:()=>null,apply:async()=>{throw new Error('Estamos actualizando los créditos. Volvé a intentar en unos minutos.');}}
+   :createFirebaseBank(this.db);
   this.queue=Promise.resolve();
   this.identities=new Map();
   this.limits=new Map();
