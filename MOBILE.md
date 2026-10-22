@@ -93,7 +93,7 @@ Antes de una beta: probar Google y Apple en dispositivos reales, restauración d
 
 ## Android firmado para Google Play desde Codemagic
 
-El workflow manual **Truco Uruguayo - Android Google Play (AAB)** genera un AAB firmado. Por ahora se sube a mano a Play Console; la subida automática a la prueba interna está lista en  pero comentada hasta cargar la clave (ver abajo). Antes de ejecutarlo:
+El workflow manual **Truco Uruguayo - Android Google Play (AAB)** genera un AAB firmado. Por ahora se sube a mano a Play Console; la subida automática a la prueba interna está lista en `codemagic.yaml` pero comentada hasta cargar la clave (ver abajo). Antes de ejecutarlo:
 
 1. Crear/verificar Play Console y registrar la app `com.matiasmoranc.truco`.
 2. Crear o reutilizar una clave de **carga** para Android, conservar una copia segura y subirla a Codemagic → Code signing identities → Android keystores con referencia `truco_android_upload`. No usar ni subir a Google Play el certificado debug del APK de prueba.
@@ -111,7 +111,7 @@ Una sola vez, para que Codemagic pueda subir el AAB:
 3. Play Console → **Usuarios y permisos** → Invitar a un usuario nuevo → el correo de la cuenta de servicio (termina en `iam.gserviceaccount.com`). En **Permisos de la app**, agregar Truco Uruguayo con **Publicar apps en segmentos de prueba** (y ver información de la app). Enviar la invitación.
 4. Codemagic → app truco → Environment variables → grupo `truco_android` → variable `GCLOUD_SERVICE_ACCOUNT_CREDENTIALS` con **todo el contenido** del JSON, marcada como **Secret**.
 5. Borrar el JSON descargado de la PC.
-6. En , descomentar el bloque  del workflow . Sin la clave cargada, ese bloque hace fallar la build antes de compilar.
+6. En `codemagic.yaml`, descomentar el bloque `publishing:` del workflow `android-play`. Sin la clave cargada, ese bloque hace fallar la build antes de compilar.
 
 Los permisos nuevos de Play Console pueden tardar en activarse. Si la primera subida falla por permisos, esperar y volver a ejecutar. El número de versión lo pone Codemagic (`PROJECT_BUILD_NUMBER`) y siempre crece.
 
