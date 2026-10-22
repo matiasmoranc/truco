@@ -8,7 +8,7 @@ compatibility_flags = ["nodejs_compat"]
 FIREBASE_PROJECT_ID = "truco-6553d"
 FIREBASE_DATABASE_URL = "https://truco-6553d-default-rtdb.firebaseio.com"
 # Where credits live: "firebase" (creditEconomy in Realtime Database) or "bank" (Bank Durable Object).
-CREDITS_BACKEND = "firebase"
+CREDITS_BACKEND = "bank"
 # Browser origins allowed to open sockets. Native apps send capacitor:// or https://localhost.
 ALLOWED_ORIGINS = "https://trucouruguayo.uy,https://truco-6553d.web.app,https://truco-6553d.firebaseapp.com,capacitor://localhost,https://localhost"
 
