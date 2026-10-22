@@ -85,7 +85,16 @@ export function createDatabase(env){
   }
   throw new Error('La base está ocupada. Volvé a intentar.');
  }
- return {get,read,transaction};
+ // Multi-path update ({'a/b':value,'c':null}); null removes.
+ async function patch(path,updates){
+  const res=await request(path,{method:'PATCH',headers:{'content-type':'application/json'},body:JSON.stringify(updates)});
+  if(!res.ok)throw new Error('No se pudo guardar en la base ('+res.status+').');
+ }
+ async function put(path,value){
+  const res=await request(path,{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify(value)});
+  if(!res.ok)throw new Error('No se pudo guardar en la base ('+res.status+').');
+ }
+ return {get,read,transaction,patch,put};
 }
 
 // Local development only (wrangler dev with DEV_MODE=1 in .dev.vars): a fake
@@ -100,6 +109,8 @@ export function createDevDatabase(ledgerStub){
    return null;
   },
   async read(){return (await ledgerStub().fetch('https://lobby/dev-ledger')).json();},
+  // The bank backup never reaches Firebase from a local test.
+  async patch(){},async put(){},
   async transaction(path,update,{initial}={}){
    for(let i=0;i<10;i++){
     const {etag,value}=i===0&&initial?initial:await this.read();

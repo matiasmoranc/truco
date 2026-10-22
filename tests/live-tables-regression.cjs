@@ -23,3 +23,15 @@ test('Live matches are never ticked from the ledger copy by repairs',()=>{
  assert.throws(()=>repairReservation(ledger,{uid:'a',now:700000}),/automáticamente/);
  assert.deepEqual(reservationAlerts(ledger,1000),[]);
 });
+test('Browser modules for live tables and credits parse as ES modules',async()=>{
+ const fs=require('node:fs'),path=require('node:path');
+ for(const file of ['live-tables.js','credits.js']){
+  const source=fs.readFileSync(path.join(__dirname,'..',file),'utf8');
+  const module=await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'));
+  assert.ok(Object.keys(module).length>0,file);
+ }
+ const {createLiveTables}=await import('data:text/javascript;base64,'+Buffer.from(fs.readFileSync(path.join(__dirname,'../live-tables.js'),'utf8')).toString('base64'));
+ const api=createLiveTables({url:'http://127.0.0.1:1',token:async()=>'x'});
+ for(const name of ['watchTable','readTable','call','watchLobby','creditsBackend'])assert.equal(typeof api[name],'function',name);
+ for(const name of ['watch','get','claim'])assert.equal(typeof api.wallet[name],'function',name);
+});

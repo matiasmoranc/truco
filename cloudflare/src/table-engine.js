@@ -1,61 +1,33 @@
 // Authoritative state of one table, held in memory by its Durable Object.
 // Game rules are the same tested modules the Cloud Functions used; the credit
-// ledger in Firebase is only touched when credits move (create, join, end,
-// rematch, cancel), never for an ordinary card or call.
+// bank is only touched when credits move (create, join, end, rematch, cancel),
+// never for an ordinary card or call.
 import tableService from '../../functions/table-service.cjs';
-import accountingGuard from '../../functions/accounting-guard.cjs';
-import historyService from '../../functions/history-service.cjs';
+import {ACTIVE,CodeTakenError} from './ledger-ops.js';
 
-const {createTable,joinTable,tableOperation,publicTable,privateTableHand}=tableService;
-const {validateAccounting}=accountingGuard;
-const {recordHistory}=historyService;
+const {tableOperation,publicTable,privateTableHand}=tableService;
+export {CodeTakenError,slimMatch} from './ledger-ops.js';
 
 export const WAIT_MS=600000;
 export const DISCONNECT_MS=45000;
 const PROBE_BALANCE=1000000;
-const ACTIVE=['waiting','reserved'];
-
-export class CodeTakenError extends Error{constructor(){super('code-taken');this.code='code-taken';}}
-
-// The ledger keeps match receipts for history, admin and account deletion;
-// hands, decks and requests stay in the Durable Object.
-export function slimMatch(m){
- const {session,requests,...rest}=structuredClone(m);
- const room=session?.room;
- return {...rest,live:'cloudflare',...(room?{session:{room:{status:room.status,scores:room.scores||null,matchResult:room.matchResult||null,closeReason:room.closeReason||null,targetPoints:room.targetPoints}}}:{})};
-}
-const plain=value=>JSON.parse(JSON.stringify(value));
 const findPlayer=(m,uid)=>Object.keys(m?.players||{}).find(p=>m.players[p]?.uid===uid)||null;
 
 export function createTableEngine({code,bank,clock=()=>Date.now()}){
  let m=null,presence={};
 
- // Run an operation against the real ledger, inside one RTDB transaction.
- // initial: a ledger read already in flight, so the transaction skips its own read.
- async function accounting(op,{creating=false,initial}={}){
-  const now=clock();let adopted=null;
-  await bank.transaction(economy=>{
-   if(!economy)throw new Error('No hay créditos disponibles.');
-   const before=economy,ledger=structuredClone(before);ledger.matches??={};ledger.tables??={};
-   if(creating){if(ledger.tables[code])throw new CodeTakenError();}
-   else{
-    const stored=ledger.matches[m.id];
-    // An administrator closed the match from the panel: the ledger wins.
-    if(stored&&!ACTIVE.includes(stored.status)&&ACTIVE.includes(m.status)){adopted={closedBy:stored};return undefined;}
-    ledger.matches[m.id]=structuredClone(m);ledger.tables[code]=m.id;
-   }
-   const next=op(ledger,now),full=next.matches[next.tables[code]];
-   const out=structuredClone(next);
-   for(const id of new Set([m?.id,full.id].filter(Boolean)))if(out.matches[id])out.matches[id]=slimMatch(out.matches[id]);
-   adopted={full};
-   return validateAccounting(before,recordHistory(before,plain(out),now));
-  },initial);
-  if(adopted?.closedBy){closeLocally(adopted.closedBy.closeReason||'admin',now);return;}
-  if(adopted?.full)m=adopted.full;
+ // One accounting step in the bank (Firebase or Cloudflare). An administrator
+ // may have closed the match in the ledger meanwhile: then the ledger wins.
+ async function accounting(op,args,{creating=false,initial}={}){
+  const now=clock();
+  const result=await bank.apply({code,match:creating?null:m,op,args,now},{initial});
+  if(result.closedBy){closeLocally(result.closedBy.closeReason||'admin',now);return;}
+  m=result.full;
  }
 
- // Cheap in-memory run; escalates to the ledger only if credits would move.
- async function operate(op,{forceLedger=false}={}){
+ // Cheap in-memory run; escalates to the bank only if credits would move.
+ async function operate(args,{forceLedger=false}={}){
+  const op=(ledger,now)=>tableOperation(ledger,{...args,code,now});
   if(!m)throw new Error('La mesa ya no está disponible.');
   if(!forceLedger){
    const now=clock(),wallets={};
@@ -65,7 +37,7 @@ export function createTableEngine({code,bank,clock=()=>Date.now()}){
    const moved=next.tables[code]!==m.id||nm.status!==m.status||JSON.stringify(next.wallets)!==JSON.stringify(wallets);
    if(!moved){m=nm;return;}
   }
-  await accounting(op);
+  await accounting('operation',args);
  }
 
  function closeLocally(reason,now){
@@ -82,26 +54,26 @@ export function createTableEngine({code,bank,clock=()=>Date.now()}){
   async create(user,{id,stake,targetPoints,mode,secret,initial}){
    if(m&&!(m.closedAt||['settled','refunded'].includes(m.status)))throw new CodeTakenError();
    const previous=m;m=null;presence={};
-   try{await accounting((ledger,now)=>createTable(ledger,{code,id,uid:user.uid,name:user.name,stake,targetPoints,mode,secret,now}),{creating:true,initial});}
+   try{await accounting('create',{id,uid:user.uid,name:user.name,stake,targetPoints,mode,secret},{creating:true,initial});}
    catch(error){if(!m)m=previous;throw error;}
   },
   async join(user,{password='',team,initial}){
    if(!m)throw new Error('La mesa ya no está disponible.');
    if(findPlayer(m,user.uid))return;
-   await accounting((ledger,now)=>joinTable(ledger,{code,uid:user.uid,name:user.name,password,team,now}),{initial});
+   await accounting('join',{uid:user.uid,name:user.name,password,team},{initial});
   },
   async act(uid,{command,requestId,expectedMatchId}){
    if(!command||typeof command.kind!=='string')throw new Error('Jugada inválida.');
    const forceLedger=['rematch','cancel','abandon'].includes(command.kind);
-   await operate((ledger,now)=>tableOperation(ledger,{code,uid,command,requestId:command.kind==='tick'?null:requestId,expectedMatchId,presence,now}),{forceLedger});
+   await operate({uid,command,requestId:command.kind==='tick'?null:requestId,expectedMatchId,presence},{forceLedger});
   },
   async tick(){
    if(!m||!ACTIVE.includes(m.status))return;
-   await operate((ledger,now)=>tableOperation(ledger,{code,uid:m.player1,command:{kind:'tick'},presence,now}));
+   await operate({uid:m.player1,command:{kind:'tick'},presence});
   },
-  async adminClose({actor,requestId,reason},adminLedgerChange){
+  async adminClose({actor,requestId,reason}){
    if(!m)throw new Error('La mesa ya no está disponible.');
-   await accounting((ledger,now)=>adminLedgerChange(ledger,{actor,action:'close-table',code,requestId,reason,now}));
+   await accounting('admin',{actor,action:'close-table',requestId,reason});
   },
   // Returns true when the visible presence changed.
   setOnline(uid,online){

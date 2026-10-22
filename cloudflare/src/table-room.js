@@ -2,10 +2,10 @@
 // action is validated in memory and the new state is pushed to all seats.
 import {DurableObject} from 'cloudflare:workers';
 import tableService from '../../functions/table-service.cjs';
-import adminService from '../../functions/admin-service.cjs';
 import {createTableEngine,CodeTakenError} from './table-engine.js';
 import {createDatabase,createDevDatabase,verifyIdToken,playerIdentity,usersBlockEachOther} from './firebase.js';
-import {lobbyStub} from './routing.js';
+import {createFirebaseBank} from './firebase-bank.js';
+import {lobbyStub,bankStub} from './routing.js';
 
 const {passwordHash}=tableService;
 const CLEANUP_MS=30*60*1000;
@@ -16,6 +16,8 @@ export class TableRoom extends DurableObject{
  constructor(ctx,env){
   super(ctx,env);
   this.db=env.DEV_MODE==='1'?createDevDatabase(()=>lobbyStub(env)):createDatabase(env);
+  // Credits: the Bank Durable Object, or creditEconomy in Firebase (see CREDITS_BACKEND).
+  this.bank=env.CREDITS_BACKEND==='bank'?{prefetch:()=>null,apply:spec=>bankStub(env).apply(spec)}:createFirebaseBank(this.db);
   this.queue=Promise.resolve();
   this.identities=new Map();
   this.limits=new Map();
@@ -29,7 +31,7 @@ export class TableRoom extends DurableObject{
  setCode(code){
   if(this.code===code)return;
   this.code=code;
-  this.engine=createTableEngine({code,bank:{transaction:(update,initial)=>this.db.transaction('creditEconomy',update,{initial})}});
+  this.engine=createTableEngine({code,bank:this.bank});
  }
  serial(task){const run=this.queue.then(task,task);this.queue=run.catch(()=>{});return run;}
 
@@ -41,7 +43,7 @@ export class TableRoom extends DurableObject{
   if(url.pathname.endsWith('/admin-close')&&request.method==='POST'){
    const body=await request.json();
    try{
-    await this.serial(async()=>{await this.engine.adminClose(body,adminService.adminLedgerChange);await this.commit();});
+    await this.serial(async()=>{await this.engine.adminClose(body);await this.commit();});
     return Response.json({ok:true});
    }catch(error){return Response.json({ok:false,error:error.message},{status:409});}
   }
@@ -60,7 +62,8 @@ export class TableRoom extends DurableObject{
    const data=await this.serial(()=>this.handle(ws,message));
    reply(true,data);
   }catch(error){
-   if(error instanceof CodeTakenError){send(ws,{t:'res',id:message.id,ok:false,error:'code-taken',code:'code-taken'});return;}
+   // Bank RPC errors arrive as plain errors with the same message.
+   if(error instanceof CodeTakenError||error?.message==='code-taken'){send(ws,{t:'res',id:message.id,ok:false,error:'code-taken',code:'code-taken'});return;}
    reply(false,error?.message||'No pudimos procesar la jugada.');
   }
  }
@@ -85,7 +88,7 @@ export class TableRoom extends DurableObject{
    if(!['public','password'].includes(visibility))throw new Error('Elegí mesa pública o con clave.');
    const secret=visibility==='password'?passwordHash(password):null;
    // Profile checks and the ledger read run together; the transaction reuses the read.
-   const [user,initial]=await Promise.all([this.identity(uid),this.db.read('creditEconomy')]);
+   const [user,initial]=await Promise.all([this.identity(uid),this.bank.prefetch()]);
    await this.engine.create(user,{id:crypto.randomUUID(),stake,targetPoints,mode,secret,initial});
    this.engine.setOnline(uid,true);
    await this.commit();return this.result(uid);
@@ -95,7 +98,7 @@ export class TableRoom extends DurableObject{
    const match=this.engine.match;
    if(!match)throw new Error('La mesa ya no está disponible.');
    if(!this.engine.playerFor(uid)){
-    const [user,blocked,initial]=await Promise.all([this.identity(uid),this.blockedWithPlayers(uid),this.db.read('creditEconomy')]);
+    const [user,blocked,initial]=await Promise.all([this.identity(uid),this.blockedWithPlayers(uid),this.bank.prefetch()]);
     if(blocked)throw new Error('No pueden entrar a la misma mesa porque uno bloqueó al otro.');
     await this.engine.join(user,{password:message.password||'',team:message.team,initial});
    }

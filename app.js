@@ -2,11 +2,11 @@ import './chat-moderation.js?v=20261013-moderation1';
 import { installPlayerPanel } from './player-panel.js?v=20261013-blocklist1';
 import { installScorer } from './scorer.js?v=20261011-scorercolors59';
 import { installActivity } from './activity.js?v=20261010-adminstats32';
-import { installCredits } from './credits.js?v=20261015-startup';
+import { installCredits } from './credits.js?v=20261022-bank1';
 import { installAccount } from './account.js?v=20261016-android-google';
 import { initializeGameAuth } from './auth-init.js?v=20261016-android-google';
 import {installTeamTable,TEAM_SEATS,playerTeam,positionDealerDeck,renderTeamLobbySeats,renderWaitingSeats} from './team-table-ui.js?v=20261019-lobby-unified';
-import {createLiveTables,LiveError} from './live-tables.js?v=20261021-live1';
+import {createLiveTables,LiveError} from './live-tables.js?v=20261022-bank1';
 const FIREBASE_VERSION = '12.4.0';
 const $ = (id) => document.getElementById(id);
 const views = ['welcome-view', 'invite-view', 'setup-view', 'waiting-view', 'game-view', 'config-view', 'learn-view', 'scorer-view'];
@@ -277,6 +277,12 @@ function liveTables(){
     if(!user)throw new Error('Iniciá sesión con tu cuenta.');
     return user.getIdToken();
   }});
+}
+// The table server says where credits live; with the bank, the balance comes from its socket.
+async function creditWalletSource(){
+  await firebaseServices();
+  const live=liveTables();
+  return (await live.creditsBackend())==='bank'?live.wallet:null;
 }
 function liveSnapshot(value){return {exists:()=>value!=null,val:()=>value??null};}
 const TABLE_CODE_ALPHABET='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -618,7 +624,7 @@ const account=installAccount({api:creditApi,services:firebaseServices,getState:(
   loadCreditFunctions().catch(()=>{});activity.start();
   await Promise.all([openInitialRoom(),initialCredits]);showLobbyOnboarding();
 },onIdentityChange:resetAccountRoom,onNameChanged:()=>showView('welcome-view'),onRegistered:uid=>{state.lobbyOnboardingUid=uid;requestAnimationFrame(showLobbyOnboarding);},inRoom:()=>!!state.room&&!$('welcome-view').classList.contains('active')});
-const credits=installCredits({services:firebaseServices,api:creditApi,getState:()=>state,document,notify:message=>toast(message,true,2000),onChange:()=>{showLobbyOnboarding();if(state.lobbyRooms)renderLobby(state.lobbyRooms);
+const credits=installCredits({services:firebaseServices,walletSource:creditWalletSource,api:creditApi,getState:()=>state,document,notify:message=>toast(message,true,2000),onChange:()=>{showLobbyOnboarding();if(state.lobbyRooms)renderLobby(state.lobbyRooms);
   if(state.room)renderMatchEnd();$('table-stake-available').textContent=String(credits.wallet()?.balance??'—');updateStakeControl();}});
 let lobbyWelcomeDialog=null,lobbyWelcomeStep=0,lobbyWelcomeTarget=null;
 const lobbyWelcomeSteps=[

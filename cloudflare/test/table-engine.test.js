@@ -1,12 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createTableEngine,slimMatch,CodeTakenError} from '../src/table-engine.js';
+import {createFirebaseBank} from '../src/firebase-bank.js';
 import adminService from '../../functions/admin-service.cjs';
 import playerService from '../../functions/player-service.cjs';
 
+// The Firebase bank over an in-memory Realtime Database.
 function memoryBank(economy){
  const bank={economy,transactions:0,writes:0,
-  async transaction(update){
+  async read(){return {etag:'x',value:bank.economy};},
+  async transaction(path,update){
    bank.transactions++;
    // Mimic RTDB: values round-trip through JSON and nulls disappear.
    const current=bank.economy?JSON.parse(JSON.stringify(bank.economy,(k,v)=>v===null?undefined:v)):null;
@@ -18,7 +21,7 @@ function memoryBank(economy){
 const wallets=()=>({wallets:{a:{balance:12,locked:0,lastGrantAt:1},b:{balance:7,locked:0,lastGrantAt:1},c:{balance:9,locked:0,lastGrantAt:1},d:{balance:9,locked:0,lastGrantAt:1}}});
 function setup(extra={}){
  let now=1000;const bank=memoryBank(extra.economy||wallets());
- const engine=createTableEngine({code:'ABCDE',bank,clock:()=>now});
+ const engine=createTableEngine({code:'ABCDE',bank:createFirebaseBank(bank),clock:()=>now});
  return {bank,engine,advance:ms=>{now+=ms;},now:()=>now};
 }
 const total=economy=>Object.values(economy.wallets).reduce((n,w)=>n+w.balance+w.locked,0);

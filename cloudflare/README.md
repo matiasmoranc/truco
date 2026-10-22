@@ -87,3 +87,43 @@ nodos `rooms` y `hands` de la base.
 
 El cron `creditExpireTables` y la reparación de reservas ignoran las partidas
 marcadas `live: 'cloudflare'`; las vence y liquida el propio servidor de mesas.
+
+## Banco de créditos (CREDITS_BACKEND)
+
+`CREDITS_BACKEND` en `wrangler.toml` decide dónde viven los créditos:
+
+- `firebase` (actual): las mesas mueven créditos con una transacción sobre todo
+  `creditEconomy` en Realtime Database.
+- `bank`: los créditos viven en el Durable Object `Bank` (`src/bank.js`), una
+  fila por billetera, recibo, historial y movimiento. Cada paso de una mesa toca
+  solo las filas de sus jugadores. La app recibe el saldo y reclama los créditos
+  diarios por WebSocket (`/bank`), y las Cloud Functions (admin, historial,
+  borrado de cuentas) leen y editan por las rutas internas `/internal/bank/*`
+  (con el secreto interno). Ver `functions/credit-store.cjs`.
+
+Las mismas reglas contables (`src/ledger-ops.js`) corren en los dos modos; los
+tests comprueban que dejan exactamente la misma contabilidad.
+
+### Migración (con las mesas vacías)
+
+```bash
+INTERNAL_SECRET=... node scripts/migrate-credits.mjs verify --url <worker> --key <clave.json>
+INTERNAL_SECRET=... node scripts/migrate-credits.mjs import --url <worker> --key <clave.json>
+```
+
+`import` se niega si hay partidas en curso o si el banco ya tiene datos, y al
+terminar compara rama por rama. Firebase solo se lee: `creditEconomy` queda
+como copia congelada para volver atrás.
+
+Para probar el banco en local, `cloudflare/.dev.vars` puede tener
+`CREDITS_BACKEND=bank` e `INTERNAL_SECRET=dev-secret`.
+
+### Copia de respaldo
+
+Cada cambio del banco anota sus filas en una cola dentro de la misma escritura
+atómica; una alarma las envía a Firebase en `creditBank` (misma forma que
+`creditEconomy`) a los 2 segundos, en una sola actualización, y reintenta cada
+30 segundos si Firebase no responde. `creditEconomy` no se toca: queda como la
+copia congelada de antes del corte. `/internal/bank/mirror` dice si hay cambios
+sin enviar, y `/internal/bank/reset` vacía el banco y su respaldo, solo mientras
+el banco no está activo (para repetir el ensayo).

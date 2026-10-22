@@ -43,6 +43,8 @@ export class Lobby extends DurableObject{
    ws.serializeAttachment({uid:user.uid});
    send(ws,{t:'res',id:message.id,ok:true,data:{uid:user.uid}});
    send(ws,{t:'lobby',rooms:this.rooms});
+   // Tells the client where to read its balance and claim daily credits.
+   send(ws,{t:'config',creditsBackend:this.env.CREDITS_BACKEND==='bank'?'bank':'firebase'});
   }catch(error){send(ws,{t:'res',id:message.id,ok:false,error:error.message});}
  }
 }

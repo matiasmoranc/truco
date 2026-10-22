@@ -26,7 +26,9 @@ export function dailyCreditChanges(wallet,timestamp) {
   return {...wallet,balance:5,locked:0,lastGrantAt:timestamp};
 }
 
-export function installCredits({services,getState,document,api,now=()=>Date.now(),setTimer=setTimeout,clearTimer=clearTimeout,onChange=()=>{},notify=()=>{}}) {
+// walletSource: resolves to the credit bank's live wallet ({watch,get,claim}) when
+// the server keeps credits in Cloudflare, or to null to keep using Firebase.
+export function installCredits({services,getState,document,api,walletSource=async()=>null,now=()=>Date.now(),setTimer=setTimeout,clearTimer=clearTimeout,onChange=()=>{},notify=()=>{}}) {
   const el=id=>document.getElementById(id);
   let uid=null,generation=0,unsubscribe=null,timer=null,wallet,busy=false,error='',available=false,detailsOpen=false,initialAttempted=false;
   const clock=()=>now()+(Number(getState().serverTimeOffset)||0);
@@ -38,9 +40,10 @@ export function installCredits({services,getState,document,api,now=()=>Date.now(
     const user=uid,epoch=generation;
     syncing=(async()=>{
       try{
-        const fb=await services(),snapshot=await fb.get(fb.ref(fb.db,'creditEconomy/wallets/'+user));
+        const bank=await walletSource();
+        const value=bank?await bank.get():(await (async()=>{const fb=await services();return fb.get(fb.ref(fb.db,'creditEconomy/wallets/'+user));})()).val();
         if(epoch!==generation||getState().uid!==user)return false;
-        wallet=snapshot.val();available=true;error='';render();onChange();return true;
+        wallet=value;available=true;error='';render();onChange();return true;
       }catch{
         if(epoch===generation){wallet=undefined;available=false;error='No pudimos confirmar tu saldo. Volvé a intentar.';render();onChange();}
         return false;
@@ -79,6 +82,14 @@ export function installCredits({services,getState,document,api,now=()=>Date.now(
     stop();uid=user;const epoch=generation;
     firstLoad=new Promise(resolve=>{finishFirstLoad=resolve;});render();
     try {
+      const bank=await walletSource();if(epoch!==generation||getState().uid!==user)return;
+      if(bank){
+        unsubscribe=bank.watch(value=>{
+          if(epoch!==generation)return;
+          wallet=value;available=true;error='';render();onChange();if(wallet!==null)settled(true);
+        });
+        return;
+      }
       const fb=await services();if(epoch!==generation||getState().uid!==user)return;
       unsubscribe=fb.onValue(fb.ref(fb.db,'creditEconomy/wallets/'+user),snapshot=>{
         if(epoch!==generation)return;
@@ -96,6 +107,13 @@ export function installCredits({services,getState,document,api,now=()=>Date.now(
     if(busy||!uid||!available||getState().firebaseConnected!==true||creditEligibility(wallet,clock())!=='available')return;
     const user=uid,epoch=generation;busy=true;render();
     try {
+      const bank=await walletSource();if(epoch!==generation||getState().uid!==user)return;
+      if(bank){
+        // The bank applies the daily rule itself; a refusal is answered from its latest balance.
+        try{const value=await bank.claim();if(epoch!==generation)return;wallet=value;detailsOpen=false;error='';}
+        catch{const value=await bank.get();if(epoch!==generation)return;wallet=value;error=creditEligibility(wallet,clock())==='available'?'No se pudieron acreditar. Revisá la conexión y volvé a intentar.':'';}
+        return;
+      }
       const fb=await services();if(epoch!==generation||getState().uid!==user)return;
       const grantTime=fb.serverTimestamp();
       const result=await fb.runTransaction(fb.ref(fb.db,'creditEconomy/wallets/'+user),current=>{

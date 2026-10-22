@@ -116,7 +116,7 @@ test('A transaction retry with a newly funded wallet cannot overwrite its balanc
 });
 test('Late confirmation from the previous account cannot overwrite the new account',async()=>{
  const m=await modulePromise,h=harness(m);await h.api.start();let resolve;
- h.fb.runTransaction=()=>new Promise(r=>resolve=r);const pending=h.api.claim();await Promise.resolve();
+ h.fb.runTransaction=()=>new Promise(r=>resolve=r);const pending=h.api.claim();while(!resolve)await Promise.resolve();
  h.api.stop();h.state.uid='b';await h.api.start();resolve({committed:true,snapshot:{val:()=>({balance:5,locked:0,lastGrantAt:today})}});await pending;
  assert.equal(h.elements['credits-balance'].textContent,'0');
 });
@@ -145,4 +145,17 @@ test('Wallet errors and changing accounts settle startup instead of leaving an e
  h.fb.onValue=(_ref,_callback,error)=>{fail=error;return ()=>{};};await h.api.start();
  const first=h.api.whenReady();fail();assert.equal(await first,false);assert.match(h.elements['credits-status'].textContent,/habilitados/);
  h.state.uid='b';await h.api.start();const second=h.api.whenReady();h.api.stop();assert.equal(await second,false);
+});
+
+test('With the credit bank active, balance and daily claim use the bank socket, never Firebase',async()=>{
+ const m=await modulePromise,elements={};let listener,claims=0,value={balance:0,locked:0,lastGrantAt:today-86400000};
+ for(const id of ['credits-panel','credits-balance','credits-status','credits-claim','credits-ad','credits-ad-note'])elements[id]={hidden:false,disabled:false,textContent:'',addEventListener(){}};
+ const bank={watch(fn){listener=fn;fn(value);return ()=>{};},async get(){return value;},async claim(){claims++;value={balance:5,locked:0,lastGrantAt:today};listener(value);return value;}};
+ const state={uid:'a',firebaseConnected:true,serverTimeOffset:0};
+ const api=m.installCredits({services:async()=>assert.fail('Firebase must not be used'),walletSource:async()=>bank,getState:()=>state,document:{getElementById:id=>elements[id]},now:()=>today,setTimer:()=>1,clearTimer(){}});
+ await api.start();assert.equal(elements['credits-balance'].textContent,'0');
+ await api.claim();assert.equal(claims,1);assert.equal(elements['credits-balance'].textContent,'5');
+ bank.claim=async()=>{throw new Error('Ya reclamaste los créditos de hoy.');};
+ value={balance:0,locked:0,lastGrantAt:today};listener(value);await api.claim();
+ assert.equal(api.wallet().lastGrantAt,today);assert.equal(await api.sync(),true);
 });

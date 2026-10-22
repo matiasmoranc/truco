@@ -10,7 +10,7 @@
     "mobile:sync": "npm run mobile:build && cap sync && npm run mobile:icons && node scripts/prepare-no-ads.cjs",
     "mobile:open:android": "cap open android",
     "mobile:open:ios": "cap open ios",
-    "test": "node --test tests/*.cjs cloudflare/test/table-engine.test.js",
+    "test": "node --test tests/*.cjs cloudflare/test/table-engine.test.js cloudflare/test/bank-core.test.js cloudflare/test/bank-mirror.test.js",
     "dev:web": "node scripts/serve-local.cjs",
     "mobile:icons": "node scripts/build-app-icons.cjs",
     "mobile:verify:no-ads": "node scripts/verify-no-ads.cjs"

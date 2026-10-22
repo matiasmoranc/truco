@@ -92,7 +92,30 @@ export function createLiveTables({url=LIVE_SERVER_URL,token}){
       entry.listeners.add(listener);
     });
   }
-  function onWake(){for(const entry of tables.values())entry.channel.wake();lobby?.channel.wake();}
+  function ensureLobby(){
+    if(lobby)return lobby;
+    lobby={rooms:null,listeners:new Set(),config:null,configWaiters:[]};
+    lobby.channel=new Channel(base+'/lobby',token,message=>{
+      if(message.t==='config'){lobby.config=message;for(const resolve of lobby.configWaiters.splice(0))resolve(message);return;}
+      if(message.t==='lobby')lobby.rooms=Object.fromEntries(Object.entries(message.rooms||{}).map(([code,room])=>[code,{public:room}]));
+      else if(message.t==='lobby-update'){lobby.rooms={...(lobby.rooms||{})};if(message.room)lobby.rooms[message.code]={public:message.room};else delete lobby.rooms[message.code];}
+      else return;
+      for(const fn of lobby.listeners)fn(lobby.rooms);
+    });
+    return lobby;
+  }
+  // Live balance from the credit bank: {watch, get, claim}.
+  let bank=null;
+  function ensureBank(){
+    if(bank)return bank;
+    bank={wallet:undefined,listeners:new Set()};
+    bank.channel=new Channel(base+'/bank',token,message=>{
+      if(message.t!=='wallet')return;
+      bank.wallet=message.wallet??null;for(const fn of bank.listeners)fn(bank.wallet);
+    });
+    return bank;
+  }
+  function onWake(){for(const entry of tables.values())entry.channel.wake();lobby?.channel.wake();bank?.channel.wake();}
   globalThis.addEventListener?.('online',onWake);
   globalThis.document?.addEventListener?.('visibilitychange',()=>{if(document.visibilityState==='visible')onWake();});
 
@@ -111,19 +134,33 @@ export function createLiveTables({url=LIVE_SERVER_URL,token}){
     closeAllTables(){for(const key of [...tables.keys()])this.closeTable(key);},
     // Open tables as {code:{public:room}}, the shape the lobby renderer reads.
     watchLobby(listener){
-      if(!lobby){
-        lobby={rooms:null,listeners:new Set()};
-        lobby.channel=new Channel(base+'/lobby',token,message=>{
-          if(message.t==='lobby')lobby.rooms=Object.fromEntries(Object.entries(message.rooms||{}).map(([code,room])=>[code,{public:room}]));
-          else if(message.t==='lobby-update'){lobby.rooms={...(lobby.rooms||{})};if(message.room)lobby.rooms[message.code]={public:message.room};else delete lobby.rooms[message.code];}
-          else return;
-          for(const fn of lobby.listeners)fn(lobby.rooms);
-        });
-      }
+      ensureLobby();
       lobby.listeners.add(listener);
       if(lobby.rooms)queueMicrotask(()=>{if(lobby?.listeners.has(listener))listener(lobby.rooms);});
       return ()=>{lobby?.listeners.delete(listener);};
     },
-    lobbyRoom(code){return lobby?.rooms?.[code]?.public||null;}
+    lobbyRoom(code){return lobby?.rooms?.[code]?.public||null;},
+    // Where credits live ('firebase' or 'bank'), as the server reports on connect.
+    creditsBackend(){
+      const current=ensureLobby();
+      return current.config?Promise.resolve(current.config.creditsBackend):new Promise(resolve=>current.configWaiters.push(message=>resolve(message.creditsBackend)));
+    },
+    wallet:{
+      watch(listener,onError){
+        const current=ensureBank();current.listeners.add(listener);
+        if(current.wallet!==undefined)queueMicrotask(()=>{if(current.listeners.has(listener))listener(current.wallet);});
+        return ()=>current.listeners.delete(listener);
+      },
+      get(){
+        const current=ensureBank();
+        if(current.wallet!==undefined)return Promise.resolve(current.wallet);
+        return new Promise((resolve,reject)=>{
+          const timer=setTimeout(()=>{current.listeners.delete(listener);reject(new LiveError('No pudimos confirmar tu saldo.','timeout'));},CALL_TIMEOUT_MS);
+          const listener=wallet=>{clearTimeout(timer);current.listeners.delete(listener);resolve(wallet);};
+          current.listeners.add(listener);
+        });
+      },
+      async claim(){return (await ensureBank().channel.call('claim')).wallet;}
+    }
   };
 }

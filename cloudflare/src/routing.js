@@ -3,3 +3,4 @@
 const LOCATION={locationHint:'sam'};
 export const lobbyStub=env=>env.LOBBY.get(env.LOBBY.idFromName('global'),LOCATION);
 export const tableStub=(env,code)=>env.TABLES.get(env.TABLES.idFromName(code),LOCATION);
+export const bankStub=env=>env.BANK.get(env.BANK.idFromName('main'),LOCATION);
