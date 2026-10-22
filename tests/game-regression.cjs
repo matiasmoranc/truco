@@ -233,7 +233,7 @@ test('Practice menu remembers the first start and shows three modes on later vis
  c.rememberLearningPractice();c.state={};c.renderLearningMenu();assert.equal(classes['learn-free'],true);assert.equal(classes['learn-game-modes'],false);
 });
 
-test('Flor can be declared after the rival opening card while own three cards remain',()=>{const c=harness(),r=room();r.playedCount=1;r.turn='player2';c.state={room:r,playerId:'player2',localHands:{player2:[card('♥',3),card('♥',6),card('♥',7)]}};vm.runInContext(extract('localAction'),c);c.localAction('flor');assert.equal(r.flors.player2,36);assert.equal(r.pendingBet.type,'flor');});
+test('Flor can be declared after the rival opening card while own three cards remain',()=>{const c=harness(),r=room();r.playedCount=1;r.turn='player2';c.state={room:r,playerId:'player2',localHands:{player2:[card('♥',3),card('♥',6),card('♥',7)]}};vm.runInContext(extract('localAction'),c);c.localAction('flor');assert.equal(r.flors.player2,36);assert.equal(r.pendingBet,null);assert.equal(r.florSettled,true);});
 
 test('Abandonment cannot request or accept a rematch',()=>{
  const c=harness(),ended={status:'complete',targetPoints:20,scores:{player1:20,player2:0},players:{player1:{uid:'a'},player2:{uid:'b'}},matchResult:{winner:'player1',loser:'player2',reason:'abandon'},endReveal:{done:true},rematch:{id:'old',requester:'player2',status:'pending'}};
@@ -262,4 +262,16 @@ test('Sending a chat message closes the chat at once and shows it like the rival
 });
 test('The server copy of a message already shown when sent does not pop up twice',()=>{
  const src=extract('syncMatchChat');assert.match(src,/pendingOwn\.findIndex\(item=>item\.text===message\.text\)/);assert.match(src,/pendingOwn=\[\]/);
+});
+test('A flor against a rival without flower scores at once, shows the call for 3 seconds and keeps the suspended truco',()=>{
+ const c=harness(),r=room();const truco={type:'truco',caller:'player2',responder:'player1',stake:2};r.pendingBet=truco;r.scores={player1:0,player2:0};
+ c.state={room:r,playerId:'player1',localHands:{player1:[card('♥',3),card('♥',6),card('♥',7)],player2:[card('♠',1),card('♦',4),card('♣',5)]}};
+ vm.runInContext(extract('localAction'),c);c.localAction('flor');
+ assert.equal(r.scores.player1,3);assert.equal(r.pendingBet,truco);assert.equal(r.florSettled,true);assert.equal(r.callNotice.duration,3000);
+});
+test('A flor against a rival holding a flower still waits for the answer',()=>{
+ const c=harness(),r=room();r.scores={player1:0,player2:0};
+ c.state={room:r,playerId:'player1',localHands:{player1:[card('♥',3),card('♥',6),card('♥',7)],player2:[card('♠',3),card('♠',6),card('♠',7)]}};
+ vm.runInContext(extract('localAction'),c);c.localAction('flor');
+ assert.equal(r.pendingBet.type,'flor');assert.equal(r.pendingBet.responder,'player2');assert.equal(r.scores.player1,0);
 });

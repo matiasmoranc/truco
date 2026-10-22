@@ -67,7 +67,7 @@ function createTeamReferee(s,{now=Date.now(),deckFactory=deck}={}){
   // before an opponent later reveals a flower. Individual points remain private.
   for(const q of SEATS)if(flower(s.originals[q],r.muestra)&&((r.playedBy[q]||0)===0||r.flors[q]!=null))r.flors[q]=true;
   r.envidoClosed=true;notice(p,'Flor');
-  const teams=new Set(Object.keys(r.flors).map(team));if(teams.size===1){award(team(p),Object.keys(r.flors).length*3,'Flores del equipo: '+Object.keys(r.flors).length+'.');r.florSettled=true;resume(suspended);checkWin();return;}
+  const teams=new Set(Object.keys(r.flors).map(team));if(teams.size===1){r.callNotice.duration=3000;award(team(p),Object.keys(r.flors).length*3,'Flores del equipo: '+Object.keys(r.flors).length+'.');r.florSettled=true;resume(suspended);checkWin();return;}
   r.pendingBet={id:crypto.randomUUID(),type:'flor',caller:p,callerTeam:team(p),responder:responder(opponent(team(p)),true),stake:3,accepted:0,called:'flor',suspendedBet:suspended};
  }
  function call(p,v){const b=r.pendingBet;

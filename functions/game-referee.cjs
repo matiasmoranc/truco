@@ -384,9 +384,11 @@ function localAction(action){
     const suspendedBet=room.pendingBet?.type==='truco'?room.pendingBet:(room.pendingBet?.suspendedBet||null);
     room.pendingBet={type:'flor',called:'flor',single:!room.flors[other],caller:player,responder:other,stake:3,accepted:0,suspendedBet};
     queueLearningAction('flor');localFeed(`${room.players[player].name} canta flor.`);
-    if(overEnvido&&!room.flors[other]){
+    // A rival without a flower has nothing to answer: the flower scores now, the call shows for 3 s and play goes on.
+    if(room.flors[other]==null&&!roomHasFlor(room,localHand(other))){
       room.florSettled=true;room.pendingBet=suspendedBet;
-      localScore(player,3,'gana la flor; se cancela el envido');
+      if(room.callNotice)room.callNotice={...room.callNotice,duration:3000};
+      localScore(player,3,overEnvido?'gana la flor; se cancela el envido':'gana la flor');
     }
     renderGame();
   } else if(['yes','no','raise'].includes(action)||action.startsWith('raise-'))localAnswerAction(action);

@@ -5,7 +5,7 @@ import { installActivity } from './activity.js?v=20261010-adminstats32';
 import { installCredits } from './credits.js?v=20261022-bank1';
 import { installAccount } from './account.js?v=20261022-ios-redirect';
 import { initializeGameAuth } from './auth-init.js?v=20261016-android-google';
-import {installTeamTable,TEAM_SEATS,playerTeam,positionDealerDeck,renderTeamLobbySeats,renderWaitingSeats} from './team-table-ui.js?v=20261022-good1';
+import {installTeamTable,TEAM_SEATS,playerTeam,positionDealerDeck,renderTeamLobbySeats,renderWaitingSeats} from './team-table-ui.js?v=20261022-flor1';
 import {createLiveTables,LiveError} from './live-tables.js?v=20261022-clock1';
 const FIREBASE_VERSION = '12.4.0';
 const $ = (id) => document.getElementById(id);
@@ -581,7 +581,7 @@ function renderCallNotice(){
     received={id:notice.id,at:Date.now(),pinned:false,notice};
     receivedCallNotices.set(key,received);
   }
-  const remaining=received&&notice&&received.id===notice.id?CALL_NOTICE_DURATION-(Date.now()-received.at):0;
+  const remaining=received&&notice&&received.id===notice.id?(Number(notice.duration)||CALL_NOTICE_DURATION)-(Date.now()-received.at):0;
   const pending=state.room?.pendingBet;
   const awaitingResponse=incoming&&addressed&&notice?.kind!=='fold'&&pending&&notice.from===pending.caller&&
     (pending.revealMode?pending.revealTurn===role:pending.responder===role);
@@ -2993,9 +2993,11 @@ function localAction(action){
     const suspendedBet=room.pendingBet?.type==='truco'?room.pendingBet:(room.pendingBet?.suspendedBet||null);
     room.pendingBet={type:'flor',called:'flor',single:!room.flors[other],caller:player,responder:other,stake:3,accepted:0,suspendedBet};
     queueLearningAction('flor');localFeed(`${room.players[player].name} canta flor.`);
-    if(overEnvido&&!room.flors[other]){
+    // A rival without a flower has nothing to answer: the flower scores now, the call shows for 3 s and play goes on.
+    if(room.flors[other]==null&&!roomHasFlor(room,localHand(other))){
       room.florSettled=true;room.pendingBet=suspendedBet;
-      localScore(player,3,'gana la flor; se cancela el envido');
+      if(room.callNotice)room.callNotice={...room.callNotice,duration:3000};
+      localScore(player,3,overEnvido?'gana la flor; se cancela el envido':'gana la flor');
     }
     renderGame();
   } else if(['yes','no','raise'].includes(action)||action.startsWith('raise-'))localAnswerAction(action);
@@ -3079,6 +3081,9 @@ function renderOpponentHand(room){
   [...hand.children].forEach((card,index)=>{
     card.style.setProperty('--fan-index',index-(count-1)/2);
   });
+  // The rival sang flor this hand.
+  const flor=$('opponent-flor'),sang=room.flors?.[otherPlayer(state.playerId)]!=null&&room.status==='started';
+  flor.classList.toggle('hidden',!sang);flor.setAttribute('aria-label',sang?`${name} cantó flor`:'');
 }
 function syncMobileGameHeader(){
   const badge=$('turn-badge'),parent=document.querySelector('.game-topbar');

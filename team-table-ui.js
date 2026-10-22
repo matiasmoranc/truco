@@ -3,8 +3,9 @@ export function teamPie(room,player){
  const i=TEAM_SEATS.indexOf(first),order=[...TEAM_SEATS.slice(i),...TEAM_SEATS.slice(0,i)];
  return order.filter(q=>playerTeam(q)===playerTeam(player)&&!room.folded?.[q]).at(-1);
 }
-export function visibleTeamNotice(notice,room,now){return !!notice&&notice.handNumber===room.handNumber&&(notice.trickNo==null||notice.trickNo===room.trickNo)&&now-notice.time>=0&&now-notice.time<5000;}
+export function visibleTeamNotice(notice,room,now){return !!notice&&notice.handNumber===room.handNumber&&(notice.trickNo==null||notice.trickNo===room.trickNo)&&now-notice.time>=0&&now-notice.time<(Number(notice.duration)||5000);}
 export const TEAM_SEATS=['player1','player2','player3','player4'];
+const FLOR_ICON=globalThis.document?.getElementById('opponent-flor')?.innerHTML||'';
 export const playerTeam=p=>['player1','player3'].includes(p)?'player1':'player2';
 export function teamSeatsFor(viewer){const i=TEAM_SEATS.indexOf(viewer);return [0,1,2,3].map(n=>TEAM_SEATS[(i+n)%4]);}
 export function dealerPosition(dealer,viewer,teams=false){
@@ -76,7 +77,9 @@ export function installTeamTable({$,getState,command,runAction,renderPlayerHand,
    const fan=Array.from({length:count},(_,j)=>`<i class="${faceUp?'sprite-card teammate-card':'opponent-card-back'}" style="--fan-index:${j-(count-1)/2};${faceUp?cardImageStyle(s.partnerHand[j]):''}"${faceUp?` aria-label="${safe(cardAccessibleName(s.partnerHand[j]))}"`:''}></i>`).join('');
    const backs=i===0?'':i===2?`<button class="team-backs team-partner-cards" type="button" aria-label="Ver cartas del compañero durante 3 segundos" aria-pressed="${faceUp}" ${count?'':'disabled'}>${fan}</button>`:`<div class="team-backs">${fan}</div>`;
    const status=r.folded?.[q]?'AL MAZO':'';
-   el.innerHTML=`${i===0?(status?`<span class="team-self-status">${status}</span>`:''):`<span class="team-player-name">${safe(person?.name||'Jugador')}${status?`<small>${status}</small>`:''}</span>`}${backs}<div class="team-speech hidden"></div>`;
+   // Rivals who sang flor show it beside their cards.
+   const flor=(i===1||i===3)&&r.status==='started'&&r.flors?.[q]!=null?`<span class="team-flor flor-badge" role="img" aria-label="${safe(person?.name||'Jugador')} cantó flor">${FLOR_ICON}</span>`:'';
+   el.innerHTML=`${i===0?(status?`<span class="team-self-status">${status}</span>`:''):`<span class="team-player-name">${safe(person?.name||'Jugador')}${status?`<small>${status}</small>`:''}</span>`}${backs}${flor}<div class="team-speech hidden"></div>`;
    if(i===2&&flip&&!matchMedia('(prefers-reduced-motion: reduce)').matches)for(const card of el.querySelectorAll('.team-backs>i'))card.animate([{rotate:'y 90deg',opacity:.3,scale:'.94'},{rotate:'y 0deg',opacity:1,scale:'1'}],{duration:280,easing:'ease-out'});
    if(i===2)el.querySelector('.team-partner-cards').onclick=()=>{showPartner();render();};
   }
