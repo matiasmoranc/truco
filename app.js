@@ -280,13 +280,35 @@ function liveTables(){
 }
 function liveSnapshot(value){return {exists:()=>value!=null,val:()=>value??null};}
 const TABLE_CODE_ALPHABET='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+function newTableCode(){
+  return Array.from(crypto.getRandomValues(new Uint32Array(5)),n=>TABLE_CODE_ALPHABET[n%TABLE_CODE_ALPHABET.length]).join('');
+}
+// Same shape as the server's waiting table, shown until the server confirms it.
+function provisionalTable({stake,targetPoints,mode,visibility},name){
+  const person={uid:state.uid,name,online:true};
+  return {managedCredits:true,mode,creditMatch:{id:null,stake,pot:stake*(mode==='2v2'?4:2),hasPassword:visibility==='password'},revision:0,status:'waiting',deviceMode:'two',createdAt:Date.now(),targetPoints,table:person,players:{player1:person},scores:{player1:0,player2:0},handNumber:1,trickCards:[],feed:[]};
+}
+async function confirmCreatedTable(code,data){
+  try{
+    await liveTables().call(code,'create',data);
+    void credits.sync().catch(error=>console.error('[truco:wallet-sync]',error));
+    if(state.pendingCreate===code)state.pendingCreate=null;
+    // The player left while the reservation was being confirmed.
+    if(state.cancelAfterCreate===code&&state.roomCode===code){state.cancelAfterCreate=null;await creditCommand({kind:'cancel'});returnToLobby();}
+  }catch(error){
+    console.error('[truco:create] failed',error);
+    if(state.pendingCreate===code)state.pendingCreate=null;
+    if(state.roomCode===code)returnToLobby();else liveTables().closeTable(code);
+    toast(error.code==='code-taken'?'No pudimos crear la mesa. Volvé a intentar.':firebaseError(error),true);
+  }
+}
 async function liveTableApi(name,data){
   await firebaseServices();
   const live=liveTables();
   if(name==='creditCreateTable'){
     // The table server owns one object per code; a taken code is retried with a new one.
     for(let attempt=0;attempt<5;attempt++){
-      const code=Array.from(crypto.getRandomValues(new Uint32Array(5)),n=>TABLE_CODE_ALPHABET[n%TABLE_CODE_ALPHABET.length]).join('');
+      const code=newTableCode();
       try{return await live.call(code,'create',data);}
       catch(error){live.closeTable(code);if(error.code!=='code-taken')throw error;}
     }
@@ -339,6 +361,7 @@ async function refreshLiveConnection(){
       ]);
     if(state.localGame||state.roomCode!==code||(state.connectionEpoch||0)!==epoch||!roomTransportConnected())return;
     const room=publicSnap.val();
+    if(!room&&state.pendingCreate===code)throw new Error('create-pending');
     if(!room||room.status==='closed'){returnToLobby('La mesa ya no está disponible.');return;}
     if(roomSeatForUid(room,state.uid)!==player){returnToLobby('Tu lugar ya no está disponible.');return;}
     const deal=privateSnap?.val();
@@ -853,8 +876,14 @@ async function enterRoom() {
       state.roomCode=code;state.playerId=seat;joinedRoom=room;
     }else{
       const stake=Number($('table-stake').value),visibility=$('table-visibility').value;
-      const result=await creditApi('creditCreateTable',{stake,targetPoints:normalizeTargetPoints($('target-points').value),mode:$('table-mode').value,visibility,password:visibility==='password'?$('table-password').value:''});
-      joinedRoom=result.room;joinedHand=result.privateHand||null;state.roomCode=result.code;state.playerId='player1';
+      const data={stake,targetPoints:normalizeTargetPoints($('target-points').value),mode:$('table-mode').value,visibility,password:visibility==='password'?$('table-password').value:''};
+      // The table appears at once; the server confirms the credit reservation behind it.
+      const code=newTableCode();
+      state.pendingCreate=code;state.cancelAfterCreate=null;
+      rememberPlayerName(name);
+      attachLiveRoom(code,'player1',provisionalTable(data,name),null);
+      void confirmCreatedTable(code,data);
+      return;
     }
     if($('join-credit-dialog').open)$('join-credit-dialog').close();
     rememberPlayerName(name);
@@ -1040,6 +1069,8 @@ function watchRoom() {
     // Room and private hand arrive together; apply the hand first so one render sees both.
     state.unsubscribe=liveTables().watchTable(code,({room,hand})=>{
       if(code!==state.roomCode||version!==state.roomWatchVersion)return;
+      // Until the server confirms a new table it reports none; keep the provisional one.
+      if(!room&&state.pendingCreate===code)return;
       if(state.privateUnsubscribe&&state.privateHandKey===`${code}:${state.uid}`&&Number(room?.matchNumber||1)===Number(state.room?.matchNumber||1)){state.privateDeal=hand||null;state.privateDealJson=JSON.stringify(hand??null);}
       onRoom(liveSnapshot(room));
     });
@@ -3347,7 +3378,7 @@ $('open-room-list').addEventListener('click',(event)=>{const button=event.target
 $('back-home').addEventListener('click',()=>{showView('welcome-view');openLobby();});
 $('fold-hand').addEventListener('click',event=>runLiveAction(event.currentTarget,foldHand));
 $('enter-room').addEventListener('click',enterRoom);
-$('leave-room').addEventListener('click',async()=>{if(state.room?.managedCredits){const waiting=state.room.status==='waiting';if(waiting)state.cancelingWaitingRoom=state.roomCode;try{await creditCommand({kind:'cancel'});if(waiting&&state.cancelingWaitingRoom)returnToLobby();}catch{state.cancelingWaitingRoom=null;return;}return;}stopRoomPresence();stopBot();state.roomWatchVersion=(state.roomWatchVersion||0)+1;state.navigationEpoch=(state.navigationEpoch||0)+1;forgetRoomSeat();if(state.unsubscribe)state.unsubscribe();if(state.privateUnsubscribe)state.privateUnsubscribe();state.privateUnsubscribe=null;state.privateHandKey=null;state.room=null;state.localGame=false;showView('welcome-view');openLobby();});
+$('leave-room').addEventListener('click',async()=>{if(state.pendingCreate&&state.pendingCreate===state.roomCode){state.cancelAfterCreate=state.roomCode;return;}if(state.room?.managedCredits){const waiting=state.room.status==='waiting';if(waiting)state.cancelingWaitingRoom=state.roomCode;try{await creditCommand({kind:'cancel'});if(waiting&&state.cancelingWaitingRoom)returnToLobby();}catch{state.cancelingWaitingRoom=null;return;}return;}stopRoomPresence();stopBot();state.roomWatchVersion=(state.roomWatchVersion||0)+1;state.navigationEpoch=(state.navigationEpoch||0)+1;forgetRoomSeat();if(state.unsubscribe)state.unsubscribe();if(state.privateUnsubscribe)state.privateUnsubscribe();state.privateUnsubscribe=null;state.privateHandKey=null;state.room=null;state.localGame=false;showView('welcome-view');openLobby();});
 $('game-home').addEventListener('click',()=>{
   if(!state.room){returnToLobby();return;}
   if(matchFinished(state.room)){closeFinishedRoom();return;}

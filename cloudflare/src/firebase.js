@@ -59,16 +59,22 @@ async function accessToken(env){
 export function createDatabase(env){
  const base=env.FIREBASE_DATABASE_URL.replace(/\/$/,'');
  async function request(path,init={}){
-  const res=await fetch(base+'/'+path+'.json',{...init,headers:{authorization:'Bearer '+await accessToken(env),...(init.headers||{})}});
+  const started=Date.now(),token=await accessToken(env),authorized=Date.now();
+  const res=await fetch(base+'/'+path+'.json',{...init,headers:{authorization:'Bearer '+token,...(init.headers||{})}});
+  if(Date.now()-started>200)console.info('rtdb slow',init.method||'GET',path,res.status,'token',authorized-started,'ms request',Date.now()-authorized,'ms bytes',res.headers.get('content-length'));
   return res;
  }
  async function get(path){const res=await request(path);if(!res.ok)throw new Error('No se pudo leer la base ('+res.status+').');return res.json();}
+ // Value plus ETag; started early, it lets a transaction skip its first read.
+ async function read(path){
+  const res=await request(path,{headers:{'x-firebase-etag':'true'}});
+  if(!res.ok)throw new Error('No se pudo leer la base ('+res.status+').');
+  return {etag:res.headers.get('etag'),value:await res.json()};
+ }
  // Optimistic-concurrency transaction, equivalent to ref.transaction() in the
  // Admin SDK: retried against the latest value when another writer wins.
- async function transaction(path,update,attempts=10){
-  let res=await request(path,{headers:{'x-firebase-etag':'true'}});
-  if(!res.ok)throw new Error('No se pudo leer la base ('+res.status+').');
-  let etag=res.headers.get('etag'),current=await res.json();
+ async function transaction(path,update,{initial,attempts=10}={}){
+  let {etag,value:current}=initial||await read(path),res;
   for(let i=0;i<attempts;i++){
    const next=update(current);
    if(next===undefined)return {committed:false,value:current};
@@ -79,7 +85,7 @@ export function createDatabase(env){
   }
   throw new Error('La base está ocupada. Volvé a intentar.');
  }
- return {get,transaction};
+ return {get,read,transaction};
 }
 
 // Local development only (wrangler dev with DEV_MODE=1 in .dev.vars): a fake
@@ -93,9 +99,10 @@ export function createDevDatabase(ledgerStub){
    if(root==='administrators')return true;
    return null;
   },
-  async transaction(path,update){
+  async read(){return (await ledgerStub().fetch('https://lobby/dev-ledger')).json();},
+  async transaction(path,update,{initial}={}){
    for(let i=0;i<10;i++){
-    const {etag,value}=await (await ledgerStub().fetch('https://lobby/dev-ledger')).json();
+    const {etag,value}=i===0&&initial?initial:await this.read();
     const current=structuredClone(value||{});current.wallets??={};
     for(const uid of seen)current.wallets[uid]??={balance:100,locked:0};
     const next=update(current);if(next===undefined)return {committed:false,value:current};

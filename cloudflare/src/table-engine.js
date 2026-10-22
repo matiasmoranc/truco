@@ -31,7 +31,8 @@ export function createTableEngine({code,bank,clock=()=>Date.now()}){
  let m=null,presence={};
 
  // Run an operation against the real ledger, inside one RTDB transaction.
- async function accounting(op,{creating=false}={}){
+ // initial: a ledger read already in flight, so the transaction skips its own read.
+ async function accounting(op,{creating=false,initial}={}){
   const now=clock();let adopted=null;
   await bank.transaction(economy=>{
    if(!economy)throw new Error('No hay créditos disponibles.');
@@ -48,7 +49,7 @@ export function createTableEngine({code,bank,clock=()=>Date.now()}){
    for(const id of new Set([m?.id,full.id].filter(Boolean)))if(out.matches[id])out.matches[id]=slimMatch(out.matches[id]);
    adopted={full};
    return validateAccounting(before,recordHistory(before,plain(out),now));
-  });
+  },initial);
   if(adopted?.closedBy){closeLocally(adopted.closedBy.closeReason||'admin',now);return;}
   if(adopted?.full)m=adopted.full;
  }
@@ -78,16 +79,16 @@ export function createTableEngine({code,bank,clock=()=>Date.now()}){
   load(saved){m=saved?.match||null;presence=saved?.presence||{};},
   snapshot(){return {match:m,presence};},
   playerFor(uid){return findPlayer(m,uid);},
-  async create(user,{id,stake,targetPoints,mode,secret}){
+  async create(user,{id,stake,targetPoints,mode,secret,initial}){
    if(m&&!(m.closedAt||['settled','refunded'].includes(m.status)))throw new CodeTakenError();
    const previous=m;m=null;presence={};
-   try{await accounting((ledger,now)=>createTable(ledger,{code,id,uid:user.uid,name:user.name,stake,targetPoints,mode,secret,now}),{creating:true});}
+   try{await accounting((ledger,now)=>createTable(ledger,{code,id,uid:user.uid,name:user.name,stake,targetPoints,mode,secret,now}),{creating:true,initial});}
    catch(error){if(!m)m=previous;throw error;}
   },
-  async join(user,{password='',team}){
+  async join(user,{password='',team,initial}){
    if(!m)throw new Error('La mesa ya no está disponible.');
    if(findPlayer(m,user.uid))return;
-   await accounting((ledger,now)=>joinTable(ledger,{code,uid:user.uid,name:user.name,password,team,now}));
+   await accounting((ledger,now)=>joinTable(ledger,{code,uid:user.uid,name:user.name,password,team,now}),{initial});
   },
   async act(uid,{command,requestId,expectedMatchId}){
    if(!command||typeof command.kind!=='string')throw new Error('Jugada inválida.');

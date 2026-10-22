@@ -29,7 +29,7 @@ export class TableRoom extends DurableObject{
  setCode(code){
   if(this.code===code)return;
   this.code=code;
-  this.engine=createTableEngine({code,bank:{transaction:update=>this.db.transaction('creditEconomy',update)}});
+  this.engine=createTableEngine({code,bank:{transaction:(update,initial)=>this.db.transaction('creditEconomy',update,{initial})}});
  }
  serial(task){const run=this.queue.then(task,task);this.queue=run.catch(()=>{});return run;}
 
@@ -70,6 +70,8 @@ export class TableRoom extends DurableObject{
   if(message.t==='auth'){
    const user=await verifyIdToken(message.token,this.env.FIREBASE_PROJECT_ID,this.env);
    ws.serializeAttachment({uid:user.uid});
+   // A non-member is about to create or join: start the profile checks now.
+   if(!this.engine.playerFor(user.uid))this.identity(user.uid).catch(()=>{});
    if(this.engine.setOnline(user.uid,true))await this.commit();
    else this.sendState(ws,user.uid);
    return {uid:user.uid};
@@ -82,8 +84,9 @@ export class TableRoom extends DurableObject{
    const {stake,targetPoints,visibility,password,mode='1v1'}=message;
    if(!['public','password'].includes(visibility))throw new Error('Elegí mesa pública o con clave.');
    const secret=visibility==='password'?passwordHash(password):null;
-   const user=await this.identity(uid);
-   await this.engine.create(user,{id:crypto.randomUUID(),stake,targetPoints,mode,secret});
+   // Profile checks and the ledger read run together; the transaction reuses the read.
+   const [user,initial]=await Promise.all([this.identity(uid),this.db.read('creditEconomy')]);
+   await this.engine.create(user,{id:crypto.randomUUID(),stake,targetPoints,mode,secret,initial});
    this.engine.setOnline(uid,true);
    await this.commit();return this.result(uid);
   }
@@ -92,9 +95,9 @@ export class TableRoom extends DurableObject{
    const match=this.engine.match;
    if(!match)throw new Error('La mesa ya no está disponible.');
    if(!this.engine.playerFor(uid)){
-    const [user,blocked]=await Promise.all([this.identity(uid),this.blockedWithPlayers(uid)]);
+    const [user,blocked,initial]=await Promise.all([this.identity(uid),this.blockedWithPlayers(uid),this.db.read('creditEconomy')]);
     if(blocked)throw new Error('No pueden entrar a la misma mesa porque uno bloqueó al otro.');
-    await this.engine.join(user,{password:message.password||'',team:message.team});
+    await this.engine.join(user,{password:message.password||'',team:message.team,initial});
    }
    this.engine.setOnline(uid,true);
    await this.commit();return this.result(uid);
@@ -116,10 +119,11 @@ export class TableRoom extends DurableObject{
  // Entry receipt: the caller gets its private hand with the room, so the table renders without another round trip.
  result(uid){const m=this.engine.match;return {code:this.code,room:this.engine.publicRoom(),privateHand:this.engine.handFor(uid),player1:m?.player1||null,player2:m?.player2||null};}
 
- async identity(uid){
+ identity(uid){
   const cached=this.identities.get(uid);
-  if(cached&&Date.now()-cached.at<60000)return cached.user;
-  const user=await playerIdentity(this.db,uid);this.identities.set(uid,{user,at:Date.now()});return user;
+  if(cached&&Date.now()-cached.at<60000)return cached.promise;
+  const promise=playerIdentity(this.db,uid);this.identities.set(uid,{promise,at:Date.now()});
+  promise.catch(()=>this.identities.delete(uid));return promise;
  }
  async blockedWithPlayers(uid){
   const people=Object.values(this.engine.match?.players||{}).filter(Boolean);
