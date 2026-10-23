@@ -1,6 +1,6 @@
 import './chat-moderation.js?v=20261013-moderation1';
 import { installPlayerPanel } from './player-panel.js?v=20261013-blocklist1';
-import { installScorer } from './scorer.js?v=20261011-scorercolors59';
+import { installScorer,renderCompactTally } from './scorer.js?v=20261023-seo1';
 import { installActivity } from './activity.js?v=20261010-adminstats32';
 import { installCredits } from './credits.js?v=20261022-bank1';
 import { installAccount } from './account.js?v=20261022-ios-redirect';
@@ -2626,16 +2626,6 @@ function alignHandWithControls(){
     const offset=Number.parseFloat(hand.style.getPropertyValue('--hand-edge-offset'))||0;
     hand.style.setProperty('--hand-edge-offset',(offset+controls.getBoundingClientRect().left-left)+'px');
   });
-}
-function renderCompactTally(points,target){
-  const limit=normalizeTargetPoints(target),n=Math.min(Math.max(0,Math.floor(Number(points)||0)),limit),slots=limit/10;
-  const halfHeight=slots*28+8,height=halfHeight*2,lines=[];
-  for(let group=0;group<Math.ceil(n/5);group++){
-    const x=5,y=5+(group%slots)*28+(group>=slots?halfHeight:0),size=Math.min(5,n-group*5),d=20;
-    const sides=[[x,y,x,y+d],[x,y+d,x+d,y+d],[x+d,y+d,x+d,y],[x+d,y,x,y],[x,y+d,x+d,y]];
-    lines.push(...sides.slice(0,size).map(([a,b,c,d])=>`<line x1="${a}" y1="${b}" x2="${c}" y2="${d}"/>`));
-  }
-  return `<svg class="compact-score-sticks" viewBox="0 0 30 ${height}" preserveAspectRatio="xMidYMin meet" role="img" aria-label="${n} puntos de ${limit}"><line x1="0" y1="${halfHeight}" x2="30" y2="${halfHeight}" stroke="#efebd7" stroke-opacity=".4"/><g fill="none" stroke="#f0eee2" stroke-width="2.5" stroke-linecap="round">${lines.join('')}</g></svg>`;
 }
 function renderTally(points,target){
   const limit=normalizeTargetPoints(target),n=Math.min(Math.max(0,Math.floor(Number(points)||0)),limit);

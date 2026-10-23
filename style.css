@@ -2079,3 +2079,4 @@ input,textarea,[contenteditable=""],[contenteditable="true"]{-webkit-user-select
 .learning-answers strong{display:grid;place-items:center;min-height:34px;padding:5px 8px;border:1px solid #e8c983aa;border-radius:8px;color:#f7f3e9;font-size:11.5px;font-weight:700;letter-spacing:.03em;line-height:1.15;text-align:center}
 .learning-answers li:first-child strong{border-color:#e8c983;background:#e8c983;color:#15251b}
 .learning-answers span{color:#e0e7dc;font-size:14px;line-height:1.35}
+.auth-tagline{margin:-6px 0 4px;color:#cfd8cc;font-size:15px;line-height:1.45}

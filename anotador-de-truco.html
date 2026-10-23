@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#10291f">
+  <title>Anotador de truco online gratis — Truco Uruguayo</title>
+  <meta name="description" content="Anotador para jugar al truco con cartas reales: anotá los puntos con palitos a 10, 20, 30 o 40, sin descargar nada y sin que se apague la pantalla.">
+  <link rel="canonical" href="https://trucouruguayo.uy/anotador-de-truco.html">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Truco Uruguayo">
+  <meta property="og:title" content="Anotador para jugar al truco">
+  <meta property="og:description" content="Anotá los puntos del truco con palitos, gratis y desde el celular.">
+  <meta property="og:url" content="https://trucouruguayo.uy/anotador-de-truco.html">
+  <meta property="og:image" content="https://trucouruguayo.uy/assets/og-truco-uruguayo.png">
+  <meta property="og:locale" content="es_UY">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" href="./favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./legal.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebApplication","name":"Anotador de truco","url":"https://trucouruguayo.uy/anotador-de-truco.html","applicationCategory":"GameApplication","operatingSystem":"Web","inLanguage":"es","offers":{"@type":"Offer","price":"0","priceCurrency":"UYU"},"isPartOf":{"@type":"WebSite","name":"Truco Uruguayo","url":"https://trucouruguayo.uy/"}}</script>
+  <style>
+    .scorer{margin:24px 0;padding:16px;border:1px solid var(--line);border-radius:16px;background:#ffffff08}
+    .scorer [hidden]{display:none!important}
+    .scorer-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
+    .scorer-head h2{margin:0;font-size:19px;color:var(--gold)}
+    .scorer button{font:inherit;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+    .scorer-secondary{min-height:44px;padding:0 16px;border:1px solid #e4c77f88;border-radius:12px;background:transparent;color:var(--ink);font-weight:600}
+    #scorer-status{margin:12px 0;text-align:center;color:var(--gold);font-size:18px;font-weight:600}
+    .scorer-targets{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px}
+    .scorer-targets button{min-height:72px;border:1px solid #e4c77f88;border-radius:14px;background:#ffffff08;color:var(--ink);font-size:26px;font-weight:700}
+    #scorer-board{grid-template-columns:1fr 1fr;gap:16px;height:min(64vh,560px);position:relative}
+    #scorer-board:not([hidden]){display:grid}
+    #scorer-board::after{content:"";position:absolute;left:50%;top:0;bottom:0;width:1px;background:var(--line)}
+    .scorer-team{display:flex;flex-direction:column;gap:10px;min-height:0}
+    .scorer-add{flex:1;min-height:0;display:flex;flex-direction:column;align-items:center;gap:6px;padding:8px;border:0;border-radius:16px;background:transparent;color:var(--ink)}
+    .scorer-add:active{background:#e4c77f1f}.scorer-add:disabled{cursor:default}
+    .scorer-winner{background:#e4c77f1a}
+    .scorer-team-name{font-size:clamp(22px,6vw,32px);font-weight:600}
+    .scorer-tally{position:relative;flex:1;width:100%;min-height:0}
+    .scorer-tally svg{position:absolute;inset:0;width:100%;height:100%}
+    .scorer-minus{min-height:48px;border:1px solid #e4c77f88;border-radius:12px;background:transparent;color:var(--ink);font-size:16px}
+    .scorer-minus:disabled{opacity:.35;cursor:default}
+    .cta{display:inline-block;margin-top:6px;padding:12px 20px;border-radius:12px;background:var(--gold);color:#15251b;font-weight:700;text-decoration:none}
+  </style>
+</head>
+<body><main class="page">
+  <header class="top"><a class="brand" href="./">Truco Uruguayo</a><nav aria-label="Páginas"><a href="./">Jugar online</a><a href="./aprender-truco-uruguayo.html">Cómo jugar</a></nav></header>
+  <p class="eyebrow">Gratis y sin descargar nada</p>
+  <h1>Anotador para jugar al truco</h1>
+  <p>¿Juegan con cartas de verdad? Usá este anotador de truco desde el celular: tocá el lado de cada equipo para sumar un punto y se dibujan los palitos, de a cinco, como en la mesa. La pantalla no se apaga mientras lo tenés abierto y el tanteador se guarda aunque cierres la página.</p>
+
+  <section class="scorer scorer-view active" id="scorer-view" aria-label="Anotador">
+    <div class="scorer-head"><h2>Anotador</h2><button class="scorer-secondary" id="scorer-new" type="button" hidden>Nueva partida</button></div>
+    <p id="scorer-status" role="status" aria-live="polite"></p>
+    <div id="scorer-setup"><div class="scorer-targets"><button type="button" data-scorer-target="10">10</button><button type="button" data-scorer-target="20">20</button><button type="button" data-scorer-target="30">30</button><button type="button" data-scorer-target="40">40</button><button type="button" data-scorer-target="50">50</button><button type="button" data-scorer-target="60">60</button></div></div>
+    <div id="scorer-board" hidden>
+      <div class="scorer-team"><button class="scorer-add" id="scorer-add-0" type="button" aria-label="Sumar un punto a Nosotros"><span class="scorer-team-name">Nosotros</span><span class="scorer-tally" id="scorer-tally-0"></span></button><button class="scorer-minus" id="scorer-minus-0" type="button" aria-label="Restar un punto a Nosotros">− Restar</button></div>
+      <div class="scorer-team"><button class="scorer-add" id="scorer-add-1" type="button" aria-label="Sumar un punto a Ellos"><span class="scorer-team-name">Ellos</span><span class="scorer-tally" id="scorer-tally-1"></span></button><button class="scorer-minus" id="scorer-minus-1" type="button" aria-label="Restar un punto a Ellos">− Restar</button></div>
+    </div>
+  </section>
+
+  <section class="card"><h2>Cómo se usa</h2><ul>
+    <li>Elegí a cuántos puntos juegan. Lo más común en el truco uruguayo es a 30.</li>
+    <li>Tocá la columna de <strong>Nosotros</strong> o de <strong>Ellos</strong> para sumar un punto. Cada cinco puntos se cierra un cuadrado con su diagonal.</li>
+    <li>Si te equivocaste, tocá <strong>Restar</strong>.</li>
+    <li>La línea del medio marca la mitad de la partida: las <em>malas</em> y las <em>buenas</em>.</li>
+    <li>Cuando un equipo llega al total, el anotador muestra quién ganó. Tocá <strong>Nueva partida</strong> para empezar otra.</li>
+  </ul></section>
+
+  <section class="card"><h2>¿No tienen cartas a mano?</h2><p>Jugá al truco uruguayo online, gratis y sin anuncios, de a dos o de a cuatro con amigos, o practicá contra el bot.</p><a class="cta" href="./">Jugar truco online</a></section>
+  <section class="card"><h2>¿Recién empezás?</h2><p>Aprendé las cartas, la muestra, el envido, la flor y el truco paso a paso en <a href="./aprender-truco-uruguayo.html">cómo jugar al truco uruguayo</a>.</p></section>
+
+  <footer class="footer">Truco Uruguayo · <a href="./reglas.html">Reglas</a> · <a href="./privacidad.html">Privacidad</a> · <a href="./soporte.html">Soporte</a></footer>
+</main>
+<script type="module">
+  import {installScorer} from './scorer.js?v=20261023-seo1';
+  installScorer({document,showView(){},standalone:true});
+</script>
+</body></html>
