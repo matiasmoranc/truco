@@ -3033,7 +3033,6 @@ function localPlay(card,launchOrigin=null) {
   if(state.room.trickCards.length===2){
     const first=state.room.trickCards[0],second=state.room.trickCards[1],winner=cardStrength(first.card,state.room.muestra)===cardStrength(second.card,state.room.muestra)?null:(cardStrength(first.card,state.room.muestra)>cardStrength(second.card,state.room.muestra)?first.playerId:second.playerId);
     state.room.tricks=[...(state.room.tricks||[]),{winner,played:[...state.room.trickCards]}];
-    queueLearningRoundResult(winner,state.room.trickCards);
     const handWinner=settleHand(state.room.tricks,state.room);
     if(winner)state.room.feed.unshift({text:`${state.room.players[winner].name} se lleva la ronda.`,time:Date.now()});
     state.room.resolvingTrick=true;state.room.resolutionId=crypto.randomUUID();state.room.resolutionEndsAt=gameTime()+3000;state.room.resolvedTrickWinner=winner;state.room.handComplete=!!handWinner;
@@ -3276,6 +3275,26 @@ function createPlayedCard(card,playerId){
   node.dataset.playedKey=playerId+':'+card.id;
   return node;
 }
+// Practice: while a round result shows, the winning card is framed and labelled (a tie frames both).
+function trickWinnerMark(room,playerId){
+  const learning=state.learning;
+  if(!learning||learning.whoWins===false||!room?.resolvingTrick||(room.trickCards||[]).length!==2)return {framed:false,label:''};
+  const winner=room.resolvedTrickWinner;
+  if(!winner)return {framed:true,label:playerId===state.playerId?'Empate':''};
+  if(playerId!==winner)return {framed:false,label:''};
+  return {framed:true,label:winner===state.playerId?'Gana vos':'Gana el rival'};
+}
+function markTrickWinner(room,container){
+  if(state.botActing||!state.learning)return;
+  for(const node of container.children){
+    const {framed,label}=trickWinnerMark(room,node.dataset.playedKey?.split(':')[0]);
+    node.classList.toggle('trick-winner',framed);
+    let tag=node.querySelector('.trick-winner-label');
+    if(!label){tag?.remove();continue;}
+    if(!tag){tag=document.createElement('span');tag.className='trick-winner-label';node.append(tag);}
+    tag.textContent=label;
+  }
+}
 function renderPlayedCards(room){
   const container=$('trick-cards'),cards=room.trickCards||[];
   const scope=[state.roomCode,state.playerId,room.matchNumber||1,room.handNumber].join(':');
@@ -3297,6 +3316,7 @@ function renderPlayedCards(room){
     node.style.visibility=(flying&&activeCardFlight)||opponentFlights.has(key)?'hidden':'';
   }
   for(const node of existing.values())node.remove();
+  markTrickWinner(room,container);
   opponentPlaySnapshot={scope,keys:publicKeys};
 }
 function animatePlayedHandCard(card,origin=null){
@@ -3817,13 +3837,6 @@ function queueLearningTrucoReminder(){
   learning.trucoReminderPending=false;learning.trucoReminderShown=true;
   learning.tutorialMessages??=[];
   learning.tutorialMessages.push({title:'Podés gritar TRUCO',pointAtTruco:true,text:'Si tocás TRUCO, podés aumentar los puntos en juego. Sin truco se juega por 1 punto. Con truco se juega por 2 puntos. El rival tiene que aceptar; si no acepta, ganás 1 punto.'});
-}
-function queueLearningRoundResult(winner,played){
-  const learning=state.learning;
-  if(!learning||learning.whoWins===false||played.length!==2)return;
-  const won=winner==='player1';
-  const message={title:winner?(won?'Mataste':'Te mató'):'Empataron',text:winner?(won?'Tu carta es más alta que la del rival.':'Su carta es más alta que la tuya.'):'Las dos cartas tienen el mismo poder.',roundCards:structuredClone(played)};
-  (learning.roundMessages??=[]).push(message);
 }
 function setLearningWhoWins(enabled){
   if(!state.learning)return;

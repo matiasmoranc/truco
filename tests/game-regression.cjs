@@ -11,7 +11,7 @@ function extract(name){
  for(;depth&&end<source.length;end++){if(source[end]==='{')depth++;else if(source[end]==='}')depth--;}
  return source.slice(start,end);
 }
-const names=['roomTransportConnected','liveSnapshot','envidoAuditResult','settleAuditedHand','auditEnvidoScores','queueLearningRoundResult','canRaiseEnvido','closeFinishedRoomChanges','pieceOrder','cardStrength','envidoValue','hasFlor','handEnvido','florValue','normalizeTargetPoints','targetPoints','capScores','faltanParaGanar','faltaEnvidoPoints','envidoBetPoints','florBetPoints','declinedFlorPoints','florAnswers','otherPlayer','settleHand','topFeed','matchWinner','matchFinished','sessionMatchResults','sessionWins','rematchRoom','rematchChanges','botDeck','botHandOutcome','rememberBotCards','botRiskAdjustment','assessBotHand','chooseBotDecision','disconnectedPlayer','disconnectMatchChanges','turnClockPlayer','turnClockRemaining','turnTimeoutChanges','declinedTrucoChanges','liveActionsBlocked','runLiveAction','privateHandMatchesRoom','roomHasFlor','canCallFirstRoundEnvido','enqueueLearningHelp','rememberLearningHelp','learningHelpTopic','localHand','localFeed','localCallAction','localAnswerAction','localPlay'];
+const names=['roomTransportConnected','liveSnapshot','envidoAuditResult','settleAuditedHand','auditEnvidoScores','trickWinnerMark','canRaiseEnvido','closeFinishedRoomChanges','pieceOrder','cardStrength','envidoValue','hasFlor','handEnvido','florValue','normalizeTargetPoints','targetPoints','capScores','faltanParaGanar','faltaEnvidoPoints','envidoBetPoints','florBetPoints','declinedFlorPoints','florAnswers','otherPlayer','settleHand','topFeed','matchWinner','matchFinished','sessionMatchResults','sessionWins','rematchRoom','rematchChanges','botDeck','botHandOutcome','rememberBotCards','botRiskAdjustment','assessBotHand','chooseBotDecision','disconnectedPlayer','disconnectMatchChanges','turnClockPlayer','turnClockRemaining','turnTimeoutChanges','declinedTrucoChanges','liveActionsBlocked','runLiveAction','privateHandMatchesRoom','roomHasFlor','canCallFirstRoundEnvido','enqueueLearningHelp','rememberLearningHelp','learningHelpTopic','localHand','localFeed','localCallAction','localAnswerAction','localPlay'];
 function harness(){
  const context={account:{isReady:()=>true},console,Math:Object.create(Math),Date,crypto:require('node:crypto').webcrypto,structuredClone,Set,Map,navigator:{onLine:true},state:{},localStorage:{setItem(){}},learningSeen:new Set(),VALID_TARGET_POINTS:[10,20,30,40,50,60],RECONNECT_GRACE_MS:45000,gameTime:()=>100000,newOpeningDraw:()=>({cards:{}}),makeCallNotice:text=>({text}),renderGame(){},renderConnectionNotice(){},syncLiveControls(){},touchFeedback(){},toast(){},firebaseError:String,queueLearningAction(){},queueLearningTrucoCall(){},turnClockKey:()=>null,pauseMessage:()=>null,animatePlayedHandCard(){},shakeTurnBadge(){},scheduleLocalNextHand(){},scheduleLocalTransition(room,fn){context.transition=fn;},localFinishHand(winner,points){context.finished={winner,points};},localScore(player,points){context.state.room.scores[player]=Math.min(20,context.state.room.scores[player]+points);},localResolveFlor(){},revealEnvido(){}};
  vm.createContext(context);vm.runInContext(names.map(extract).join('\n'),context);return context;
@@ -94,22 +94,18 @@ test('Closing a finished result closes the shared room, but cannot close a new r
 });
 
 
-test('Practice round help reports win, loss and tie in either play order and can be disabled independently',()=>{
- for(const first of ['player1','player2']){
-  for(const winner of ['player1','player2',null]){
-   const c=harness(),played=[{playerId:first,card:card('♠',1)},{playerId:first==='player1'?'player2':'player1',card:card('♥',3)}];
-   c.state.learning={hints:false,pointsInfo:false,whoWins:true};
-   c.queueLearningRoundResult(winner,played);
-   const message=c.state.learning.roundMessages[0];
-   assert.equal(message.title,winner==='player1'?'Mataste':winner==='player2'?'Te mató':'Empataron');
-   assert.equal(message.roundCards.length,2);assert.notEqual(message.roundCards,played);
-   assert.equal(message.roundCards[0].playerId,first);
-   c.state.learning.whoWins=false;c.queueLearningRoundResult(winner,played);
-   assert.equal(c.state.learning.roundMessages.length,1);
-   assert.equal(c.state.learning.hints,false);assert.equal(c.state.learning.pointsInfo,false);
-  }
+test('Practice frames the winning card with who won beside it, both cards on a tie, and can be disabled',()=>{
+ const played=[{playerId:'player2',card:card('♠',1)},{playerId:'player1',card:card('♥',3)}];
+ for(const [winner,own,rival] of [['player1','Gana vos',''],['player2','','Gana el rival'],[null,'Empate','']]){
+  const c=harness();c.state.playerId='player1';c.state.learning={whoWins:true};
+  const r={resolvingTrick:true,resolvedTrickWinner:winner,trickCards:played};
+  const mine=c.trickWinnerMark(r,'player1'),theirs=c.trickWinnerMark(r,'player2');
+  assert.equal(mine.label,own);assert.equal(theirs.label,rival);
+  assert.equal(mine.framed,winner!=='player2');assert.equal(theirs.framed,winner!=='player1');
+  c.state.learning.whoWins=false;assert.equal(c.trickWinnerMark(r,'player1').framed,false);
+  c.state.learning.whoWins=true;assert.equal(c.trickWinnerMark({...r,resolvingTrick:false},winner||'player1').framed,false);
  }
- const c=harness();c.queueLearningRoundResult('player1',[]);assert.equal(c.state.learning,undefined);
+ const c=harness();assert.equal(c.trickWinnerMark({resolvingTrick:true,resolvedTrickWinner:'player1',trickCards:played},'player1').framed,false);
 });
 
 test('First incorrect declaration is determined by order, including mano player2 and old hands',()=>{
