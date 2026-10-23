@@ -25,7 +25,7 @@ export function createTableEngine({code,bank,clock=()=>Date.now()}){
  // The bot seat the table is waiting for, if any.
  const botSeat=()=>m?.status==='reserved'&&m.session?Object.keys(m.players||{}).find(p=>m.players[p]?.bot&&mustAct(m.session,p))||null:null;
  // When the bot moves: after a short pause, or, if its human partner may signal
- // it, once the signal arrives or 10 s after its turn started.
+ // it, once the signal arrives or 12 s after its turn started.
  function scheduleBot(){
   const seat=botSeat();if(!seat){botDueAt=null;botKey=null;return;}
   const r=m.session.room,signal=signalFor(r,seat),key=[seat,r.turnClock?.key||'',signal||''].join('|');

@@ -327,3 +327,11 @@ test('Team tables show the pause countdown while flowers, envidos and tricks are
  const branch=source.slice(source.indexOf("if(state.room.mode==='2v2'){syncPrivateHand();"));
  assert.ok(branch.slice(0,branch.indexOf('return;}')).includes('renderRoundPauseTimer()'));
 });
+test('A bot partner is shown as CompaBot to its teammates and as Bot to the rivals',()=>{
+ const src=fs.readFileSync(path.join(__dirname,'../team-table-ui.js'),'utf8');
+ const line=key=>{const i=src.indexOf(key);return src.slice(i,src.indexOf(String.fromCharCode(10),i)).replace('export ','');};
+ const seatName=new Function(line('export const playerTeam=')+';'+line('export function seatName')+';return seatName;')();
+ const room={players:{player1:{name:'Ana'},player2:{name:'Bot',bot:true},player3:{name:'Bot',bot:true},player4:{name:'Luis'}}};
+ assert.equal(seatName(room,'player3','player1'),'CompaBot');assert.equal(seatName(room,'player2','player1'),'Bot');assert.equal(seatName(room,'player1','player1'),'Ana');
+ assert.ok(src.includes("value!=='grita'||hasWord"));
+});

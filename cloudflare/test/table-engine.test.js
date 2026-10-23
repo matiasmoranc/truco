@@ -245,7 +245,7 @@ test('Two people against two bots: only the people pay and collect',async()=>{
  assert.equal(bank.economy.wallets.a.locked+bank.economy.wallets.b.locked,0);
 });
 
-test('A bot partner waits up to 10 s for the pie\'s signal, obeys "vení" and otherwise plays on its own',async()=>{
+test('A bot partner waits up to 12 s for the pie\'s signal, obeys "vení" and otherwise plays on its own',async()=>{
  let obeyed=false,waited=false;
  // The bot partner must open a trick for its team, which a match may never deal: play new matches until both cases show up.
  for(let attempt=0;attempt<6&&!(obeyed&&waited);attempt++){
@@ -256,8 +256,8 @@ test('A bot partner waits up to 10 s for the pie\'s signal, obeys "vení" and ot
   const m=engine.match,s=m.session,r=s.room;
   if(teamBot.awaitsSignal(s,'player3')&&!teamBot.signalFor(r,'player3')){
    const played=r.playedBy?.player3||0,start=r.turnClock.startedAt;
-   advance(start+9000-now());await engine.tick();
-   assert.equal(engine.match.session.room.playedBy?.player3||0,played,'the bot played before 10 s');
+   advance(start+teamBot.SIGNAL_WAIT_MS-1000-now());await engine.tick();
+   assert.equal(engine.match.session.room.playedBy?.player3||0,played,'the bot played before 12 s');
    if(!obeyed){
     const lowest=[...s.hands.player3].sort((x,y)=>teamReferee.strength(x,r.muestra)-teamReferee.strength(y,r.muestra))[0];
     await engine.act('a',{command:{kind:'team-signal',value:'veni'},requestId:'v'+i,expectedMatchId:m.id});
@@ -266,7 +266,7 @@ test('A bot partner waits up to 10 s for the pie\'s signal, obeys "vení" and ot
     if((after.playedBy?.player3||0)>played){assert.equal(after.trickCards.find(c=>c.playerId==='player3')?.card.id??after.tricks.at(-1).cards.find(c=>c.playerId==='player3').card.id,lowest.id);obeyed=true;}
    }else{
     const waiting=JSON.stringify(engine.match.session);advance(1100);await engine.tick();
-    assert.notEqual(JSON.stringify(engine.match.session),waiting,'the bot did not move after 10 s');
+    assert.notEqual(JSON.stringify(engine.match.session),waiting,'the bot did not move after 12 s');
     waited=true;
    }
    continue;

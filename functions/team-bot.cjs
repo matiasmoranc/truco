@@ -144,7 +144,7 @@ function mustAct(s,p){
 }
 
 // A bot that plays first for its team waits this long for its partner's signal.
-const SIGNAL_WAIT_MS=10000;
+const SIGNAL_WAIT_MS=12000;
 // Whether the bot's partner (the pie) is a person who can signal it now: vení, jugá or gritá.
 function awaitsSignal(s,p){
  const r=s?.room;if(!mustAct(s,p)||r.pendingBet)return false;
@@ -168,21 +168,20 @@ function obeyedCards(s,p,signal){
 
 // Commands for the bot in `seat`, best first; the table tries them in order, so
 // a rule the bot misjudged falls back to the next legal move. [] = not its move.
-const BLUFF=0.12;
+const BLUFF=0.15;
 function botCommands(s,p,random=Math.random){
  if(!mustAct(s,p))return [];
  const r=s.room,b=r.pendingBet;
  if(b?.revealMode)return declarations(s,p);
  if(b)return owesFlor(s,p)&&b.type!=='flor'?[call('flor'),...answers(s,p,random)]:answers(s,p,random);
  const moves=owesFlor(s,p)?[call('flor')]:[],tantos=teamTantos(s,p);
- // Now and then (about one hand in eight) the pie bluffs an envido with few points.
+ // Now and then (about 15% of the time) the pie bluffs an envido with few points.
  if(canOpenEnvido(r,p)&&isPie(r,p)&&(tantos>=27||tantos<23&&random()<BLUFF))moves.push(call(tantos>=31?'real':'envido'));
  const signal=signalFor(r,p),next=r.trucoLevel+1,trucoOpen=next<=4&&r.lastTrucoTeam!==team(p),truco=call({2:'truco',3:'retruco',4:'vale4'}[next]);
  if(signal==='veni'||signal==='juga')return [...moves,...obeyedCards(s,p,signal).map(card=>({kind:'play',cardId:card.id}))];
  const ranked=rankedCards(s,p,random),chance=ranked[0]?.chance??0;
- // Shout once the team has won a round; before that only with a near-sure hand, or as an occasional bluff.
- const wonRound=(r.tricks||[]).some(t=>t.winner===team(p));
- if(trucoOpen&&(signal==='grita'||chance>=(wonRound?({2:0.66,3:0.74,4:0.8})[next]:0.92)||next===2&&chance<0.3&&random()<BLUFF))moves.push(truco);
+ // Never shout in the first round (unless the partner says gritá); later, when the cards look like winning, or as an occasional bluff.
+ if(trucoOpen&&(signal==='grita'||r.trickNo>1&&(chance>=({2:0.66,3:0.74,4:0.8})[next]||next===2&&chance<0.3&&random()<BLUFF)))moves.push(truco);
  return [...moves,...ranked.map(({card})=>({kind:'play',cardId:card.id}))];
 }
 

@@ -121,12 +121,15 @@ function opening(){
  s.hands.player1=[tcard('♥',4),tcard('♣',5),tcard('♠',6)];s.originals=structuredClone(s.hands);
  return {s,r};
 }
-test('Bots wait to shout truco until their team won a round, and bluff only now and then',()=>{
+test('Bots never shout truco in the first round; later they shout with good cards or bluff now and then',()=>{
  const {s,r}=opening();s.truth={player1:5,player2:5,player3:5,player4:5};r.envidoClosed=true;
  const calls=random=>botCommands(s,'player1',random).filter(c=>c.kind==='call').map(c=>c.value);
+ assert.ok(!calls(()=>0.05).includes('truco'),'no truco in the first round, not even as a bluff');
+ r.trickNo=2;r.tricks=[{winner:'player2'}];
  assert.ok(!calls(()=>0.99).includes('truco'),'a weak hand does not shout without a bluff');
- assert.ok(calls(()=>0.05).includes('truco'),'a weak hand can bluff');
+ assert.ok(calls(()=>0.05).includes('truco'),'from the second round a weak hand can bluff');
  s.hands.player1=[tcard('♦',2),tcard('♦',4),tcard('♠',1)];s.originals.player1=s.hands.player1;
+ r.trickNo=1;r.tricks=[];assert.ok(!calls(()=>0.99).includes('truco'),'a strong hand also waits for the second round');
  r.tricks=[{winner:'player1'}];r.trickNo=2;
  assert.ok(calls(()=>0.99).includes('truco'),'after winning a round a strong hand shouts');
 });

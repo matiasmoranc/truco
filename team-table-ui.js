@@ -13,6 +13,8 @@ export function visibleTeamNotice(notice,room,now){return !!notice&&notice.handN
 export const TEAM_SEATS=['player1','player2','player3','player4'];
 const FLOR_ICON=globalThis.document?.getElementById('opponent-flor')?.innerHTML||'';
 export const playerTeam=p=>['player1','player3'].includes(p)?'player1':'player2';
+// A bot on the viewer's team is shown as CompaBot; to the other team it stays a plain rival.
+export function seatName(room,seat,viewer){const person=room?.players?.[seat];return person?.bot&&viewer&&seat!==viewer&&playerTeam(seat)===playerTeam(viewer)?'CompaBot':person?.name;}
 export function teamSeatsFor(viewer){const i=TEAM_SEATS.indexOf(viewer);return [0,1,2,3].map(n=>TEAM_SEATS[(i+n)%4]);}
 export function dealerPosition(dealer,viewer,teams=false){
  return teams?['self','right','partner','left'][teamSeatsFor(viewer).indexOf(dealer)]:(dealer===viewer?'self':'partner');
@@ -80,9 +82,9 @@ export function installTeamTable({$,getState,command,runAction,renderPlayerHand,
  const safe=escapeHtml;
  const ensure=(id,tag,parent,cls)=>{let el=$(id);if(!el){el=document.createElement(tag);el.id=id;el.className=cls;parent.append(el);}return el;};
  const send=(button,c)=>runAction(button,()=>command(c));
- // A bot partner waits up to 10 s for the pie's signal (vení, jugá, gritá): a yellow
+ // A bot partner waits up to 12 s for the pie's signal (vení, jugá, gritá): a yellow
  // disc beside my cards empties clockwise from its top radius. startedAt null hides it.
- const SIGNAL_WAIT_MS=10000,SIGNAL_TIMER_SIZE=36;let signalTimerHide=null;
+ const SIGNAL_WAIT_MS=12000,SIGNAL_TIMER_SIZE=36;let signalTimerHide=null;
  function renderSignalTimer(startedAt){
   const timer=ensure('signal-timer','div',$('felt-area'),'signal-timer hidden');
   const left=Number.isFinite(startedAt)?SIGNAL_WAIT_MS-(gameTime()-startedAt):0;
@@ -95,7 +97,7 @@ export function installTeamTable({$,getState,command,runAction,renderPlayerHand,
   signalTimerHide=setTimeout(()=>timer.classList.add('hidden'),left);
  }
  function renderEnd(){const s=getState(),r=s.room;if(r?.mode!=='2v2')return;const visible=r.status==='complete'&&r.endReveal?.done;$('match-end').classList.toggle('hidden',!visible);if(!visible)return;
-  const names=t=>TEAM_SEATS.filter(p=>playerTeam(p)===t).map(p=>r.players[p].name).join(' + '),won=r.matchResult.winner;
+  const names=t=>TEAM_SEATS.filter(p=>playerTeam(p)===t).map(p=>seatName(r,p,s.playerId)).join(' + '),won=r.matchResult.winner;
   $('match-end-title').textContent=playerTeam(s.playerId)===won?'¡Ganó tu equipo!':'Ganó el equipo rival';
   $('match-end-score').innerHTML=['player1','player2'].map(t=>`<div class="${won===t?'match-score-winner':''}"><strong>${r.scores[t]}</strong><span>${safe(names(t))}</span></div>`).join('<b>–</b>');
   $('match-session-score').textContent=r.creditResult?'Cada ganador recibe '+r.creditResult.payout+' créditos.':'Confirmando los créditos…';$('match-session-score').classList.remove('hidden');
@@ -126,8 +128,8 @@ export function installTeamTable({$,getState,command,runAction,renderPlayerHand,
    const backs=i===0?'':i===2?`<button class="team-backs team-partner-cards" type="button" aria-label="Ver cartas del compañero durante 3 segundos" aria-pressed="${faceUp}" ${count?'':'disabled'}>${fan}</button>`:`<div class="team-backs">${fan}</div>`;
    const status=r.folded?.[q]?'AL MAZO':'';
    // Everyone who sang flor shows it beside their cards, you and your partner included.
-   const flor=r.status==='started'&&r.flors?.[q]!=null?`<span class="team-flor flor-badge" role="img" aria-label="${safe(person?.name||'Jugador')} cantó flor">${FLOR_ICON}</span>`:'';
-   el.innerHTML=`${i===0?(status?`<span class="team-self-status">${status}</span>`:''):`<span class="team-player-name">${safe(person?.name||'Jugador')}${status?`<small>${status}</small>`:''}</span>`}${backs}${flor}<div class="team-speech hidden"></div>`;
+   const flor=r.status==='started'&&r.flors?.[q]!=null?`<span class="team-flor flor-badge" role="img" aria-label="${safe(seatName(r,q,p)||'Jugador')} cantó flor">${FLOR_ICON}</span>`:'';
+   el.innerHTML=`${i===0?(status?`<span class="team-self-status">${status}</span>`:''):`<span class="team-player-name">${safe(seatName(r,q,p)||'Jugador')}${status?`<small>${status}</small>`:''}</span>`}${backs}${flor}<div class="team-speech hidden"></div>`;
    if(i===2&&flip&&!matchMedia('(prefers-reduced-motion: reduce)').matches)for(const card of el.querySelectorAll('.team-backs>i'))card.animate([{rotate:'y 90deg',opacity:.3,scale:'.94'},{rotate:'y 0deg',opacity:1,scale:'1'}],{duration:280,easing:'ease-out'});
    if(i===2)el.querySelector('.team-partner-cards').onclick=()=>{showPartner();render();};
   }
@@ -148,7 +150,7 @@ export function installTeamTable({$,getState,command,runAction,renderPlayerHand,
     if(same&&!known.has(key)&&!matchMedia('(prefers-reduced-motion: reduce)').matches){const launched=item.playerId===p&&s.teamPlayOrigin?.cardId===item.card.id?s.teamPlayOrigin.rect:null;if(launched)s.teamPlayOrigin=null;const origin=item.playerId===p?$('hand'):$('team-seat-'+item.playerId),a=launched||origin.getBoundingClientRect(),b=el.getBoundingClientRect();el.animate([{translate:`${a.left+a.width/2-b.left-b.width/2}px ${a.top+a.height/2-b.top-b.height/2}px`,opacity:.5},{translate:'0 0',opacity:1}],{duration:500,easing:'cubic-bezier(.22,.61,.36,1)'});}}
    old.delete(key);
   }for(const el of old.values())el.remove();known=keys;scope=nextScope;
-  const evidence=$('end-hand-reveal'),groups=r.endReveal?.groups||[];evidence.classList.toggle('hidden',!groups.length||!['revealing','complete'].includes(r.status)||r.endReveal.done);if(!evidence.classList.contains('hidden'))evidence.innerHTML=groups.map(g=>`<section><strong>${safe(g.name)} · ${safe(g.label)}</strong><div>${g.cards.map(c=>`<i class="sprite-card" style="${cardImageStyle(c)}"></i>`).join('')}</div></section>`).join('');
+  const evidence=$('end-hand-reveal'),groups=r.endReveal?.groups||[];evidence.classList.toggle('hidden',!groups.length||!['revealing','complete'].includes(r.status)||r.endReveal.done);if(!evidence.classList.contains('hidden'))evidence.innerHTML=groups.map(g=>`<section><strong>${safe(seatName(r,g.player,s.playerId)||g.name)} · ${safe(g.label)}</strong><div>${g.cards.map(c=>`<i class="sprite-card" style="${cardImageStyle(c)}"></i>`).join('')}</div></section>`).join('');
   const picker=$('envido-picker'),declaring=playing&&pending?.revealMode&&pending.revealTurn===p;picker.classList.toggle('hidden',!declaring);if(declaring){const key=pending.id+':'+p;if(declareKey!==key){declareKey=key;const flower=pending.type==='flor',start=flower&&s.hand.length===3?florPoints(s.hand,r.muestra):0;const best=Math.max(-1,...Object.values(pending.reveals||{})),max=flower?47:37;
    // The first to declare must say a number; after that, "paso" when my partner leads, otherwise "son buenas".
    const good=best<0?'':'<button class="pass-button" id="team-good">'+(teamLeadsDeclaration(pending,mineTeam)?'PASO':'SON BUENAS')+'</button>';
@@ -167,7 +169,9 @@ export function installTeamTable({$,getState,command,runAction,renderPlayerHand,
   if(signalButtons){
    // With a single card left there is nothing low to throw: only jugá or gritá make sense.
    const lastCard=(r.handCounts?.[r.turn]??3)<=1;
-   for(const [value,label] of [['veni','Vení'],['juga','Jugá'],['grita','Gritá']].filter(([value])=>!(lastCard&&value==='veni')))buttons.push('<button class="pass-button team-signal-button" data-team-signal="'+value+'">'+label+'</button>');
+   // Gritá only while our team has the word: it may call truco, retruco or vale cuatro.
+   const hasWord=r.trucoLevel<4&&r.lastTrucoTeam!==mineTeam;
+   for(const [value,label] of [['veni','Vení'],['juga','Jugá'],['grita','Gritá']].filter(([value])=>!(lastCard&&value==='veni')&&(value!=='grita'||hasWord)))buttons.push('<button class="pass-button team-signal-button" data-team-signal="'+value+'">'+label+'</button>');
   }
   const signaled=r.teamSignal?.to===r.turn&&r.teamSignal.handNumber===r.handNumber&&r.teamSignal.trickNo===r.trickNo;
   renderSignalTimer(signalButtons&&r.players[r.turn]?.bot&&!signaled?r.turnClock?.startedAt:null);
@@ -189,6 +193,6 @@ export function renderWaitingSeats(room,viewer,safe){
  // Only the creator can fill an empty seat of a team table with a bot.
  const botButtons=teams&&me==='player1'&&room.status==='waiting';
  return seats.map((key,i)=>{const player=players[key],team=playerTeam(key)==='player1'?'1':'2';
-  return '<div class="waiting-player waiting-player-'+positions[i]+' '+(player?'occupied':'empty')+(player?.bot?' bot':'')+'"><span class="waiting-player-name">'+safe(player?.name||'Lugar disponible')+'</span>'+'<div class="waiting-player-cards" aria-hidden="true">'+(player?[-1,0,1].map(n=>'<span class="opponent-card-back" style="--fan-index:'+n+'"></span>').join(''):'<span class="waiting-empty-place">+</span>')+'</div>'+(!player&&botButtons?'<button type="button" class="waiting-bot-button" data-add-bot="'+key+'">Usar bot</button>':'')+'</div>';
+  return '<div class="waiting-player waiting-player-'+positions[i]+' '+(player?'occupied':'empty')+(player?.bot?' bot':'')+'"><span class="waiting-player-name">'+safe((player&&seatName(room,key,me))||'Lugar disponible')+'</span>'+'<div class="waiting-player-cards" aria-hidden="true">'+(player?[-1,0,1].map(n=>'<span class="opponent-card-back" style="--fan-index:'+n+'"></span>').join(''):'<span class="waiting-empty-place">+</span>')+'</div>'+(!player&&botButtons?'<button type="button" class="waiting-bot-button" data-add-bot="'+key+'">Usar bot</button>':'')+'</div>';
  }).join('');
 }

@@ -167,6 +167,7 @@ function createTeamReferee(s,{now=Date.now(),deckFactory=deck}={}){
   const leader=r.mano;
   const mates=ordered(leader).filter(q=>team(q)===team(p)&&active(q));
   if(!labels[value]||r.pendingBet||mates.length!==2||mates.at(-1)!==p||r.turn!==mates[0])throw new Error('Solo el pie puede indicar cuando juega su compañero.');
+  if(value==='grita'&&(r.trucoLevel>=4||r.lastTrucoTeam===team(p)))throw new Error('Tu equipo no tiene la palabra para gritar.');
   r.teamSignal={id:crypto.randomUUID(),from:p,to:r.turn,text:labels[value],value,handNumber:r.handNumber,trickNo:r.trickNo,time:now};
  }
  function action(p,c){if(!SEATS.includes(p))throw new Error('Jugador inválido.');advance();if(c.kind==='draw'){if(r.status!=='drawing'||r.openingDraw.cards[p])throw new Error('El sorteo cambió.');r.openingDraw.cards[p]=s.drawPool.shift();if(SEATS.every(q=>r.openingDraw.cards[q]))r.openingDraw.resolveAt=now+2000;return advance();}

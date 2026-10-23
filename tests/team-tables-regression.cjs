@@ -161,3 +161,9 @@ test('A raise against a sung flor is answered by the player who sang it, even if
  const flowers=l.matches.m1.session.room.endReveal.groups.filter(g=>/FLOR/.test(g.label));
  assert.equal(flowers.length,1);assert.equal(flowers[0].player,room.florWinner);
 });
+test('Gritá is only accepted while the team has the word to call truco',()=>{
+ let l=started();const s=l.matches.m1.session;s.room.turn='player1';s.room.lastTrucoTeam='player1';s.room.trucoLevel=2;
+ assert.throws(()=>act(l,'c',{kind:'team-signal',value:'grita'},1000),/palabra/);
+ s.room.lastTrucoTeam='player2';l=act(l,'c',{kind:'team-signal',value:'grita'},1001);
+ assert.equal(l.matches.m1.session.room.teamSignal.value,'grita');
+});
