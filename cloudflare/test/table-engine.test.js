@@ -4,6 +4,7 @@ import {createTableEngine,slimMatch,CodeTakenError} from '../src/table-engine.js
 import {createFirebaseBank} from '../src/firebase-bank.js';
 import adminService from '../../functions/admin-service.cjs';
 import playerService from '../../functions/player-service.cjs';
+import teamBot from '../../functions/team-bot.cjs';
 
 // The Firebase bank over an in-memory Realtime Database.
 function memoryBank(economy){
@@ -185,4 +186,60 @@ test('In maintenance no table can move credits, and the ledger stays untouched',
  const engine=createTableEngine({code:'ABCDE',bank:{prefetch:()=>null,apply:async()=>{throw new Error('Estamos actualizando los créditos. Volvé a intentar en unos minutos.');}}});
  await assert.rejects(engine.create({uid:'a',name:'Mati'},{id:'g',stake:1,targetPoints:10,mode:'1v1'}),/actualizando/);
  assert.equal(engine.match,null);assert.equal(JSON.stringify(bank.economy),before);
+});
+
+// "Usar bot" in 2v2 tables: bots fill empty seats, play on their own and never touch a wallet.
+async function playOut(engine,advance,{maxSteps=20000}={}){
+ const humans=Object.entries(engine.match.players).filter(([,p])=>!p.bot);
+ for(let i=0;i<maxSteps;i++){
+  const m=engine.match;if(m.status!=='reserved')return m;
+  const human=humans.find(([seat])=>teamBot.mustAct(m.session,seat));
+  if(human){
+   const [seat,{uid}]=human;let moved=false;
+   for(const command of teamBot.botCommands(m.session,seat)){try{await engine.act(uid,{command,requestId:'h'+i,expectedMatchId:m.id});moved=true;break;}catch{}}
+   assert.ok(moved,'the human seat found no legal move');
+  }else{advance(2000);await engine.tick();}
+ }
+ throw new Error('the match did not finish');
+}
+
+test('Only the creator seats bots, and a full bot table starts charging only people',async()=>{
+ const {bank,engine}=setup();
+ await engine.create({uid:'a',name:'A'},{id:'bots1',stake:1,targetPoints:10,mode:'2v2'});
+ await engine.join({uid:'b',name:'B'},{team:'player2'});
+ await assert.rejects(engine.act('b',{command:{kind:'add-bot',seat:'player3'},requestId:'x1',expectedMatchId:'bots1'}),/creó la mesa/);
+ await engine.act('a',{command:{kind:'add-bot',seat:'player3'},requestId:'x2',expectedMatchId:'bots1'});
+ await assert.rejects(engine.act('a',{command:{kind:'add-bot',seat:'player3'},requestId:'x3',expectedMatchId:'bots1'}),/ocupado/);
+ assert.equal(engine.match.status,'waiting');assert.equal(engine.match.players.player3.name,'Bot · Difícil');
+ await engine.act('a',{command:{kind:'add-bot',seat:'player4'},requestId:'x4',expectedMatchId:'bots1'});
+ assert.equal(engine.match.status,'reserved');assert.equal(engine.lobbyEntry(),null);
+ assert.deepEqual(Object.keys(bank.economy.wallets).sort(),['a','b','c','d']);
+ assert.equal(bank.economy.wallets.a.locked,1);assert.equal(bank.economy.wallets.b.locked,1);
+});
+
+test('A person with three bots plays a whole match; the bank covers the bots and the rematch starts at once',async()=>{
+ const {bank,engine,advance}=setup();
+ await engine.create({uid:'a',name:'A'},{id:'bots2',stake:2,targetPoints:10,mode:'2v2'});
+ for(const seat of ['player2','player3','player4'])await engine.act('a',{command:{kind:'add-bot',seat},requestId:'s'+seat,expectedMatchId:'bots2'});
+ assert.equal(engine.publicRoom().status,'started');
+ const m=await playOut(engine,advance);
+ assert.equal(m.status,'settled');
+ const won=m.session.room.matchResult.winner==='player1';
+ assert.deepEqual(bank.economy.wallets.a,{balance:won?14:10,locked:0,lastGrantAt:1});
+ assert.deepEqual(m.winners,won?['a']:[]);
+ assert.ok(!Object.keys(bank.economy.wallets).some(uid=>uid.startsWith('bot:')));
+ await engine.act('a',{command:{kind:'rematch',value:'request'},requestId:'again',expectedMatchId:m.id});
+ assert.equal(engine.match.status,'reserved');assert.equal(engine.match.matchNumber,2);
+ assert.equal(bank.economy.wallets.a.locked,2);
+});
+
+test('Two people against two bots: only the people pay and collect',async()=>{
+ const {bank,engine,advance}=setup();
+ await engine.create({uid:'a',name:'A'},{id:'bots3',stake:1,targetPoints:10,mode:'2v2'});
+ await engine.join({uid:'b',name:'B'},{team:'player1'});
+ for(const seat of ['player2','player4'])await engine.act('a',{command:{kind:'add-bot',seat},requestId:'s'+seat,expectedMatchId:'bots3'});
+ const m=await playOut(engine,advance);
+ const won=m.session.room.matchResult.winner==='player1';
+ assert.equal(bank.economy.wallets.a.balance,won?13:11);assert.equal(bank.economy.wallets.b.balance,won?8:6);
+ assert.equal(bank.economy.wallets.a.locked+bank.economy.wallets.b.locked,0);
 });

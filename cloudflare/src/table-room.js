@@ -113,7 +113,7 @@ export class TableRoom extends DurableObject{
    const {command,requestId,expectedMatchId}=message;
    if(!command||typeof command.kind!=='string'||(requestId!=null&&(typeof requestId!=='string'||!/^[a-zA-Z0-9_-]{1,100}$/.test(requestId))))throw new Error('Jugada inválida.');
    if(command.kind==='rematch'&&this.engine.match){
-    const people=Object.values(this.engine.match.players||{}).filter(Boolean);
+    const people=Object.values(this.engine.match.players||{}).filter(p=>p&&!p.bot);
     for(let a=0;a<people.length;a++)for(let b=a+1;b<people.length;b++)if(await usersBlockEachOther(this.db,people[a].uid,people[b].uid))throw new Error('No pueden iniciar una revancha porque hay jugadores bloqueados.');
    }
    await this.engine.act(uid,{command,requestId,expectedMatchId});
@@ -132,7 +132,7 @@ export class TableRoom extends DurableObject{
   promise.catch(()=>this.identities.delete(uid));return promise;
  }
  async blockedWithPlayers(uid){
-  const people=Object.values(this.engine.match?.players||{}).filter(Boolean);
+  const people=Object.values(this.engine.match?.players||{}).filter(p=>p&&!p.bot);
   return (await Promise.all(people.map(p=>usersBlockEachOther(this.db,uid,p.uid)))).some(Boolean);
  }
  rateLimit(uid,bucket,limit){

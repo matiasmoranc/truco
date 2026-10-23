@@ -8,7 +8,7 @@ const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
 const videos=[...source.matchAll(/src:'(assets\/tutorial\/[^']+\.mp4)'/g)].map(match=>match[1]);
 test('Learning screen offers the tutorial videos in a dialog with navigation',()=>{
   for(const id of ['learn-videos','learn-videos-dialog','learn-videos-player','learn-videos-prev','learn-videos-next','learn-videos-close'])assert.ok(html.includes(`id="${id}"`),id);
-  assert.ok(html.includes('Ver videos explicativos'));
+  assert.ok(html.includes('Ver videos introductorios'));
   assert.ok(/<video[^>]*id="learn-videos-player"[^>]*playsinline/.test(html),'inline playback on iPhone');
 });
 test('Every tutorial video exists, in order, and opens once on the first visit',()=>{

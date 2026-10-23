@@ -66,3 +66,13 @@ test('Notices expire and never cross a hand or trick boundary',async()=>{
  assert.equal(visibleTeamNotice(n,{...room,handNumber:3},2000),false);assert.equal(visibleTeamNotice(n,{...room,trickNo:2},2000),false);
  assert.equal(teamPie(room,'player1'),'player3');assert.equal(teamPie({...room,trickCards:[{playerId:'player3'}]},'player1'),'player3');
 });
+test('Only the creator sees "Usar bot", once under each empty seat of a waiting team table',async()=>{
+ const {renderWaitingSeats}=await ui,safe=s=>String(s);
+ const room={mode:'2v2',status:'waiting',players:{player1:{name:'Ana'},player2:{name:'Bot · Difícil',uid:'bot:player2',bot:true}}};
+ const creator=renderWaitingSeats(room,'player1',safe);
+ assert.deepEqual([...creator.matchAll(/data-add-bot="(player\d)"/g)].map(m=>m[1]).sort(),['player3','player4']);
+ assert.ok(/waiting-player[^"]* occupied bot"/.test(creator));
+ assert.ok(!/data-add-bot/.test(renderWaitingSeats({...room,players:{...room.players,player3:{name:'Juan'}}},'player3',safe)));
+ assert.ok(!/data-add-bot/.test(renderWaitingSeats({...room,status:'closed'},'player1',safe)));
+ assert.ok(!/data-add-bot/.test(renderWaitingSeats({status:'waiting',players:{player1:{name:'Ana'}}},'player1',safe)));
+});

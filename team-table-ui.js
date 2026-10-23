@@ -121,7 +121,9 @@ export function renderWaitingSeats(room,viewer,safe){
  const teams=room.mode==='2v2',players=room.players||{};
  const me=viewer||'player1',seats=teams?teamSeatsFor(me):[me,me==='player1'?'player2':'player1'];
  const positions=teams?['self','right','partner','left']:['self','partner'];
+ // Only the creator can fill an empty seat of a team table with a bot.
+ const botButtons=teams&&me==='player1'&&room.status==='waiting';
  return seats.map((key,i)=>{const player=players[key],team=playerTeam(key)==='player1'?'1':'2';
-  return '<div class="waiting-player waiting-player-'+positions[i]+' '+(player?'occupied':'empty')+'"><span class="waiting-player-name">'+safe(player?.name||'Lugar disponible')+'</span>'+'<div class="waiting-player-cards" aria-hidden="true">'+(player?[-1,0,1].map(n=>'<span class="opponent-card-back" style="--fan-index:'+n+'"></span>').join(''):'<span class="waiting-empty-place">+</span>')+'</div></div>';
+  return '<div class="waiting-player waiting-player-'+positions[i]+' '+(player?'occupied':'empty')+(player?.bot?' bot':'')+'"><span class="waiting-player-name">'+safe(player?.name||'Lugar disponible')+'</span>'+'<div class="waiting-player-cards" aria-hidden="true">'+(player?[-1,0,1].map(n=>'<span class="opponent-card-back" style="--fan-index:'+n+'"></span>').join(''):'<span class="waiting-empty-place">+</span>')+'</div>'+(!player&&botButtons?'<button type="button" class="waiting-bot-button" data-add-bot="'+key+'">Usar bot</button>':'')+'</div>';
  }).join('');
 }

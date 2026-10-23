@@ -1,4 +1,5 @@
 'use strict';
+const {isBotUid}=require('./bot-seat.cjs');
 
 // Server-only accounting for the next stage of credited matches. Never import
 // this module into the browser or settle from rooms/public.scores: those scores
@@ -47,7 +48,7 @@ function refundCanceledMatch(ledger,{id,now}) {
   const old=matchFor(ledger,id);if(old.status==='refunded')return ledger;
   if(old.status!=='reserved'||!Number.isFinite(now))throw new Error('credit-match-not-refundable');
   const next=structuredClone(ledger),match=matchFor(next,id);
-  const participants=match.mode==='2v2'?Object.values(match.players).map(p=>p.uid):[match.player1,match.player2];
+  const participants=match.mode==='2v2'?Object.values(match.players).map(p=>p.uid).filter(uid=>!isBotUid(uid)):[match.player1,match.player2];
   for(const uid of participants){const wallet=walletFor(next,uid);if(wallet.locked!==match.stake)throw new Error('credit-reservation-mismatch');wallet.balance=amount(wallet.balance+match.stake);wallet.locked=0;}
   Object.assign(match,{status:'refunded',refundedAt:now});return next;
 }

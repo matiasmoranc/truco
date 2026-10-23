@@ -4,11 +4,13 @@ import tableService from '../../functions/table-service.cjs';
 import adminService from '../../functions/admin-service.cjs';
 import accountingGuard from '../../functions/accounting-guard.cjs';
 import historyService from '../../functions/history-service.cjs';
+import botSeat from '../../functions/bot-seat.cjs';
 
 const {createTable,joinTable,tableOperation}=tableService;
 const {adminLedgerChange}=adminService;
 const {validateAccounting}=accountingGuard;
 const {recordHistory}=historyService;
+const {isBotUid}=botSeat;
 
 export const ACTIVE=['waiting','reserved'];
 export class CodeTakenError extends Error{constructor(){super('code-taken');this.code='code-taken';}}
@@ -52,7 +54,8 @@ export function applyLedgerOp(economy,spec){
 // Rows an operation can read or change, so the bank loads only those.
 export function ledgerKeys(spec){
  const uids=new Set();
- for(const person of Object.values(spec.match?.players||{}))if(person?.uid)uids.add(person.uid);
+ // Bot seats have no wallet row.
+ for(const person of Object.values(spec.match?.players||{}))if(person?.uid&&!isBotUid(person.uid))uids.add(person.uid);
  if(spec.args?.uid)uids.add(spec.args.uid);
  if(spec.match?.player1)uids.add(spec.match.player1);
  const ids=spec.match?.id?[spec.match.id]:[];

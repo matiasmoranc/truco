@@ -205,7 +205,7 @@ function syncMatchChat(){
     if(state.room.mode==='2v2'){
       let select=$('chat-block-target');
       if(!select){select=document.createElement('select');select.id='chat-block-target';select.className='table-mode-select';select.setAttribute('aria-label','Jugador para bloquear');document.querySelector('.chat-options-panel').prepend(select);select.addEventListener('change',()=>loadPersistentChatBlock(chatContextKey()));}
-      select.innerHTML=roomSeats().filter(p=>p!==state.playerId&&state.room.players?.[p]).map(p=>'<option value="'+p+'">'+escapeHtml(state.room.players[p].name||'Jugador')+'</option>').join('');
+      select.innerHTML=roomSeats().filter(p=>p!==state.playerId&&state.room.players?.[p]&&!state.room.players[p].bot).map(p=>'<option value="'+p+'">'+escapeHtml(state.room.players[p].name||'Jugador')+'</option>').join('');
     }
     if($('chat-block-target'))$('chat-block-target').hidden=state.room.mode!=='2v2';
     chatPlayerBlocked=false;matchChat.reporting=false;
@@ -3589,6 +3589,7 @@ function rememberLearningPractice(){
 function renderLearningMenu(){
   const started=hasStartedLearningPractice();
   $('learn-free').classList.toggle('hidden',started);
+  $('learn-path-note').classList.toggle('hidden',started);
   $('learn-game-modes').classList.toggle('hidden',!started);
 }
 function openLearning(){
@@ -4098,6 +4099,11 @@ function continueLearningStage(){
   if(complete)startLearning(stage);
 }
 $('learn-game').addEventListener('click',openLearning);
+$('seats').addEventListener('click',async event=>{
+  const button=event.target.closest('[data-add-bot]');if(!button||button.disabled)return;
+  button.disabled=true;
+  try{await creditCommand({kind:'add-bot',seat:button.dataset.addBot});}catch{button.disabled=false;}
+});
 $('learn-videos').addEventListener('click',()=>openLearnVideos(0));
 $('learn-videos-close').addEventListener('click',()=>$('learn-videos-dialog').close());
 $('learn-videos-prev').addEventListener('click',()=>showLearnVideo(learnVideoIndex-1));

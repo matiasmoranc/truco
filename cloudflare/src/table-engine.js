@@ -3,18 +3,37 @@
 // bank is only touched when credits move (create, join, end, rematch, cancel),
 // never for an ordinary card or call.
 import tableService from '../../functions/table-service.cjs';
+import teamBot from '../../functions/team-bot.cjs';
 import {ACTIVE,CodeTakenError} from './ledger-ops.js';
 
 const {tableOperation,publicTable,privateTableHand}=tableService;
+const {mustAct,botCommands}=teamBot;
 export {CodeTakenError,slimMatch} from './ledger-ops.js';
 
 export const WAIT_MS=600000;
 export const DISCONNECT_MS=45000;
+// A bot answers after a short pause, so people can follow the table.
+export const BOT_DELAY_MS=1500;
 const PROBE_BALANCE=1000000;
 const findPlayer=(m,uid)=>Object.keys(m?.players||{}).find(p=>m.players[p]?.uid===uid)||null;
 
 export function createTableEngine({code,bank,clock=()=>Date.now()}){
- let m=null,presence={};
+ let m=null,presence={},botDueAt=null;
+
+ // The bot seat the table is waiting for, if any.
+ const botSeat=()=>m?.status==='reserved'&&m.session?Object.keys(m.players||{}).find(p=>m.players[p]?.bot&&mustAct(m.session,p))||null:null;
+ function scheduleBot(){botDueAt=botSeat()?botDueAt??clock()+BOT_DELAY_MS:null;}
+ // Tries the bot's moves best first; the referee rejects an illegal one unchanged.
+ async function playBot(){
+  const seat=botSeat();botDueAt=null;if(!seat)return false;
+  let failure=null;
+  for(const command of botCommands(m.session,seat)){
+   try{await operate({uid:m.players[seat].uid,command,requestId:null,presence});return true;}
+   catch(error){failure=error;}
+  }
+  console.error('bot move failed',code,seat,failure?.message);
+  return false;
+ }
 
  // One accounting step in the bank (Firebase or Cloudflare). An administrator
  // may have closed the match in the ledger meanwhile: then the ledger wins.
@@ -48,7 +67,7 @@ export function createTableEngine({code,bank,clock=()=>Date.now()}){
  return {
   get match(){return m;},
   get presence(){return presence;},
-  load(saved){m=saved?.match||null;presence=saved?.presence||{};},
+  load(saved){m=saved?.match||null;presence=saved?.presence||{};botDueAt=null;scheduleBot();},
   snapshot(){return {match:m,presence};},
   playerFor(uid){return findPlayer(m,uid);},
   async create(user,{id,stake,targetPoints,mode,secret,initial}){
@@ -61,15 +80,18 @@ export function createTableEngine({code,bank,clock=()=>Date.now()}){
    if(!m)throw new Error('La mesa ya no está disponible.');
    if(findPlayer(m,user.uid))return;
    await accounting('join',{uid:user.uid,name:user.name,password,team},{initial});
+   scheduleBot();
   },
   async act(uid,{command,requestId,expectedMatchId}){
    if(!command||typeof command.kind!=='string')throw new Error('Jugada inválida.');
    const forceLedger=['rematch','cancel','abandon'].includes(command.kind);
    await operate({uid,command,requestId:command.kind==='tick'?null:requestId,expectedMatchId,presence},{forceLedger});
+   scheduleBot();
   },
   async tick(){
    if(!m||!ACTIVE.includes(m.status))return;
-   await operate({uid:m.player1,command:{kind:'tick'},presence});
+   if(!(botDueAt!=null&&clock()>=botDueAt&&await playBot()))await operate({uid:m.player1,command:{kind:'tick'},presence});
+   scheduleBot();
   },
   async adminClose({actor,requestId,reason}){
    if(!m)throw new Error('La mesa ya no está disponible.');
@@ -104,6 +126,7 @@ export function createTableEngine({code,bank,clock=()=>Date.now()}){
    if(m.status==='reserved'&&r){
     times.push(r.resolutionEndsAt,r.pendingNextHand?.endsAt,r.status==='revealing'?r.endReveal?.endsAt:null,r.openingDraw?.resolveAt,r.openingDraw?.endsAt);
     if(r.turnClock?.startedAt)times.push(r.turnClock.startedAt+45000);
+    times.push(botDueAt);
     for(const p of Object.values(presence))if(p?.online===false&&Number.isFinite(p.disconnectedAt))times.push(p.disconnectedAt+DISCONNECT_MS);
     // Safety net for any timer the projection above does not know about.
     times.push(now+15000);

@@ -74,7 +74,7 @@ export class Bank extends DurableObject{
  }
  // Local development: players start with 100 test credits.
  async seedDevWallets(spec){
-  const uids=[...Object.values(spec.match?.players||{}).map(p=>p?.uid),spec.args?.uid].filter(Boolean);
+  const uids=[...Object.values(spec.match?.players||{}).filter(p=>!p?.bot).map(p=>p?.uid),spec.args?.uid].filter(Boolean);
   const {version,ledger}=await this.core.exportLedger();
   const missing=uids.filter(uid=>!ledger.wallets?.[uid]);if(!missing.length)return;
   for(const uid of missing)(ledger.wallets??={})[uid]={balance:100,locked:0};
