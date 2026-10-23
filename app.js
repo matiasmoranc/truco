@@ -1945,7 +1945,8 @@ function reconcilePendingPlay(){
   }
 }
 async function playManagedCard(card){
-  if(liveActionsBlocked()||state.liveAction||state.playActionInFlight||state.room.status!=='started'||state.room.resolvingTrick||state.room.pendingNextHand||state.room.turn!==state.playerId||state.room.pendingBet||!state.hand.some(c=>c.id===card.id))return;
+  if(liveActionsBlocked()||state.liveAction||state.playActionInFlight||state.room.status!=='started'||!state.hand.some(c=>c.id===card.id))return;
+  if(state.room.resolvingTrick||state.room.pendingNextHand||state.room.turn!==state.playerId||state.room.pendingBet){shakeTurnBadge();return;}
   const token={code:state.roomCode,hand:state.room.handNumber,cardId:card.id};
   state.playActionToken=token;state.playActionInFlight=true;state.pendingCardId=card.id;syncLiveControls();
   const origin=state.cardLaunchOrigin;state.cardLaunchOrigin=null;
@@ -1969,7 +1970,7 @@ async function playCard(card) {
   const other=state.playerId==='player1'?'player2':'player1';
   if (!players[state.playerId] || !players[other]) { toast('Esperando al otro jugador.'); return; }
   const pause=pauseMessage();
-  if(pause){renderRoundPauseTimer();return;}
+  if(pause){renderRoundPauseTimer();shakeTurnBadge();return;}
   if(state.room.pendingBet){shakeTurnBadge();return;}
   if (state.room.turn !== state.playerId) {
     shakeTurnBadge();
@@ -2136,8 +2137,8 @@ function shakeTurnBadge(){
   badge.getAnimations?.().forEach(animation=>animation.cancel());
   clearTimeout(badge._shakeTimer);
   badge.classList.add('turn-rejected');
-  badge.animate?.([{translate:'0 0'},{translate:'-5px 0'},{translate:'5px 0'},{translate:'-4px 0'},{translate:'4px 0'},{translate:'0 0'}],{duration:400,easing:'ease-out'});
-  badge._shakeTimer=setTimeout(()=>badge.classList.remove('turn-rejected'),400);
+  badge.animate?.([{translate:'0 0'},{translate:'-6px 0'},{translate:'6px 0'},{translate:'-5px 0'},{translate:'5px 0'},{translate:'-3px 0'},{translate:'3px 0'},{translate:'0 0'}],{duration:600,easing:'ease-out'});
+  badge._shakeTimer=setTimeout(()=>badge.classList.remove('turn-rejected'),600);
 }
 function waitingTurnLabel(room=state.room){
   const pending=room?.pendingBet;
@@ -3025,7 +3026,7 @@ function localPlay(card,launchOrigin=null) {
   if(state.learning?.paused)return;
   if(state.room?.turnClock?.key===turnClockKey()&&turnClockRemaining(state.room.turnClock).expired){renderTurnTimer();return;}
   const player=state.playerId;
-  const pause=pauseMessage();if(pause){renderRoundPauseTimer();return;}
+  const pause=pauseMessage();if(pause){renderRoundPauseTimer();shakeTurnBadge();return;}
   if(state.room.status!=='started')return;
   if(state.room.pendingBet){shakeTurnBadge();return;}
   if(state.room.turn!==player){shakeTurnBadge();return;}
