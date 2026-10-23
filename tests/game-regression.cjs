@@ -312,3 +312,12 @@ test('A command on a table still being created waits for the server to confirm i
  assert.equal(sent.length,1);assert.equal(sent[0].expectedMatchId,'m1');assert.equal(sent[0].command.seat,'player2');
  c.state.room={managedCredits:true,creditMatch:{id:null}};await c.creditCommand({kind:'tick'});assert.equal(sent.length,1);
 });
+test('The bot sings flor only on its own turn or when answering, never during the rival turn',()=>{
+ const c=harness(),flor=[card('♠',3),card('♠',6),card('♠',7)];
+ const r=room();Object.assign(r,{turn:'player1',mano:'player1',playedCount:0,pendingBet:null,flors:{}});
+ assert.equal(c.chooseBotDecision(r,flor,'hard',{}),null);
+ r.turn='player2';assert.equal(c.chooseBotDecision(r,flor,'hard',{}).value,'flor');
+ r.playedCount=1;assert.equal(c.chooseBotDecision(r,flor,'hard',{}).value,'flor');
+ r.turn='player1';r.pendingBet={type:'truco',caller:'player1',responder:'player2',stake:2};assert.equal(c.chooseBotDecision(r,flor,'hard',{}).value,'flor');
+ assert.ok(!source.includes("room.turn==='player2'||(!room.playedCount&&roomHasFlor"));
+});

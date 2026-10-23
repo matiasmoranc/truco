@@ -2811,7 +2811,8 @@ function chooseBotDecision(room,hand,level,memory,random=Math.random){
     return {kind:'reveal',value:tantos,good:room.mano!==me&&tantos<Number(bet.reveals?.[room.mano])};
   }
   if(bet&&bet.responder!==me)return null;
-  if(!room.playedCount&&flower&&room.flors?.[me]==null)return {kind:'action',value:'flor'};
+  // Flor is sung on the bot's own turn before its first card, or as it answers a call; never during the rival's turn.
+  if((bet||room.turn===me)&&hand.length===3&&flower&&room.flors?.[me]==null)return {kind:'action',value:'flor'};
   if(bet){
     if(bet.type==='flor'){
       if(bet.single)return {kind:'action',value:flower?'yes':'no'};
@@ -2871,7 +2872,7 @@ function scheduleBot(){
   if(room.resolvingTrick||room.pendingNextHand||room.status==='revealing'){clearTimeout(state.botTimer);state.botTimer=null;return;}
   const ready=room.status==='drawing'?!room.openingDraw?.cards?.player2:
     room.status==='complete'?room.rematch?.status==='pending'&&room.rematch.requester==='player1':
-    room.status==='started'&&(room.pendingBet?(room.pendingBet.revealMode?room.pendingBet.revealTurn==='player2':room.pendingBet.responder==='player2'):room.turn==='player2'||(!room.playedCount&&roomHasFlor(room,localHand('player2'))&&room.flors?.player2==null));
+    room.status==='started'&&(room.pendingBet?(room.pendingBet.revealMode?room.pendingBet.revealTurn==='player2':room.pendingBet.responder==='player2'):room.turn==='player2');
   if(!ready){clearTimeout(state.botTimer);state.botTimer=null;return;}
   const actionKey=room.status==='drawing'?key+':draw:'+room.openingDraw?.endsAt:
     room.status==='complete'?key+':rematch:'+room.rematch?.id:
