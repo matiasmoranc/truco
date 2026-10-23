@@ -2043,13 +2043,15 @@ input,textarea,[contenteditable=""],[contenteditable="true"]{-webkit-user-select
 
 /* Tutorial videos: vertical clips with previous/next navigation. */
 .learn-content>.learn-videos-button{margin:0 0 18px}
-.learn-videos-dialog{width:min(440px,calc(100vw - 24px));max-height:calc(100dvh - 24px);margin:auto;padding:16px;color:var(--ink);background:#0c402f;border:1px solid var(--gold);border-radius:18px;overflow:auto;box-shadow:0 20px 60px #0006}
+.learn-videos-dialog{width:min(calc(100vw - 12px),calc((100dvh - 128px) * .5625 + 20px));height:calc(100dvh - 12px);max-width:none;max-height:none;margin:auto;padding:10px;color:var(--ink);background:#0c402f;border:1px solid var(--gold);border-radius:14px;overflow:hidden;box-shadow:0 20px 60px #0006}
+.learn-videos-dialog[open]{display:flex;flex-direction:column}
 .learn-videos-dialog::backdrop{background:rgba(4,24,15,.72);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
-.learn-videos-dialog h2{color:#ebd08a;font-size:20px;margin:4px 44px 2px 0}
-.learn-videos-step{margin:0 44px 12px 0;color:#c2cec4;font-size:14px}
-.learn-videos-player{display:block;width:auto;max-width:100%;height:min(calc(100dvh - 210px),720px);aspect-ratio:9/16;margin:0 auto;border-radius:12px;background:#0c402f;cursor:pointer;object-fit:contain}
-.learn-videos-nav{display:flex;gap:10px;margin-top:14px}
-.learn-videos-nav>.button{flex:1;justify-content:center;min-height:44px;font-size:14px;border-radius:9px}
+.learn-videos-dialog .learn-close{position:absolute;top:8px;right:8px;float:none;width:34px;height:34px;font-size:23px}
+.learn-videos-dialog h2{color:#ebd08a;font-size:17px;margin:2px 44px 0 4px}
+.learn-videos-step{margin:0 44px 6px 4px;color:#c2cec4;font-size:13px}
+.learn-videos-player{display:block;flex:1 1 auto;min-height:0;width:100%;height:auto;border-radius:10px;background:#0c402f;cursor:pointer;object-fit:contain}
+.learn-videos-nav{display:flex;gap:8px;margin-top:8px}
+.learn-videos-nav>.button{flex:1;justify-content:center;min-height:42px;font-size:14px;border-radius:9px}
 .learn-videos-nav>.button:disabled{opacity:.4;cursor:default}
 .learn-videos-dialog .button.secondary{background:#15392b;color:#ead39b;border:1px solid #d8b87588;font-weight:600}
 .learn-videos-dialog button:focus-visible{outline:2px solid #ead39b;outline-offset:3px}
