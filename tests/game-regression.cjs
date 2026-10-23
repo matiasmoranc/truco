@@ -321,3 +321,9 @@ test('The bot sings flor only on its own turn or when answering, never during th
  r.turn='player1';r.pendingBet={type:'truco',caller:'player1',responder:'player2',stake:2};assert.equal(c.chooseBotDecision(r,flor,'hard',{}).value,'flor');
  assert.ok(!source.includes("room.turn==='player2'||(!room.playedCount&&roomHasFlor"));
 });
+test('Team tables show the pause countdown while flowers, envidos and tricks are shown',()=>{
+ const team=fs.readFileSync(path.join(__dirname,'../team-table-ui.js'),'utf8');
+ assert.ok(!team.includes("$('round-pause-timer')"),'the team table must not hide the pause countdown');
+ const branch=source.slice(source.indexOf("if(state.room.mode==='2v2'){syncPrivateHand();"));
+ assert.ok(branch.slice(0,branch.indexOf('return;}')).includes('renderRoundPauseTimer()'));
+});

@@ -177,7 +177,7 @@ export function installTeamTable({$,getState,command,runAction,renderPlayerHand,
   if(answers.length){const options=document.createElement('div'),response=document.createElement('div');options.className='bet-options-row';response.className='bet-answers-row';for(const b of actionBox.querySelectorAll('button'))(answers.includes(b)?response:options).append(b);actionBox.replaceChildren(...(options.children.length?[options]:[]),response);}for(const b of $('player-actions').querySelectorAll('[data-team-action]'))b.onclick=e=>send(e.currentTarget,{kind:'call',value:b.dataset.teamAction});
   for(const b of $('player-actions').querySelectorAll('[data-team-signal]'))b.onclick=e=>send(e.currentTarget,{kind:'team-signal',value:b.dataset.teamSignal});
   const time=r.turnClock?Math.max(0,Math.ceil((45000-(gameTime()-r.turnClock.startedAt))/1000)):null;setTurnBadge(drawing?'SORTEO':r.status==='revealing'||r.pendingNextHand||r.resolvingTrick?'NUEVA JUGADA':turn===p?(pending?'RESPONDÉ':'TU TURNO'):'Turno de '+(r.players[turn]?.name||'…'));
-  const pause=$('round-pause-timer');pause.classList.add('hidden');renderEnd();syncControls();
+  renderEnd();syncControls();
  }
  return {render,renderEnd};
 }
