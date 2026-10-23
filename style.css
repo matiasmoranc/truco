@@ -2065,6 +2065,11 @@ input,textarea,[contenteditable=""],[contenteditable="true"]{-webkit-user-select
 .signal-timer{position:absolute;z-index:5;width:36px;height:36px;border-radius:50%;background:conic-gradient(transparent 0 var(--signal-sweep),#e8c983 var(--signal-sweep) 360deg);box-shadow:0 0 0 2px #e8c98366;pointer-events:none}
 @keyframes signal-drain{from{--signal-sweep:0deg}to{--signal-sweep:360deg}}.played-card.trick-winner{overflow:visible}
 .played-card.trick-winner::after{content:"";position:absolute;inset:-7px;border:3px solid #e8c983;border-radius:12px;box-shadow:0 0 14px #e8c98355;pointer-events:none;animation:trick-winner-in .22s ease-out both}
-.trick-winner-label{position:absolute;top:50%;left:calc(100% + 12px);transform:translateY(-50%);width:max-content;max-width:80px;padding:0;color:#e8c983;font:700 16px/1.15 "DM Sans",sans-serif;text-align:left;text-shadow:0 1px 6px #00180ecc;pointer-events:none;animation:trick-winner-in .22s ease-out both}
+.trick-winner-label{position:absolute;top:50%;left:calc(100% + 12px);transform:translateY(-50%);display:flex;flex-direction:column;align-items:flex-start;gap:6px;width:max-content;max-width:84px;padding:0;color:#e8c983;font:700 16px/1.15 "DM Sans",sans-serif;text-align:left;text-shadow:0 1px 6px #00180ecc;pointer-events:none;animation:trick-winner-in .22s ease-out both}
 @keyframes trick-winner-in{from{opacity:0}to{opacity:1}}
 @media(prefers-reduced-motion:reduce){.played-card.trick-winner::after,.trick-winner-label{animation:none}}
+.trick-winner-why{pointer-events:auto;min-height:32px;margin:-6px 0;padding:6px 0;border:0;background:none;color:#f1f5ee;font:600 13px/1 "DM Sans",sans-serif;text-decoration:underline;text-underline-offset:3px;cursor:pointer;touch-action:manipulation}
+.trick-winner-timer{display:block;width:72px;height:3px;border-radius:2px;background:#e8c98333;overflow:hidden}
+.trick-winner-timer::before{content:"";display:block;height:100%;background:#e8c983;transform-origin:left;animation:trick-winner-timer var(--trick-left,4000ms) linear forwards}
+.trick-winner-label.is-paused .trick-winner-timer::before{animation-play-state:paused}
+@keyframes trick-winner-timer{from{transform:scaleX(1)}to{transform:scaleX(0)}}

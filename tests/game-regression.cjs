@@ -13,7 +13,7 @@ function extract(name){
 }
 const names=['roomTransportConnected','liveSnapshot','envidoAuditResult','settleAuditedHand','auditEnvidoScores','trickWinnerMark','canRaiseEnvido','closeFinishedRoomChanges','pieceOrder','cardStrength','envidoValue','hasFlor','handEnvido','florValue','normalizeTargetPoints','targetPoints','capScores','faltanParaGanar','faltaEnvidoPoints','envidoBetPoints','florBetPoints','declinedFlorPoints','florAnswers','otherPlayer','settleHand','topFeed','matchWinner','matchFinished','sessionMatchResults','sessionWins','rematchRoom','rematchChanges','botDeck','botHandOutcome','rememberBotCards','botRiskAdjustment','assessBotHand','chooseBotDecision','disconnectedPlayer','disconnectMatchChanges','turnClockPlayer','turnClockRemaining','turnTimeoutChanges','declinedTrucoChanges','liveActionsBlocked','runLiveAction','privateHandMatchesRoom','roomHasFlor','canCallFirstRoundEnvido','enqueueLearningHelp','rememberLearningHelp','learningHelpTopic','localHand','localFeed','localCallAction','localAnswerAction','localPlay'];
 function harness(){
- const context={account:{isReady:()=>true},console,Math:Object.create(Math),Date,crypto:require('node:crypto').webcrypto,structuredClone,Set,Map,navigator:{onLine:true},state:{},localStorage:{setItem(){}},learningSeen:new Set(),VALID_TARGET_POINTS:[10,20,30,40,50,60],RECONNECT_GRACE_MS:45000,gameTime:()=>100000,newOpeningDraw:()=>({cards:{}}),makeCallNotice:text=>({text}),renderGame(){},renderConnectionNotice(){},syncLiveControls(){},touchFeedback(){},toast(){},firebaseError:String,queueLearningAction(){},queueLearningTrucoCall(){},turnClockKey:()=>null,pauseMessage:()=>null,animatePlayedHandCard(){},shakeTurnBadge(){},scheduleLocalNextHand(){},scheduleLocalTransition(room,fn){context.transition=fn;},localFinishHand(winner,points){context.finished={winner,points};},localScore(player,points){context.state.room.scores[player]=Math.min(20,context.state.room.scores[player]+points);},localResolveFlor(){},revealEnvido(){}};
+ const context={account:{isReady:()=>true},console,Math:Object.create(Math),Date,crypto:require('node:crypto').webcrypto,structuredClone,Set,Map,navigator:{onLine:true},state:{},localStorage:{setItem(){}},learningSeen:new Set(),VALID_TARGET_POINTS:[10,20,30,40,50,60],RECONNECT_GRACE_MS:45000,PRACTICE_PAUSE_MS:4000,gameTime:()=>100000,newOpeningDraw:()=>({cards:{}}),makeCallNotice:text=>({text}),renderGame(){},renderConnectionNotice(){},syncLiveControls(){},touchFeedback(){},toast(){},firebaseError:String,queueLearningAction(){},queueLearningTrucoCall(){},turnClockKey:()=>null,pauseMessage:()=>null,animatePlayedHandCard(){},shakeTurnBadge(){},scheduleLocalNextHand(){},scheduleLocalTransition(room,fn){context.transition=fn;},localFinishHand(winner,points){context.finished={winner,points};},localScore(player,points){context.state.room.scores[player]=Math.min(20,context.state.room.scores[player]+points);},localResolveFlor(){},revealEnvido(){}};
  vm.createContext(context);vm.runInContext(names.map(extract).join('\n'),context);return context;
 }
 const card=(suit,rank)=>({id:({'♦':'oro','♥':'copa','♠':'espada','♣':'basto'}[suit])+'-'+rank,suit,rank});
@@ -281,4 +281,13 @@ test('La mia es flor keeps playing and the higher flower takes the stake when th
  assert.equal(JSON.stringify(c.settleSingleFlor(r,{player1:0,player2:0})),JSON.stringify({player1:3,player2:0}));
  assert.match(c.scoringEntries(r,{player1:3,player2:0},'').map(e=>e.detail).join(' '),/La mía es flor/);
  r.flors={player1:28,player2:28};assert.equal(JSON.stringify(c.settleSingleFlor(r,{player1:0,player2:0})),JSON.stringify({player1:3,player2:0}));
+});
+test('Por que opens the card guide with both round cards and practice pauses last 4 seconds',()=>{
+ const c=harness();let opened=0;c.openStudySheet=()=>opened++;c.state.learning={};
+ vm.runInContext(extract('openTrickGuide'),c);
+ const played=[{playerId:'player2',card:card('♠',1)},{playerId:'player1',card:card('♥',3)}];
+ c.openTrickGuide({trickCards:played});
+ assert.equal(opened,1);assert.equal(c.state.learning.activeTutorial.trickGuide,true);assert.equal(c.state.learning.activeTutorial.roundCards.length,2);assert.notEqual(c.state.learning.activeTutorial.roundCards,played);
+ assert.match(source,/const PRACTICE_PAUSE_MS=4000;/);
+ assert.ok(source.includes('resolutionEndsAt=gameTime()+(state.learning?PRACTICE_PAUSE_MS:3000)'));
 });

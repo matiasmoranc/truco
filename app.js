@@ -502,6 +502,8 @@ function makeCallNotice(text,bet=state.room?.pendingBet){
   return {...(spoken==='Me voy al mazo'?{kind:'fold'}:{}),id:crypto.randomUUID(),from:state.playerId,to:state.playerId==='player1'?'player2':'player1',text:spoken==='Tiene'||spoken==='Me voy al mazo'?text.split('.')[0]+'.':/\bcanta \d+ (tantos|son mejores|son iguales)\b/i.test(text)?spoken:text,spoken,selfVerb:ownCallVerb(spoken,bet),time:Date.now(),handNumber:state.room?.handNumber||1};
 }
 
+// Practice gives a little more time to read each result.
+const PRACTICE_PAUSE_MS=4000;
 let roundPauseTimer=null;
 const roundPauseArrivals=new Map();
 // Live tables set their deadlines with the table server clock; count down with that clock.
@@ -514,13 +516,13 @@ function roundPauseInfo(room=state.room){
   if(!room)return null;
   let key,endsAt,duration,label;
   if(room.resolvingTrick){
-    key='trick:'+room.resolutionId;endsAt=room.resolutionEndsAt;duration=3000;
+    key='trick:'+room.resolutionId;endsAt=room.resolutionEndsAt;duration=state.learning?PRACTICE_PAUSE_MS:3000;
     const next=room.resolvedTrickWinner||room.mano;
     label=room.handComplete?'Siguiente mano':next===state.playerId?'Jugás en':'Pausa';
   }else if(room.status==='revealing'&&room.endReveal){
-    key='reveal:'+room.endReveal.id;endsAt=room.endReveal.endsAt;duration=state.learning?3000:5000;label='Siguiente mano';
+    key='reveal:'+room.endReveal.id;endsAt=room.endReveal.endsAt;duration=state.learning?PRACTICE_PAUSE_MS:5000;label='Siguiente mano';
   }else if(room.pendingNextHand){
-    key='redeal:'+room.pendingNextHand.id;endsAt=room.pendingNextHand.endsAt;duration=3000;label='Siguiente mano';
+    key='redeal:'+room.pendingNextHand.id;endsAt=room.pendingNextHand.endsAt;duration=state.learning?PRACTICE_PAUSE_MS:3000;label='Siguiente mano';
   }else return null;
   const arrivalKey=`${state.roomCode}:${room.handNumber}:${key}`;
   if(!Number.isFinite(Number(endsAt))||endsAt==null){
@@ -1555,6 +1557,7 @@ function scheduleLocalNextHand(room){
   const pending=room.pendingNextHand;
   if(!pending)return;
   clearTimeout(state.resolutionTimer);state.resolutionTimerKey=pending.id;
+  if(state.learning)pending.endsAt=gameTime()+PRACTICE_PAUSE_MS;
   state.resolutionTimer=scheduleLocalTransition(room,()=>{
     if(!state.localGame||state.room!==room||room.pendingNextHand?.id!==pending.id)return;
     room.pendingNextHand=null;state.resolutionTimer=null;state.resolutionTimerKey=null;
@@ -3035,9 +3038,9 @@ function localPlay(card,launchOrigin=null) {
     state.room.tricks=[...(state.room.tricks||[]),{winner,played:[...state.room.trickCards]}];
     const handWinner=settleHand(state.room.tricks,state.room);
     if(winner)state.room.feed.unshift({text:`${state.room.players[winner].name} se lleva la ronda.`,time:Date.now()});
-    state.room.resolvingTrick=true;state.room.resolutionId=crypto.randomUUID();state.room.resolutionEndsAt=gameTime()+3000;state.room.resolvedTrickWinner=winner;state.room.handComplete=!!handWinner;
+    state.room.resolvingTrick=true;state.room.resolutionId=crypto.randomUUID();state.room.resolutionEndsAt=gameTime()+(state.learning?PRACTICE_PAUSE_MS:3000);state.room.resolvedTrickWinner=winner;state.room.handComplete=!!handWinner;
     const resolvingRoom=state.room;
-    scheduleLocalTransition(resolvingRoom,()=>{if(!state.localGame||state.room!==resolvingRoom)return;state.room.resolvingTrick=false;state.room.resolutionEndsAt=null;state.room.handComplete=false;state.room.trickCards=[];if(handWinner){localFinishHand(handWinner,state.room.trucoLevel||1);return;}else{state.room.turn=winner||state.room.mano;state.room.trickNo++;}state.hand=[...(state.localHands[state.playerId]||[])];renderGame();},3000);
+    scheduleLocalTransition(resolvingRoom,()=>{if(!state.localGame||state.room!==resolvingRoom)return;state.room.resolvingTrick=false;state.room.resolutionEndsAt=null;state.room.handComplete=false;state.room.trickCards=[];if(handWinner){localFinishHand(handWinner,state.room.trucoLevel||1);return;}else{state.room.turn=winner||state.room.mano;state.room.trickNo++;}state.hand=[...(state.localHands[state.playerId]||[])];renderGame();},state.learning?PRACTICE_PAUSE_MS:3000);
   }else state.room.turn=player==='player1'?'player2':'player1';
   renderGame();
 }
@@ -3054,7 +3057,7 @@ function localFinishHand(winner,points,ending='rounds'){
   localDealAfterHand();
 }
 function localShowEvidence(groups){
-  const room=state.room,delay=state.learning?3000:5000;
+  const room=state.room,delay=state.learning?PRACTICE_PAUSE_MS:5000;
   room.status='revealing';room.pendingBet=null;room.trickCards=[];room.turn=null;room.endReveal={id:crypto.randomUUID(),endsAt:gameTime()+delay,groups};
   scheduleLocalTransition(room,()=>{if(!state.localGame||state.room!==room||room.status!=='revealing')return;localDealAfterHand();},delay);
 }
@@ -3291,9 +3294,25 @@ function markTrickWinner(room,container){
     node.classList.toggle('trick-winner',framed);
     let tag=node.querySelector('.trick-winner-label');
     if(!label){tag?.remove();continue;}
-    if(!tag){tag=document.createElement('span');tag.className='trick-winner-label';node.append(tag);}
-    tag.textContent=label;
+    if(tag?.dataset.round!==room.resolutionId){
+      tag?.remove();
+      // Text, a link to the card guide with both cards, and a bar that runs out with the pause.
+      tag=document.createElement('span');tag.className='trick-winner-label';tag.dataset.round=room.resolutionId;
+      const text=document.createElement('span'),why=document.createElement('button'),bar=document.createElement('span');
+      text.className='trick-winner-text';why.type='button';why.className='trick-winner-why';why.textContent='¿Por qué?';bar.className='trick-winner-timer';
+      why.addEventListener('click',event=>{event.stopPropagation();openTrickGuide(room);});
+      const left=Math.max(0,(roundPauseInfo(room)?.endsAt??gameTime())-gameTime());
+      bar.style.setProperty('--trick-left',left+'ms');
+      tag.append(text,why,bar);node.append(tag);
+    }
+    tag.querySelector('.trick-winner-text').textContent=label;
+    tag.classList.toggle('is-paused',!!state.learning.paused);
   }
+}
+function openTrickGuide(room){
+  if(!state.learning||!room.trickCards?.length)return;
+  state.learning.activeTutorial={roundCards:structuredClone(room.trickCards),trickGuide:true};
+  openStudySheet();
 }
 function renderPlayedCards(room){
   const container=$('trick-cards'),cards=room.trickCards||[];
@@ -3949,6 +3968,7 @@ function scheduleLocalTransition(room,callback,delay){
 function pauseLearning(){
   const learning=state.learning;if(!learning)return;
   if(!learning.paused){learning.pausedAt=gameTime();learning.paused=true;}
+  for(const tag of document.querySelectorAll('.trick-winner-label'))tag.classList.add('is-paused');
   clearTimeout(state.botTimer);state.botTimer=null;
   const transition=learning.transition;
   if(transition?.timer!=null){
@@ -4157,6 +4177,7 @@ $('learn-menu').addEventListener('click',openLearning);
 $('game-sheet').addEventListener('click',()=>{if(state.learning)openStudySheet();});
 $('learn-sheet-menu').addEventListener('click',openStudySheet);
 $('learn-sheet-close').addEventListener('click',()=>$('learn-sheet-dialog').close());
+$('learn-sheet-dialog').addEventListener('close',()=>{if(state.learning?.activeTutorial?.trickGuide)state.learning.activeTutorial=null;});
 $('learn-envido-study').addEventListener('click',()=>openStudy('envido'));
 $('learn-flor-study').addEventListener('click',()=>openStudy('flor'));
 $('learn-flor-points-study').addEventListener('click',()=>openStudy('flor-points'));
