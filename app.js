@@ -5,7 +5,7 @@ import { installActivity } from './activity.js?v=20261010-adminstats32';
 import { installCredits } from './credits.js?v=20261022-bank1';
 import { installAccount } from './account.js?v=20261022-ios-redirect';
 import { initializeGameAuth } from './auth-init.js?v=20261016-android-google';
-import {installTeamTable,TEAM_SEATS,playerTeam,positionDealerDeck,renderTeamLobbySeats,renderWaitingSeats} from './team-table-ui.js?v=20261023-compa1';
+import {installTeamTable,TEAM_SEATS,playerTeam,positionDealerDeck,renderTeamLobbySeats,renderWaitingSeats} from './team-table-ui.js?v=20261023-ui4';
 import {createLiveTables,LiveError} from './live-tables.js?v=20261022-clock1';
 const FIREBASE_VERSION = '12.4.0';
 const $ = (id) => document.getElementById(id);
@@ -2349,7 +2349,7 @@ function renderGame() {
   if (!state.room||state.botActing) return;
   $('game-view').classList.toggle('team-mode',state.room.mode==='2v2');
   // Team tables count down their pauses (tricks, shown flowers and envidos) like 1v1.
-  if(state.room.mode==='2v2'){syncPrivateHand();syncMatchChat();renderCallNotice();teamTable.render();renderTurnTimer();renderRoundPauseTimer();finishRoomPreparation();return;}
+  if(state.room.mode==='2v2'){syncPrivateHand();syncMatchChat();renderCallNotice();teamTable.render();renderTurnTimer();renderRoundPauseTimer();placeMyFlor();finishRoomPreparation();return;}
   $('opponent-hand').classList.remove('hidden');
   $('team-seats')?.remove();
   syncMatchChat();
@@ -2374,6 +2374,7 @@ function renderGame() {
   const sharedTable = true;
   renderEndEvidence(room,sharedTable);
   renderRoundPauseTimer();
+  placeMyFlor();
   $('game-view').classList.toggle('two-device-mode', true);
   const mobileMarker=document.querySelector('.mobile-score'),felt=$('felt-area');
   if(mobileMarker.parentElement!==felt)felt.append(mobileMarker);
@@ -3117,6 +3118,21 @@ function opponentCardCount(room,playerId=otherPlayer(state.playerId)){
   }
   return Math.max(0,3-played.size);
 }
+// Your sung flor sits just right of your cards, in 1v1 and 2v2 alike.
+function placeMyFlor(){
+  const flor=$('my-flor'),room=state.room;if(!flor)return;
+  const cards=[...$('hand').querySelectorAll('.hand-card')];
+  const show=!!room&&room.status==='started'&&room.flors?.[state.playerId]!=null&&cards.length>0&&$('game-view').classList.contains('active');
+  flor.classList.toggle('hidden',!show);if(!show)return;
+  if(!flor.innerHTML)flor.innerHTML=$('opponent-flor').innerHTML;
+  requestAnimationFrame(()=>{
+    const rects=[...$('hand').querySelectorAll('.hand-card')].map(card=>card.getBoundingClientRect()).filter(rect=>rect.width);if(!rects.length)return;
+    const base=(flor.offsetParent||document.body).getBoundingClientRect();
+    flor.style.left=(Math.max(...rects.map(rect=>rect.right))-base.left+10)+'px';
+    flor.style.top=((Math.min(...rects.map(rect=>rect.top))+Math.max(...rects.map(rect=>rect.bottom)))/2-base.top)+'px';
+  });
+}
+globalThis.addEventListener?.('resize',()=>placeMyFlor());
 function renderOpponentHand(room){
   const hand=$('opponent-hand');if(!hand)return;
   const count=opponentCardCount(room),name=room.players?.[otherPlayer(state.playerId)]?.name||'Tu rival';
@@ -3129,9 +3145,6 @@ function renderOpponentHand(room){
   // The rival sang flor this hand.
   const flor=$('opponent-flor'),sang=room.flors?.[otherPlayer(state.playerId)]!=null&&room.status==='started';
   flor.classList.toggle('hidden',!sang);flor.setAttribute('aria-label',sang?`${name} cantó flor`:'');
-  // And yours, beside your hand.
-  const mine=$('my-flor');if(!mine.innerHTML)mine.innerHTML=flor.innerHTML;
-  mine.classList.toggle('hidden',!(room.flors?.[state.playerId]!=null&&room.status==='started'));
 }
 function syncMobileGameHeader(){
   const badge=$('turn-badge'),parent=document.querySelector('.game-topbar');
