@@ -5,7 +5,7 @@ import { installActivity } from './activity.js?v=20261010-adminstats32';
 import { installCredits } from './credits.js?v=20261022-bank1';
 import { installAccount } from './account.js?v=20261022-ios-redirect';
 import { initializeGameAuth } from './auth-init.js?v=20261016-android-google';
-import {installTeamTable,TEAM_SEATS,playerTeam,positionDealerDeck,renderTeamLobbySeats,renderWaitingSeats} from './team-table-ui.js?v=20261022-flor1';
+import {installTeamTable,TEAM_SEATS,playerTeam,positionDealerDeck,renderTeamLobbySeats,renderWaitingSeats} from './team-table-ui.js?v=20261023-bots2';
 import {createLiveTables,LiveError} from './live-tables.js?v=20261022-clock1';
 const FIREBASE_VERSION = '12.4.0';
 const $ = (id) => document.getElementById(id);

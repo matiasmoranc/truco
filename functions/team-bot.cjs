@@ -14,6 +14,8 @@ const prefer=(ok,yes,no)=>ok?[yes,no]:[no,yes];
 
 function teamTantos(s,p){const r=s.room;return Math.max(...[p,partnerOf(p)].filter(q=>!r.folded?.[q]).map(q=>s.truth?.[q]??0));}
 const canOpenEnvido=(r,p)=>r.trickNo===1&&!r.envidoClosed&&(r.playedBy?.[p]||0)===0;
+// The pie, the team's last player from the mano, is the one who sings envido.
+const isPie=(r,p)=>ordered(r.mano).filter(q=>team(q)===team(p)&&!r.folded?.[q]).at(-1)===p;
 const owesFlor=(s,p)=>(s.room.playedBy?.[p]||0)===0&&s.room.flors?.[p]==null&&flower(s.originals?.[p]||[],s.room.muestra);
 
 // Every simulated player wins the trick as cheaply as possible, never overtakes
@@ -149,7 +151,7 @@ function botCommands(s,p,random=Math.random){
  if(b?.revealMode)return declarations(s,p);
  if(b)return owesFlor(s,p)&&b.type!=='flor'?[call('flor'),...answers(s,p,random)]:answers(s,p,random);
  const moves=owesFlor(s,p)?[call('flor')]:[],tantos=teamTantos(s,p);
- if(canOpenEnvido(r,p)&&tantos>=27)moves.push(call(tantos>=31?'real':'envido'));
+ if(canOpenEnvido(r,p)&&isPie(r,p)&&tantos>=27)moves.push(call(tantos>=31?'real':'envido'));
  const signal=signalFor(r,p),next=r.trucoLevel+1,trucoOpen=next<=4&&r.lastTrucoTeam!==team(p),truco=call({2:'truco',3:'retruco',4:'vale4'}[next]);
  if(signal==='veni'||signal==='juga')return [...moves,...obeyedCards(s,p,signal).map(card=>({kind:'play',cardId:card.id}))];
  const ranked=rankedCards(s,p,random),chance=ranked[0]?.chance??0;

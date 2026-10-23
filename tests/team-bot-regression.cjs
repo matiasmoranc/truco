@@ -73,3 +73,13 @@ test('A timed-out flor declaration uses the flor points, and says son buenas whe
  createTeamReferee(s,{now:93000}).advance();
  assert.equal(r.callNotice.text,'Son buenas');
 });
+
+test('Only the pie bot sings envido; the first of its team just plays',()=>{
+ const s=newTeamSession('ABCDE',people,30,{id:'m5',stake:1,pot:4,matchNumber:1},1000),r=s.room;
+ Object.assign(r,{mano:'player1',turn:'player1',trickNo:1,envidoClosed:false,playedBy:{},flors:{},trickCards:[]});
+ s.truth={player1:33,player2:0,player3:33,player4:0};
+ for(const q of ['player1','player2','player3','player4'])r.flors[q]=true;
+ assert.ok(!botCommands(s,'player1',()=>0.99).some(c=>c.kind==='call'&&['envido','real'].includes(c.value)));
+ r.turn='player3';
+ assert.deepEqual(botCommands(s,'player3',()=>0.99)[0],{kind:'call',value:'real'});
+});

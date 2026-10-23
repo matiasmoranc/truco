@@ -25,19 +25,44 @@ export function dealerDeckPose(seat,teams,width,height){
  const sampleAngle=Math.atan2(dx,-dy)*180/Math.PI;
  return {left,top,sampleAngle,deckAngle:sampleAngle+90,inwardX:dx/length,inwardY:dy/length};
 }
+// Where the four played cards land on this screen, measured once per felt size with hidden probes.
+let playedSlots={key:'',boxes:[]};
+function playedCardBoxes($,bounds){
+ const key=Math.round(bounds.width)+'x'+Math.round(bounds.height),cards=$('trick-cards');
+ if(playedSlots.key===key||!cards)return playedSlots.boxes;
+ const boxes=['self','right','partner','left'].map(pos=>{const probe=document.createElement('div');probe.className='sprite-card team-played team-played-'+pos;probe.style.cssText='visibility:hidden;animation:none;transition:none';cards.append(probe);const box=probe.getBoundingClientRect();probe.remove();return box;});
+ playedSlots={key,boxes:boxes.some(b=>b.width)?boxes:[]};return playedSlots.boxes;
+}
+const touches=(a,b,gap=4)=>a.left<b.right+gap&&b.left<a.right+gap&&a.top<b.bottom+gap&&b.top<a.bottom+gap;
+// Team tables: the nudge that keeps deck and sample clear, per felt size, seat and hand size.
+const deckNudges=new Map();
 export function positionDealerDeck($,dealer,viewer,teams=false){
  const seat=dealerPosition(dealer,viewer,teams)||'self',felt=$('felt-area');
  const bounds=felt.getBoundingClientRect(),pose=dealerDeckPose(seat,teams,bounds.width,bounds.height);
  const offset=($('muestra-card').offsetHeight||84)*.34;
- for(const id of ['deck-stack','muestra-card']){
+ // push: pixels away from the center; side: pixels across that direction.
+ const place=(push,side)=>{for(const id of ['deck-stack','muestra-card']){
   const el=$(id);if(el.parentElement!==felt)felt.append(el);
   el.dataset.dealerPosition=seat;
-  const sample=id==='muestra-card';
-  el.style.left=sample?`calc(${pose.left}% + ${pose.inwardX*offset}px)`:pose.left+'%';
-  el.style.top=sample?`calc(${pose.top}% + ${pose.inwardY*offset}px)`:pose.top+'%';
+  const sample=id==='muestra-card',along=(sample?offset:0)-push;
+  el.style.left=`calc(${pose.left}% + ${pose.inwardX*along-pose.inwardY*side}px)`;
+  el.style.top=`calc(${pose.top}% + ${pose.inwardY*along+pose.inwardX*side}px)`;
   el.style.right='auto';el.style.transform=`translate(calc(-50% + ${sample?'var(--muestra-dx,0px)':'0px'}),calc(-50% + ${sample?'var(--muestra-dy,0px)':'0px'})) rotate(${sample?pose.sampleAngle:pose.deckAngle}deg)`;
   el.style.zIndex=sample?'3':'4';el.style.transformOrigin='50% 50%';
- }
+ }};
+ if(!teams){place(0,0);return;}
+ // Played cards must never cover the sample; the deck also stays off my hand and the seats.
+ const handCards=[...(felt.querySelectorAll?.('#hand .hand-card')||[])];
+ const key=[Math.round(bounds.width),Math.round(bounds.height),seat,handCards.length].join(':');
+ if(deckNudges.has(key)){const [push,side]=deckNudges.get(key);place(push,side);return;}
+ place(0,0);
+ const slots=playedCardBoxes($,bounds);if(!slots.length)return;
+ const obstacles=[...slots,...[...handCards,...felt.querySelectorAll('.team-seat .team-player-name,.team-seat .team-backs>i')].map(el=>el.getBoundingClientRect())];
+ const clear=()=>{const boxes=[$('muestra-card'),$('deck-stack')].map(el=>el.getBoundingClientRect()),d=boxes[1];
+  return d.left>=bounds.left&&d.right<=bounds.right&&d.top>=bounds.top&&d.bottom<=bounds.bottom&&!boxes.some(b=>obstacles.some(o=>touches(b,o)));};
+ let best=[0,0];
+ search:for(let push=0;push<=120;push+=8)for(const side of [0,-16,16,-32,32,-48,48]){place(push,side);if(clear()){best=[push,side];break search;}}
+ deckNudges.set(key,best);place(...best);
 }
 export function renderTeamLobbySeats(code,room,safe,disabled=false){
  const group=(team,index)=>`<div class="lobby-team" role="group" aria-label="Equipo ${index}">${TEAM_SEATS.filter(p=>playerTeam(p)===team).map(p=>room.players?.[p]?`<span class="lobby-team-name" title="${safe(room.players[p].name)}">${safe(room.players[p].name)}</span>`:`<button class="lobby-team-join" data-room="${safe(code)}" data-seat="player" data-team="${team}" aria-label="Entrar al equipo ${index}" ${disabled?'disabled':''}>Entrar</button>`).join('<span class="lobby-team-dash" aria-hidden="true">–</span>')}</div>`;
@@ -137,7 +162,10 @@ export function installTeamTable({$,getState,command,runAction,renderPlayerHand,
   }
   const signaled=r.teamSignal?.to===r.turn&&r.teamSignal.handNumber===r.handNumber&&r.teamSignal.trickNo===r.trickNo;
   renderSignalTimer(signalButtons&&r.players[r.turn]?.bot&&!signaled?r.turnClock?.startedAt:null);
-  $('player-actions').classList.toggle('hidden',drawing||r.status==='complete');$('player-actions').innerHTML=buttons.length?'<div class="action-buttons compact-actions team-actions">'+buttons.join('')+'</div>':'';for(const b of $('player-actions').querySelectorAll('[data-team-action]'))b.onclick=e=>send(e.currentTarget,{kind:'call',value:b.dataset.teamAction});
+  $('player-actions').classList.toggle('hidden',drawing||r.status==='complete');$('player-actions').innerHTML=buttons.length?'<div class="action-buttons compact-actions team-actions">'+buttons.join('')+'</div>':'';
+  // As in 1v1: quiero / no quiero always on the bottom row, every other call above.
+  const actionBox=$('player-actions').querySelector('.team-actions'),answers=actionBox?[...actionBox.querySelectorAll('[data-team-action="yes"],[data-team-action="no"]')]:[];
+  if(answers.length){const options=document.createElement('div'),response=document.createElement('div');options.className='bet-options-row';response.className='bet-answers-row';for(const b of actionBox.querySelectorAll('button'))(answers.includes(b)?response:options).append(b);actionBox.replaceChildren(...(options.children.length?[options]:[]),response);}for(const b of $('player-actions').querySelectorAll('[data-team-action]'))b.onclick=e=>send(e.currentTarget,{kind:'call',value:b.dataset.teamAction});
   for(const b of $('player-actions').querySelectorAll('[data-team-signal]'))b.onclick=e=>send(e.currentTarget,{kind:'team-signal',value:b.dataset.teamSignal});
   const time=r.turnClock?Math.max(0,Math.ceil((45000-(gameTime()-r.turnClock.startedAt))/1000)):null;setTurnBadge(drawing?'SORTEO':r.status==='revealing'||r.pendingNextHand||r.resolvingTrick?'NUEVA JUGADA':turn===p?(pending?'RESPONDÉ':'TU TURNO'):'Turno de '+(r.players[turn]?.name||'…'));
   const pause=$('round-pause-timer');pause.classList.add('hidden');renderEnd();syncControls();
