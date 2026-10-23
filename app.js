@@ -503,7 +503,7 @@ function makeCallNotice(text,bet=state.room?.pendingBet){
 }
 
 // Practice gives a little more time to read each result.
-const PRACTICE_PAUSE_MS=4000;
+const PRACTICE_PAUSE_MS=5000;
 let roundPauseTimer=null;
 const roundPauseArrivals=new Map();
 // Live tables set their deadlines with the table server clock; count down with that clock.
@@ -2427,7 +2427,7 @@ function renderGame() {
   if(mustDeclareFlor){buttons.push('<button class="call-button" data-action="flor"><strong>FLOR</strong></button>');}
   else if(pending?.revealMode){buttons.push('<span class="action-wait">'+(pending.revealTurn===state.playerId?'Deslizá para elegir tus tantos':'Esperando los tantos del rival…')+'</span>');}
   else if(pending?.type==='flor'){if(pending.responder===state.playerId)buttons.push(...florAnswers(pending,roomHasFlor(room,state.hand)).map(([action,label])=>`<button class="${action==='yes'?'call-button':'pass-button'}" data-action="${action}">${label}</button>`));else buttons.push('<span class="action-wait">ESPERANDO RESPUESTA…</span>');}
-  else if(pending){if(pending.responder===state.playerId){if(['envido','truco'].includes(pending.type)&&state.hand.length===3&&roomHasFlor(room,state.hand)&&!room.flors?.[state.playerId])buttons.push('<button class="call-button" data-action="flor"><strong>FLOR</strong></button>');if(pending.type==='truco'&&canEnvido)buttons.push('<button class="pass-button" data-action="envido"><strong>ENVIDO</strong></button><button class="pass-button" data-action="real"><strong>REAL ENVIDO</strong></button><button class="pass-button" data-action="falta"><strong>FALTA ENVIDO</strong></button>');if(canRaiseEnvido(pending)&&!Object.keys(room.flors||{}).length){buttons.push('<div class="envido-action-grid"><div class="envido-action-row envido-raises"><button class="pass-button" data-action="raise-envido"><strong>ENVIDO</strong></button><button class="pass-button" data-action="raise-real"><strong>REAL ENVIDO</strong></button><button class="pass-button" data-action="raise-falta"><strong>FALTA ENVIDO</strong></button></div><div class="envido-action-row envido-answer"><button class="call-button" data-action="yes">QUIERO</button><button class="pass-button" data-action="no">NO QUIERO</button></div></div>');}else{buttons.push(`${pending.type==='flor'&&pending.single&&!roomHasFlor(room,state.hand)?'':`<button class="call-button" data-action="yes">${pending.type==='flor'?(pending.single?'FLOR':'LA MÍA ES FLOR'):'QUIERO'}</button>`}<button class="pass-button" data-action="no">${pending.type==='flor'&&pending.single?'TIENE':'NO QUIERO'}</button>`);}if(pending.type==='truco'&&pending.stake<4)buttons.push(`<button class="pass-button" data-action="raise">${pending.stake===2?'RETRUCO':'VALE 4'}</button>`);if(pending.type==='flor'&&!pending.single){buttons.push('<button class="pass-button" data-action="raise-conflor">CON FLOR ENVIDO</button><button class="pass-button" data-action="raise-faltaflor">CONTRA FLOR AL RESTO</button>');}}else buttons.push('<span class="action-wait">ESPERANDO RESPUESTA…</span>');}
+  else if(pending){if(pending.responder===state.playerId){if(['envido','truco'].includes(pending.type)&&state.hand.length===3&&roomHasFlor(room,state.hand)&&!room.flors?.[state.playerId])buttons.push('<button class="call-button" data-action="flor"><strong>FLOR</strong></button>');if(pending.type==='truco'&&canEnvido)buttons.push('<button class="pass-button" data-action="envido"><strong>ENVIDO</strong></button><button class="pass-button" data-action="real"><strong>REAL ENVIDO</strong></button><button class="pass-button" data-action="falta"><strong>FALTA ENVIDO</strong></button>');if(canRaiseEnvido(pending)&&!Object.keys(room.flors||{}).length){buttons.push('<div class="envido-action-grid"><div class="envido-action-row envido-raises"><button class="pass-button" data-action="raise-envido"><strong>ENVIDO</strong></button><button class="pass-button" data-action="raise-real"><strong>REAL ENVIDO</strong></button><button class="pass-button" data-action="raise-falta"><strong>FALTA ENVIDO</strong></button></div><div class="envido-action-row envido-answer"><button class="call-button" data-action="yes">QUIERO</button><button class="pass-button" data-action="no">NO QUIERO</button></div></div>');}else{buttons.push(`${pending.type==='flor'?florAnswers(pending,roomHasFlor(room,state.hand)).map(([action,label])=>`<button class="${action==='yes'?'call-button':'pass-button'}" data-action="${action}">${label}</button>`).join(''):'<button class="call-button" data-action="yes">QUIERO</button><button class="pass-button" data-action="no">NO QUIERO</button>'}`);}if(pending.type==='truco'&&pending.stake<4)buttons.push(`<button class="pass-button" data-action="raise">${pending.stake===2?'RETRUCO':'VALE 4'}</button>`);}else buttons.push('<span class="action-wait">ESPERANDO RESPUESTA…</span>');}
   else {
     if(state.hand.length===3&&roomHasFlor(room,state.hand)&&!room.flors?.[state.playerId])buttons.push('<button class="call-button" data-action="flor"><strong>FLOR</strong></button>');
     if(canEnvido)buttons.push('<button class="pass-button" data-action="envido"><strong>ENVIDO</strong></button><button class="pass-button" data-action="real"><strong>REAL</strong></button><button class="pass-button" data-action="falta"><strong>FALTA</strong></button>');
@@ -3285,7 +3285,7 @@ function trickWinnerMark(room,playerId){
   const winner=room.resolvedTrickWinner;
   if(!winner)return {framed:true,label:playerId===state.playerId?'Empate':''};
   if(playerId!==winner)return {framed:false,label:''};
-  return {framed:true,label:winner===state.playerId?'Gana vos':'Gana el rival'};
+  return {framed:true,label:winner===state.playerId?'Ganás vos':'Gana el rival'};
 }
 function markTrickWinner(room,container){
   if(state.botActing||!state.learning)return;
@@ -3867,11 +3867,33 @@ function setLearningWhoWins(enabled){
   }
   renderLearning();
 }
+// Practice: each answer button with one short line on what it does, in the order shown below.
+function learningAnswerOptions(room,bet){
+  const pts=n=>n+' '+(Number(n)===1?'punto':'puntos');
+  if(bet.type==='truco'){
+    const stake=Number(bet.stake)||2,options=[['QUIERO','Juegan esta mano por '+pts(stake)+'.'],['NO QUIERO','El bot gana '+pts(stake-1)+' y se reparte de nuevo.']];
+    if(stake<4)options.push([stake===2?'RETRUCO':'VALE 4','Subís a '+pts(stake+1)+'. Si el bot no quiere, ganás '+pts(stake)+'.']);
+    return options;
+  }
+  if(bet.type==='envido'){
+    const options=[['QUIERO','Gana quien tenga más tantos: '+pts(Number(bet.stake)||2)+'.'],['NO QUIERO','El bot gana '+pts(Number(bet.accepted)||1)+'.']];
+    if(canRaiseEnvido(bet)&&!Object.keys(room.flors||{}).length)options.push(['ENVIDO · REAL · FALTA','Subís los puntos en juego.']);
+    return options;
+  }
+  if(bet.type==='flor'){
+    const hand=state.localOriginalHands?.player1||state.hand,stake=Number(bet.stake)||3;
+    const texts={yes:bet.single?'Cantás tu flor y compiten las dos.':bet.called==='flor'?'Siguen jugando. Al final, la flor más alta gana '+pts(stake)+'.':'La flor más alta gana '+pts(stake)+'.',
+      no:bet.single?'No tenés flor: el bot gana 3 puntos.':'El bot gana '+pts(declinedFlorPoints(bet))+'.',
+      'raise-conflor':'Apostás '+pts(florBetPoints(room,'conflor'))+' a la flor más alta.','raise-faltaflor':'Apostás la partida a la flor más alta.'};
+    return florAnswers(bet,roomHasFlor(room,hand)).map(([action,label])=>[label,texts[action]||'']);
+  }
+  return [];
+}
 function learningResponseTitle(room,bet){
  if(!bet)return 'Antes de responder';
  if(bet.revealMode&&bet.caller===state.playerId)return 'Declarar tus tantos de envido';
  if(bet.revealMode&&bet.caller==null)return 'Declarar tus tantos de envido';
- const name=room.players?.[bet.caller]?.name||'El rival';
+ const name=state.localGame&&bet.caller==='player2'?'El bot':room.players?.[bet.caller]?.name||'El rival';
  if(bet.type==='truco')return name+(Number(bet.stake)===2?' gritó ':' dice ')+({2:'TRUCO',3:'RETRUCO',4:'VALE 4'}[bet.stake]||'TRUCO');
  if(bet.type==='flor')return name+' cantó '+betCallNames(bet).join(' + ').toUpperCase();
  if(bet.type==='envido')return name+' dijo '+betCallNames(bet).join(' + ').toUpperCase();
@@ -3898,7 +3920,14 @@ function showLearningMessage(){
   if(scoreMessage){$('learning-hint').removeAttribute('aria-labelledby');$('learning-hint').setAttribute('aria-label','Puntos de la mano');}
   else{$('learning-hint').removeAttribute('aria-label');$('learning-hint').setAttribute('aria-labelledby','learning-message-title');}
   const body=$('learning-message-body');body.replaceChildren();
-  (tutorial?[tutorial.text]:scoreMessage?[scoreMessage]:learningGuidance()).flatMap(text=>text.replace(/\.\s*/g,'.\n').split('\n')).filter(text=>text.trim()).forEach(text=>{const p=document.createElement('p');p.textContent=text;body.append(p);});
+  const answers=!tutorial&&!scoreMessage&&bet&&!bet.revealMode&&bet.responder==='player1'?learningAnswerOptions(room,bet):[];
+  $('learning-hint').classList.toggle('answer-message',answers.length>0);
+  if(answers.length){
+    const ask=document.createElement('p'),list=document.createElement('ul');
+    ask.className='learning-answer-ask';ask.textContent='¿Qué respondés?';list.className='learning-answers';
+    for(const [label,text] of answers){const item=document.createElement('li'),name=document.createElement('strong'),detail=document.createElement('span');name.textContent=label;detail.textContent=text;item.append(name,detail);list.append(item);}
+    body.append(ask,list);
+  }else (tutorial?[tutorial.text]:scoreMessage?[scoreMessage]:learningGuidance()).flatMap(text=>text.replace(/\.\s*/g,'.\n').split('\n')).filter(text=>text.trim()).forEach(text=>{const p=document.createElement('p');p.textContent=text;body.append(p);});
   const studyButton=$('learning-message-study'),kind=!tutorial&&!scoreMessage&&['envido','flor'].includes(bet?.type)?bet.type:null;
   studyButton.classList.toggle('hidden',!kind);
   studyButton.dataset.studyKind=kind||'';

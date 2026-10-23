@@ -2070,6 +2070,12 @@ input,textarea,[contenteditable=""],[contenteditable="true"]{-webkit-user-select
 @media(prefers-reduced-motion:reduce){.played-card.trick-winner::after,.trick-winner-label{animation:none}}
 .trick-winner-why{pointer-events:auto;min-height:32px;margin:-6px 0;padding:6px 0;border:0;background:none;color:#f1f5ee;font:600 13px/1 "DM Sans",sans-serif;text-decoration:underline;text-underline-offset:3px;cursor:pointer;touch-action:manipulation}
 .trick-winner-timer{display:block;width:72px;height:3px;border-radius:2px;background:#e8c98333;overflow:hidden}
-.trick-winner-timer::before{content:"";display:block;height:100%;background:#e8c983;transform-origin:left;animation:trick-winner-timer var(--trick-left,4000ms) linear forwards}
+.trick-winner-timer::before{content:"";display:block;height:100%;background:#e8c983;transform-origin:left;animation:trick-winner-timer var(--trick-left,5000ms) linear forwards}
 .trick-winner-label.is-paused .trick-winner-timer::before{animation-play-state:paused}
 @keyframes trick-winner-timer{from{transform:scaleX(1)}to{transform:scaleX(0)}}
+.learning-message .learning-answer-ask{margin:2px 0 12px!important;color:#e8c983;font-size:15px!important;font-weight:600;text-align:left}
+.learning-answers{list-style:none;margin:0;padding:0;display:grid;gap:10px;text-align:left}
+.learning-answers li{display:grid;grid-template-columns:112px 1fr;align-items:center;gap:12px}
+.learning-answers strong{display:grid;place-items:center;min-height:34px;padding:5px 8px;border:1px solid #e8c983aa;border-radius:8px;color:#f7f3e9;font-size:11.5px;font-weight:700;letter-spacing:.03em;line-height:1.15;text-align:center}
+.learning-answers li:first-child strong{border-color:#e8c983;background:#e8c983;color:#15251b}
+.learning-answers span{color:#e0e7dc;font-size:14px;line-height:1.35}
