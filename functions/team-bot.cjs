@@ -110,27 +110,30 @@ function declarations(s,p){
  return prefer(best<0||truth>best,{kind:'declare',value:truth,good:false},{kind:'declare',value:0,good:true});
 }
 
+// Envido and flor thresholds: the 1v1 "difícil" bot's plus 3, since a team table plays more reserved.
+// Tantos are the best of the pair. A flower is always sung; con flor envido needs 32 (1v1 accepts it always).
+const ENVIDO={open:28,real:36,overTruco:30,raise:35,accept:{envido:26,real:29,falta:33}};
+const FLOR={raise:41,accept:{conflor:32,falta:35}};
 function answers(s,p,random){
  const r=s.room,b=r.pendingBet,moves=[];
  if(b.type==='truco'){
   const tantos=teamTantos(s,p);
-  if(canOpenEnvido(r,p)&&tantos>=27)moves.push(call(tantos>=31?'real':'envido'));
+  if(canOpenEnvido(r,p)&&tantos>=ENVIDO.overTruco)moves.push(call(tantos>=ENVIDO.real?'real':'envido'));
   const chance=winChance(s,p,random),level=b.stake;
   if(level<4&&chance>=(level===2?0.75:0.82))moves.push(call('raise'));
   return [...moves,...prefer(chance>=({2:0.35,3:0.4,4:0.45})[level],call('yes'),call('no'))];
  }
  if(b.type==='envido'){
   const tantos=teamTantos(s,p);
-  if(b.called==='envido'&&tantos>=31)moves.push(call('raise-real'));
-  else if(b.called==='real'&&tantos>=33)moves.push(call('raise-falta'));
-  return [...moves,...prefer(tantos>=({envido:27,real:29,falta:31}[b.called]??29),call('yes'),call('no'))];
+  if(b.called!=='falta'&&tantos>=ENVIDO.raise)moves.push(call(b.called==='envido'?'raise-real':'raise-falta'));
+  return [...moves,...prefer(tantos>=(ENVIDO.accept[b.called]??ENVIDO.accept.real),call('yes'),call('no'))];
  }
  if(b.type==='flor'){
   const ours=[p,partnerOf(p)].filter(q=>!r.folded?.[q]&&(r.flors?.[q]!=null||q===p&&owesFlor(s,p))).map(q=>florValue(s.originals[q],r.muestra));
   if(!ours.length)return [call('no'),call('yes')];
   const best=Math.max(...ours);
-  if(b.called==='flor'&&best>=35)moves.push(call('raise-conflor'));
-  return [...moves,...prefer(best>=({conflor:32,falta:34}[b.called]??0),call('yes'),call('no'))];
+  if(b.called!=='falta'&&best>=FLOR.raise)moves.push(call(b.called==='flor'?'raise-conflor':'raise-faltaflor'));
+  return [...moves,...prefer(best>=(FLOR.accept[b.called]??0),call('yes'),call('no'))];
  }
  return [call('no'),call('yes')];
 }
@@ -176,7 +179,7 @@ function botCommands(s,p,random=Math.random){
  if(b)return owesFlor(s,p)&&b.type!=='flor'?[call('flor'),...answers(s,p,random)]:answers(s,p,random);
  const moves=owesFlor(s,p)?[call('flor')]:[],tantos=teamTantos(s,p);
  // Now and then (about 15% of the time) the pie bluffs an envido with few points.
- if(canOpenEnvido(r,p)&&isPie(r,p)&&(tantos>=27||tantos<23&&random()<BLUFF))moves.push(call(tantos>=31?'real':'envido'));
+ if(canOpenEnvido(r,p)&&isPie(r,p)&&(tantos>=ENVIDO.open||tantos<23&&random()<BLUFF))moves.push(call(tantos>=ENVIDO.real?'real':'envido'));
  const signal=signalFor(r,p),next=r.trucoLevel+1,trucoOpen=next<=4&&r.lastTrucoTeam!==team(p),truco=call({2:'truco',3:'retruco',4:'vale4'}[next]);
  if(signal==='veni'||signal==='juga')return [...moves,...obeyedCards(s,p,signal).map(card=>({kind:'play',cardId:card.id}))];
  const ranked=rankedCards(s,p,random),chance=ranked[0]?.chance??0;

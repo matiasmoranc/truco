@@ -82,7 +82,7 @@ test('A timed-out flor declaration uses the flor points, and says son buenas whe
 test('Only the pie bot sings envido; the first of its team just plays',()=>{
  const s=newTeamSession('ABCDE',people,30,{id:'m5',stake:1,pot:4,matchNumber:1},1000),r=s.room;
  Object.assign(r,{mano:'player1',turn:'player1',trickNo:1,envidoClosed:false,playedBy:{},flors:{},trickCards:[]});
- s.truth={player1:33,player2:0,player3:33,player4:0};
+ s.truth={player1:36,player2:0,player3:36,player4:0};
  for(const q of ['player1','player2','player3','player4'])r.flors[q]=true;
  assert.ok(!botCommands(s,'player1',()=>0.99).some(c=>c.kind==='call'&&['envido','real'].includes(c.value)));
  r.turn='player3';
@@ -142,4 +142,12 @@ test('A bot answering a flor with its own unsung flower does not fold it',()=>{
  const {s,r}=opening();s.hands.player2=[tcard('♣',1),tcard('♣',4),tcard('♣',7)];s.originals=structuredClone(s.hands);
  r.flors={player1:true};r.pendingBet={id:'f1',type:'flor',caller:'player1',callerTeam:'player1',responder:'player2',stake:3,accepted:0,called:'flor'};
  const first=botCommands(s,'player2',()=>0.99)[0];assert.notDeepEqual(first,{kind:'call',value:'no'});
+});
+test('Team bots use the 1v1 hard thresholds plus 3 for envido',()=>{
+ const {s,r}=opening();r.turn='player3';
+ const first=t=>{s.truth={player1:0,player2:0,player3:t,player4:0};return botCommands(s,'player3',()=>0.99).find(c=>c.kind==='call'&&['envido','real'].includes(c.value))?.value||null;};
+ assert.equal(first(27),null);assert.equal(first(28),'envido');assert.equal(first(35),'envido');assert.equal(first(36),'real');
+ const answer=(called,t)=>{s.truth={player1:0,player2:0,player3:t,player4:0};r.turn='player1';r.pendingBet={id:'e1',type:'envido',caller:'player2',callerTeam:'player2',responder:'player3',stake:2,accepted:0,called};return botCommands(s,'player3',()=>0.99)[0].value;};
+ assert.equal(answer('envido',25),'no');assert.equal(answer('envido',26),'yes');assert.equal(answer('real',29),'yes');assert.equal(answer('falta',32),'no');assert.equal(answer('falta',33),'yes');
+ assert.equal(answer('envido',35),'raise-real');
 });
