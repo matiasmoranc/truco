@@ -114,3 +114,29 @@ test('Rivals use the declared envido and shown cards: 35 with a 12 and a 5 shown
  assert.ok(winChance(s,'player2',random)>0.4);
  assert.notDeepEqual(botCommands(s,'player2',random)[0],{kind:'call',value:'no'});
 });
+const tcard=(suit,rank)=>({id:({'♦':'oro','♥':'copa','♠':'espada','♣':'basto'})[suit]+'-'+rank,suit,rank,label:String(rank)});
+function opening(){
+ const s=newTeamSession('ABCDE',people,30,{id:'m9',stake:1,pot:4,matchNumber:1},1000),r=s.room;
+ Object.assign(r,{mano:'player1',turn:'player1',trickNo:1,envidoClosed:false,playedBy:{},flors:{},trickCards:[],tricks:[],trucoLevel:1,lastTrucoTeam:null,pendingBet:null,muestra:tcard('♦',6)});
+ s.hands.player1=[tcard('♥',4),tcard('♣',5),tcard('♠',6)];s.originals=structuredClone(s.hands);
+ return {s,r};
+}
+test('Bots wait to shout truco until their team won a round, and bluff only now and then',()=>{
+ const {s,r}=opening();s.truth={player1:5,player2:5,player3:5,player4:5};r.envidoClosed=true;
+ const calls=random=>botCommands(s,'player1',random).filter(c=>c.kind==='call').map(c=>c.value);
+ assert.ok(!calls(()=>0.99).includes('truco'),'a weak hand does not shout without a bluff');
+ assert.ok(calls(()=>0.05).includes('truco'),'a weak hand can bluff');
+ s.hands.player1=[tcard('♦',2),tcard('♦',4),tcard('♠',1)];s.originals.player1=s.hands.player1;
+ r.tricks=[{winner:'player1'}];r.trickNo=2;
+ assert.ok(calls(()=>0.99).includes('truco'),'after winning a round a strong hand shouts');
+});
+test('The pie bot bluffs envido with few points only now and then',()=>{
+ const {s,r}=opening();r.turn='player3';s.truth={player1:4,player2:0,player3:5,player4:0};
+ const envido=random=>botCommands(s,'player3',random).some(c=>c.kind==='call'&&c.value==='envido');
+ assert.equal(envido(()=>0.99),false);assert.equal(envido(()=>0.05),true);
+});
+test('A bot answering a flor with its own unsung flower does not fold it',()=>{
+ const {s,r}=opening();s.hands.player2=[tcard('♣',1),tcard('♣',4),tcard('♣',7)];s.originals=structuredClone(s.hands);
+ r.flors={player1:true};r.pendingBet={id:'f1',type:'flor',caller:'player1',callerTeam:'player1',responder:'player2',stake:3,accepted:0,called:'flor'};
+ const first=botCommands(s,'player2',()=>0.99)[0];assert.notDeepEqual(first,{kind:'call',value:'no'});
+});

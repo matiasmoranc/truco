@@ -5,7 +5,7 @@ import { installActivity } from './activity.js?v=20261010-adminstats32';
 import { installCredits } from './credits.js?v=20261022-bank1';
 import { installAccount } from './account.js?v=20261022-ios-redirect';
 import { initializeGameAuth } from './auth-init.js?v=20261016-android-google';
-import {installTeamTable,TEAM_SEATS,playerTeam,positionDealerDeck,renderTeamLobbySeats,renderWaitingSeats} from './team-table-ui.js?v=20261023-pause1';
+import {installTeamTable,TEAM_SEATS,playerTeam,positionDealerDeck,renderTeamLobbySeats,renderWaitingSeats} from './team-table-ui.js?v=20261023-flor3';
 import {createLiveTables,LiveError} from './live-tables.js?v=20261022-clock1';
 const FIREBASE_VERSION = '12.4.0';
 const $ = (id) => document.getElementById(id);
@@ -3097,6 +3097,9 @@ function renderOpponentHand(room){
   // The rival sang flor this hand.
   const flor=$('opponent-flor'),sang=room.flors?.[otherPlayer(state.playerId)]!=null&&room.status==='started';
   flor.classList.toggle('hidden',!sang);flor.setAttribute('aria-label',sang?`${name} cantó flor`:'');
+  // And yours, beside your hand.
+  const mine=$('my-flor');if(!mine.innerHTML)mine.innerHTML=flor.innerHTML;
+  mine.classList.toggle('hidden',!(room.flors?.[state.playerId]!=null&&room.status==='started'));
 }
 function syncMobileGameHeader(){
   const badge=$('turn-badge'),parent=document.querySelector('.game-topbar');

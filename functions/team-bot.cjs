@@ -126,7 +126,7 @@ function answers(s,p,random){
   return [...moves,...prefer(tantos>=({envido:27,real:29,falta:31}[b.called]??29),call('yes'),call('no'))];
  }
  if(b.type==='flor'){
-  const ours=[p,partnerOf(p)].filter(q=>r.flors?.[q]!=null&&!r.folded?.[q]).map(q=>florValue(s.originals[q],r.muestra));
+  const ours=[p,partnerOf(p)].filter(q=>!r.folded?.[q]&&(r.flors?.[q]!=null||q===p&&owesFlor(s,p))).map(q=>florValue(s.originals[q],r.muestra));
   if(!ours.length)return [call('no'),call('yes')];
   const best=Math.max(...ours);
   if(b.called==='flor'&&best>=35)moves.push(call('raise-conflor'));
@@ -168,17 +168,21 @@ function obeyedCards(s,p,signal){
 
 // Commands for the bot in `seat`, best first; the table tries them in order, so
 // a rule the bot misjudged falls back to the next legal move. [] = not its move.
+const BLUFF=0.12;
 function botCommands(s,p,random=Math.random){
  if(!mustAct(s,p))return [];
  const r=s.room,b=r.pendingBet;
  if(b?.revealMode)return declarations(s,p);
  if(b)return owesFlor(s,p)&&b.type!=='flor'?[call('flor'),...answers(s,p,random)]:answers(s,p,random);
  const moves=owesFlor(s,p)?[call('flor')]:[],tantos=teamTantos(s,p);
- if(canOpenEnvido(r,p)&&isPie(r,p)&&tantos>=27)moves.push(call(tantos>=31?'real':'envido'));
+ // Now and then (about one hand in eight) the pie bluffs an envido with few points.
+ if(canOpenEnvido(r,p)&&isPie(r,p)&&(tantos>=27||tantos<23&&random()<BLUFF))moves.push(call(tantos>=31?'real':'envido'));
  const signal=signalFor(r,p),next=r.trucoLevel+1,trucoOpen=next<=4&&r.lastTrucoTeam!==team(p),truco=call({2:'truco',3:'retruco',4:'vale4'}[next]);
  if(signal==='veni'||signal==='juga')return [...moves,...obeyedCards(s,p,signal).map(card=>({kind:'play',cardId:card.id}))];
  const ranked=rankedCards(s,p,random),chance=ranked[0]?.chance??0;
- if(trucoOpen&&(signal==='grita'||chance>=({2:0.66,3:0.74,4:0.8})[next]||next===2&&chance>=0.45&&random()<0.1))moves.push(truco);
+ // Shout once the team has won a round; before that only with a near-sure hand, or as an occasional bluff.
+ const wonRound=(r.tricks||[]).some(t=>t.winner===team(p));
+ if(trucoOpen&&(signal==='grita'||chance>=(wonRound?({2:0.66,3:0.74,4:0.8})[next]:0.92)||next===2&&chance<0.3&&random()<BLUFF))moves.push(truco);
  return [...moves,...ranked.map(({card})=>({kind:'play',cardId:card.id}))];
 }
 

@@ -2079,3 +2079,7 @@ input,textarea,[contenteditable=""],[contenteditable="true"]{-webkit-user-select
 .learning-answers strong{display:grid;place-items:center;min-height:34px;padding:5px 8px;border:1px solid #e8c983aa;border-radius:8px;color:#f7f3e9;font-size:11.5px;font-weight:700;letter-spacing:.03em;line-height:1.15;text-align:center}
 .learning-answers li:first-child strong{border-color:#e8c983;background:#e8c983;color:#15251b}
 .learning-answers span{color:#e0e7dc;font-size:14px;line-height:1.35}
+.my-flor{display:none}
+.game.player-mode.two-device-mode .my-flor:not(.hidden){display:grid;position:absolute;left:18px;top:calc(var(--board-handCenter,66%) - var(--board-handHeight,130px)*.5 - 22px);transform:translateY(-50%);z-index:11}
+.game.drawing-mode .my-flor,.game.reveal-mode .my-flor,.game.team-mode .my-flor{display:none!important}
+.setup-game-modes button[data-table-mode="bot"]{flex-direction:column;justify-content:center;gap:1px;white-space:normal;line-height:1.1}.setup-game-modes button small{display:block;font-size:10.5px;font-weight:500;letter-spacing:0;text-transform:none;opacity:.8;white-space:nowrap}

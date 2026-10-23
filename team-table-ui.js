@@ -125,8 +125,8 @@ export function installTeamTable({$,getState,command,runAction,renderPlayerHand,
    const fan=Array.from({length:count},(_,j)=>`<i class="${faceUp?'sprite-card teammate-card':'opponent-card-back'}" style="--fan-index:${j-(count-1)/2};${faceUp?cardImageStyle(s.partnerHand[j]):''}"${faceUp?` aria-label="${safe(cardAccessibleName(s.partnerHand[j]))}"`:''}></i>`).join('');
    const backs=i===0?'':i===2?`<button class="team-backs team-partner-cards" type="button" aria-label="Ver cartas del compañero durante 3 segundos" aria-pressed="${faceUp}" ${count?'':'disabled'}>${fan}</button>`:`<div class="team-backs">${fan}</div>`;
    const status=r.folded?.[q]?'AL MAZO':'';
-   // Rivals who sang flor show it beside their cards.
-   const flor=(i===1||i===3)&&r.status==='started'&&r.flors?.[q]!=null?`<span class="team-flor flor-badge" role="img" aria-label="${safe(person?.name||'Jugador')} cantó flor">${FLOR_ICON}</span>`:'';
+   // Everyone who sang flor shows it beside their cards, you and your partner included.
+   const flor=r.status==='started'&&r.flors?.[q]!=null?`<span class="team-flor flor-badge" role="img" aria-label="${safe(person?.name||'Jugador')} cantó flor">${FLOR_ICON}</span>`:'';
    el.innerHTML=`${i===0?(status?`<span class="team-self-status">${status}</span>`:''):`<span class="team-player-name">${safe(person?.name||'Jugador')}${status?`<small>${status}</small>`:''}</span>`}${backs}${flor}<div class="team-speech hidden"></div>`;
    if(i===2&&flip&&!matchMedia('(prefers-reduced-motion: reduce)').matches)for(const card of el.querySelectorAll('.team-backs>i'))card.animate([{rotate:'y 90deg',opacity:.3,scale:'.94'},{rotate:'y 0deg',opacity:1,scale:'1'}],{duration:280,easing:'ease-out'});
    if(i===2)el.querySelector('.team-partner-cards').onclick=()=>{showPartner();render();};
