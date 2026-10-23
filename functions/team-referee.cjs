@@ -101,6 +101,8 @@ function createTeamReferee(s,{now=Date.now(),deckFactory=deck}={}){
   else if(['truco','retruco','vale4'].includes(v)){const wanted={truco:2,retruco:3,vale4:4}[v];if(b||wanted!==r.trucoLevel+1||wanted>4||r.lastTrucoTeam===team(p))throw new Error('Ese grito no está disponible.');r.pendingBet={id:crypto.randomUUID(),type:'truco',caller:p,callerTeam:team(p),responder:responder(opponent(team(p))),stake:wanted,called:v};}
   else throw new Error('Canto inválido.');notice(p,({truco:'Truco',retruco:'Retruco',vale4:'Vale cuatro',envido:'Envido',real:'Real envido',falta:'Falta envido'})[v]);
  }
+ // Passing while one's own team leads the declarations is "paso", not "son buenas".
+ function passWord(b,p){const lead=(b.order||[]).filter(q=>(b.reveals?.[q]??-1)>=0).reduce((a,q)=>!a||b.reveals[q]>b.reveals[a]?q:a,null);return lead&&team(lead)===team(p)?'Paso':'Son buenas';}
  // Flower points are the real ones; ties go to the earlier seat from the mano.
  function declareFlor(p,n,good){
   const b=r.pendingBet;b.reveals??={};
@@ -108,7 +110,7 @@ function createTeamReferee(s,{now=Date.now(),deckFactory=deck}={}){
   if(good&&best<0)throw new Error('El mano declara primero los puntos de su flor.');
   if(!good&&n!==truth)throw new Error('Declará los puntos de tu flor: '+truth+'.');
   if(!good&&n<=best)throw new Error('No superás la flor declarada: decí son buenas.');
-  b.reveals[p]=good?-1:n;notice(p,good?'Son buenas':n+' de flor');
+  const word=good?passWord(b,p):'';b.reveals[p]=good?-1:n;notice(p,good?word:n+' de flor');
   const next=b.order.slice(b.order.indexOf(p)+1).find(active);
   if(next){b.revealTurn=next;b.responder=next;return;}
   const winner=b.order.reduce((a,q)=>!a||(b.reveals[q]??-1)>(b.reveals[a]??-1)?q:a,null);
@@ -123,7 +125,7 @@ function createTeamReferee(s,{now=Date.now(),deckFactory=deck}={}){
   if(b.type==='flor'){declareFlor(p,n,good);return;}
   if(!good&&(!Number.isInteger(n)||n<0||n>37))throw new Error('Elegí un valor entre 0 y 37.');
   b.reveals??={};if(good&&!Object.values(b.reveals).some(v=>v>=0)&&active(p))throw new Error('El mano declara primero sus tantos.');
-  b.reveals[p]=good?-1:n;notice(p,good?'Son buenas':n+' tantos');
+  const word=good?passWord(b,p):'';b.reveals[p]=good?-1:n;notice(p,good?word:n+' tantos');
   const i=b.order.indexOf(p),next=b.order.slice(i+1).find(active);
   if(next){b.revealTurn=next;b.responder=next;return;}
   const best=b.order.reduce((a,q)=>!a||(b.reveals[q]??-1)>(b.reveals[a]??-1)?q:a,null);
@@ -144,7 +146,7 @@ function createTeamReferee(s,{now=Date.now(),deckFactory=deck}={}){
   const leader=r.mano;
   const mates=ordered(leader).filter(q=>team(q)===team(p)&&active(q));
   if(!labels[value]||r.pendingBet||mates.length!==2||mates.at(-1)!==p||r.turn!==mates[0])throw new Error('Solo el pie puede indicar cuando juega su compañero.');
-  r.teamSignal={id:crypto.randomUUID(),from:p,to:r.turn,text:labels[value],handNumber:r.handNumber,trickNo:r.trickNo,time:now};
+  r.teamSignal={id:crypto.randomUUID(),from:p,to:r.turn,text:labels[value],value,handNumber:r.handNumber,trickNo:r.trickNo,time:now};
  }
  function action(p,c){if(!SEATS.includes(p))throw new Error('Jugador inválido.');advance();if(c.kind==='draw'){if(r.status!=='drawing'||r.openingDraw.cards[p])throw new Error('El sorteo cambió.');r.openingDraw.cards[p]=s.drawPool.shift();if(SEATS.every(q=>r.openingDraw.cards[q]))r.openingDraw.resolveAt=now+2000;return advance();}
   if(r.status!=='started'||r.resolvingTrick||r.pendingNextHand)throw new Error('Esperá a que termine la pausa.');if(!active(p))throw new Error('Te fuiste al mazo en esta mano.');if(c.kind==='team-signal')signal(p,c.value);else if(c.kind==='play')play(p,c.cardId);else if(c.kind==='call')call(p,c.value);else if(c.kind==='fold')fold(p);else if(c.kind==='declare')declare(p,c.value,c.good===true);else throw new Error('Acción inválida.');return advance();}

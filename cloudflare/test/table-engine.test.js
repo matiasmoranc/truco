@@ -1,10 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createTableEngine,slimMatch,CodeTakenError} from '../src/table-engine.js';
+import {createTableEngine,slimMatch,CodeTakenError,BOT_DELAY_MS} from '../src/table-engine.js';
 import {createFirebaseBank} from '../src/firebase-bank.js';
 import adminService from '../../functions/admin-service.cjs';
 import playerService from '../../functions/player-service.cjs';
 import teamBot from '../../functions/team-bot.cjs';
+import teamReferee from '../../functions/team-referee.cjs';
 
 // The Firebase bank over an in-memory Realtime Database.
 function memoryBank(economy){
@@ -210,7 +211,7 @@ test('Only the creator seats bots, and a full bot table starts charging only peo
  await assert.rejects(engine.act('b',{command:{kind:'add-bot',seat:'player3'},requestId:'x1',expectedMatchId:'bots1'}),/creó la mesa/);
  await engine.act('a',{command:{kind:'add-bot',seat:'player3'},requestId:'x2',expectedMatchId:'bots1'});
  await assert.rejects(engine.act('a',{command:{kind:'add-bot',seat:'player3'},requestId:'x3',expectedMatchId:'bots1'}),/ocupado/);
- assert.equal(engine.match.status,'waiting');assert.equal(engine.match.players.player3.name,'Bot · Difícil');
+ assert.equal(engine.match.status,'waiting');assert.equal(engine.match.players.player3.name,'Bot');
  await engine.act('a',{command:{kind:'add-bot',seat:'player4'},requestId:'x4',expectedMatchId:'bots1'});
  assert.equal(engine.match.status,'reserved');assert.equal(engine.lobbyEntry(),null);
  assert.deepEqual(Object.keys(bank.economy.wallets).sort(),['a','b','c','d']);
@@ -242,4 +243,34 @@ test('Two people against two bots: only the people pay and collect',async()=>{
  const won=m.session.room.matchResult.winner==='player1';
  assert.equal(bank.economy.wallets.a.balance,won?13:11);assert.equal(bank.economy.wallets.b.balance,won?8:6);
  assert.equal(bank.economy.wallets.a.locked+bank.economy.wallets.b.locked,0);
+});
+
+test('A bot partner waits up to 10 s for the pie\'s signal, obeys "vení" and otherwise plays on its own',async()=>{
+ const {engine,advance,now}=setup();
+ await engine.create({uid:'a',name:'A'},{id:'sig1',stake:1,targetPoints:30,mode:'2v2'});
+ for(const seat of ['player2','player3','player4'])await engine.act('a',{command:{kind:'add-bot',seat},requestId:'s'+seat,expectedMatchId:'sig1'});
+ let obeyed=false,waited=false;
+ for(let i=0;i<20000&&engine.match.status==='reserved'&&!(obeyed&&waited);i++){
+  const m=engine.match,s=m.session,r=s.room;
+  if(teamBot.awaitsSignal(s,'player3')&&!teamBot.signalFor(r,'player3')){
+   const played=r.playedBy?.player3||0,start=r.turnClock.startedAt;
+   advance(start+9000-now());await engine.tick();
+   assert.equal(engine.match.session.room.playedBy?.player3||0,played,'the bot played before 10 s');
+   if(!obeyed){
+    const lowest=[...s.hands.player3].sort((x,y)=>teamReferee.strength(x,r.muestra)-teamReferee.strength(y,r.muestra))[0];
+    await engine.act('a',{command:{kind:'team-signal',value:'veni'},requestId:'v'+i,expectedMatchId:m.id});
+    advance(BOT_DELAY_MS+100);await engine.tick();
+    const after=engine.match.session.room;
+    if((after.playedBy?.player3||0)>played){assert.equal(after.trickCards.find(c=>c.playerId==='player3')?.card.id??after.tricks.at(-1).cards.find(c=>c.playerId==='player3').card.id,lowest.id);obeyed=true;}
+   }else{
+    advance(1100);await engine.tick();
+    assert.ok((engine.match.session.room.playedBy?.player3||0)>played||engine.match.session.room.pendingBet,'the bot did not move after 10 s');
+    waited=true;
+   }
+   continue;
+  }
+  if(teamBot.mustAct(s,'player1')){for(const command of teamBot.botCommands(s,'player1')){try{await engine.act('a',{command,requestId:'h'+i,expectedMatchId:m.id});break;}catch{}}}
+  else{advance(2000);await engine.tick();}
+ }
+ assert.ok(obeyed,'the bot never obeyed vení');assert.ok(waited,'the bot never played on its own after waiting');
 });

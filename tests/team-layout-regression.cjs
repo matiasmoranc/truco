@@ -68,11 +68,24 @@ test('Notices expire and never cross a hand or trick boundary',async()=>{
 });
 test('Only the creator sees "Usar bot", once under each empty seat of a waiting team table',async()=>{
  const {renderWaitingSeats}=await ui,safe=s=>String(s);
- const room={mode:'2v2',status:'waiting',players:{player1:{name:'Ana'},player2:{name:'Bot · Difícil',uid:'bot:player2',bot:true}}};
+ const room={mode:'2v2',status:'waiting',players:{player1:{name:'Ana'},player2:{name:'Bot',uid:'bot:player2',bot:true}}};
  const creator=renderWaitingSeats(room,'player1',safe);
  assert.deepEqual([...creator.matchAll(/data-add-bot="(player\d)"/g)].map(m=>m[1]).sort(),['player3','player4']);
  assert.ok(/waiting-player[^"]* occupied bot"/.test(creator));
  assert.ok(!/data-add-bot/.test(renderWaitingSeats({...room,players:{...room.players,player3:{name:'Juan'}}},'player3',safe)));
  assert.ok(!/data-add-bot/.test(renderWaitingSeats({...room,status:'closed'},'player1',safe)));
  assert.ok(!/data-add-bot/.test(renderWaitingSeats({status:'waiting',players:{player1:{name:'Ana'}}},'player1',safe)));
+});
+test('The declaration buttons say "paso" only while my own team leads',async()=>{
+ const {teamLeadsDeclaration}=await ui,order=['player2','player3','player4','player1'];
+ assert.equal(teamLeadsDeclaration({order,reveals:{}},'player1'),false);
+ assert.equal(teamLeadsDeclaration({order,reveals:{player2:27}},'player1'),false);
+ assert.equal(teamLeadsDeclaration({order,reveals:{player2:27,player3:31}},'player1'),true);
+ assert.equal(teamLeadsDeclaration({order,reveals:{player2:31,player3:31}},'player1'),false);
+ assert.equal(teamLeadsDeclaration({order,reveals:{player2:27,player3:-1}},'player2'),true);
+});
+test('Team decks sit a little farther from the center than before, on every side',async()=>{
+ const {dealerDeckPose}=await ui;
+ const before={self:[75,52],right:[73,21],partner:[27,21],left:[25,52]};
+ for(const [seat,[x,y]] of Object.entries(before)){const pose=dealerDeckPose(seat,true,390,760);assert.ok(Math.hypot(pose.left-50,pose.top-44)>Math.hypot(x-50,y-44));}
 });

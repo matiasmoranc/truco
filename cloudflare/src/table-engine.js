@@ -7,7 +7,7 @@ import teamBot from '../../functions/team-bot.cjs';
 import {ACTIVE,CodeTakenError} from './ledger-ops.js';
 
 const {tableOperation,publicTable,privateTableHand}=tableService;
-const {mustAct,botCommands}=teamBot;
+const {SIGNAL_WAIT_MS,mustAct,awaitsSignal,signalFor,botCommands}=teamBot;
 export {CodeTakenError,slimMatch} from './ledger-ops.js';
 
 export const WAIT_MS=600000;
@@ -18,14 +18,22 @@ const PROBE_BALANCE=1000000;
 const findPlayer=(m,uid)=>Object.keys(m?.players||{}).find(p=>m.players[p]?.uid===uid)||null;
 
 export function createTableEngine({code,bank,clock=()=>Date.now()}){
- let m=null,presence={},botDueAt=null;
+ let m=null,presence={},botDueAt=null,botKey=null;
 
  // The bot seat the table is waiting for, if any.
  const botSeat=()=>m?.status==='reserved'&&m.session?Object.keys(m.players||{}).find(p=>m.players[p]?.bot&&mustAct(m.session,p))||null:null;
- function scheduleBot(){botDueAt=botSeat()?botDueAt??clock()+BOT_DELAY_MS:null;}
+ // When the bot moves: after a short pause, or, if its human partner may signal
+ // it, once the signal arrives or 10 s after its turn started.
+ function scheduleBot(){
+  const seat=botSeat();if(!seat){botDueAt=null;botKey=null;return;}
+  const r=m.session.room,signal=signalFor(r,seat),key=[seat,r.turnClock?.key||'',signal||''].join('|');
+  if(key===botKey&&botDueAt!=null)return;
+  const now=clock(),waitUntil=!signal&&awaitsSignal(m.session,seat)?(r.turnClock?.startedAt??now)+SIGNAL_WAIT_MS:0;
+  botKey=key;botDueAt=Math.max(now+BOT_DELAY_MS,waitUntil);
+ }
  // Tries the bot's moves best first; the referee rejects an illegal one unchanged.
  async function playBot(){
-  const seat=botSeat();botDueAt=null;if(!seat)return false;
+  const seat=botSeat();botDueAt=null;botKey=null;if(!seat)return false;
   let failure=null;
   for(const command of botCommands(m.session,seat)){
    try{await operate({uid:m.players[seat].uid,command,requestId:null,presence});return true;}
@@ -67,7 +75,7 @@ export function createTableEngine({code,bank,clock=()=>Date.now()}){
  return {
   get match(){return m;},
   get presence(){return presence;},
-  load(saved){m=saved?.match||null;presence=saved?.presence||{};botDueAt=null;scheduleBot();},
+  load(saved){m=saved?.match||null;presence=saved?.presence||{};botDueAt=null;botKey=null;scheduleBot();},
   snapshot(){return {match:m,presence};},
   playerFor(uid){return findPlayer(m,uid);},
   async create(user,{id,stake,targetPoints,mode,secret,initial}){

@@ -2740,7 +2740,7 @@ async function startBotGame(name){
   if(!await startLocalBotGame())return;
   state.bot=true;state.botDifficulty=$('bot-level').value;
   state.roomCode='BOT1';state.room.targetPoints=Number($('target-points').value);
-  state.room.players={player1:{name},player2:{name:'Bot · '+botLevelLabel(state.botDifficulty)}};
+  state.room.players={player1:{name},player2:{name:'Bot'}};
   try{localStorage.setItem('truco-player-name',name);}catch{}
   state.dismissedMatchEnd=null;renderGame();
 }

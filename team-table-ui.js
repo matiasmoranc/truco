@@ -3,6 +3,12 @@ export function teamPie(room,player){
  const i=TEAM_SEATS.indexOf(first),order=[...TEAM_SEATS.slice(i),...TEAM_SEATS.slice(0,i)];
  return order.filter(q=>playerTeam(q)===playerTeam(player)&&!room.folded?.[q]).at(-1);
 }
+// Whether the best envido or flor declared so far is from `team`; ties go to the earlier seat from the mano.
+export function teamLeadsDeclaration(bet,team){
+ const reveals=bet?.reveals||{};
+ const lead=(bet?.order||[]).filter(q=>(reveals[q]??-1)>=0).reduce((a,q)=>!a||reveals[q]>reveals[a]?q:a,null);
+ return !!lead&&playerTeam(lead)===team;
+}
 export function visibleTeamNotice(notice,room,now){return !!notice&&notice.handNumber===room.handNumber&&(notice.trickNo==null||notice.trickNo===room.trickNo)&&now-notice.time>=0&&now-notice.time<(Number(notice.duration)||5000);}
 export const TEAM_SEATS=['player1','player2','player3','player4'];
 const FLOR_ICON=globalThis.document?.getElementById('opponent-flor')?.innerHTML||'';
@@ -12,7 +18,8 @@ export function dealerPosition(dealer,viewer,teams=false){
  return teams?['self','right','partner','left'][teamSeatsFor(viewer).indexOf(dealer)]:(dealer===viewer?'self':'partner');
 }
 export function dealerDeckPose(seat,teams,width,height){
- const spots=teams?{self:[75,52],right:[73,21],partner:[27,21],left:[25,52]}:{self:[82,44],partner:[18,44]};
+ // Team tables keep the deck a little away from the center, so played cards never cover the sample.
+ const spots=teams?{self:[76,58],right:[78,16],partner:[22,16],left:[24,58]}:{self:[82,44],partner:[18,44]};
  const [left,top]=spots[seat]||spots.self;
  const dx=(50-left)*width/100,dy=(44-top)*height/100,length=Math.hypot(dx,dy)||1;
  const sampleAngle=Math.atan2(dx,-dy)*180/Math.PI;
@@ -46,6 +53,20 @@ export function installTeamTable({$,getState,command,runAction,renderPlayerHand,
  const safe=escapeHtml;
  const ensure=(id,tag,parent,cls)=>{let el=$(id);if(!el){el=document.createElement(tag);el.id=id;el.className=cls;parent.append(el);}return el;};
  const send=(button,c)=>runAction(button,()=>command(c));
+ // A bot partner waits up to 10 s for the pie's signal (vení, jugá, gritá): a yellow
+ // disc beside my cards empties clockwise from its top radius. startedAt null hides it.
+ const SIGNAL_WAIT_MS=10000,SIGNAL_TIMER_SIZE=36;let signalTimerHide=null;
+ function renderSignalTimer(startedAt){
+  const timer=ensure('signal-timer','div',$('felt-area'),'signal-timer hidden');
+  const left=Number.isFinite(startedAt)?SIGNAL_WAIT_MS-(gameTime()-startedAt):0;
+  clearTimeout(signalTimerHide);
+  if(left<=0){timer.classList.add('hidden');timer.dataset.key='';return;}
+  if(timer.dataset.key!==String(startedAt)){timer.dataset.key=String(startedAt);timer.style.animation='none';void timer.offsetWidth;timer.style.animation=`signal-drain ${SIGNAL_WAIT_MS}ms linear ${left-SIGNAL_WAIT_MS}ms forwards`;}
+  const card=$('hand').querySelector('.hand-card')||$('hand'),felt=$('felt-area').getBoundingClientRect(),box=card.getBoundingClientRect();
+  timer.style.left=Math.max(4,box.left-felt.left-SIGNAL_TIMER_SIZE-10)+'px';timer.style.top=(box.top-felt.top+box.height/2-SIGNAL_TIMER_SIZE/2)+'px';
+  timer.classList.remove('hidden');
+  signalTimerHide=setTimeout(()=>timer.classList.add('hidden'),left);
+ }
  function renderEnd(){const s=getState(),r=s.room;if(r?.mode!=='2v2')return;const visible=r.status==='complete'&&r.endReveal?.done;$('match-end').classList.toggle('hidden',!visible);if(!visible)return;
   const names=t=>TEAM_SEATS.filter(p=>playerTeam(p)===t).map(p=>r.players[p].name).join(' + '),won=r.matchResult.winner;
   $('match-end-title').textContent=playerTeam(s.playerId)===won?'¡Ganó tu equipo!':'Ganó el equipo rival';
@@ -55,7 +76,7 @@ export function installTeamTable({$,getState,command,runAction,renderPlayerHand,
   $('match-end-message').textContent=Object.keys(votes).length?'Revancha: '+Object.keys(votes).length+' de 4 confirmaron.':'La revancha necesita la confirmación de los cuatro.';
   $('request-rematch').classList.toggle('hidden',voted);$('accept-rematch').classList.add('hidden');$('decline-rematch').classList.add('hidden');
  }
- function render(){const s=getState(),r=s.room,p=s.playerId;if(r?.mode!=='2v2')return;
+ function render(){const s=getState(),r=s.room,p=s.playerId;if(r?.mode!=='2v2'){$('signal-timer')?.classList.add('hidden');return;}
   const game=$('game-view'),felt=$('felt-area'),seats=teamSeatsFor(p),mineTeam=playerTeam(p),enemyTeam=mineTeam==='player1'?'player2':'player1';
   game.classList.add('team-mode','player-mode','two-device-mode');game.classList.remove('learning-mode','folding-hand','declaring-envido');$('learning-toolbar').classList.add('hidden');$('learning-rounds').classList.add('hidden');$('call-notice').classList.add('hidden');$('opponent-hand').classList.add('hidden');$('game-sheet').classList.add('hidden');
   syncHeader();const marker=document.querySelector('.mobile-score');if(marker.parentElement!==felt)felt.append(marker);marker.classList.remove('hidden');
@@ -99,16 +120,23 @@ export function installTeamTable({$,getState,command,runAction,renderPlayerHand,
    old.delete(key);
   }for(const el of old.values())el.remove();known=keys;scope=nextScope;
   const evidence=$('end-hand-reveal'),groups=r.endReveal?.groups||[];evidence.classList.toggle('hidden',!groups.length||!['revealing','complete'].includes(r.status)||r.endReveal.done);if(!evidence.classList.contains('hidden'))evidence.innerHTML=groups.map(g=>`<section><strong>${safe(g.name)} · ${safe(g.label)}</strong><div>${g.cards.map(c=>`<i class="sprite-card" style="${cardImageStyle(c)}"></i>`).join('')}</div></section>`).join('');
-  const picker=$('envido-picker'),declaring=playing&&pending?.revealMode&&pending.revealTurn===p;picker.classList.toggle('hidden',!declaring);if(declaring){const key=pending.id+':'+p;if(declareKey!==key){declareKey=key;const flower=pending.type==='flor',start=flower&&s.hand.length===3?florPoints(s.hand,r.muestra):0;const best=Math.max(-1,...Object.values(pending.reveals||{})),max=flower?47:37;if(best>=max||(flower&&best>=0&&start<=best)){picker.innerHTML='<p class="team-declare-label">'+(best>=max?(flower?'Declararon la flor más alta.':'Declararon el máximo de tantos.'):'Tu flor no supera la declarada.')+'</p><div class="team-declare-buttons"><button class="pass-button" id="team-good">SON BUENAS</button></div>';$('team-good').onclick=e=>send(e.currentTarget,{kind:'declare',good:true});}else{picker.innerHTML='<label class="team-declare-label">'+(flower?'Puntos de tu flor':'Tus tantos')+' <output id="team-declare-value">'+start+'</output><input id="team-declare-slider" type="range" min="0" max="'+(flower?47:37)+'" value="'+start+'" /></label><div class="team-declare-buttons"><button class="call-button" id="team-declare">DECLARAR</button><button class="pass-button" id="team-good">SON BUENAS</button></div>';$('team-declare-slider').oninput=e=>{$('team-declare-value').textContent=e.target.value;};$('team-declare').onclick=e=>send(e.currentTarget,{kind:'declare',value:Number($('team-declare-slider').value)});$('team-good').onclick=e=>send(e.currentTarget,{kind:'declare',good:true});}}}else declareKey='';
+  const picker=$('envido-picker'),declaring=playing&&pending?.revealMode&&pending.revealTurn===p;picker.classList.toggle('hidden',!declaring);if(declaring){const key=pending.id+':'+p;if(declareKey!==key){declareKey=key;const flower=pending.type==='flor',start=flower&&s.hand.length===3?florPoints(s.hand,r.muestra):0;const best=Math.max(-1,...Object.values(pending.reveals||{})),max=flower?47:37;
+   // The first to declare must say a number; after that, "paso" when my partner leads, otherwise "son buenas".
+   const good=best<0?'':'<button class="pass-button" id="team-good">'+(teamLeadsDeclaration(pending,mineTeam)?'PASO':'SON BUENAS')+'</button>';
+   if(best>=max||(flower&&best>=0&&start<=best)){picker.innerHTML='<p class="team-declare-label">'+(best>=max?(flower?'Declararon la flor más alta.':'Declararon el máximo de tantos.'):'Tu flor no supera la declarada.')+'</p><div class="team-declare-buttons">'+good+'</div>';}else{picker.innerHTML='<label class="team-declare-label">'+(flower?'Puntos de tu flor':'Tus tantos')+' <output id="team-declare-value">'+start+'</output><input id="team-declare-slider" type="range" min="0" max="'+(flower?47:37)+'" value="'+start+'" /></label><div class="team-declare-buttons"><button class="call-button" id="team-declare">DECLARAR</button>'+good+'</div>';$('team-declare-slider').oninput=e=>{$('team-declare-value').textContent=e.target.value;};$('team-declare').onclick=e=>send(e.currentTarget,{kind:'declare',value:Number($('team-declare-slider').value)});}
+   if($('team-good'))$('team-good').onclick=e=>send(e.currentTarget,{kind:'declare',good:true});}}else declareKey='';
   const buttons=[];
   const add=(value,label,primary=false)=>buttons.push(`<button class="${primary?'call-button':'pass-button'}" data-team-action="${value}">${label}</button>`);
   if(playing&&!r.folded?.[p]){
    if(!pending&&r.turn===p){const flower=hasFlor(r,s.hand);if(!r.flors?.[p]&&(r.playedBy?.[p]||0)===0&&flower)add('flor','FLOR');if(!flower&&!r.envidoClosed&&(r.playedBy?.[p]||0)===0&&r.trickNo===1){add('envido','ENVIDO');add('real','REAL');add('falta','FALTA');}if((!flower||r.flors?.[p])&&r.trucoLevel<4&&r.lastTrucoTeam!==mineTeam)add(r.trucoLevel===1?'truco':r.trucoLevel===2?'retruco':'vale4',r.trucoLevel===1?'TRUCO':r.trucoLevel===2?'RETRUCO':'VALE 4',true);}
    if(pending&&!pending.revealMode&&pending.responder===p){if(pending.type!=='flor'&&hasFlor(r,s.hand)&&!r.flors?.[p])add('flor','FLOR',true);add('yes',pending.type==='flor'&&hasFlor(r,s.hand)?'LA MÍA ES FLOR':'QUIERO',true);add('no','NO QUIERO');if(pending.type==='truco'){if(pending.stake<4)add('raise',pending.stake===2?'RETRUCO':'VALE 4');if(!r.envidoClosed&&(r.playedBy?.[p]||0)===0){add('envido','ENVIDO');add('real','REAL');add('falta','FALTA');}}if(pending.type==='envido'&&pending.called!=='falta'){add('raise-envido','ENVIDO');add('raise-real','REAL');add('raise-falta','FALTA');}if(pending.type==='flor'&&pending.called==='flor'){add('raise-conflor','CON FLOR ENVIDO');add('raise-faltaflor','CONTRA FLOR AL RESTO');}}
   }
-  if(playing&&!pending&&!r.folded?.[p]&&r.turn!==p&&playerTeam(r.turn)===mineTeam&&!r.folded?.[r.turn]&&teamPie(r,p)===p){
+  const signalButtons=playing&&!pending&&!r.folded?.[p]&&r.turn!==p&&playerTeam(r.turn)===mineTeam&&!r.folded?.[r.turn]&&teamPie(r,p)===p;
+  if(signalButtons){
    for(const [value,label] of [['veni','Vení'],['juga','Jugá'],['grita','Gritá']])buttons.push('<button class="pass-button team-signal-button" data-team-signal="'+value+'">'+label+'</button>');
   }
+  const signaled=r.teamSignal?.to===r.turn&&r.teamSignal.handNumber===r.handNumber&&r.teamSignal.trickNo===r.trickNo;
+  renderSignalTimer(signalButtons&&r.players[r.turn]?.bot&&!signaled?r.turnClock?.startedAt:null);
   $('player-actions').classList.toggle('hidden',drawing||r.status==='complete');$('player-actions').innerHTML=buttons.length?'<div class="action-buttons compact-actions team-actions">'+buttons.join('')+'</div>':'';for(const b of $('player-actions').querySelectorAll('[data-team-action]'))b.onclick=e=>send(e.currentTarget,{kind:'call',value:b.dataset.teamAction});
   for(const b of $('player-actions').querySelectorAll('[data-team-signal]'))b.onclick=e=>send(e.currentTarget,{kind:'team-signal',value:b.dataset.teamSignal});
   const time=r.turnClock?Math.max(0,Math.ceil((45000-(gameTime()-r.turnClock.startedAt))/1000)):null;setTurnBadge(drawing?'SORTEO':r.status==='revealing'||r.pendingNextHand||r.resolvingTrick?'NUEVA JUGADA':turn===p?(pending?'RESPONDÉ':'TU TURNO'):'Turno de '+(r.players[turn]?.name||'…'));

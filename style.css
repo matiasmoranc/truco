@@ -2060,3 +2060,7 @@ input,textarea,[contenteditable=""],[contenteditable="true"]{-webkit-user-select
 .waiting-bot-button:disabled{opacity:.55;cursor:default}
 .waiting-bot-button:focus-visible{outline:2px solid #ead39b;outline-offset:3px}
 .waiting-player.bot .waiting-player-name{border-color:#e8c98366;color:#e8c983}
+/* A bot partner waits for the pie's signal: the disc empties clockwise in 10 s. */
+@property --signal-sweep{syntax:'<angle>';inherits:false;initial-value:0deg}
+.signal-timer{position:absolute;z-index:5;width:36px;height:36px;border-radius:50%;background:conic-gradient(transparent 0 var(--signal-sweep),#e8c983 var(--signal-sweep) 360deg);box-shadow:0 0 0 2px #e8c98366;pointer-events:none}
+@keyframes signal-drain{from{--signal-sweep:0deg}to{--signal-sweep:360deg}}

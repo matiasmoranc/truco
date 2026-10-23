@@ -118,6 +118,29 @@ function mustAct(s,p){
  return b?.revealMode?b.revealTurn===p:b?b.responder===p:r.turn===p;
 }
 
+// A bot that plays first for its team waits this long for its partner's signal.
+const SIGNAL_WAIT_MS=10000;
+// Whether the bot's partner (the pie) is a person who can signal it now: vení, jugá or gritá.
+function awaitsSignal(s,p){
+ const r=s?.room;if(!mustAct(s,p)||r.pendingBet)return false;
+ const mates=ordered(r.mano).filter(q=>team(q)===team(p)&&!r.folded?.[q]);
+ return mates.length===2&&mates[0]===p&&!r.players?.[mates[1]]?.bot;
+}
+// The signal the bot got for this trick, if any.
+function signalFor(r,p){
+ const n=r.teamSignal;if(!n||n.to!==p||n.handNumber!==r.handNumber||n.trickNo!==r.trickNo)return null;
+ return n.value||({'Vení':'veni','Jugá':'juga','Gritá':'grita'})[n.text]||null;
+}
+// Vení: throw the lowest card. Jugá: take the trick as cheaply as possible, or lead the highest.
+function obeyedCards(s,p,signal){
+ const r=s.room,m=r.muestra,sorted=[...(s.hands[p]||[])].sort(byStrength(m));
+ if(signal==='veni')return sorted;
+ const best=Math.max(-1,...(r.trickCards||[]).map(c=>strength(c.card,m)));
+ const winner=r.trickCards?.length?sorted.find(c=>strength(c,m)>best):null;
+ const first=winner||sorted.at(-1);
+ return [first,...sorted.filter(c=>c!==first).reverse()];
+}
+
 // Commands for the bot in `seat`, best first; the table tries them in order, so
 // a rule the bot misjudged falls back to the next legal move. [] = not its move.
 function botCommands(s,p,random=Math.random){
@@ -127,9 +150,11 @@ function botCommands(s,p,random=Math.random){
  if(b)return owesFlor(s,p)&&b.type!=='flor'?[call('flor'),...answers(s,p,random)]:answers(s,p,random);
  const moves=owesFlor(s,p)?[call('flor')]:[],tantos=teamTantos(s,p);
  if(canOpenEnvido(r,p)&&tantos>=27)moves.push(call(tantos>=31?'real':'envido'));
- const ranked=rankedCards(s,p,random),chance=ranked[0]?.chance??0,next=r.trucoLevel+1;
- if(next<=4&&r.lastTrucoTeam!==team(p)&&(chance>=({2:0.66,3:0.74,4:0.8})[next]||next===2&&chance>=0.45&&random()<0.1))moves.push(call({2:'truco',3:'retruco',4:'vale4'}[next]));
+ const signal=signalFor(r,p),next=r.trucoLevel+1,trucoOpen=next<=4&&r.lastTrucoTeam!==team(p),truco=call({2:'truco',3:'retruco',4:'vale4'}[next]);
+ if(signal==='veni'||signal==='juga')return [...moves,...obeyedCards(s,p,signal).map(card=>({kind:'play',cardId:card.id}))];
+ const ranked=rankedCards(s,p,random),chance=ranked[0]?.chance??0;
+ if(trucoOpen&&(signal==='grita'||chance>=({2:0.66,3:0.74,4:0.8})[next]||next===2&&chance>=0.45&&random()<0.1))moves.push(truco);
  return [...moves,...ranked.map(({card})=>({kind:'play',cardId:card.id}))];
 }
 
-module.exports={mustAct,botCommands,winChance,teamTantos};
+module.exports={SIGNAL_WAIT_MS,mustAct,awaitsSignal,signalFor,botCommands,winChance,teamTantos};
