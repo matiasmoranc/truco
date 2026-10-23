@@ -303,3 +303,12 @@ test('Practice answer help lists each visible button with one short line',()=>{
  assert.ok(!flor.includes('NO QUIERO'));
  assert.ok(source.includes("pending.type==='flor'?florAnswers(pending,roomHasFlor(room,state.hand))"));
 });
+test('A command on a table still being created waits for the server to confirm it instead of being dropped',async()=>{
+ const sent=[],c={state:{roomCode:'ABCDE',room:{managedCredits:true,creditMatch:{id:null},status:'waiting'}},setTimeout,crypto:require('node:crypto').webcrypto,liveActionsBlocked:()=>false,applyActionReceipt(){},toast(){},firebaseError:e=>String(e),creditTickPending:false,
+  creditApi:async(name,data)=>{sent.push(data);return {ok:true};}};
+ vm.createContext(c);vm.runInContext(extract('confirmedMatchId')+String.fromCharCode(10)+extract('creditCommand'),c);
+ setTimeout(()=>{c.state.room={...c.state.room,creditMatch:{id:'m1'}};},150);
+ await c.creditCommand({kind:'add-bot',seat:'player2'});
+ assert.equal(sent.length,1);assert.equal(sent[0].expectedMatchId,'m1');assert.equal(sent[0].command.seat,'player2');
+ c.state.room={managedCredits:true,creditMatch:{id:null}};await c.creditCommand({kind:'tick'});assert.equal(sent.length,1);
+});

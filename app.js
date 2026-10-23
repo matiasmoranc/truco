@@ -4167,7 +4167,8 @@ $('learn-game').addEventListener('click',openLearning);
 $('seats').addEventListener('click',async event=>{
   const button=event.target.closest('[data-add-bot]');if(!button||button.disabled)return;
   button.disabled=true;
-  try{await creditCommand({kind:'add-bot',seat:button.dataset.addBot});}catch{button.disabled=false;}
+  // A successful add redraws the seats; otherwise the button must work again.
+  try{await creditCommand({kind:'add-bot',seat:button.dataset.addBot});}catch{}finally{if(button.isConnected)button.disabled=false;}
 });
 $('learn-videos').addEventListener('click',()=>openLearnVideos(0));
 $('learn-videos-close').addEventListener('click',()=>$('learn-videos-dialog').close());
@@ -4309,8 +4310,18 @@ function applyActionReceipt(result,code){
   if(state.room.status==='waiting'){renderWaiting();return;}
   syncPrivateHand();renderGame();
 }
+// A table just created shows before the server confirms it; wait for its match id.
+async function confirmedMatchId(code){
+  for(let waited=0;waited<15000;waited+=100){
+    if(state.roomCode!==code)return null;
+    const id=state.room?.creditMatch?.id;if(id)return id;
+    await new Promise(resolve=>setTimeout(resolve,100));
+  }
+  return null;
+}
 async function creditCommand(command){
-  const code=state.roomCode,matchId=state.room?.creditMatch?.id;
+  const code=state.roomCode;let matchId=state.room?.creditMatch?.id;
+  if(code&&!matchId&&command.kind!=='tick'&&state.room?.managedCredits)matchId=await confirmedMatchId(code);
   if(!code||!matchId)return;
   if(liveActionsBlocked()&&command.kind!=='tick')throw new Error('Esperá a recuperar la conexión.');
   if(command.kind==='tick'&&(creditTickPending||state.liveAction||state.playActionInFlight||state.foldInFlight))return;
