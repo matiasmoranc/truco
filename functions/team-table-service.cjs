@@ -25,7 +25,8 @@ function operation(ledger,m,{uid,command:c,requestId,expectedMatchId,presence,no
  if(m.status==='waiting'){if(c.kind==='cancel'||c.kind==='abandon'||now-m.createdAt>=600000)return refund(ledger,m,now);if(c.kind==='add-bot')return addBot(ledger,m,{by:p,seat:c.seat,now});if(c.kind!=='tick')fail('Esperando a los cuatro jugadores.');return ledger;}
  if(m.status==='refunded')return ledger;
  if(!m.session)fail('Mesa cerrada.');let r=m.session.room;
- const before=JSON.stringify(m.session);createTeamReferee(m.session,{now}).advance();account(ledger,m,now);
+ // A timer step that fails must never trap the players: abandoning still ends the match.
+ const before=JSON.stringify(m.session);try{createTeamReferee(m.session,{now}).advance();}catch(error){if(c.kind!=='abandon')throw error;}account(ledger,m,now);
  if(c.kind==='abandon'&&m.status==='reserved'){
   if(r.status==='drawing'){r.status='closed';return refund(ledger,m,now);}
   const t=opposite(team(p));Object.assign(r,{status:'complete',scores:{...r.scores,[t]:m.targetPoints},matchResult:{winner:t,loser:p,reason:'abandon'},endReveal:{done:true},turn:null,turnClock:null,pendingBet:null,pendingNextHand:null,resolvingTrick:false});

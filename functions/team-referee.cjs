@@ -11,7 +11,12 @@ function strength(c,m){const p=piece(c,m);if(p)return 30-p;const id=c.id;if(id==
 function value(c,m){const p=piece(c,m);return p?[30,29,28,27,27][p-1]:c.rank<10?c.rank:0;}
 function flower(h,m){return h.length===3&&(h.filter(c=>piece(c,m)).length>=2||new Set(h.map(c=>c.suit)).size===1||h.some(c=>piece(c,m))&&new Set(h.filter(c=>!piece(c,m)).map(c=>c.suit)).size===1);}
 function florValue(h,m){const pieces=h.filter(c=>piece(c,m)).sort((a,b)=>value(b,m)-value(a,m));return pieces.length?value(pieces[0],m)+h.filter(c=>c!==pieces[0]).reduce((n,c)=>n+(piece(c,m)?value(c,m)%10:value(c,m)),0):20+h.reduce((n,c)=>n+value(c,m),0);}
-function envido(h,m){let best=0;for(let i=0;i<h.length;i++){best=Math.max(best,value(h[i],m));for(let j=i+1;j<h.length;j++)if(piece(h[i],m)||piece(h[j],m))best=Math.max(best,value(h[i],m)+value(h[j],m));else if(h[i].suit===h[j].suit)best=Math.max(best,20+value(h[i],m)+value(h[j],m));}return best;}
+// Same count as the 1v1 game: a single piece adds the best other card; with two
+// or more pieces (an unsung flor) only the best piece counts, so it never passes 37.
+function envido(h,m){const values=h.map(c=>value(c,m)),pieces=h.filter(c=>piece(c,m));let best=Math.max(0,...values);
+ if(pieces.length===1){const i=h.indexOf(pieces[0]);best=Math.max(best,values[i]+Math.max(0,...values.filter((_,j)=>j!==i)));}
+ for(let i=0;i<h.length;i++)for(let j=i+1;j<h.length;j++)if(!piece(h[i],m)&&!piece(h[j],m)&&h[i].suit===h[j].suit)best=Math.max(best,20+values[i]+values[j]);
+ return best;}
 function settledTricks(tricks,mano){const a=tricks[0]?.winner,b=tricks[1]?.winner;if(tricks.length<2)return null;if(a&&(!b||a===b))return a;if(!a&&b)return b;if(tricks.length<3)return null;return tricks[2].winner||a||team(mano);}
 function newTeamSession(code,players,targetPoints,creditMatch,now=Date.now()){
  const s={code,hands:{},originals:{},truth:{},drawPool:deck(),room:{mode:'2v2',managedCredits:true,creditMatch,deviceMode:'two',status:'drawing',createdAt:now,matchNumber:creditMatch.matchNumber||1,targetPoints,table:players.player1,players,teams:{player1:['player1','player3'],player2:['player2','player4']},scores:{player1:0,player2:0},handNumber:0,trickNo:1,playedCount:0,tricks:[],trickCards:[],feed:[],trucoLevel:1,flors:{},timeoutCounts:{},openingDraw:{cards:{},endsAt:now+60000}}};createTeamReferee(s,{now}).start();return s;
@@ -22,6 +27,8 @@ function createTeamReferee(s,{now=Date.now(),deckFactory=deck}={}){
  r.tricks=Array.isArray(r.tricks)?r.tricks:Object.values(r.tricks||{});r.trickCards=Array.isArray(r.trickCards)?r.trickCards:Object.values(r.trickCards||{});
  r.flors??={};r.timeoutCounts??={};r.playedBy??={};r.folded??={};r.feed??=[];s.hands??={};s.originals??={};s.truth??={};
  if(r.openingDraw)r.openingDraw.cards??={};
+ // Recount every envido from the dealt cards, so a hand saved with an older count cannot block the table.
+ if(r.status==='started'&&r.muestra)for(const q of SEATS)if(s.originals[q])s.truth[q]=envido(s.originals[q],r.muestra);
  const feed=text=>{r.feed=[{text,time:now},...(r.feed||[])].slice(0,12);};
  const notice=(p,text)=>{r.callNotice={id:crypto.randomUUID(),from:p,text,spoken:text,time:now,handNumber:r.handNumber,trickNo:r.trickNo};};
  const active=p=>!r.folded?.[p];
@@ -107,7 +114,7 @@ function createTeamReferee(s,{now=Date.now(),deckFactory=deck}={}){
  function declareFlor(p,n,good){
   const b=r.pendingBet;b.reveals??={};
   const best=Object.values(b.reveals).reduce((m,v)=>Math.max(m,v),-1),truth=florValue(s.originals[p],r.muestra);
-  if(good&&best<0)throw new Error('El mano declara primero los puntos de su flor.');
+  if(good&&best<0&&active(p))throw new Error('El mano declara primero los puntos de su flor.');
   if(!good&&n!==truth)throw new Error('Declará los puntos de tu flor: '+truth+'.');
   if(!good&&n<=best)throw new Error('No superás la flor declarada: decí son buenas.');
   const word=good?passWord(b,p):'';b.reveals[p]=good?-1:n;notice(p,good?word:n+' de flor');
@@ -132,13 +139,15 @@ function createTeamReferee(s,{now=Date.now(),deckFactory=deck}={}){
   r.envidoAudit={winner:best,value:b.reveals[best],stake:b.stake,reveals:b.reveals,order:b.order,settled:false};r.envidoClosed=true;resume(b.suspendedBet);
   if(b.called==='falta')finish(team(best),0,'Falta envido: se verifican los tantos.');
  }
+ // When the time runs out: the real envido or flor points, or "son buenas" if they do not beat the best one.
+ function autoDeclare(p){const b=r.pendingBet,best=Object.values(b.reveals||{}).reduce((n,v)=>Math.max(n,v),-1),n=b.type==='flor'?florValue(s.originals[p],r.muestra):s.truth[p];declare(p,n,best>=0&&n<=best);}
  function advance(){
   if(r.status==='drawing'){deal('player4');r.openingDraw=null;delete s.drawPool;}
   if(r.status==='started'&&r.resolvingTrick&&now>=r.resolutionEndsAt){const w=settledTricks(r.tricks,r.mano);r.resolvingTrick=false;r.resolutionEndsAt=null;if(w)finish(w,r.trucoLevel);else{r.trickCards=[];r.trickNo++;r.callNotice=null;r.teamSignal=null;r.turn=active(r.resolvedTrickWinner)?r.resolvedTrickWinner:nextActive(r.resolvedTrickWinner);}}
   if(r.status==='started'&&r.pendingNextHand&&now>=r.pendingNextHand.endsAt){const b=r.pendingNextHand;finish(b.winner,b.foldPoints,'El equipo rival se retiró o no quiso.');}
   if(r.status==='complete'&&r.endReveal&&!r.endReveal.done&&now>=r.endReveal.endsAt)r.endReveal.done=true;
   if(r.status==='revealing'&&now>=r.endReveal.endsAt)deal(nextSeat(r.dealer));
-  if(r.status==='started'&&r.turnClock&&now-r.turnClock.startedAt>=45000){const p=r.turnClock.player;r.timeoutCounts[p]=(r.timeoutCounts[p]||0)+1;if(r.timeoutCounts[p]>=3){finish(opponent(team(p)),r.targetPoints,'Inactividad.');r.endReveal.done=true;}else if(r.pendingBet?.responder===p&&!r.pendingBet.revealMode)call(p,'no');else if(r.pendingBet?.revealMode)declare(p,s.truth[p],false);else fold(p);}
+  if(r.status==='started'&&r.turnClock&&now-r.turnClock.startedAt>=45000){const p=r.turnClock.player;r.timeoutCounts[p]=(r.timeoutCounts[p]||0)+1;if(r.timeoutCounts[p]>=3){finish(opponent(team(p)),r.targetPoints,'Inactividad.');r.endReveal.done=true;}else if(r.pendingBet?.responder===p&&!r.pendingBet.revealMode)call(p,'no');else if(r.pendingBet?.revealMode)autoDeclare(p);else fold(p);}
   clock();return s;
  }
  function signal(p,value){

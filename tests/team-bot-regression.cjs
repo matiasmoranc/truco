@@ -43,3 +43,33 @@ test('Envido declarations: the first must say a number, and passing behind one\'
  ref.action('player2',{kind:'declare',good:true});assert.equal(r.callNotice.text,'Son buenas');
  ref.action('player3',{kind:'declare',good:true});assert.equal(r.callNotice.text,'Paso');
 });
+
+test('Envido never passes 37: two pieces count only the best one, like the 1v1 game',()=>{
+ const {envido}=require('../functions/team-referee.cjs');
+ const muestra={id:'oro-4',suit:'♦',rank:4},card=(suit,rank)=>({id:({'♦':'oro','♥':'copa','♠':'espada'})[suit]+'-'+rank,suit,rank});
+ assert.equal(envido([card('♦',2),card('♥',2),card('♦',12)],muestra),30);
+ assert.equal(envido([card('♦',2),card('♥',7),card('♠',3)],muestra),37);
+ assert.equal(envido([card('♥',7),card('♥',6),card('♠',3)],muestra),33);
+});
+test('A table saved with an impossible envido unblocks: the timed-out player declares the recounted points',()=>{
+ const {createTeamReferee}=require('../functions/team-referee.cjs');
+ const s=newTeamSession('ABCDE',people,30,{id:'m3',stake:1,pot:4,matchNumber:1},1000),r=s.room;
+ const muestra={id:'oro-4',suit:'♦',rank:4,label:'4'},card=(suit,rank)=>({id:({'♦':'oro','♥':'copa'})[suit]+'-'+rank,suit,rank,label:String(rank)});
+ r.muestra=muestra;s.originals.player1=[card('♦',2),card('♥',2),card('♦',12)];s.hands.player1=s.originals.player1.slice(1);
+ s.truth.player1=59;
+ r.pendingBet={id:'b2',type:'envido',caller:'player2',callerTeam:'player2',responder:'player1',stake:2,accepted:0,called:'envido',revealMode:true,reveals:{},order:['player1','player2','player3','player4'],revealTurn:'player1'};
+ r.turnClock={key:'k',player:'player1',startedAt:1000};
+ createTeamReferee(s,{now:1000+46000}).advance();
+ assert.equal(r.pendingBet.reveals.player1,30);assert.equal(s.truth.player1,30);assert.equal(r.pendingBet.revealTurn,'player2');
+});
+test('A timed-out flor declaration uses the flor points, and says son buenas when it cannot win',()=>{
+ const {createTeamReferee,florValue}=require('../functions/team-referee.cjs');
+ const s=newTeamSession('ABCDE',people,30,{id:'m4',stake:1,pot:4,matchNumber:1},1000),r=s.room,order=['player1','player2','player3','player4'];
+ r.pendingBet={id:'b3',type:'flor',caller:'player2',callerTeam:'player2',responder:'player1',stake:5,accepted:3,called:'conflor',revealMode:true,reveals:{},order:['player1','player2'],revealTurn:'player1'};
+ r.turnClock={key:'k',player:'player1',startedAt:1000};
+ createTeamReferee(s,{now:47000}).advance();
+ assert.equal(r.pendingBet.reveals.player1,florValue(s.originals.player1,r.muestra));
+ r.pendingBet.reveals.player1=99;r.turnClock={key:'k2',player:'player2',startedAt:47000};
+ createTeamReferee(s,{now:93000}).advance();
+ assert.equal(r.callNotice.text,'Son buenas');
+});
