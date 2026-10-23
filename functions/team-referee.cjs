@@ -108,8 +108,14 @@ function createTeamReferee(s,{now=Date.now(),deckFactory=deck}={}){
   else if(['truco','retruco','vale4'].includes(v)){const wanted={truco:2,retruco:3,vale4:4}[v];if(b||wanted!==r.trucoLevel+1||wanted>4||r.lastTrucoTeam===team(p))throw new Error('Ese grito no está disponible.');r.pendingBet={id:crypto.randomUUID(),type:'truco',caller:p,callerTeam:team(p),responder:responder(opponent(team(p))),stake:wanted,called:v};}
   else throw new Error('Canto inválido.');notice(p,({truco:'Truco',retruco:'Retruco',vale4:'Vale cuatro',envido:'Envido',real:'Real envido',falta:'Falta envido'})[v]);
  }
+ // The best declaration so far; ties go to the earlier seat from the mano.
+ const leadSeat=b=>(b.order||[]).filter(q=>(b.reveals?.[q]??-1)>=0).reduce((a,q)=>!a||b.reveals[q]>b.reveals[a]?q:a,null);
  // Passing while one's own team leads the declarations is "paso", not "son buenas".
- function passWord(b,p){const lead=(b.order||[]).filter(q=>(b.reveals?.[q]??-1)>=0).reduce((a,q)=>!a||b.reveals[q]>b.reveals[a]?q:a,null);return lead&&team(lead)===team(p)?'Paso':'Son buenas';}
+ function passWord(b,p){const lead=leadSeat(b);return lead&&team(lead)===team(p)?'Paso':'Son buenas';}
+ // Who declares next: someone who has not spoken yet, from the losing side only (a
+ // player whose partner already has the best points stays quiet, but speaks if the
+ // rivals overtake later).
+ const nextDeclarer=(b,p)=>{const lead=leadSeat(b),i=b.order.indexOf(p);return [...b.order.slice(i+1),...b.order.slice(0,i)].find(q=>active(q)&&b.reveals?.[q]===undefined&&!(lead&&team(lead)===team(q)));};
  // Flower points are the real ones; ties go to the earlier seat from the mano.
  function declareFlor(p,n,good){
   const b=r.pendingBet;b.reveals??={};
@@ -118,7 +124,7 @@ function createTeamReferee(s,{now=Date.now(),deckFactory=deck}={}){
   if(!good&&n!==truth)throw new Error('Declará los puntos de tu flor: '+truth+'.');
   if(!good&&n<=best)throw new Error('No superás la flor declarada: decí son buenas.');
   const word=good?passWord(b,p):'';b.reveals[p]=good?-1:n;notice(p,good?word:n+' de flor');
-  const next=b.order.slice(b.order.indexOf(p)+1).find(active);
+  const next=nextDeclarer(b,p);
   if(next){b.revealTurn=next;b.responder=next;return;}
   const winner=b.order.reduce((a,q)=>!a||(b.reveals[q]??-1)>(b.reveals[a]??-1)?q:a,null);
   award(team(winner),b.stake,'Flor ganada.');r.florCompared=b.called!=='flor';r.florSettled=true;r.envidoClosed=true;resume(b.suspendedBet);checkWin();
@@ -133,7 +139,7 @@ function createTeamReferee(s,{now=Date.now(),deckFactory=deck}={}){
   if(!good&&(!Number.isInteger(n)||n<0||n>37))throw new Error('Elegí un valor entre 0 y 37.');
   b.reveals??={};if(good&&!Object.values(b.reveals).some(v=>v>=0)&&active(p))throw new Error('El mano declara primero sus tantos.');
   const word=good?passWord(b,p):'';b.reveals[p]=good?-1:n;notice(p,good?word:n+' tantos');
-  const i=b.order.indexOf(p),next=b.order.slice(i+1).find(active);
+  const next=nextDeclarer(b,p);
   if(next){b.revealTurn=next;b.responder=next;return;}
   const best=b.order.reduce((a,q)=>!a||(b.reveals[q]??-1)>(b.reveals[a]??-1)?q:a,null);
   r.envidoAudit={winner:best,value:b.reveals[best],stake:b.stake,reveals:b.reveals,order:b.order,settled:false};r.envidoClosed=true;resume(b.suspendedBet);

@@ -165,7 +165,9 @@ export function installTeamTable({$,getState,command,runAction,renderPlayerHand,
   }
   const signalButtons=playing&&!pending&&!r.folded?.[p]&&r.turn!==p&&playerTeam(r.turn)===mineTeam&&!r.folded?.[r.turn]&&teamPie(r,p)===p;
   if(signalButtons){
-   for(const [value,label] of [['veni','Vení'],['juga','Jugá'],['grita','Gritá']])buttons.push('<button class="pass-button team-signal-button" data-team-signal="'+value+'">'+label+'</button>');
+   // With a single card left there is nothing low to throw: only jugá or gritá make sense.
+   const lastCard=(r.handCounts?.[r.turn]??3)<=1;
+   for(const [value,label] of [['veni','Vení'],['juga','Jugá'],['grita','Gritá']].filter(([value])=>!(lastCard&&value==='veni')))buttons.push('<button class="pass-button team-signal-button" data-team-signal="'+value+'">'+label+'</button>');
   }
   const signaled=r.teamSignal?.to===r.turn&&r.teamSignal.handNumber===r.handNumber&&r.teamSignal.trickNo===r.trickNo;
   renderSignalTimer(signalButtons&&r.players[r.turn]?.bot&&!signaled?r.turnClock?.startedAt:null);

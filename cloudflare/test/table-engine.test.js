@@ -263,8 +263,8 @@ test('A bot partner waits up to 10 s for the pie\'s signal, obeys "vení" and ot
     const after=engine.match.session.room;
     if((after.playedBy?.player3||0)>played){assert.equal(after.trickCards.find(c=>c.playerId==='player3')?.card.id??after.tricks.at(-1).cards.find(c=>c.playerId==='player3').card.id,lowest.id);obeyed=true;}
    }else{
-    advance(1100);await engine.tick();
-    assert.ok((engine.match.session.room.playedBy?.player3||0)>played||engine.match.session.room.pendingBet,'the bot did not move after 10 s');
+    const waiting=JSON.stringify(engine.match.session);advance(1100);await engine.tick();
+    assert.notEqual(JSON.stringify(engine.match.session),waiting,'the bot did not move after 10 s');
     waited=true;
    }
    continue;

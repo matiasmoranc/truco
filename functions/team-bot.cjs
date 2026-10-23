@@ -2,8 +2,10 @@
 // Plays a 2v2 seat filled with "Usar bot", at the "difícil" level. Like a person
 // it knows its own cards and its partner's (shown to every player at the start of
 // the hand); the rivals' cards stay hidden, so truco decisions and the card to play
-// come from sampling the hands the rivals could still hold.
-const {SEATS,team,ordered,strength,flower,florValue,settledTricks}=require('./team-referee.cjs');
+// come from sampling the hands the rivals could still hold, keeping only those that
+// fit what the table showed: the envido each rival declared, a flor it sang, and the
+// cards it already played.
+const {SEATS,team,ordered,strength,flower,florValue,envido,settledTricks}=require('./team-referee.cjs');
 
 const DECK=[['♦','oro'],['♥','copa'],['♠','espada'],['♣','basto']].flatMap(([suit,name])=>[1,2,3,4,5,6,7,10,11,12].map(rank=>({id:name+'-'+rank,suit,rank})));
 const SAMPLES=40;
@@ -60,25 +62,46 @@ function unseenCards(s,p){
  for(const c of r.trickCards||[])known.add(c.card.id);
  return DECK.filter(c=>!known.has(c.id));
 }
-function sampleHands(s,p,pool,random){
- const r=s.room,deck=[...pool];
- for(let i=deck.length-1;i>0;i--){const j=Math.floor(random()*(i+1));[deck[i],deck[j]]=[deck[j],deck[i]];}
- const hands={[p]:s.hands[p]||[]},mate=partnerOf(p);
+const shownBy=(r,q)=>[...(r.tricks||[]).flatMap(t=>t.cards||[]),...(r.trickCards||[])].filter(c=>c.playerId===q).map(c=>c.card);
+function combos(cards,k){const out=[],pick=(start,acc)=>{if(acc.length===k){out.push(acc.slice());return;}for(let i=start;i<cards.length;i++){acc.push(cards[i]);pick(i+1,acc);acc.pop();}};pick(0,[]);return out;}
+// For each rival with a clue, every hidden hand that fits it: its shown cards plus
+// the hidden ones must give the envido it declared, and a flor if it sang one.
+function rivalOptions(s,p,pool){
+ const r=s.room,m=r.muestra,out={};
+ const reveals={...(r.envidoAudit?.reveals||{}),...(r.pendingBet?.type==='envido'?r.pendingBet.reveals||{}:{})};
+ for(const q of SEATS){
+  if(team(q)===team(p)||r.folded?.[q])continue;
+  const said=Number.isInteger(reveals[q])&&reveals[q]>=0?reveals[q]:null,sang=r.flors?.[q]!=null;
+  if(said==null&&!sang)continue;
+  const shown=shownBy(r,q);
+  const fits=combos(pool,Math.max(0,3-shown.length)).filter(h=>{const full=[...shown,...h];return (said==null||envido(full,m)===said)&&(!sang||flower(full,m));});
+  if(fits.length)out[q]=fits;
+ }
+ return out;
+}
+// What the bot knows when it samples: the unseen cards and the hands each rival can hold.
+function knowledge(s,p){const pool=unseenCards(s,p);return {pool,options:rivalOptions(s,p,pool)};}
+function sampleHands(s,p,{pool,options},random){
+ const r=s.room,hands={[p]:s.hands[p]||[]},mate=partnerOf(p),used=new Set();
  if(!r.folded?.[mate])hands[mate]=s.hands[mate]||[];
+ // Rivals with clues first: a random hand among those that fit, without reusing cards.
+ for(const [q,fits] of Object.entries(options))for(let t=0;t<12;t++){const h=fits[Math.floor(random()*fits.length)];if(h.every(c=>!used.has(c.id))){hands[q]=h;for(const c of h)used.add(c.id);break;}}
+ const deck=pool.filter(c=>!used.has(c.id));
+ for(let i=deck.length-1;i>0;i--){const j=Math.floor(random()*(i+1));[deck[i],deck[j]]=[deck[j],deck[i]];}
  let k=0;
- for(const q of SEATS)if(team(q)!==team(p)&&!r.folded?.[q]){const n=Math.max(0,3-(r.playedBy?.[q]||0));hands[q]=deck.slice(k,k+n);k+=n;}
+ for(const q of SEATS)if(team(q)!==team(p)&&!r.folded?.[q]&&!hands[q]){const n=Math.max(0,3-(r.playedBy?.[q]||0));hands[q]=deck.slice(k,k+n);k+=n;}
  return hands;
 }
 // Share of sampled hands the bot's team wins, optionally playing `card` now.
-function winChance(s,p,random=Math.random,card=null){
- const pool=unseenCards(s,p);let wins=0;
- for(let i=0;i<SAMPLES;i++)if(playOut(s,sampleHands(s,p,pool,random),card?{seat:p,card}:null)===team(p))wins++;
+function winChance(s,p,random=Math.random,card=null,known=knowledge(s,p)){
+ let wins=0;
+ for(let i=0;i<SAMPLES;i++)if(playOut(s,sampleHands(s,p,known,random),card?{seat:p,card}:null)===team(p))wins++;
  return wins/SAMPLES;
 }
 // Best card first; on a tie, the cheaper card.
 function rankedCards(s,p,random){
- const m=s.room.muestra;
- return [...(s.hands[p]||[])].sort(byStrength(m)).map(card=>({card,chance:winChance(s,p,random,card)})).sort((a,b)=>b.chance-a.chance);
+ const m=s.room.muestra,known=knowledge(s,p);
+ return [...(s.hands[p]||[])].sort(byStrength(m)).map(card=>({card,chance:winChance(s,p,random,card,known)})).sort((a,b)=>b.chance-a.chance);
 }
 
 function declarations(s,p){
@@ -159,4 +182,4 @@ function botCommands(s,p,random=Math.random){
  return [...moves,...ranked.map(({card})=>({kind:'play',cardId:card.id}))];
 }
 
-module.exports={SIGNAL_WAIT_MS,mustAct,awaitsSignal,signalFor,botCommands,winChance,teamTantos};
+module.exports={SIGNAL_WAIT_MS,mustAct,awaitsSignal,signalFor,botCommands,winChance,teamTantos,rivalOptions,unseenCards};

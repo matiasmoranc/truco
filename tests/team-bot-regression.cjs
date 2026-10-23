@@ -32,7 +32,7 @@ test('Gritá makes the bot call truco before playing',()=>{
  assert.deepEqual(botCommands(s,p,()=>0.99)[0],{kind:'call',value:'truco'});
 });
 
-test('Envido declarations: the first must say a number, and passing behind one\'s partner is "Paso"',()=>{
+test('Envido declarations: the first must say a number, and whoever\'s partner already leads is skipped',()=>{
  const {createTeamReferee}=require('../functions/team-referee.cjs');
  const s=newTeamSession('ABCDE',people,30,{id:'m2',stake:1,pot:4,matchNumber:1},1000),r=s.room;
  const order=['player1','player2','player3','player4'];
@@ -41,7 +41,12 @@ test('Envido declarations: the first must say a number, and passing behind one\'
  assert.throws(()=>ref.action('player1',{kind:'declare',good:true}),/declara primero/);
  ref.action('player1',{kind:'declare',value:28});
  ref.action('player2',{kind:'declare',good:true});assert.equal(r.callNotice.text,'Son buenas');
- ref.action('player3',{kind:'declare',good:true});assert.equal(r.callNotice.text,'Paso');
+ // player3's partner (player1) leads with 28: player3 says nothing and player4 declares next.
+ assert.equal(r.pendingBet.revealTurn,'player4');
+ assert.throws(()=>ref.action('player3',{kind:'declare',good:true}),/No te corresponde/);
+ // player4 overtakes with 31: now player3, who has not spoken, may answer.
+ ref.action('player4',{kind:'declare',value:31});assert.equal(r.pendingBet.revealTurn,'player3');
+ ref.action('player3',{kind:'declare',good:true});assert.equal(r.envidoAudit.winner,'player4');
 });
 
 test('Envido never passes 37: two pieces count only the best one, like the 1v1 game',()=>{
@@ -82,4 +87,30 @@ test('Only the pie bot sings envido; the first of its team just plays',()=>{
  assert.ok(!botCommands(s,'player1',()=>0.99).some(c=>c.kind==='call'&&['envido','real'].includes(c.value)));
  r.turn='player3';
  assert.deepEqual(botCommands(s,'player3',()=>0.99)[0],{kind:'call',value:'real'});
+});
+
+test('Rivals use the declared envido and shown cards: 35 with a 12 and a 5 shown means the last card is the 2 of the muestra',()=>{
+ const {rivalOptions,unseenCards,winChance}=require('../functions/team-bot.cjs');
+ const c=(suit,rank)=>({id:({'♦':'oro','♥':'copa','♠':'espada','♣':'basto'})[suit]+'-'+rank,suit,rank,label:String(rank)});
+ const humans={player1:{uid:'a',name:'A'},player3:{uid:'b',name:'B'},player2:{uid:'bot:player2',name:'Bot',bot:true},player4:{uid:'bot:player4',name:'Bot',bot:true}};
+ const s=newTeamSession('ABCDE',humans,30,{id:'m6',stake:1,pot:4,matchNumber:1},1000),r=s.room;
+ r.muestra=c('♦',6);r.mano='player3';r.dealer='player2';
+ s.originals={player1:[c('♠',1),c('♣',4),c('♣',6)],player2:[c('♣',3),c('♥',7),c('♠',3)],player3:[c('♠',12),c('♥',5),c('♦',2)],player4:[c('♥',4),c('♥',2),c('♣',5)]};
+ // Trick 1 went to the humans (1 de espadas); in trick 2 player3 showed the 5 and player4 must play.
+ r.tricks=[{winner:'player1',leader:'player1',cards:[{playerId:'player3',card:c('♠',12)},{playerId:'player4',card:c('♥',4)},{playerId:'player1',card:c('♠',1)},{playerId:'player2',card:c('♣',3)}]}];
+ r.trickNo=2;r.trickCards=[{playerId:'player1',card:c('♣',4)},{playerId:'player2',card:c('♥',7)},{playerId:'player3',card:c('♥',5)}];
+ r.playedBy={player1:2,player2:2,player3:2,player4:1};
+ s.hands={player1:[c('♣',6)],player2:[c('♠',3)],player3:[c('♦',2)],player4:[c('♥',2),c('♣',5)]};
+ r.turn='player4';r.envidoClosed=true;r.flors={};
+ r.envidoAudit={winner:'player3',value:35,stake:2,reveals:{player3:35,player4:-1,player1:-1,player2:-1},order:['player3','player4','player1','player2'],settled:true};
+ const options=rivalOptions(s,'player2',unseenCards(s,'player2'));
+ assert.deepEqual(options.player3.map(h=>h.map(x=>x.id)),[['oro-2']]);
+ r.pendingBet={id:'t1',type:'truco',caller:'player3',callerTeam:'player1',responder:'player2',stake:2,called:'truco'};
+ let seed=7;const random=()=>((seed=seed*16807%2147483647)/2147483647);
+ assert.equal(winChance(s,'player2',random),0);
+ assert.deepEqual(botCommands(s,'player2',random)[0],{kind:'call',value:'no'});
+ // Without that envido the same cards look good enough to accept.
+ r.envidoAudit=null;
+ assert.ok(winChance(s,'player2',random)>0.4);
+ assert.notDeepEqual(botCommands(s,'player2',random)[0],{kind:'call',value:'no'});
 });
