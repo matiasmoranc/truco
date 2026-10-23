@@ -34,9 +34,10 @@ function playedCardBoxes($,bounds){
  playedSlots={key,boxes:boxes.some(b=>b.width)?boxes:[]};return playedSlots.boxes;
 }
 const touches=(a,b,gap=4)=>a.left<b.right+gap&&b.left<a.right+gap&&a.top<b.bottom+gap&&b.top<a.bottom+gap;
-// Team tables: the nudge that keeps deck and sample clear, per felt size, seat and hand size.
+// Team tables: the nudge that keeps deck and sample clear, chosen once per hand (scope)
+// and screen size, so the deck never moves while the hand is played.
 const deckNudges=new Map();
-export function positionDealerDeck($,dealer,viewer,teams=false){
+export function positionDealerDeck($,dealer,viewer,teams=false,scope=''){
  const seat=dealerPosition(dealer,viewer,teams)||'self',felt=$('felt-area');
  const bounds=felt.getBoundingClientRect(),pose=dealerDeckPose(seat,teams,bounds.width,bounds.height);
  const offset=($('muestra-card').offsetHeight||84)*.34;
@@ -53,7 +54,7 @@ export function positionDealerDeck($,dealer,viewer,teams=false){
  if(!teams){place(0,0);return;}
  // Played cards must never cover the sample; the deck also stays off my hand and the seats.
  const handCards=[...(felt.querySelectorAll?.('#hand .hand-card')||[])];
- const key=[Math.round(bounds.width),Math.round(bounds.height),seat,handCards.length].join(':');
+ const key=[Math.round(bounds.width),Math.round(bounds.height),seat,scope||handCards.length].join(':');
  if(deckNudges.has(key)){const [push,side]=deckNudges.get(key);place(push,side);return;}
  place(0,0);
  const slots=playedCardBoxes($,bounds);if(!slots.length)return;
@@ -62,6 +63,7 @@ export function positionDealerDeck($,dealer,viewer,teams=false){
   return d.left>=bounds.left&&d.right<=bounds.right&&d.top>=bounds.top&&d.bottom<=bounds.bottom&&!boxes.some(b=>obstacles.some(o=>touches(b,o)));};
  let best=[0,0];
  search:for(let push=0;push<=120;push+=8)for(const side of [0,-16,16,-32,32,-48,48]){place(push,side);if(clear()){best=[push,side];break search;}}
+ if(deckNudges.size>40)deckNudges.clear();
  deckNudges.set(key,best);place(...best);
 }
 export function renderTeamLobbySeats(code,room,safe,disabled=false){
@@ -132,13 +134,15 @@ export function installTeamTable({$,getState,command,runAction,renderPlayerHand,
   clearTimeout(noticeTimer);
   const notices=[r.callNotice,r.teamSignal].filter(n=>visibleTeamNotice(n,r,gameTime())&&n.text!=='Se reparte');
   for(const n of notices){const speech=$('team-seat-'+n.from)?.querySelector('.team-speech');if(speech){speech.textContent=n.spoken||n.text;speech.classList.remove('hidden');}if(n===r.callNotice&&noticeKey!==n.id){noticeKey=n.id;speakCall(n.spoken||'');}}
+  // All flowers are announced together: everyone who has one says "Flor", not only who sang it first.
+  if(notices.some(n=>n===r.callNotice&&n.text==='Flor'))for(const q of Object.keys(r.flors||{})){const speech=$('team-seat-'+q)?.querySelector('.team-speech');if(speech){speech.textContent='Flor';speech.classList.remove('hidden');}}
   if(notices.length)noticeTimer=setTimeout(()=>{if(getState().room?.mode==='2v2')render();},Math.max(1,Math.min(...notices.map(n=>n.time+5000-gameTime()))));
   const drawing=r.status==='drawing';game.classList.toggle('drawing-mode',drawing);game.classList.toggle('reveal-mode',r.status==='revealing');$('opening-draw').classList.add('hidden');
   const playing=r.status==='started'&&!r.resolvingTrick&&!r.pendingNextHand;
   const myTurn=playing&&!pending&&r.turn===p&&!r.folded?.[p];if(!s.handGestureActive)renderPlayerHand(drawing?[]:orderedHand(),myTurn);
   $('fold-hand').classList.toggle('hidden',!playing||!!r.folded?.[p]);$('fold-hand').textContent='IRSE AL MAZO';
   const sample=r.muestra;$('deck-stack').classList.toggle('hidden',drawing||!sample);$('muestra-card').classList.toggle('hidden',drawing||!sample);$('muestra-card').classList.toggle('sprite-card',!!sample);if(sample){const el=$('muestra-card'),key=s.roomCode+':'+r.matchNumber+':'+r.handNumber;const dx=el.dataset.dragHand===key?el.style.getPropertyValue('--muestra-dx'):'0px',dy=el.dataset.dragHand===key?el.style.getPropertyValue('--muestra-dy'):'0px';el.dataset.dragHand=key;el.style.cssText=cardImageStyle(sample);el.style.setProperty('--muestra-dx',dx);el.style.setProperty('--muestra-dy',dy);$('muestra-card').setAttribute('aria-label',cardAccessibleName(sample)+', muestra');}
-  positionDealerDeck($,r.dealer||'player4',p,true);
+  positionDealerDeck($,r.dealer||'player4',p,true,[s.roomCode,r.matchNumber,r.handNumber].join(':'));
   const cards=$('trick-cards'),nextScope=[s.roomCode,r.matchNumber,r.handNumber].join(':'),same=scope===nextScope;const old=new Map([...cards.children].map(n=>[n.dataset.playedKey,n]));const keys=new Set();
   for(const item of r.trickCards||[]){const key=item.playerId+':'+item.card.id;keys.add(key);let el=old.get(key);if(!el){el=document.createElement('div');el.dataset.playedKey=key;cards.append(el);el.className='sprite-card team-played team-played-'+positions[seats.indexOf(item.playerId)];el.style.cssText=cardImageStyle(item.card);el.setAttribute('aria-label',r.players[item.playerId].name+': '+cardAccessibleName(item.card));
     if(same&&!known.has(key)&&!matchMedia('(prefers-reduced-motion: reduce)').matches){const origin=item.playerId===p?$('hand'):$('team-seat-'+item.playerId),a=origin.getBoundingClientRect(),b=el.getBoundingClientRect();el.animate([{translate:`${a.left+a.width/2-b.left-b.width/2}px ${a.top+a.height/2-b.top-b.height/2}px`,opacity:.5},{translate:'0 0',opacity:1}],{duration:500,easing:'cubic-bezier(.22,.61,.36,1)'});}}
@@ -154,7 +158,10 @@ export function installTeamTable({$,getState,command,runAction,renderPlayerHand,
   const add=(value,label,primary=false)=>buttons.push(`<button class="${primary?'call-button':'pass-button'}" data-team-action="${value}">${label}</button>`);
   if(playing&&!r.folded?.[p]){
    if(!pending&&r.turn===p){const flower=hasFlor(r,s.hand);if(!r.flors?.[p]&&(r.playedBy?.[p]||0)===0&&flower)add('flor','FLOR');if(!flower&&!r.envidoClosed&&(r.playedBy?.[p]||0)===0&&r.trickNo===1){add('envido','ENVIDO');add('real','REAL');add('falta','FALTA');}if((!flower||r.flors?.[p])&&r.trucoLevel<4&&r.lastTrucoTeam!==mineTeam)add(r.trucoLevel===1?'truco':r.trucoLevel===2?'retruco':'vale4',r.trucoLevel===1?'TRUCO':r.trucoLevel===2?'RETRUCO':'VALE 4',true);}
-   if(pending&&!pending.revealMode&&pending.responder===p){if(pending.type!=='flor'&&hasFlor(r,s.hand)&&!r.flors?.[p])add('flor','FLOR',true);add('yes',pending.type==='flor'&&hasFlor(r,s.hand)?'LA MÍA ES FLOR':'QUIERO',true);add('no','NO QUIERO');if(pending.type==='truco'){if(pending.stake<4)add('raise',pending.stake===2?'RETRUCO':'VALE 4');if(!r.envidoClosed&&(r.playedBy?.[p]||0)===0){add('envido','ENVIDO');add('real','REAL');add('falta','FALTA');}}if(pending.type==='envido'&&pending.called!=='falta'){add('raise-envido','ENVIDO');add('raise-real','REAL');add('raise-falta','FALTA');}if(pending.type==='flor'&&pending.called==='flor'){add('raise-conflor','CON FLOR ENVIDO');add('raise-faltaflor','CONTRA FLOR AL RESTO');}}
+   // Holding an unsung flor, the only answer is to sing it: no envido, no quiero / no quiero yet.
+   const owesFlor=pending&&!pending.revealMode&&pending.responder===p&&pending.type!=='flor'&&(r.playedBy?.[p]||0)===0&&hasFlor(r,s.hand)&&!r.flors?.[p];
+   if(owesFlor)add('flor','FLOR',true);
+   else if(pending&&!pending.revealMode&&pending.responder===p){add('yes',pending.type==='flor'&&hasFlor(r,s.hand)?'LA MÍA ES FLOR':'QUIERO',true);add('no','NO QUIERO');if(pending.type==='truco'){if(pending.stake<4)add('raise',pending.stake===2?'RETRUCO':'VALE 4');if(!r.envidoClosed&&(r.playedBy?.[p]||0)===0){add('envido','ENVIDO');add('real','REAL');add('falta','FALTA');}}if(pending.type==='envido'&&pending.called!=='falta'){add('raise-envido','ENVIDO');add('raise-real','REAL');add('raise-falta','FALTA');}if(pending.type==='flor'&&pending.called==='flor'){add('raise-conflor','CON FLOR ENVIDO');add('raise-faltaflor','CONTRA FLOR AL RESTO');}}
   }
   const signalButtons=playing&&!pending&&!r.folded?.[p]&&r.turn!==p&&playerTeam(r.turn)===mineTeam&&!r.folded?.[r.turn]&&teamPie(r,p)===p;
   if(signalButtons){

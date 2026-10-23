@@ -5,7 +5,7 @@ import { installActivity } from './activity.js?v=20261010-adminstats32';
 import { installCredits } from './credits.js?v=20261022-bank1';
 import { installAccount } from './account.js?v=20261022-ios-redirect';
 import { initializeGameAuth } from './auth-init.js?v=20261016-android-google';
-import {installTeamTable,TEAM_SEATS,playerTeam,positionDealerDeck,renderTeamLobbySeats,renderWaitingSeats} from './team-table-ui.js?v=20261023-bots2';
+import {installTeamTable,TEAM_SEATS,playerTeam,positionDealerDeck,renderTeamLobbySeats,renderWaitingSeats} from './team-table-ui.js?v=20261023-bots3';
 import {createLiveTables,LiveError} from './live-tables.js?v=20261022-clock1';
 const FIREBASE_VERSION = '12.4.0';
 const $ = (id) => document.getElementById(id);
@@ -2331,7 +2331,7 @@ function finishRoomPreparation(){
   requestAnimationFrame(()=>{
     if(state.roomCode!==code||state.preparingRoom!==code)return;
     positionMobileTable();
-    positionDealerDeck($,state.room.dealer||(state.room.mode==='2v2'?'player4':otherPlayer(state.room.mano||'player1')),state.playerId,state.room.mode==='2v2');
+    positionDealerDeck($,state.room.dealer||(state.room.mode==='2v2'?'player4':otherPlayer(state.room.mano||'player1')),state.playerId,state.room.mode==='2v2',[state.roomCode,state.room.matchNumber,state.room.handNumber].join(':'));
     requestAnimationFrame(()=>{if(state.roomCode!==code||state.preparingRoom!==code)return;state.preparingRoom=null;state.joinIntent=null;$('game-view').classList.remove('table-preparing');});
   });
 }
@@ -4114,7 +4114,7 @@ $('learn-videos-dialog').addEventListener('close',()=>{const video=$('learn-vide
 $('learn-back').addEventListener('click',()=>{stopBot();showView('welcome-view');openLobby();});
 $('learn-free').addEventListener('click',()=>startLearning(0));
 $('learn-game-modes').addEventListener('click',event=>{const button=event.target.closest('[data-learning-stage]');if(button)startLearning(Number(button.dataset.learningStage));});
-window.addEventListener('resize',()=>{syncMobileGameHeader();positionLearningScoreArrow();positionLearningControls();alignHandWithControls();positionMobileCallNotice();if(state.room)positionDealerDeck($,state.room.dealer||(state.room.mode==='2v2'?'player4':otherPlayer(state.room.mano||'player1')),state.playerId,state.room.mode==='2v2');});
+window.addEventListener('resize',()=>{syncMobileGameHeader();positionLearningScoreArrow();positionLearningControls();alignHandWithControls();positionMobileCallNotice();if(state.room)positionDealerDeck($,state.room.dealer||(state.room.mode==='2v2'?'player4':otherPlayer(state.room.mano||'player1')),state.playerId,state.room.mode==='2v2',[state.roomCode,state.room.matchNumber,state.room.handNumber].join(':'));});
 function indicateLearningMessageClose(event){
   const dialog=event.currentTarget;
   if(!dialog.open)return;
@@ -4239,6 +4239,8 @@ function applyActionReceipt(result,code){
   if(state.roomCode!==code||!result?.room||isOlderRoom(result.room,state.room))return;
   state.room={...result.room,...(state.room?.connectionPresence?{connectionPresence:state.room.connectionPresence}:{})};
   if(result.privateHand&&Number(result.privateHand.revision)>=Number(state.privateDeal?.revision||0))state.privateDeal=result.privateHand;
+  // A waiting room (e.g. after "Usar bot") redraws its seats instead of the game table.
+  if(state.room.status==='waiting'){renderWaiting();return;}
   syncPrivateHand();renderGame();
 }
 async function creditCommand(command){

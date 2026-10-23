@@ -56,3 +56,4 @@ test('Confirmed departure closes the dialog even if its callable acknowledgment 
   if(confirmed==='unconfirmed')assert.equal(nodes['abandon-error'].textContent,'timeout');
  }
 });
+test('A waiting-room receipt (Usar bot) redraws the seats, never the game table',()=>{const c=harness();let game=0,waiting=0;c.renderGame=()=>game++;c.renderWaiting=()=>waiting++;c.applyActionReceipt({room:{...c.state.room,revision:5,status:'waiting'}},'ABCDE');assert.equal(waiting,1);assert.equal(game,0);});
