@@ -58,6 +58,7 @@
         <header class="topbar"><button class="icon-button back-navigation" id="learn-back" aria-label="Volver al inicio"><svg class="back-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M19 12H5m7 7-7-7 7-7"/></svg></button><span class="mini-brand"><img class="truco-logo" src="assets/truco-v3.png" alt="Truco" width="1536" height="1024"></span><span></span></header>
         <div class="learn-content">
           <h1 id="learn-title">Aprendé jugando</h1>
+          <button id="learn-videos" class="button secondary learn-videos-button">Ver videos explicativos</button>
           <ol class="learn-path"><li><strong>Lo básico</strong><span>Aprendé a jugar partidas simples para entender el valor de las cartas.<br>Siempre tenés disponible la guía de cartas, donde verás qué cartas tenés.</span></li><li><strong>Sumá el envido</strong><span>Cuando estés listo, sumaremos el envido a tus partidas.</span></li><li><strong>Sumá la flor</strong><span>Cuando estés listo, sumaremos la flor a tus partidas.</span></li></ol>
           <p>Siempre podés volver al punto anterior.</p>
           <button id="learn-free" class="button primary">Empezar práctica</button>
@@ -66,6 +67,12 @@
           <div class="learn-practice-actions"><button id="learn-envido-study" class="button primary">Practicar envido</button><button id="learn-flor-study" class="button primary">Practicar flor</button><button id="learn-flor-points-study" class="button primary">Practicar puntos de flor</button><button id="learn-sheet-menu" class="button secondary">Ver guía de cartas</button></div>
         </div>
       </section>
+      <dialog id="learn-videos-dialog" class="learn-videos-dialog" aria-labelledby="learn-videos-title">
+        <button id="learn-videos-close" class="learn-close" aria-label="Cerrar videos">×</button>
+        <h2 id="learn-videos-title">Cómo se juega</h2><p id="learn-videos-step" class="learn-videos-step" aria-live="polite"></p>
+        <video id="learn-videos-player" class="learn-videos-player" playsinline muted autoplay preload="metadata" aria-describedby="learn-videos-step"></video>
+        <div class="learn-videos-nav"><button id="learn-videos-prev" class="button secondary">Anterior</button><button id="learn-videos-next" class="button primary">Siguiente</button></div>
+      </dialog>
       <dialog id="learn-coach-dialog" class="learn-coach-dialog" aria-labelledby="learn-coach-title">
         <p id="learn-coach-step" class="learn-small"></p><h2 id="learn-coach-title"></h2><div id="learn-coach-body"></div>
         <div class="learn-dialog-actions"><button id="learn-coach-continue" class="button primary">Entendido, a jugar</button><button id="learn-coach-next" class="button secondary hidden">Sumar el envido - Etapa 2/3</button><button id="learn-coach-previous" class="button secondary hidden">Volver a la Etapa 1 sin envido</button><button id="learn-coach-menu" class="text-button">Volver al inicio</button></div>

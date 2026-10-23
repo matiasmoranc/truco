@@ -2040,3 +2040,16 @@ input,textarea,[contenteditable=""],[contenteditable="true"]{-webkit-user-select
 .team-seat .team-flor{position:absolute;right:-6px;bottom:-4px;z-index:2}
 @keyframes flor-badge-pop{from{opacity:0;scale:.4}to{opacity:1;scale:1}}
 @media(prefers-reduced-motion:reduce){.flor-badge{animation:none}}
+
+/* Tutorial videos: vertical clips with previous/next navigation. */
+.learn-content>.learn-videos-button{margin:0 0 18px}
+.learn-videos-dialog{width:min(440px,calc(100vw - 24px));max-height:calc(100dvh - 24px);margin:auto;padding:16px;color:var(--ink);background:#0c402f;border:1px solid var(--gold);border-radius:18px;overflow:auto;box-shadow:0 20px 60px #0006}
+.learn-videos-dialog::backdrop{background:rgba(4,24,15,.72);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
+.learn-videos-dialog h2{color:#ebd08a;font-size:20px;margin:4px 44px 2px 0}
+.learn-videos-step{margin:0 44px 12px 0;color:#c2cec4;font-size:14px}
+.learn-videos-player{display:block;width:auto;max-width:100%;height:min(calc(100dvh - 210px),720px);aspect-ratio:9/16;margin:0 auto;border-radius:12px;background:#0c402f;cursor:pointer;object-fit:contain}
+.learn-videos-nav{display:flex;gap:10px;margin-top:14px}
+.learn-videos-nav>.button{flex:1;justify-content:center;min-height:44px;font-size:14px;border-radius:9px}
+.learn-videos-nav>.button:disabled{opacity:.4;cursor:default}
+.learn-videos-dialog .button.secondary{background:#15392b;color:#ead39b;border:1px solid #d8b87588;font-weight:600}
+.learn-videos-dialog button:focus-visible{outline:2px solid #ead39b;outline-offset:3px}

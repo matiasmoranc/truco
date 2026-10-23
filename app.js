@@ -3596,6 +3596,30 @@ function openLearning(){
   $('learn-coach-dialog').close();
   if(state.learning){stopBot();clearTimeout(state.resolutionTimer);state.room=null;state.localGame=false;}
   renderLearningMenu();showView('learn-view');
+  if(!learnVideosSeen())openLearnVideos();
+}
+const LEARN_VIDEOS=[
+  {src:'assets/tutorial/1-baraja.mp4',title:'La baraja'},
+  {src:'assets/tutorial/2-reparto.mp4',title:'El reparto'},
+  {src:'assets/tutorial/3-puntos.mp4',title:'¿Cómo ganar puntos?'},
+  {src:'assets/tutorial/4-ganar-mano.mp4',title:'Ganar una mano'},
+  {src:'assets/tutorial/5-valor-cartas.mp4',title:'El valor de las cartas'},
+  {src:'assets/tutorial/6-a-practicar.mp4',title:'¡Vamos a practicar!'},
+];
+let learnVideoIndex=0;
+function learnVideosSeen(){try{return localStorage.getItem('truco-learn-videos-seen-v1')==='true';}catch{return true;}}
+function showLearnVideo(index){
+  learnVideoIndex=Math.max(0,Math.min(LEARN_VIDEOS.length-1,index));
+  const video=$('learn-videos-player'),item=LEARN_VIDEOS[learnVideoIndex],last=learnVideoIndex===LEARN_VIDEOS.length-1;
+  video.src=item.src;video.setAttribute('aria-label',item.title);video.play?.()?.catch?.(()=>{});
+  $('learn-videos-step').textContent=`${learnVideoIndex+1} de ${LEARN_VIDEOS.length} · ${item.title}`;
+  $('learn-videos-prev').disabled=learnVideoIndex===0;
+  $('learn-videos-next').textContent=last?'Listo':'Siguiente';
+}
+function openLearnVideos(index=0){
+  try{localStorage.setItem('truco-learn-videos-seen-v1','true');}catch{}
+  if(!$('learn-videos-dialog').open)$('learn-videos-dialog').showModal();
+  showLearnVideo(index);
 }
 async function startLearning(stage=0){
   if(state.learningStarting)return;state.learningStarting=true;
@@ -4074,6 +4098,13 @@ function continueLearningStage(){
   if(complete)startLearning(stage);
 }
 $('learn-game').addEventListener('click',openLearning);
+$('learn-videos').addEventListener('click',()=>openLearnVideos(0));
+$('learn-videos-close').addEventListener('click',()=>$('learn-videos-dialog').close());
+$('learn-videos-prev').addEventListener('click',()=>showLearnVideo(learnVideoIndex-1));
+$('learn-videos-next').addEventListener('click',()=>{if(learnVideoIndex===LEARN_VIDEOS.length-1)$('learn-videos-dialog').close();else showLearnVideo(learnVideoIndex+1);});
+// Tapping the video pauses it, resumes it, or replays it once it ended.
+$('learn-videos-player').addEventListener('click',event=>{const video=event.currentTarget;if(video.paused||video.ended)video.play?.()?.catch?.(()=>{});else video.pause();});
+$('learn-videos-dialog').addEventListener('close',()=>{const video=$('learn-videos-player');video.pause();video.removeAttribute('src');video.load();});
 $('learn-back').addEventListener('click',()=>{stopBot();showView('welcome-view');openLobby();});
 $('learn-free').addEventListener('click',()=>startLearning(0));
 $('learn-game-modes').addEventListener('click',event=>{const button=event.target.closest('[data-learning-stage]');if(button)startLearning(Number(button.dataset.learningStage));});

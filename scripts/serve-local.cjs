@@ -4,7 +4,7 @@
 const http=require('node:http'),net=require('node:net'),fs=require('node:fs'),path=require('node:path');
 const root=path.resolve(__dirname,'..'),port=Number(process.argv[2]||5174);
 const [liveHost,livePort]=(process.argv[3]||'127.0.0.1:8787').split(':');
-const types={'.html':'text/html; charset=utf-8','.js':'text/javascript','.css':'text/css','.svg':'image/svg+xml','.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg','.webp':'image/webp','.json':'application/json','.txt':'text/plain'};
+const types={'.html':'text/html; charset=utf-8','.js':'text/javascript','.css':'text/css','.svg':'image/svg+xml','.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg','.webp':'image/webp','.json':'application/json','.txt':'text/plain','.mp4':'video/mp4'};
 const hidden=['cloudflare','functions','node_modules','.git','android','ios','www'];
 const livePath=url=>url.replace(/^\/live/,'')||'/';
 
