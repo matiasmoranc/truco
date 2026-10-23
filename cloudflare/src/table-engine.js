@@ -14,7 +14,7 @@ export const WAIT_MS=600000;
 export const DISCONNECT_MS=45000;
 // A bot answers after a short pause, so people can follow the table; after
 // another bot's move it waits longer, so a run of bot plays stays readable.
-export const BOT_DELAY_MS=1500;
+export const BOT_DELAY_MS=2000;
 export const BOT_AFTER_BOT_MS=3000;
 const PROBE_BALANCE=1000000;
 const findPlayer=(m,uid)=>Object.keys(m?.players||{}).find(p=>m.players[p]?.uid===uid)||null;

@@ -300,3 +300,4 @@ test('A bot that follows another bot waits 3 s; after a person it answers in 1.5
  }
  assert.ok(checkedBot&&checkedHuman);
 });
+test('Bots answer after 2 seconds, and wait longer after another bot',()=>{assert.equal(BOT_DELAY_MS,2000);assert.ok(BOT_AFTER_BOT_MS>BOT_DELAY_MS);});
