@@ -12,13 +12,15 @@ export {CodeTakenError,slimMatch} from './ledger-ops.js';
 
 export const WAIT_MS=600000;
 export const DISCONNECT_MS=45000;
-// A bot answers after a short pause, so people can follow the table.
+// A bot answers after a short pause, so people can follow the table; after
+// another bot's move it waits longer, so a run of bot plays stays readable.
 export const BOT_DELAY_MS=1500;
+export const BOT_AFTER_BOT_MS=3000;
 const PROBE_BALANCE=1000000;
 const findPlayer=(m,uid)=>Object.keys(m?.players||{}).find(p=>m.players[p]?.uid===uid)||null;
 
 export function createTableEngine({code,bank,clock=()=>Date.now()}){
- let m=null,presence={},botDueAt=null,botKey=null;
+ let m=null,presence={},botDueAt=null,botKey=null,lastMoveByBot=false;
 
  // The bot seat the table is waiting for, if any.
  const botSeat=()=>m?.status==='reserved'&&m.session?Object.keys(m.players||{}).find(p=>m.players[p]?.bot&&mustAct(m.session,p))||null:null;
@@ -29,14 +31,14 @@ export function createTableEngine({code,bank,clock=()=>Date.now()}){
   const r=m.session.room,signal=signalFor(r,seat),key=[seat,r.turnClock?.key||'',signal||''].join('|');
   if(key===botKey&&botDueAt!=null)return;
   const now=clock(),waitUntil=!signal&&awaitsSignal(m.session,seat)?(r.turnClock?.startedAt??now)+SIGNAL_WAIT_MS:0;
-  botKey=key;botDueAt=Math.max(now+BOT_DELAY_MS,waitUntil);
+  botKey=key;botDueAt=Math.max(now+(lastMoveByBot?BOT_AFTER_BOT_MS:BOT_DELAY_MS),waitUntil);
  }
  // Tries the bot's moves best first; the referee rejects an illegal one unchanged.
  async function playBot(){
   const seat=botSeat();botDueAt=null;botKey=null;if(!seat)return false;
   let failure=null;
   for(const command of botCommands(m.session,seat)){
-   try{await operate({uid:m.players[seat].uid,command,requestId:null,presence});return true;}
+   try{await operate({uid:m.players[seat].uid,command,requestId:null,presence});lastMoveByBot=true;return true;}
    catch(error){failure=error;}
   }
   console.error('bot move failed',code,seat,failure?.message);
@@ -94,6 +96,7 @@ export function createTableEngine({code,bank,clock=()=>Date.now()}){
    if(!command||typeof command.kind!=='string')throw new Error('Jugada inválida.');
    const forceLedger=['rematch','cancel','abandon'].includes(command.kind);
    await operate({uid,command,requestId:command.kind==='tick'?null:requestId,expectedMatchId,presence},{forceLedger});
+   if(!['tick','chat','mute'].includes(command.kind))lastMoveByBot=false;
    scheduleBot();
   },
   async tick(){

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createTableEngine,slimMatch,CodeTakenError,BOT_DELAY_MS} from '../src/table-engine.js';
+import {createTableEngine,slimMatch,CodeTakenError,BOT_DELAY_MS,BOT_AFTER_BOT_MS} from '../src/table-engine.js';
 import {createFirebaseBank} from '../src/firebase-bank.js';
 import adminService from '../../functions/admin-service.cjs';
 import playerService from '../../functions/player-service.cjs';
@@ -273,4 +273,27 @@ test('A bot partner waits up to 10 s for the pie\'s signal, obeys "vení" and ot
   else{advance(2000);await engine.tick();}
  }
  assert.ok(obeyed,'the bot never obeyed vení');assert.ok(waited,'the bot never played on its own after waiting');
+});
+
+test('A bot that follows another bot waits 3 s; after a person it answers in 1.5 s',async()=>{
+ const {engine,advance}=setup();
+ await engine.create({uid:'a',name:'A'},{id:'pace1',stake:1,targetPoints:30,mode:'2v2'});
+ for(const seat of ['player2','player3','player4'])await engine.act('a',{command:{kind:'add-bot',seat},requestId:'s'+seat,expectedMatchId:'pace1'});
+ const snap=()=>JSON.stringify(engine.match.session);
+ const botTurn=()=>['player2','player3','player4'].some(q=>teamBot.mustAct(engine.match.session,q));
+ let checkedBot=false,checkedHuman=false;
+ for(let i=0;i<5000&&engine.match.status==='reserved'&&!(checkedBot&&checkedHuman);i++){
+  const s=engine.match.session;
+  if(teamBot.mustAct(s,'player1')){
+   for(const command of teamBot.botCommands(s,'player1')){try{await engine.act('a',{command,requestId:'h'+i,expectedMatchId:engine.match.id});break;}catch{}}
+   if(!checkedHuman&&botTurn()&&!teamBot.awaitsSignal(engine.match.session,'player3')){const before=snap();advance(BOT_DELAY_MS+100);await engine.tick();assert.notEqual(snap(),before,'a bot after a person waited too long');checkedHuman=true;}
+   continue;
+  }
+  const before=snap();advance(BOT_DELAY_MS+100);await engine.tick();
+  if(snap()!==before&&!checkedBot&&botTurn()&&!engine.match.session.room.resolvingTrick&&!teamBot.awaitsSignal(engine.match.session,'player3')){
+   const moved=snap();advance(BOT_DELAY_MS+100);await engine.tick();assert.equal(snap(),moved,'a bot after a bot moved before 3 s');
+   advance(BOT_AFTER_BOT_MS-(BOT_DELAY_MS+100)+100);await engine.tick();assert.notEqual(snap(),moved,'a bot after a bot did not move at 3 s');checkedBot=true;
+  }
+ }
+ assert.ok(checkedBot&&checkedHuman);
 });

@@ -5,7 +5,7 @@ import { installActivity } from './activity.js?v=20261010-adminstats32';
 import { installCredits } from './credits.js?v=20261022-bank1';
 import { installAccount } from './account.js?v=20261022-ios-redirect';
 import { initializeGameAuth } from './auth-init.js?v=20261016-android-google';
-import {installTeamTable,TEAM_SEATS,playerTeam,positionDealerDeck,renderTeamLobbySeats,renderWaitingSeats} from './team-table-ui.js?v=20261023-bots3';
+import {installTeamTable,TEAM_SEATS,playerTeam,positionDealerDeck,renderTeamLobbySeats,renderWaitingSeats} from './team-table-ui.js?v=20261023-bots4';
 import {createLiveTables,LiveError} from './live-tables.js?v=20261022-clock1';
 const FIREBASE_VERSION = '12.4.0';
 const $ = (id) => document.getElementById(id);
@@ -1945,7 +1945,10 @@ async function playManagedCard(card){
   if(liveActionsBlocked()||state.liveAction||state.playActionInFlight||state.room.status!=='started'||state.room.resolvingTrick||state.room.pendingNextHand||state.room.turn!==state.playerId||state.room.pendingBet||!state.hand.some(c=>c.id===card.id))return;
   const token={code:state.roomCode,hand:state.room.handNumber,cardId:card.id};
   state.playActionToken=token;state.playActionInFlight=true;state.pendingCardId=card.id;syncLiveControls();
-  const origin=state.cardLaunchOrigin;state.cardLaunchOrigin=null;animatePlayedHandCard(card,origin);
+  const origin=state.cardLaunchOrigin;state.cardLaunchOrigin=null;
+  // Team tables animate the card once, into its own slot, from where it left the hand.
+  if(state.room.mode==='2v2'){const source=$('hand').querySelector('[data-card="'+CSS.escape(card.id)+'"]');state.teamPlayOrigin=source?{cardId:card.id,rect:origin?.cardId===card.id?origin.rect:source.getBoundingClientRect()}:null;}
+  else animatePlayedHandCard(card,origin);
   try{await creditCommand({kind:'play',cardId:card.id});}
   catch(error){console.error('[truco:play]',error);if(state.roomCode===token.code){removeCardFlight();void refreshLiveConnection();}}
   finally{if(state.playActionToken===token){state.playActionToken=null;state.playActionInFlight=false;state.pendingCardId=null;}if(state.roomCode===token.code){renderGame();syncLiveControls();}}
