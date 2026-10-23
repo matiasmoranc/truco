@@ -308,7 +308,8 @@ function provisionalTable({stake,targetPoints,mode,visibility},name){
 }
 async function confirmCreatedTable(code,data){
   try{
-    await liveTables().call(code,'create',data);
+    // Apply the confirmed table at once: until then it has no match id and commands are ignored.
+    applyActionReceipt(await liveTables().call(code,'create',data),code);
     void credits.sync().catch(error=>console.error('[truco:wallet-sync]',error));
     if(state.pendingCreate===code)state.pendingCreate=null;
     // The player left while the reservation was being confirmed.
@@ -1158,7 +1159,9 @@ function renderWaiting() {
   const ready = !!(state.room.table && roomSeats().every(p=>players[p]));
   $('room-status').textContent = ready?'Todo listo':'Esperando rival';
   $('seats').className='seats waiting-table'+(state.room.mode==='2v2'?' waiting-table-teams':'');
-  $('seats').innerHTML=renderWaitingSeats(state.room,state.playerId,escapeHtml);
+  // Redraw only when the seats change, so an identical update never swaps a button under the finger.
+  const seatsHtml=renderWaitingSeats(state.room,state.playerId,escapeHtml);
+  if($('seats').dataset.html!==seatsHtml){$('seats').innerHTML=seatsHtml;$('seats').dataset.html=seatsHtml;}
   if(ready&&isCoordinator()&&!state.room.managedCredits)startGame().catch(error=>toast(firebaseError(error),true));
   $('game-room-code').textContent = 'MESA ABIERTA';
 }
@@ -4159,7 +4162,11 @@ $('seats').addEventListener('click',async event=>{
   const button=event.target.closest('[data-add-bot]');if(!button||button.disabled)return;
   button.disabled=true;
   // A successful add redraws the seats; otherwise the button must work again.
-  try{await creditCommand({kind:'add-bot',seat:button.dataset.addBot});}catch{}finally{if(button.isConnected)button.disabled=false;}
+  try{
+    // A table created a moment ago gets its match id when the server confirms it; until then the command would be dropped.
+    for(let i=0;i<50&&!state.room?.creditMatch?.id;i++)await new Promise(resolve=>setTimeout(resolve,100));
+    await creditCommand({kind:'add-bot',seat:button.dataset.addBot});
+  }catch{}finally{if(button.isConnected)button.disabled=false;}
 });
 $('learn-videos').addEventListener('click',()=>openLearnVideos(0));
 $('learn-videos-close').addEventListener('click',()=>$('learn-videos-dialog').close());
