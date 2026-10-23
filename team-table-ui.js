@@ -87,14 +87,25 @@ export function installTeamTable({$,getState,command,runAction,renderPlayerHand,
  // A bot partner waits up to 12 s for the pie's signal (vení, jugá, gritá): a yellow
  // disc beside my cards empties clockwise from its top radius. startedAt null hides it.
  const SIGNAL_WAIT_MS=12000,SIGNAL_TIMER_SIZE=36;let signalTimerHide=null;
+ // A sung flor sits right beside its player's cards (left of them on the right edge of the table).
+ function placeSeatFlor(seat,onRightEdge){
+  const badge=seat.querySelector('.team-flor');if(!badge)return;
+  requestAnimationFrame(()=>{
+   const cards=[...seat.querySelectorAll('.team-backs>i')].map(card=>card.getBoundingClientRect()).filter(rect=>rect.width);if(!cards.length)return;
+   const base=seat.getBoundingClientRect(),width=badge.offsetWidth||34,mid=(Math.min(...cards.map(r=>r.top))+Math.max(...cards.map(r=>r.bottom)))/2;
+   const left=onRightEdge?Math.min(...cards.map(r=>r.left))-base.left-width-2:Math.max(...cards.map(r=>r.right))-base.left+2;
+   Object.assign(badge.style,{left:left+'px',top:(mid-base.top)+'px',right:'auto',bottom:'auto',transform:'translateY(-50%)'});
+  });
+ }
  function renderSignalTimer(startedAt){
   const timer=ensure('signal-timer','div',$('felt-area'),'signal-timer hidden');
   const left=Number.isFinite(startedAt)?SIGNAL_WAIT_MS-(gameTime()-startedAt):0;
   clearTimeout(signalTimerHide);
   if(left<=0){timer.classList.add('hidden');timer.dataset.key='';return;}
   if(timer.dataset.key!==String(startedAt)){timer.dataset.key=String(startedAt);timer.style.animation='none';void timer.offsetWidth;timer.style.animation=`signal-drain ${SIGNAL_WAIT_MS}ms linear ${left-SIGNAL_WAIT_MS}ms forwards`;}
-  const card=$('hand').querySelector('.hand-card')||$('hand'),felt=$('felt-area').getBoundingClientRect(),box=card.getBoundingClientRect();
-  timer.style.left=Math.max(4,box.left-felt.left-SIGNAL_TIMER_SIZE-10)+'px';timer.style.top=(box.top-felt.top+box.height/2-SIGNAL_TIMER_SIZE/2)+'px';
+  // Always the same spot: bottom left, just above the action buttons.
+  const felt=$('felt-area').getBoundingClientRect(),actions=$('player-actions').getBoundingClientRect(),floor=actions.height?actions.top:felt.bottom;
+  timer.style.left='16px';timer.style.top=(floor-felt.top-SIGNAL_TIMER_SIZE-14)+'px';
   timer.classList.remove('hidden');
   signalTimerHide=setTimeout(()=>timer.classList.add('hidden'),left);
  }
@@ -132,6 +143,7 @@ export function installTeamTable({$,getState,command,runAction,renderPlayerHand,
    // Everyone who sang flor shows it beside their cards, you and your partner included.
    const flor=i!==0&&r.status==='started'&&r.flors?.[q]!=null?`<span class="team-flor flor-badge" role="img" aria-label="${safe(seatName(r,q,p)||'Jugador')} cantó flor">${FLOR_ICON}</span>`:'';
    el.innerHTML=`${i===0?(status?`<span class="team-self-status">${status}</span>`:''):`<span class="team-player-name">${safe(seatName(r,q,p)||'Jugador')}${status?`<small>${status}</small>`:''}</span>`}${backs}${flor}<div class="team-speech hidden"></div>`;
+   placeSeatFlor(el,positions[i]==='right');
    if(i===2&&flip&&!matchMedia('(prefers-reduced-motion: reduce)').matches)for(const card of el.querySelectorAll('.team-backs>i'))card.animate([{rotate:'y 90deg',opacity:.3,scale:'.94'},{rotate:'y 0deg',opacity:1,scale:'1'}],{duration:280,easing:'ease-out'});
    if(i===2)el.querySelector('.team-partner-cards').onclick=()=>{showPartner();render();};
   }
