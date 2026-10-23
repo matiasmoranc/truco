@@ -69,12 +69,19 @@ function combos(cards,k){const out=[],pick=(start,acc)=>{if(acc.length===k){out.
 function rivalOptions(s,p,pool){
  const r=s.room,m=r.muestra,out={};
  const reveals={...(r.envidoAudit?.reveals||{}),...(r.pendingBet?.type==='envido'?r.pendingBet.reveals||{}:{})};
+ // Son buenas against the other team's best caps that rival's envido at that best.
+ const declared=Object.entries(reveals).filter(([,v])=>Number.isInteger(v)&&v>=0),best=declared.reduce((a,b)=>!a||b[1]>a[1]?b:a,null);
+ const florSaid=r.pendingBet?.type==='flor'?r.pendingBet.reveals||{}:{};
  for(const q of SEATS){
   if(team(q)===team(p)||r.folded?.[q])continue;
-  const said=Number.isInteger(reveals[q])&&reveals[q]>=0?reveals[q]:null,sang=r.flors?.[q]!=null;
-  if(said==null&&!sang)continue;
-  const shown=shownBy(r,q);
-  const fits=combos(pool,Math.max(0,3-shown.length)).filter(h=>{const full=[...shown,...h];return (said==null||envido(full,m)===said)&&(!sang||flower(full,m));});
+  const said=Number.isInteger(reveals[q])&&reveals[q]>=0?reveals[q]:null,sang=r.flors?.[q]!=null,shown=shownBy(r,q);
+  const cap=reveals[q]===-1&&best&&team(best[0])!==team(q)?best[1]:null;
+  const florPoints=Number.isInteger(florSaid[q])&&florSaid[q]>=0?florSaid[q]:null;
+  // Someone who already played without singing flor almost surely holds none.
+  const quiet=!sang&&shown.length>0;
+  if(said==null&&cap==null&&!sang&&!quiet)continue;
+  let fits=combos(pool,Math.max(0,3-shown.length)).filter(h=>{const full=[...shown,...h];return (said==null||envido(full,m)===said)&&(cap==null||envido(full,m)<=cap)&&(!sang||flower(full,m))&&(florPoints==null||florValue(full,m)===florPoints);});
+  if(quiet){const plain=fits.filter(h=>!flower([...shown,...h],m));if(plain.length)fits=plain;}
   if(fits.length)out[q]=fits;
  }
  return out;

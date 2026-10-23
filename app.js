@@ -2776,6 +2776,36 @@ function botRiskAdjustment(room,stake){
   // Avoid risking the match unnecessarily; press a real advantage when it can finish it.
   return (rival<=stake?0.12:rival<=stake*2?0.05:0)-(mine<=stake?0.05:0);
 }
+// The rival's unplayed cards that fit what the table showed: the cards it played, the envido it
+// declared (or its son buenas), and a flor it sang or declared. A rival that played without singing
+// flor most likely has none. Only public information is used, never the rival's hidden cards.
+function botRivalHands(room,count,unseen){
+  const muestra=room.muestra,shown=[...(room.tricks||[]).flatMap(trick=>trick.played||[]),...(room.trickCards||[])].filter(item=>item.playerId==='player1').map(item=>item.card);
+  if(!muestra||!count||shown.length+count!==3)return null;
+  const bet=room.pendingBet,audit=room.envidoAudit,reveals=audit?.reveals||(bet?.type==='envido'?bet.reveals:null)||{};
+  const said=Number.isInteger(reveals.player1)?reveals.player1:null;
+  const passed=said==null&&!!audit&&Number.isInteger(reveals.player2)?reveals.player2:null;
+  const sangFlor=room.flors?.player1!=null;
+  const florSaid=bet?.type==='flor'&&Number.isInteger(bet.reveals?.player1)?bet.reveals.player1:sangFlor&&room.florCompared?Number(room.flors.player1):null;
+  const quietFlor=room.practiceRules?.flor!==false&&!sangFlor&&shown.length>0;
+  if(said==null&&passed==null&&!sangFlor&&!quietFlor)return null;
+  const fits=[],weights=[];
+  const visit=(start,combo)=>{
+    if(combo.length===count){
+      const full=[...shown,...combo],flower=hasFlor(full,muestra);
+      if(said!=null&&(flower||handEnvido(full,muestra)!==said))return;
+      if(passed!=null&&handEnvido(full,muestra)>passed)return;
+      if(sangFlor&&!flower)return;
+      if(florSaid!=null&&florValue(full,muestra)!==florSaid)return;
+      fits.push(combo);weights.push(quietFlor&&flower?0.15:1);return;
+    }
+    for(let i=start;i<unseen.length;i++)visit(i+1,[...combo,unseen[i]]);
+  };
+  visit(0,[]);
+  if(!fits.length)return null;
+  const total=weights.reduce((sum,weight)=>sum+weight,0);
+  return random=>{let pick=random()*total;for(let i=0;i<fits.length;i++){pick-=weights[i];if(pick<0)return fits[i];}return fits.at(-1);};
+}
 function assessBotHand(room,hand,level,memory,random=Math.random){
   rememberBotCards(room,memory);
   const played=room.trickCards||[],pending=played.length===1?played[0]:null;
@@ -2785,10 +2815,12 @@ function assessBotHand(room,hand,level,memory,random=Math.random){
   const samples=level==='hard'?144:level==='normal'?72:36;
   const totals=new Map(hand.map(card=>[card.id,0]));
   const winners=(room.tricks||[]).map(trick=>trick.winner);
+  // The hard bot reasons from what the rival declared and played; the others guess blindly.
+  const rivalHand=level==='hard'?botRivalHands(room,count,unseen):null;
   let wins=0;
   for(let sample=0;sample<samples;sample++){
-    const pool=[...unseen],rival=[];
-    for(let i=0;i<count&&pool.length;i++)rival.push(pool.splice(Math.min(pool.length-1,Math.floor(random()*pool.length)),1)[0]);
+    const pool=[...unseen],rival=rivalHand?[...rivalHand(random)]:[];
+    if(!rivalHand)for(let i=0;i<count&&pool.length;i++)rival.push(pool.splice(Math.min(pool.length-1,Math.floor(random()*pool.length)),1)[0]);
     const turn=pending?otherPlayer(pending.playerId):room.turn||room.mano;
     if(turn==='player2'){
       let best=0;

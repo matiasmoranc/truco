@@ -11,7 +11,7 @@ function extract(name){
  for(;depth&&end<source.length;end++){if(source[end]==='{')depth++;else if(source[end]==='}')depth--;}
  return source.slice(start,end);
 }
-const names=['roomTransportConnected','liveSnapshot','envidoAuditResult','settleAuditedHand','auditEnvidoScores','trickWinnerMark','canRaiseEnvido','closeFinishedRoomChanges','pieceOrder','cardStrength','envidoValue','hasFlor','handEnvido','florValue','normalizeTargetPoints','targetPoints','capScores','faltanParaGanar','faltaEnvidoPoints','envidoBetPoints','florBetPoints','declinedFlorPoints','florAnswers','otherPlayer','settleHand','topFeed','matchWinner','matchFinished','sessionMatchResults','sessionWins','rematchRoom','rematchChanges','botDeck','botHandOutcome','rememberBotCards','botRiskAdjustment','assessBotHand','chooseBotDecision','disconnectedPlayer','disconnectMatchChanges','turnClockPlayer','turnClockRemaining','turnTimeoutChanges','declinedTrucoChanges','liveActionsBlocked','runLiveAction','privateHandMatchesRoom','roomHasFlor','canCallFirstRoundEnvido','enqueueLearningHelp','rememberLearningHelp','learningHelpTopic','localHand','localFeed','localCallAction','localAnswerAction','localPlay'];
+const names=['roomTransportConnected','liveSnapshot','envidoAuditResult','settleAuditedHand','auditEnvidoScores','trickWinnerMark','botRivalHands','canRaiseEnvido','closeFinishedRoomChanges','pieceOrder','cardStrength','envidoValue','hasFlor','handEnvido','florValue','normalizeTargetPoints','targetPoints','capScores','faltanParaGanar','faltaEnvidoPoints','envidoBetPoints','florBetPoints','declinedFlorPoints','florAnswers','otherPlayer','settleHand','topFeed','matchWinner','matchFinished','sessionMatchResults','sessionWins','rematchRoom','rematchChanges','botDeck','botHandOutcome','rememberBotCards','botRiskAdjustment','assessBotHand','chooseBotDecision','disconnectedPlayer','disconnectMatchChanges','turnClockPlayer','turnClockRemaining','turnTimeoutChanges','declinedTrucoChanges','liveActionsBlocked','runLiveAction','privateHandMatchesRoom','roomHasFlor','canCallFirstRoundEnvido','enqueueLearningHelp','rememberLearningHelp','learningHelpTopic','localHand','localFeed','localCallAction','localAnswerAction','localPlay'];
 function harness(){
  const context={account:{isReady:()=>true},console,Math:Object.create(Math),Date,crypto:require('node:crypto').webcrypto,structuredClone,Set,Map,navigator:{onLine:true},state:{},localStorage:{setItem(){}},learningSeen:new Set(),VALID_TARGET_POINTS:[10,20,30,40,50,60],RECONNECT_GRACE_MS:45000,PRACTICE_PAUSE_MS:5000,gameTime:()=>100000,newOpeningDraw:()=>({cards:{}}),makeCallNotice:text=>({text}),renderGame(){},renderConnectionNotice(){},syncLiveControls(){},touchFeedback(){},toast(){},firebaseError:String,queueLearningAction(){},queueLearningTrucoCall(){},turnClockKey:()=>null,pauseMessage:()=>null,animatePlayedHandCard(){},shakeTurnBadge(){},scheduleLocalNextHand(){},scheduleLocalTransition(room,fn){context.transition=fn;},localFinishHand(winner,points){context.finished={winner,points};},localScore(player,points){context.state.room.scores[player]=Math.min(20,context.state.room.scores[player]+points);},localResolveFlor(){},revealEnvido(){}};
  vm.createContext(context);vm.runInContext(names.map(extract).join('\n'),context);return context;
@@ -334,4 +334,32 @@ test('A bot partner is shown as CompaBot to its teammates and as Bot to the riva
  const room={players:{player1:{name:'Ana'},player2:{name:'Bot',bot:true},player3:{name:'Bot',bot:true},player4:{name:'Luis'}}};
  assert.equal(seatName(room,'player3','player1'),'CompaBot');assert.equal(seatName(room,'player2','player1'),'Bot');assert.equal(seatName(room,'player1','player1'),'Ana');
  assert.ok(src.includes("value!=='grita'||hasWord"));
+});
+test('The hard bot deduces the rival hand only from declared envido, sung flor and played cards',()=>{
+ const c={};vm.createContext(c);vm.runInContext(['pieceOrder','envidoValue','hasFlor','handEnvido','florValue','botDeck','botRivalHands'].map(extract).join(String.fromCharCode(10)),c);
+ const muestra=card('♦',6),deck=c.botDeck();
+ const sampleAll=(room,count,known)=>{const unseen=deck.filter(x=>!known.includes(x.id));const pick=c.botRivalHands(room,count,unseen);assert.ok(pick);const out=[];for(let i=0;i<300;i++)out.push(pick(Math.random));return out;};
+ // Said 37 and threw a common 4: the other two must be the 2 of the muestra and a 7.
+ let room={muestra,tricks:[],trickCards:[{playerId:'player1',card:card('♠',4)}],envidoAudit:{reveals:{player1:37,player2:20}},flors:{}};
+ for(const hand of sampleAll(room,2,['oro-6','espada-4']))assert.deepEqual(hand.map(x=>x.id).filter(id=>id==='oro-2'||/-7$/.test(id)).length,2);
+ // Said 30 and threw a 3: every guess adds up to exactly 30 (an 11 or 10 of the muestra, a 7 with the 3, ...).
+ room={muestra,tricks:[],trickCards:[{playerId:'player1',card:card('♣',3)}],envidoAudit:{reveals:{player1:30,player2:20}},flors:{}};
+ const thirty=sampleAll(room,2,['oro-6','basto-3']);for(const hand of thirty){const full=[card('♣',3),...hand];assert.equal(c.handEnvido(full,muestra),30);assert.equal(c.hasFlor(full,muestra),false);}
+ assert.ok(thirty.some(hand=>hand.some(x=>['oro-10','oro-11'].includes(x.id))),'a piece of the muestra is among the options');
+ // Said son buenas against 25: never more than 25.
+ room={muestra,tricks:[],trickCards:[{playerId:'player1',card:card('♥',5)}],envidoAudit:{reveals:{player2:25}},flors:{}};
+ for(const hand of sampleAll(room,2,['oro-6','copa-5']))assert.ok(c.handEnvido([card('♥',5),...hand],muestra)<=25);
+ // Sang flor: every guess is a flower.
+ room={muestra,tricks:[],trickCards:[{playerId:'player1',card:card('♠',1)}],flors:{player1:33},florCompared:false};
+ for(const hand of sampleAll(room,2,['oro-6','espada-1']))assert.ok(c.hasFlor([card('♠',1),...hand],muestra));
+ // With nothing declared and no card thrown, the bot does not narrow anything.
+ assert.equal(c.botRivalHands({muestra,tricks:[],trickCards:[],flors:{}},3,deck),null);
+});
+test('Knowing the rival declared 37 and threw a common 4 lowers the hard bot win chance',()=>{
+ const c={structuredClone};vm.createContext(c);vm.runInContext(['pieceOrder','cardStrength','envidoValue','hasFlor','handEnvido','florValue','botDeck','botRivalHands','rememberBotCards','otherPlayer','assessBotHand','botHandOutcome','settleHand'].map(extract).join(String.fromCharCode(10)),c);
+ const seeded=()=>{let x=12345;return ()=>((x=(x*1103515245+12345)%2147483648)/2147483648);};
+ const room={muestra:card('♦',6),mano:'player1',turn:'player2',tricks:[],trickCards:[{playerId:'player1',card:card('♠',4)}],envidoAudit:{reveals:{player1:37,player2:20}},flors:{}};
+ const hand=[card('♠',3),card('♥',2),card('♣',12)];
+ const hard=c.assessBotHand(room,hand,'hard',{},seeded()).chance,blind=c.assessBotHand(room,hand,'normal',{},seeded()).chance;
+ assert.ok(hard<blind-0.1,'hard '+hard+' vs blind '+blind);
 });

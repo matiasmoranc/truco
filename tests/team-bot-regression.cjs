@@ -1,7 +1,7 @@
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const {newTeamSession,strength}=require('../functions/team-referee.cjs');
-const {botCommands,signalFor}=require('../functions/team-bot.cjs');
+const {botCommands,signalFor,rivalOptions,unseenCards}=require('../functions/team-bot.cjs');const {envido:teamEnvido,flower:teamFlower}=require('../functions/team-referee.cjs');
 
 const people=Object.fromEntries(['player1','player2','player3','player4'].map(p=>[p,{uid:'bot:'+p,name:'Bot',bot:true}]));
 // A fresh hand where the bot on turn got `value` from its partner; envido and flor are already settled.
@@ -150,4 +150,11 @@ test('Team bots use the 1v1 hard thresholds plus 3 for envido',()=>{
  const answer=(called,t)=>{s.truth={player1:0,player2:0,player3:t,player4:0};r.turn='player1';r.pendingBet={id:'e1',type:'envido',caller:'player2',callerTeam:'player2',responder:'player3',stake:2,accepted:0,called};return botCommands(s,'player3',()=>0.99)[0].value;};
  assert.equal(answer('envido',25),'no');assert.equal(answer('envido',26),'yes');assert.equal(answer('real',29),'yes');assert.equal(answer('falta',32),'no');assert.equal(answer('falta',33),'yes');
  assert.equal(answer('envido',35),'raise-real');
+});
+test('Team bots read son buenas and a quiet first card when guessing rival hands',()=>{
+ const {s,r}=opening();
+ r.envidoAudit={reveals:{player1:30,player2:-1}};r.trickCards=[{playerId:'player2',card:tcard('♠',5)}];r.playedBy={player2:1};
+ const options=rivalOptions(s,'player1',unseenCards(s,'player1'));
+ assert.ok(options.player2.length>0);
+ for(const h of options.player2){const full=[tcard('♠',5),...h];assert.ok(teamEnvido(full,r.muestra)<=30);assert.equal(teamFlower(full,r.muestra),false);}
 });
