@@ -246,10 +246,12 @@ test('Two people against two bots: only the people pay and collect',async()=>{
 });
 
 test('A bot partner waits up to 10 s for the pie\'s signal, obeys "vení" and otherwise plays on its own',async()=>{
+ let obeyed=false,waited=false;
+ // The bot partner must open a trick for its team, which a match may never deal: play new matches until both cases show up.
+ for(let attempt=0;attempt<6&&!(obeyed&&waited);attempt++){
  const {engine,advance,now}=setup();
  await engine.create({uid:'a',name:'A'},{id:'sig1',stake:1,targetPoints:30,mode:'2v2'});
  for(const seat of ['player2','player3','player4'])await engine.act('a',{command:{kind:'add-bot',seat},requestId:'s'+seat,expectedMatchId:'sig1'});
- let obeyed=false,waited=false;
  for(let i=0;i<20000&&engine.match.status==='reserved'&&!(obeyed&&waited);i++){
   const m=engine.match,s=m.session,r=s.room;
   if(teamBot.awaitsSignal(s,'player3')&&!teamBot.signalFor(r,'player3')){
@@ -271,6 +273,7 @@ test('A bot partner waits up to 10 s for the pie\'s signal, obeys "vení" and ot
   }
   if(teamBot.mustAct(s,'player1')){for(const command of teamBot.botCommands(s,'player1')){try{await engine.act('a',{command,requestId:'h'+i,expectedMatchId:m.id});break;}catch{}}}
   else{advance(2000);await engine.tick();}
+ }
  }
  assert.ok(obeyed,'the bot never obeyed vení');assert.ok(waited,'the bot never played on its own after waiting');
 });

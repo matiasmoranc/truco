@@ -410,7 +410,7 @@ function localPlay(card,launchOrigin=null) {
   if(state.learning?.paused)return;
   if(state.room?.turnClock?.key===turnClockKey()&&turnClockRemaining(state.room.turnClock).expired){renderTurnTimer();return;}
   const player=state.playerId;
-  const pause=pauseMessage();if(pause){renderRoundPauseTimer();return;}
+  const pause=pauseMessage();if(pause){renderRoundPauseTimer();shakeTurnBadge();return;}
   if(state.room.status!=='started')return;
   if(state.room.pendingBet){shakeTurnBadge();return;}
   if(state.room.turn!==player){shakeTurnBadge();return;}
@@ -421,12 +421,11 @@ function localPlay(card,launchOrigin=null) {
   if(state.room.trickCards.length===2){
     const first=state.room.trickCards[0],second=state.room.trickCards[1],winner=cardStrength(first.card,state.room.muestra)===cardStrength(second.card,state.room.muestra)?null:(cardStrength(first.card,state.room.muestra)>cardStrength(second.card,state.room.muestra)?first.playerId:second.playerId);
     state.room.tricks=[...(state.room.tricks||[]),{winner,played:[...state.room.trickCards]}];
-    queueLearningRoundResult(winner,state.room.trickCards);
     const handWinner=settleHand(state.room.tricks,state.room);
     if(winner)state.room.feed.unshift({text:`${state.room.players[winner].name} se lleva la ronda.`,time:Date.now()});
-    state.room.resolvingTrick=true;state.room.resolutionId=crypto.randomUUID();state.room.resolutionEndsAt=gameTime()+3000;state.room.resolvedTrickWinner=winner;state.room.handComplete=!!handWinner;
+    state.room.resolvingTrick=true;state.room.resolutionId=crypto.randomUUID();state.room.resolutionEndsAt=gameTime()+(state.learning?PRACTICE_PAUSE_MS:3000);state.room.resolvedTrickWinner=winner;state.room.handComplete=!!handWinner;
     const resolvingRoom=state.room;
-    scheduleLocalTransition(resolvingRoom,()=>{if(!state.localGame||state.room!==resolvingRoom)return;state.room.resolvingTrick=false;state.room.resolutionEndsAt=null;state.room.handComplete=false;state.room.trickCards=[];if(handWinner){localFinishHand(handWinner,state.room.trucoLevel||1);return;}else{state.room.turn=winner||state.room.mano;state.room.trickNo++;}state.hand=[...(state.localHands[state.playerId]||[])];renderGame();},3000);
+    scheduleLocalTransition(resolvingRoom,()=>{if(!state.localGame||state.room!==resolvingRoom)return;state.room.resolvingTrick=false;state.room.resolutionEndsAt=null;state.room.handComplete=false;state.room.trickCards=[];if(handWinner){localFinishHand(handWinner,state.room.trucoLevel||1);return;}else{state.room.turn=winner||state.room.mano;state.room.trickNo++;}state.hand=[...(state.localHands[state.playerId]||[])];renderGame();},state.learning?PRACTICE_PAUSE_MS:3000);
   }else state.room.turn=player==='player1'?'player2':'player1';
   renderGame();
 }
@@ -443,7 +442,7 @@ function localFinishHand(winner,points,ending='rounds'){
   localDealAfterHand();
 }
 function localShowEvidence(groups){
-  const room=state.room,delay=state.learning?3000:5000;
+  const room=state.room,delay=state.learning?PRACTICE_PAUSE_MS:5000;
   room.status='revealing';room.pendingBet=null;room.trickCards=[];room.turn=null;room.endReveal={id:crypto.randomUUID(),endsAt:gameTime()+delay,groups};
   scheduleLocalTransition(room,()=>{if(!state.localGame||state.room!==room||room.status!=='revealing')return;localDealAfterHand();},delay);
 }
