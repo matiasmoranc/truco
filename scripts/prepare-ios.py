@@ -3,6 +3,7 @@ import base64
 import os
 import json
 import plistlib
+import re
 from pathlib import Path
 
 root = Path(__file__).resolve().parent.parent
@@ -29,14 +30,8 @@ info["ITSAppUsesNonExemptEncryption"] = False
 for key in ["GADApplicationIdentifier", "SKAdNetworkItems", "NSUserTrackingUsageDescription"]:
     info.pop(key, None)
 info["UISupportedInterfaceOrientations"] = ["UIInterfaceOrientationPortrait"]
-# Apple requires all four orientations for iPad multitasking. iPhone remains
-# portrait-only; the separate iPad declaration does not rotate the phone UI.
-info["UISupportedInterfaceOrientations~ipad"] = [
-    "UIInterfaceOrientationPortrait",
-    "UIInterfaceOrientationPortraitUpsideDown",
-    "UIInterfaceOrientationLandscapeLeft",
-    "UIInterfaceOrientationLandscapeRight",
-]
+# The first App Store release is iPhone only (portrait); iPad comes in a later version.
+info.pop("UISupportedInterfaceOrientations~ipad", None)
 info_path.write_bytes(plistlib.dumps(info))
 (app / "App.entitlements").write_bytes(plistlib.dumps({"com.apple.developer.applesignin": ["Default"]}))
 
@@ -59,5 +54,9 @@ if resource_id not in project:
         project = project.replace(marker, replacement)
 if "CODE_SIGN_ENTITLEMENTS = App/App.entitlements;" not in project:
     project = project.replace("INFOPLIST_FILE = App/Info.plist;", "INFOPLIST_FILE = App/Info.plist;\n\t\t\t\tCODE_SIGN_ENTITLEMENTS = App/App.entitlements;")
+# iPhone only: no iPad build, screenshots or iPad review for this release.
+project, families = re.subn(r"TARGETED_DEVICE_FAMILY = [^;]+;", "TARGETED_DEVICE_FAMILY = 1;", project)
+if not families:
+    project = project.replace("INFOPLIST_FILE = App/Info.plist;", "INFOPLIST_FILE = App/Info.plist;\n\t\t\t\tTARGETED_DEVICE_FAMILY = 1;")
 project_path.write_text(project)
-print("iOS configurado: Firebase, acceso Google y capacidad Sign in with Apple.")
+print("iOS configurado: Firebase, acceso Google, Sign in with Apple y solo iPhone.")
