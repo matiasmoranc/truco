@@ -40,7 +40,8 @@ export function recordVisit({fetch=globalThis.fetch,nav=globalThis.navigator,loc
  if(!location||typeof fetch!=='function')return null;
  // Local copies, crawlers and automated browsers stay out of the numbers.
  if(!nativePlatform()&&/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location?.hostname||''))return null;
- if(nav?.webdriver||/bot|crawl|spider|slurp|lighthouse|headless/i.test(nav?.userAgent||''))return null;
+ // Claude's own browser checks the live site while working on it: not a visitor.
+ if(nav?.webdriver||/bot|crawl|spider|slurp|lighthouse|headless|Claude\//i.test(nav?.userAgent||''))return null;
  const day=uruguayDay(),first=storedDay()!==day;storeDay(day);
  const data={platform:visitPlatform(nav),page:visitPage(location?.pathname),first,ref:visitReferrer(location),...(testDevice()?{test:true}:{})};
  return fetch(ENDPOINT,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({data}),keepalive:true})

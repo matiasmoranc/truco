@@ -76,3 +76,7 @@ test('Visits claimed by a player count per player, and the rest stay anonymous',
  assert.equal(visitClaimPath({visitId:'-NaBcDeFgHiJkLmNoPqR',visitDay:'2026-10-24'}),'adminMetrics/visitLog/2026-10-24/-NaBcDeFgHiJkLmNoPqR');
  for(const bad of [{visitId:'../x',visitDay:'2026-10-24'},{visitId:'-NaBcDeFgHiJkLmNoPqR',visitDay:'../'},{}])assert.equal(visitClaimPath(bad),null);
 });
+test("Claude's own browser checking the live site does not count as a visit",async()=>{
+ const {recordVisit}=await import('data:text/javascript;base64,'+Buffer.from(require('node:fs').readFileSync(require('node:path').join(__dirname,'../visit.js'),'utf8')).toString('base64'));
+ assert.equal(recordVisit({fetch:()=>Promise.resolve(),nav:{userAgent:'Mozilla/5.0 (Windows NT 10.0) Chrome/152 Claude/3.6556.2 Safari/537.36'},location:{hostname:'trucouruguayo.uy',pathname:'/'}}),null);
+});
