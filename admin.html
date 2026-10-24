@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="es"><head><meta charset="utf-8">
-  <meta name="robots" content="noindex, nofollow"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Administración · Truco Uruguayo</title><link rel="stylesheet" href="admin.css?v=12"></head>
+  <meta name="robots" content="noindex, nofollow"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Administración · Truco Uruguayo</title><link rel="stylesheet" href="admin.css?v=13"></head>
 <body>
 <section id="access" class="access"><div class="access-card"><img src="assets/truco-v3.png" alt=""><small>TRUCO URUGUAYO</small><h1>Administración</h1><p id="identity"></p><p id="access-status">Verificando sesión…</p><button id="login" class="primary" hidden>Continuar con Google</button><button id="switch-account" hidden>Usar otra cuenta</button><a href="./">Volver al juego</a></div></section>
 <div id="console" class="shell" hidden>
@@ -37,15 +37,17 @@
   </section>
 
   <section id="visits" hidden>
-   <div class="toolbar"><label>Período<select id="visit-range"><option value="7">Últimos 7 días</option><option value="14">Últimos 14 días</option><option value="30" selected>Últimos 30 días</option></select></label><label>Mostrar<select id="visit-measure"><option value="visitors">Visitantes (dispositivos únicos por día)</option><option value="visits">Visitas (cada vez que abren el juego)</option></select></label></div>
+   <div class="toolbar"><label>Período<select id="visit-range"><option value="today">Hoy</option><option value="yesterday">Ayer</option><option value="7">Últimos 7 días</option><option value="14">Últimos 14 días</option><option value="30" selected>Últimos 30 días</option><option value="90">Últimos 90 días</option><option value="custom">Entre fechas…</option></select></label><label class="date-field" hidden>Desde<input id="visit-from" type="date"></label><label class="date-field" hidden>Hasta<input id="visit-to" type="date"></label><label>Mostrar<select id="visit-measure"><option value="visitors">Visitantes (dispositivos únicos por día)</option><option value="visits">Visitas (cada vez que abren el juego)</option></select></label></div>
+   <p id="visit-period" class="note"></p>
    <div id="visit-totals" class="kpis compact"></div>
+   <article id="visit-detail" class="panel" hidden><div class="panel-head"><h2 id="visit-detail-title"></h2><button id="visit-detail-close" type="button">Cerrar</button></div><div id="visit-detail-body"></div></article>
    <article class="panel"><div class="panel-head"><h2 id="visit-chart-title">Por día y plataforma</h2><div class="legend" data-legend></div></div><div id="visit-chart" class="bar-chart stacked tall"></div></article>
    <div class="panels">
     <article class="panel"><div class="panel-head"><h2>Páginas más visitadas</h2></div><div id="visit-pages" class="platform-bars"></div></article>
-    <article class="panel"><div class="panel-head"><h2>Visitas por hora · hoy</h2></div><div id="visit-hours" class="bar-chart hours"></div></article>
+    <article class="panel"><div class="panel-head"><h2>Visitas por hora · período</h2></div><div id="visit-hours" class="bar-chart hours"></div></article>
    </div>
    <article class="panel"><div class="panel-head"><h2>Detalle por día</h2></div><div class="table-scroll"><table id="visit-table" class="data-table"></table></div></article>
-   <p class="note">Horario de Uruguay. Las visitas son anónimas: no se guarda ningún dato de la persona. Se cuentan desde la web (trucouruguayo.uy y GitHub) y desde las apps a partir de la próxima versión publicada.</p>
+   <p class="note">Horario de Uruguay. Tocá una plataforma para ver quién entró en el período. Las visitas sin sesión son anónimas: se guarda el tipo de dispositivo, navegador, página y de dónde llegó, pero no datos de la persona. Se cuentan desde la web (trucouruguayo.uy y GitHub) y desde las apps a partir de la próxima versión publicada.</p>
   </section>
 
   <section id="users" hidden>
@@ -68,4 +70,4 @@
  </main>
 </div>
 <dialog id="edit"><form id="edit-form"><div class="dialog-head"><h2 id="edit-title"></h2><button type="button" id="close" aria-label="Cerrar">×</button></div><p id="edit-description"></p><label id="value-label">Nuevo valor<input id="value" required></label><label id="delete-label" hidden>Escribí el nombre exacto para confirmar<input id="delete-confirm" autocomplete="off"></label><label>Motivo<input id="reason" required minlength="3" maxlength="200" placeholder="Por qué realizás este cambio"></label><p id="edit-error" role="alert"></p><div class="dialog-actions"><button id="cancel" type="button">Cancelar</button><button id="save" class="primary" type="submit">Confirmar cambio</button></div></form></dialog>
-<script type="module" src="admin.js?v=12"></script></body></html>
+<script type="module" src="admin.js?v=13"></script></body></html>

@@ -1,16 +1,51 @@
 'use strict';
-// Anonymous page visits: counters only, no identifiers. A device reports
-// "first" once per Uruguay day, so visitors approximate unique devices.
-const {uruguayDate}=require('./activity-service.cjs');
-const PLATFORMS=['app-ios','app-android','web-ios','web-android','web-desktop'];
+// Anonymous page visits: counters plus a per-visit detail with device type,
+// browser and origin. No IP, account or device identifier is stored. A device
+// reports "first" once per Uruguay day, so visitors approximate unique devices.
+const {uruguayDate,PLATFORMS}=require('./activity-service.cjs');
 const PAGES=['juego','anotador','aprender','otra'];
 const VISIT_DAYS=90;
+const DAY=/^\d{4}-\d{2}-\d{2}$/;
 function visitUpdates({platform,page,first,now,increment}){
  if(!PLATFORMS.includes(platform)||!PAGES.includes(page)||typeof first!=='boolean')throw new Error('Visita inválida.');
  const {day,hour}=uruguayDate(now),base=day+'/';
  const result={[base+'visits/'+platform]:increment(1),[base+'pages/'+page]:increment(1),[base+'hours/'+hour]:increment(1)};
  if(first)result[base+'visitors/'+platform]=increment(1);
  return result;
+}
+// Short, readable device facts from the user agent the server received.
+function deviceFacts(agent=''){
+ agent=String(agent).slice(0,400);
+ let os='Otro',browser='Otro',model='';
+ const ios=/(?:iPhone|iPad|iPod).*?OS (\d+)/.exec(agent),android=/Android (\d+)/.exec(agent);
+ if(ios)os=(/iPad/.test(agent)?'iPadOS ':'iOS ')+ios[1];
+ else if(android){os='Android '+android[1];const m=/Android [\d.]+; ([^;)]+)[;)]/.exec(agent);if(m&&m[1].trim()!=='K'&&!/^wv$/.test(m[1].trim()))model=m[1].trim().slice(0,40);}
+ else if(/Windows/.test(agent))os='Windows';
+ else if(/Macintosh/.test(agent))os='macOS';
+ else if(/CrOS/.test(agent))os='ChromeOS';
+ else if(/Linux/.test(agent))os='Linux';
+ if(/Instagram/.test(agent))browser='Instagram';
+ else if(/FBAN|FBAV|FB_IAB/.test(agent))browser='Facebook';
+ else if(/WhatsApp/.test(agent))browser='WhatsApp';
+ else if(/EdgA?\//.test(agent))browser='Edge';
+ else if(/OPR\/|Opera/.test(agent))browser='Opera';
+ else if(/SamsungBrowser/.test(agent))browser='Samsung Internet';
+ else if(/Firefox|FxiOS/.test(agent))browser='Firefox';
+ else if(/CriOS|Chrome\//.test(agent))browser=/; wv\)/.test(agent)?'App':'Chrome';
+ else if(/Safari\//.test(agent))browser='Safari';
+ else if(/AppleWebKit/.test(agent))browser='App';
+ return {os,browser,model};
+}
+// Origin: a campaign tag (utm_source) or the referring site, grouped by brand.
+function visitOrigin(ref){
+ const value=typeof ref==='string'&&/^[a-z0-9.-]{1,80}$/i.test(ref)?ref.toLowerCase():'';
+ if(!value)return 'Directo';
+ const known=[[/instagram/,'Instagram'],[/facebook|fb\.com|^fb$/,'Facebook'],[/google/,'Google'],[/bing/,'Bing'],[/whatsapp|wa\.me/,'WhatsApp'],[/^t\.co$|twitter|^x\.com$/,'X'],[/tiktok/,'TikTok'],[/youtube|youtu\.be/,'YouTube'],[/github/,'GitHub'],[/apple\.com|apps\.apple/,'App Store'],[/play\.google/,'Google Play']];
+ for(const [pattern,name] of known)if(pattern.test(value))return name;
+ return value.replace(/^www\./,'');
+}
+function visitRecord({platform,page,first,ref,userAgent,now}){
+ return {at:now,platform,page,first,origin:visitOrigin(ref),...deviceFacts(userAgent)};
 }
 const count=value=>Number.isSafeInteger(value)&&value>0?value:0;
 function visitSummary({visits,now,days=30}){
@@ -26,4 +61,27 @@ function visitSummary({visits,now,days=30}){
  }
  return {platforms:PLATFORMS,days:list};
 }
-module.exports={PLATFORMS,PAGES,VISIT_DAYS,visitUpdates,visitSummary};
+function visitRange({from,to,platform,now}){
+ if(!DAY.test(from||'')||!DAY.test(to||'')||from>to)throw new Error('Período inválido.');
+ if(from<uruguayDate(now-(VISIT_DAYS-1)*86400000).day)throw new Error('El período puede abarcar hasta '+VISIT_DAYS+' días atrás.');
+ if(platform!=='all'&&!PLATFORMS.includes(platform))throw new Error('Plataforma inválida.');
+ return {from,to,platform};
+}
+// Who came in a period: anonymous visit details and signed-in players.
+function visitorsInRange({log,activity,platform,limit=1000}){
+ const matches=p=>platform==='all'||p===platform;
+ const visits=[];
+ for(const records of Object.values(log||{}))for(const r of Object.values(records||{}))if(r&&Number.isFinite(r.at)&&matches(r.platform))visits.push(r);
+ visits.sort((a,b)=>b.at-a.at);
+ const players=new Map();
+ for(const [day,data] of Object.entries(activity||{})){
+  for(const [uid,platforms] of Object.entries(data?.platforms||{})){
+   const used=Object.keys(platforms||{}).filter(p=>PLATFORMS.includes(p)&&matches(p));
+   if(!used.length)continue;
+   const player=players.get(uid)||{uid,days:0,lastDay:'',platforms:[]};
+   player.days++;if(day>player.lastDay)player.lastDay=day;player.platforms=[...new Set([...player.platforms,...used])];players.set(uid,player);
+  }
+ }
+ return {visits:visits.slice(0,limit),totalVisits:visits.length,players:[...players.values()].sort((a,b)=>b.lastDay.localeCompare(a.lastDay)||b.days-a.days)};
+}
+module.exports={PLATFORMS,PAGES,VISIT_DAYS,visitUpdates,visitSummary,deviceFacts,visitOrigin,visitRecord,visitRange,visitorsInRange};

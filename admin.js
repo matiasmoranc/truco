@@ -188,27 +188,92 @@ function renderHours(){
  const day=metrics?.days.find(d=>d.day===$('metric-day').value),hours=day?.hours||Array.from({length:24},(_,hour)=>({hour,users:0}));
  columns($('hour-chart'),hours.map(h=>({label:String(h.hour).padStart(2,'0'),value:h.users,tooltip:String(h.hour).padStart(2,'0')+':00 – '+String((h.hour+1)%24).padStart(2,'0')+':00 · '+h.users+' jugadores'})),{labelEvery:3});
 }
+const addDays=(day,n)=>new Date(Date.parse(day+'T12:00:00Z')+n*86400000).toISOString().slice(0,10);
+const longDay=day=>new Intl.DateTimeFormat('es-UY',{weekday:'short',day:'2-digit',month:'2-digit',timeZone:'UTC'}).format(new Date(day+'T12:00:00Z'));
+const visitTime=at=>new Intl.DateTimeFormat('es-UY',{timeZone:'America/Montevideo',day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(at));
+let visitDetail=null,visitDetailRequest=0;
+// The selected period as Uruguay days, clamped to the stored history.
+function visitPeriod(){
+ const today=metrics?.today||new Date(Date.now()-10800000).toISOString().slice(0,10),oldest=addDays(today,-89),choice=$('visit-range').value;
+ const custom=choice==='custom';for(const field of document.querySelectorAll('.date-field'))field.hidden=!custom;
+ for(const id of ['visit-from','visit-to']){$(id).min=oldest;$(id).max=today;}
+ let from,to=today;
+ if(choice==='today')from=today;
+ else if(choice==='yesterday')from=to=addDays(today,-1);
+ else if(custom){
+  if(!$('visit-from').value)$('visit-from').value=addDays(today,-6);if(!$('visit-to').value)$('visit-to').value=today;
+  from=$('visit-from').value;to=$('visit-to').value;
+  if(from>to)[from,to]=[to,from];
+ }else from=addDays(today,-(Number(choice)-1));
+ if(from<oldest)from=oldest;if(to>today)to=today;
+ return {from,to};
+}
 function renderVisits(){
- const all=metrics?.visits?.days||[];
- const range=Number($('visit-range').value),measure=$('visit-measure').value,unit=measure==='visits'?'visitas':'visitantes';
- const days=all.slice(-range),totalKey=measure==='visits'?'totalVisits':'totalVisitors';
+ const all=metrics?.visits?.days||[],{from,to}=visitPeriod();
+ const measure=$('visit-measure').value,unit=measure==='visits'?'visitas':'visitantes',totalKey=measure==='visits'?'totalVisits':'totalVisitors';
+ const days=all.filter(d=>d.day>=from&&d.day<=to);
+ $('visit-period').textContent=from===to?'Período: '+longDay(from):'Período: del '+longDay(from)+' al '+longDay(to)+' ('+days.length+' días)';
  $('visit-chart-title').textContent=(measure==='visits'?'Visitas':'Visitantes')+' por día y plataforma';
- columns($('visit-chart'),days.map(d=>({label:shortDay(d.day),segments:platformSegments(d[measure]),tooltip:platformTooltip(d.day,d[measure],unit)})),{labelEvery:range>14?3:1});
+ columns($('visit-chart'),days.map(d=>({label:shortDay(d.day),segments:platformSegments(d[measure]),tooltip:platformTooltip(d.day,d[measure],unit)})),{labelEvery:Math.max(1,Math.ceil(days.length/12))});
  const sum=key=>days.reduce((total,d)=>total+(d[measure][key]||0),0),grand=days.reduce((total,d)=>total+d[totalKey],0);
  $('visit-totals').replaceChildren();
- const card=(label,value,color)=>{const k=node('article','','kpi'),title=node('small',label);if(color){const swatch=node('i','','swatch');swatch.style.background=color;title.prepend(swatch);}k.append(title,node('strong',number(value)));$('visit-totals').append(k);};
- card('Total '+unit,grand);for(const [key,label] of Object.entries(PLATFORM_LABELS))card(label,sum(key),'var(--'+key+')');
+ const card=(key,label,value,color)=>{
+  const k=node('button','','kpi metric-link'),title=node('small',label);k.type='button';k.dataset.platform=key;k.title='Ver quién entró';
+  if(color){const swatch=node('i','','swatch');swatch.style.background=color;title.prepend(swatch);}
+  k.classList.toggle('selected',visitDetail?.platform===key);
+  k.append(title,node('strong',number(value)),node('span','Ver quién entró','delta'));k.onclick=()=>openVisitDetail(key);$('visit-totals').append(k);
+ };
+ card('all','Total '+unit,grand);for(const [key,label] of Object.entries(PLATFORM_LABELS))card(key,label,sum(key),'var(--'+key+')');
  bars($('visit-pages'),Object.entries(PAGE_LABELS).map(([key,label])=>({label,value:days.reduce((total,d)=>total+(d.pages?.[key]||0),0)})).sort((a,b)=>b.value-a.value));
- const today=all[all.length-1];
- columns($('visit-hours'),(today?.hours||Array(24).fill(0)).map((value,h)=>({label:String(h).padStart(2,'0'),value,tooltip:String(h).padStart(2,'0')+':00 · '+value+' visitas'})),{labelEvery:3});
+ const hours=Array.from({length:24},(_,h)=>days.reduce((total,d)=>total+(d.hours?.[h]||0),0));
+ columns($('visit-hours'),hours.map((value,h)=>({label:String(h).padStart(2,'0'),value,tooltip:String(h).padStart(2,'0')+':00 · '+value+' visitas'})),{labelEvery:3});
  const table=$('visit-table');table.replaceChildren();
  const head=node('tr');head.append(node('th','Día'),...Object.values(PLATFORM_LABELS).map(label=>node('th',label)),node('th','Total','total'));table.append(head);
  for(const d of [...days].reverse()){
-  const row=node('tr');row.append(node('td',new Intl.DateTimeFormat('es-UY',{weekday:'short',day:'2-digit',month:'2-digit',timeZone:'UTC'}).format(new Date(d.day+'T12:00:00Z'))));
+  const row=node('tr');row.append(node('td',longDay(d.day)));
   for(const key of Object.keys(PLATFORM_LABELS)){const value=d[measure][key]||0;row.append(node('td',number(value),value?'':'zero'));}
   row.append(node('td',number(d[totalKey]),'total'));table.append(row);
  }
+ if(visitDetail&&(visitDetail.from!==from||visitDetail.to!==to))openVisitDetail(visitDetail.platform);
 }
+function simpleTable(headers,rows){
+ const wrap=node('div','','table-scroll'),table=node('table','','data-table'),head=node('tr');
+ head.append(...headers.map(h=>node('th',h)));table.append(head);
+ for(const cells of rows){const row=node('tr');for(const cell of cells)row.append(node('td',cell));table.append(row);}
+ wrap.append(table);return wrap;
+}
+// Who came through one platform (or all) in the selected period.
+async function openVisitDetail(platform){
+ const {from,to}=visitPeriod(),request=++visitDetailRequest;
+ visitDetail={platform,from,to};
+ for(const k of $('visit-totals').children)k.classList.toggle('selected',k.dataset.platform===platform);
+ const label=platform==='all'?'Todas las plataformas':PLATFORM_LABELS[platform];
+ $('visit-detail').hidden=false;$('visit-detail-title').textContent=label+' · '+(from===to?longDay(from):shortDay(from)+' al '+shortDay(to));
+ $('visit-detail-body').replaceChildren(node('p','Cargando…','empty'));
+ $('visit-detail').scrollIntoView({behavior:'smooth',block:'start'});
+ let data;
+ try{data=(await call({action:'visitors',from,to,platform})).data;}
+ catch(e){if(request===visitDetailRequest)$('visit-detail-body').replaceChildren(node('p',errorText(e),'empty'));return;}
+ if(request!==visitDetailRequest)return;
+ const body=$('visit-detail-body');body.replaceChildren();
+ // Players with an account, by name.
+ const players=node('div','','detail-block');players.append(node('h3','Jugadores con sesión ('+data.players.length+')'));
+ if(data.players.length)players.append(simpleTable(['Jugador','Plataformas','Días que entró','Última vez'],data.players.map(p=>[p.name||p.uid,p.platforms.map(k=>PLATFORM_LABELS[k]).join(', '),String(p.days),longDay(p.lastDay)])));
+ else players.append(node('p','Nadie con sesión iniciada entró por acá en este período.','empty'));
+ // Anonymous visits: origin breakdown and the latest visits.
+ const visits=node('div','','detail-block');visits.append(node('h3','Visitas registradas ('+number(data.totalVisits)+')'));
+ if(data.visits.length){
+  const origins={};for(const v of data.visits)origins[v.origin||'Directo']=(origins[v.origin||'Directo']||0)+1;
+  const originBars=node('div','','platform-bars');bars(originBars,Object.entries(origins).sort((a,b)=>b[1]-a[1]).slice(0,8).map(([label,value])=>({label,value})));
+  visits.append(node('h4','De dónde llegaron'),originBars,node('h4','Últimas visitas'));
+  const headers=['Fecha y hora',...(platform==='all'?['Plataforma']:[]),'Página','Dispositivo','Navegador','Origen','Tipo'];
+  visits.append(simpleTable(headers,data.visits.slice(0,300).map(v=>[visitTime(v.at),...(platform==='all'?[PLATFORM_LABELS[v.platform]||v.platform]:[]),PAGE_LABELS[v.page]||v.page,v.os+(v.model?' · '+v.model:''),v.browser,v.origin||'Directo',v.first?'Nueva del día':'Repetida'])));
+  if(data.totalVisits>300)visits.append(node('p','Se muestran las 300 más recientes.','note'));
+ }else visits.append(node('p','No hay visitas con detalle en este período.','empty'));
+ visits.append(node('p','El detalle de cada visita se guarda desde el 24/10/2026; antes solo existen los totales.','note'));
+ body.append(players,visits);
+}
+$('visit-detail-close').onclick=()=>{visitDetail=null;visitDetailRequest++;$('visit-detail').hidden=true;for(const k of $('visit-totals').children)k.classList.remove('selected');};
 function renderMetrics(){
  if(!metrics)return;
  $('metric-total').textContent=number(metrics.total);$('metric-active').textContent=number(metrics.active);$('metric-today').textContent=number(metrics.todayUsers);
@@ -226,7 +291,7 @@ function renderMetrics(){
  columns($('day-chart'),Array.from({length:30},(_,i)=>{const day=new Date(Date.parse(metrics.today+'T12:00:00Z')-(29-i)*86400000).toISOString().slice(0,10);return {label:shortDay(day),value:byDay.get(day)||0,tooltip:shortDay(day)+' · '+(byDay.get(day)||0)+' jugadores únicos'};}),{labelEvery:3});
  renderVisits();renderUsers();
 }
-$('visit-range').addEventListener('change',renderVisits);$('visit-measure').addEventListener('change',renderVisits);
+for(const id of ['visit-range','visit-measure','visit-from','visit-to'])$(id).addEventListener('change',renderVisits);
 legend();
 async function refreshMetrics(){
  if(metricsBusy)return;metricsBusy=true;const generation=epoch;

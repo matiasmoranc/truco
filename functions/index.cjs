@@ -232,8 +232,16 @@ exports.adminConsole=onCall({...options,secrets:[liveInternalSecret]},async requ
   const registeredUids=[];let token;
   do{const page=await getAuth().listUsers(1000,token);registeredUids.push(...page.users.filter(u=>u.providerData.some(p=>['google.com','apple.com','password'].includes(p.providerId))).map(u=>u.uid));token=page.pageToken;}while(token);
   const now=Date.now(),cutoff=uruguayDate(now-29*86400000).day;
-  const [days,presence,start,visits]=await Promise.all([db.ref('adminMetrics/days').orderByKey().startAt(cutoff).get(),db.ref('adminMetrics/presence').get(),db.ref('adminMetrics/startedAt').get(),db.ref('adminMetrics/visits').orderByKey().startAt(cutoff).get()]);
-  return {...activitySummary({registeredUids,now,metrics:{days:days.val()||{},presence:presence.val()||{},startedAt:start.val()}}),visits:visitSummary({visits:visits.val()||{},now})};
+  const [days,presence,start,visits]=await Promise.all([db.ref('adminMetrics/days').orderByKey().startAt(cutoff).get(),db.ref('adminMetrics/presence').get(),db.ref('adminMetrics/startedAt').get(),db.ref('adminMetrics/visits').orderByKey().startAt(uruguayDate(now-(VISIT_DAYS-1)*86400000).day).get()]);
+  return {...activitySummary({registeredUids,now,metrics:{days:days.val()||{},presence:presence.val()||{},startedAt:start.val()}}),visits:visitSummary({visits:visits.val()||{},now,days:VISIT_DAYS})};
+ }
+ if(action==='visitors'){
+  let range;try{range=visitRange({...data,now:Date.now()});}catch(e){throw new HttpsError('invalid-argument',e.message);}
+  const [log,activity]=await Promise.all(['visitLog','days'].map(key=>db.ref('adminMetrics/'+key).orderByKey().startAt(range.from).endAt(range.to).get()));
+  const result=visitorsInRange({log:log.val()||{},activity:activity.val()||{},platform:range.platform});
+  const names=await Promise.all(result.players.slice(0,300).map(p=>db.ref('profiles/'+p.uid+'/name').get()));
+  result.players=result.players.slice(0,300).map((p,i)=>({...p,name:names[i].val()||''}));
+  return result;
  }
  if(action==='delete'){
   let failure;
@@ -345,14 +353,14 @@ const {uruguayDate,activityUpdates,activitySummary}=require('./activity-service.
 exports.playerActivity=onCall({...options,maxInstances:3},async request=>{
  const user=await identity(request);await rateLimit(user.uid,10,'activity');
  const now=Date.now();let updates;
- try{updates=activityUpdates({uid:user.uid,sessionId:request.data?.sessionId,visible:request.data?.visible,now});}catch(e){throw new HttpsError('invalid-argument',e.message);}
+ try{updates=activityUpdates({uid:user.uid,sessionId:request.data?.sessionId,visible:request.data?.visible,platform:request.data?.platform,now});}catch(e){throw new HttpsError('invalid-argument',e.message);}
  await db.ref('adminMetrics').update(updates);
  await db.ref('adminMetrics/startedAt').transaction(current=>current||now);
  return {ok:true};
 });
 // Anonymous visit counters for the admin panel. No login and no stored
 // identifiers; a per-instance limit keeps one address from inflating them.
-const {visitUpdates,visitSummary,VISIT_DAYS}=require('./visit-service.cjs');
+const {visitUpdates,visitSummary,visitRecord,visitRange,visitorsInRange,VISIT_DAYS}=require('./visit-service.cjs');
 const visitLimits=new Map();
 exports.siteVisit=onCall({region:'us-central1',maxInstances:3,timeoutSeconds:10,cors:true},async request=>{
  const now=Date.now(),ip=String(request.rawRequest?.ip||'');
@@ -362,16 +370,18 @@ exports.siteVisit=onCall({region:'us-central1',maxInstances:3,timeoutSeconds:10,
  if(visitLimits.size>5000)for(const [key,list] of visitLimits)if(list.every(at=>now-at>=60000))visitLimits.delete(key);
  let updates;
  try{updates=visitUpdates({...request.data,now,increment:ServerValue.increment});}catch(e){throw new HttpsError('invalid-argument',e.message);}
- await db.ref('adminMetrics/visits').update(updates);
+ const {day}=uruguayDate(now),data=request.data||{};
+ const record=visitRecord({...data,now,userAgent:request.rawRequest?.headers?.['user-agent']});
+ await Promise.all([db.ref('adminMetrics/visits').update(updates),db.ref('adminMetrics/visitLog/'+day).push(record)]);
  return {ok:true};
 });
 exports.activityCleanup=onSchedule({schedule:'every day 04:00',timeZone:'America/Montevideo',region:'us-central1',maxInstances:1},async()=>{
- const now=Date.now(),cutoff=uruguayDate(now-29*86400000).day;
+ const now=Date.now();
  await db.ref('adminMetrics').transaction(metrics=>{
   if(!metrics)return undefined;
-  for(const day of Object.keys(metrics.days||{}))if(day<cutoff)delete metrics.days[day];
+  // Daily activity, counters and visit details are kept for VISIT_DAYS.
   const visitCutoff=uruguayDate(now-(VISIT_DAYS-1)*86400000).day;
-  for(const day of Object.keys(metrics.visits||{}))if(day<visitCutoff)delete metrics.visits[day];
+  for(const key of ['days','visits','visitLog'])for(const day of Object.keys(metrics[key]||{}))if(day<visitCutoff)delete metrics[key][day];
   for(const [uid,sessions] of Object.entries(metrics.presence||{})){
    for(const [id,session] of Object.entries(sessions))if(now-session.at>=90000)delete sessions[id];
    if(!Object.keys(sessions).length)delete metrics.presence[uid];

@@ -78,6 +78,15 @@ section{display:grid;gap:16px}
 .bar-chart::after{content:'';position:absolute;left:0;right:0;bottom:18px;border-top:1px solid var(--line)}
 #visit-hours .seg{background:var(--web-android)}
 
+/* Visit detail */
+.kpi.selected{border-color:var(--gold);background:#e8c98314}
+.toolbar .date-field{min-width:150px}
+#visit-detail{border-color:#e8c98355;scroll-margin-top:16px}
+#visit-detail-body{display:grid;gap:22px}
+.detail-block{display:grid;gap:10px}.detail-block h3{font-size:14px}.detail-block h4{margin:6px 0 0;font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.6px}
+.detail-block .data-table td{white-space:nowrap}.detail-block .data-table th,.detail-block .data-table td{text-align:left}
+#visit-period{margin:-4px 0 0}
+
 /* Tables */
 .table-scroll{overflow-x:auto}
 .data-table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}

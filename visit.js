@@ -23,6 +23,12 @@ export function visitPage(path=globalThis.location?.pathname||''){
  if(/\/$|index\.html$/.test(path))return 'juego';
  return 'otra';
 }
+// Where the visit came from: a campaign tag or the referring site's host.
+export function visitReferrer(location=globalThis.location,referrer=globalThis.document?.referrer||''){
+ let tag='';try{tag=new URLSearchParams(location?.search||'').get('utm_source')||'';}catch{}
+ if(/^[a-z0-9.-]{1,80}$/i.test(tag))return tag.toLowerCase();
+ try{const host=new URL(referrer).hostname;return host&&host!==location?.hostname?host.slice(0,80):'';}catch{return '';}
+}
 function uruguayDay(now=new Date()){return new Intl.DateTimeFormat('en-CA',{timeZone:'America/Montevideo'}).format(now);}
 function storedDay(){try{return localStorage.getItem(DAY_KEY);}catch{return null;}}
 function storeDay(day){try{localStorage.setItem(DAY_KEY,day);}catch{/* Private mode: every visit counts as new. */}}
@@ -33,7 +39,7 @@ export function recordVisit({fetch=globalThis.fetch,nav=globalThis.navigator,loc
  if(!nativePlatform()&&/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location?.hostname||''))return null;
  if(nav?.webdriver||/bot|crawl|spider|slurp|lighthouse|headless/i.test(nav?.userAgent||''))return null;
  const day=uruguayDay(),first=storedDay()!==day;storeDay(day);
- const data={platform:visitPlatform(nav),page:visitPage(location?.pathname),first};
+ const data={platform:visitPlatform(nav),page:visitPage(location?.pathname),first,ref:visitReferrer(location)};
  return fetch(ENDPOINT,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({data}),keepalive:true}).catch(()=>null);
 }
 recordVisit();
