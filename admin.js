@@ -4,6 +4,10 @@ import {getFunctions,httpsCallable} from 'https://www.gstatic.com/firebasejs/12.
 const $=id=>document.getElementById(id);
 let auth,call,users=[],pageToken=null,selection=null,busy=false,epoch=0,metrics=null,metricsBusy=false,metricsTimer=null,pagesLoaded=1,userScope='all',tableData={tables:[],archivedTables:[]};
 function say(message){$('status').textContent=message;}
+const number=value=>new Intl.NumberFormat('es-UY').format(Number(value)||0);
+const PLATFORM_LABELS={'app-ios':'App iPhone','app-android':'App Android','web-ios':'Web iPhone','web-android':'Web Android','web-desktop':'Web computadora'};
+const PAGE_LABELS={juego:'Juego',anotador:'Anotador',aprender:'Aprender a jugar',otra:'Reglas y otras'};
+const TAB_TITLES={metrics:'Resumen',visits:'Visitas',users:'Usuarios y créditos',tables:'Mesas y partidas',reports:'Problemas reportados',audit:'Historial de cambios'};
 function errorText(e){return e.code==='functions/not-found'?'Falta publicar las funciones de administración en Firebase.':e.message||'No se pudo completar el cambio.';}
 function node(tag,text,className){const el=document.createElement(tag);el.textContent=text;if(className)el.className=className;return el;}
 function button(text,handler){const el=node('button',text);if(text==='Eliminar usuario')el.classList.add('danger');el.type='button';el.addEventListener('click',handler);return el;}
@@ -20,14 +24,17 @@ function renderUsers(){
  const expanded=new Set([...$('user-list').querySelectorAll('details[open]')].map(el=>el.dataset.uid));
  const query=$('search').value.toLocaleLowerCase();$('user-list').replaceChildren();
  for(const u of users.filter(u=>[u.name,u.email,u.uid].some(v=>v.toLocaleLowerCase().includes(query)))){
-  const card=node('details','', 'card user-card');card.dataset.uid=u.uid;card.open=expanded.has(u.uid);
-  const summary=node('summary');summary.append(node('span',u.name||'Sin nombre'),node('strong',u.balance+' créditos'));card.append(summary);
-  const detail=node('div','','user-detail');detail.append(node('p',u.email||'Sin correo'),node('small','UID: '+u.uid),node('small',u.locked+' reservados · '+(u.disabled?'Bloqueado':'Habilitado')+' · '+(metrics?.online.includes(u.uid)?'En línea':'Fuera de línea')),node('small','Registro: '+new Date(u.createdAt).toLocaleDateString('es-UY')));card.append(detail);
+  const card=node('details','','user-card');card.dataset.uid=u.uid;card.open=expanded.has(u.uid);
+  const online=metrics?.online.includes(u.uid);
+  const state=node('span','',u.disabled?'state blocked':online?'state online':'state');state.append(node('i'),document.createTextNode(u.disabled?'Bloqueado':online?'Jugando':'Desconectado'));
+  const summary=node('summary','','user-row');
+  summary.append(node('span',u.name||'Sin nombre','user-name'),node('span',u.email||'Sin correo','user-mail'),node('strong',number(u.balance),'num'),node('span',number(u.locked),'num reserved'),state,node('span',new Date(u.createdAt).toLocaleDateString('es-UY'),'joined'));card.append(summary);
+  const detail=node('div','','user-detail');detail.append(node('small','UID: '+u.uid),node('small','Correo: '+(u.email||'Sin correo')),node('small','Saldo '+number(u.balance)+' · '+number(u.locked)+' reservados · Registro '+new Date(u.createdAt).toLocaleDateString('es-UY')));card.append(detail);
   const movements=node('details');movements.append(node('summary','Movimientos de créditos'));
   for(const e of Object.values(tableData.movements?.[u.uid]||{}).sort((a,b)=>b.at-a.at))movements.append(node('p',formatTableTime(e.at)+': saldo '+e.before+' → '+e.after+' · reservados '+e.reservedBefore+' → '+e.reservedAfter));detail.append(movements);
   const actions=node('div','','actions');actions.append(button('Editar créditos',()=>openEdit('credits',u)),button('Cambiar nombre',()=>openEdit('rename',u)),button(u.disabled?'Desbloquear':'Bloquear',()=>openEdit('block',u)),button('Eliminar usuario',()=>openEdit('delete',u)));detail.append(actions);$('user-list').append(card);
  }
- if(!$('user-list').children.length)$('user-list').append(node('p','No hay usuarios para mostrar.'));
+ if(!$('user-list').children.length)$('user-list').append(node('p','No hay usuarios para mostrar.','empty'));
  $('more').hidden=!pageToken;
 }
 async function refresh(more=false,preservePages=false){
@@ -50,11 +57,14 @@ async function refresh(more=false,preservePages=false){
   for(const a of data.alerts||[]){const card=node('article','','card');card.append(node('h3','Créditos reservados: '+(users.find(u=>u.uid===a.uid)?.name||a.uid)),node('p',a.locked+' créditos · '+a.reason));if(a.repairable)card.append(button('Resolver reserva',async()=>{try{await call({action:'repair-reservation',uid:a.uid});await refresh();}catch(e){say(errorText(e));}}));$('reservation-alerts').append(card);}
   $('reports-list').replaceChildren();
   for(const r of data.reports||[]){const card=node('article','','card');card.append(node('h3',r.name),node('small',formatTableTime(r.at)),node('p',r.message),node('small',r.matchId?'Mesa '+r.code+' · ID '+r.matchId:r.localId?'Partida contra el bot · ID '+r.localId:'Reporte general del juego'));card.append(node('small','Usuario: '+r.uid));if(r.matchId)card.append(button('Ver partida',()=>{showTab('tables');$('table-search').value=r.matchId;$('table-state').value='all';renderTables();}));$('reports-list').append(card);}
-  if(!data.reports?.length)$('reports-list').append(node('p','No hay problemas reportados.'));
+  if(!data.reports?.length)$('reports-list').append(node('p','No hay problemas reportados.','empty'));
+  $('reports-count').hidden=!data.reports?.length;$('reports-count').textContent=data.reports?.length||'';
+  $('kpi-tables').textContent=number(data.tables?.length||0);$('kpi-tables-note').textContent=(data.alerts?.length?data.alerts.length+' reservas por revisar':'En curso o esperando rival');
   $('audit-list').replaceChildren();for(const a of data.audit){
    const card=node('article','','card');card.append(node('h3',a.action),node('p',a.reason),node('p',a.uid||a.code||''),node('small',new Date(a.at).toLocaleString('es-UY')),node('small','Administrador: '+a.actor));
    if(a.before!==undefined)card.append(node('p',String(a.before)+' → '+String(a.after)));$('audit-list').append(card);
   }await refreshMetrics();say('');
+  $('updated').textContent='Actualizado '+new Intl.DateTimeFormat('es-UY',{timeZone:'America/Montevideo',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date());
  }catch(e){if(generation===epoch)say(errorText(e));}finally{busy=false;$('more').disabled=false;$('user-scope').disabled=false;for(const b of document.querySelectorAll('[data-scope]'))b.disabled=false;}
 }
 function tableTime(table){return Number(table.finishedAt||table.createdAt)||0;}
@@ -115,7 +125,8 @@ $('table-search').addEventListener('input',renderTables);
 $('table-order').addEventListener('change',renderTables);
 $('table-state').addEventListener('change',renderTables);
 $('search').addEventListener('input',renderUsers);$('more').onclick=()=>refresh(true);
-function showTab(name){for(const section of ['metrics','users','tables','audit','reports'])$(section).hidden=section!==name;for(const tab of document.querySelectorAll('[data-tab]'))tab.classList.toggle('active',tab.dataset.tab===name);}
+function showTab(name){for(const section of Object.keys(TAB_TITLES))$(section).hidden=section!==name;for(const tab of document.querySelectorAll('[data-tab]'))tab.classList.toggle('active',tab.dataset.tab===name);$('page-title').textContent=TAB_TITLES[name];}
+$('refresh').onclick=()=>refresh(false,true);
 for(const b of document.querySelectorAll('[data-tab]'))b.onclick=()=>showTab(b.dataset.tab);
 async function showUsers(scope){if(busy)return;userScope=scope;pagesLoaded=1;pageToken=null;users=[];$('search').value='';$('user-scope').value=scope;renderUsers();showTab('users');await refresh();}
 for(const b of document.querySelectorAll('[data-scope]'))b.onclick=()=>showUsers(b.dataset.scope);
@@ -130,33 +141,93 @@ $('edit-form').onsubmit=async event=>{
  $('save').disabled=true;$('edit-error').textContent='';
  try{await call(data);$('edit').close();say('Cambio guardado.');await refresh();}catch(e){$('edit-error').textContent=errorText(e);}finally{$('save').disabled=false;}
 };
+const shortDay=day=>day.slice(8,10)+'/'+day.slice(5,7);
+function legend(){
+ for(const el of document.querySelectorAll('[data-legend]')){
+  el.replaceChildren();
+  for(const [key,label] of Object.entries(PLATFORM_LABELS)){const item=node('span',label);const swatch=node('i');swatch.style.background='var(--'+key+')';item.prepend(swatch);el.append(item);}
+ }
+}
+// Column chart from plain values or per-platform segments. Every column has a
+// tooltip with the exact numbers; labels thin out on narrow charts.
+function columns(target,items,{labelEvery=1,showValues=true}={}){
+ target.replaceChildren();
+ const totals=items.map(item=>item.segments?item.segments.reduce((sum,s)=>sum+s.value,0):item.value);
+ const maximum=Math.max(1,...totals);
+ if(totals.every(total=>!total)){target.append(node('p','Todavía no hay datos para este período.','empty'));return;}
+ items.forEach((item,i)=>{
+  const col=node('div','','bar-col');col.title=item.tooltip||item.label+': '+totals[i];
+  if(showValues)col.append(node('span',totals[i]?number(totals[i]):'','val'));
+  const stack=node('div','','stack');stack.style.height=(totals[i]/maximum*100)+'%';
+  for(const s of item.segments||[{value:item.value}]){if(!s.value)continue;const seg=node('div','','seg');seg.style.height=(s.value/(totals[i]||1)*100)+'%';if(s.key)seg.style.background='var(--'+s.key+')';stack.append(seg);}
+  col.append(stack,node('span',i%labelEvery===0?item.label:'','lbl'));target.append(col);
+ });
+}
+function bars(target,rows){
+ target.replaceChildren();
+ const total=rows.reduce((sum,r)=>sum+r.value,0);
+ if(!total){target.append(node('p','Todavía no hay visitas registradas.','empty'));return;}
+ const maximum=Math.max(...rows.map(r=>r.value));
+ for(const r of rows){
+  const row=node('div','','pbar'),name=node('span',r.label);
+  if(r.color){const swatch=node('i','','swatch');swatch.style.background=r.color;name.prepend(swatch);}
+  const track=node('div','','track'),fill=node('div','','fill');fill.style.width=(r.value/maximum*100)+'%';fill.style.background=r.color||'var(--gold)';track.append(fill);
+  const value=node('strong',number(r.value));value.append(node('small',Math.round(r.value/total*100)+'%'));
+  row.append(name,track,value);target.append(row);
+ }
+}
+function delta(el,today,yesterday){
+ el.className='delta';
+ if(!yesterday){el.textContent=today?'Sin datos de ayer':'';return;}
+ const change=Math.round((today-yesterday)/yesterday*100);
+ el.textContent=(change>0?'+':'')+change+'% vs. ayer ('+number(yesterday)+')';el.classList.add(change>=0?'up':'down');
+}
+const platformSegments=counts=>Object.keys(PLATFORM_LABELS).map(key=>({key,value:counts[key]||0}));
+const platformTooltip=(day,counts,unit)=>shortDay(day)+' · '+number(Object.values(counts).reduce((a,b)=>a+b,0))+' '+unit+'\n'+Object.entries(PLATFORM_LABELS).map(([key,label])=>label+': '+number(counts[key]||0)).join('\n');
 function renderHours(){
- $('hour-chart').replaceChildren();
  const day=metrics?.days.find(d=>d.day===$('metric-day').value),hours=day?.hours||Array.from({length:24},(_,hour)=>({hour,users:0}));
- const maximum=Math.max(1,...hours.map(h=>h.users));
- for(let start=0;start<24;start+=12){
-  const group=node('div','','hour-group');
-  const heading=node('div','','hour-row hour-heading');heading.append(node('span','Horario'),node('span','Actividad'),node('span','Usuarios'));group.append(heading);
-  for(const h of hours.slice(start,start+12)){
-   const row=node('div','','hour-row');
-   const time=String(h.hour).padStart(2,'0')+':00 – '+String((h.hour+1)%24).padStart(2,'0')+':00';
-   const track=node('div','','hour-track'),fill=node('div','','hour-fill');fill.style.width=(h.users/maximum*100)+'%';track.setAttribute('aria-hidden','true');track.append(fill);
-   row.append(node('span',time),track,node('strong',String(h.users)));group.append(row);
-  }
-  $('hour-chart').append(group);
+ columns($('hour-chart'),hours.map(h=>({label:String(h.hour).padStart(2,'0'),value:h.users,tooltip:String(h.hour).padStart(2,'0')+':00 – '+String((h.hour+1)%24).padStart(2,'0')+':00 · '+h.users+' jugadores'})),{labelEvery:3});
+}
+function renderVisits(){
+ const all=metrics?.visits?.days||[];
+ const range=Number($('visit-range').value),measure=$('visit-measure').value,unit=measure==='visits'?'visitas':'visitantes';
+ const days=all.slice(-range),totalKey=measure==='visits'?'totalVisits':'totalVisitors';
+ $('visit-chart-title').textContent=(measure==='visits'?'Visitas':'Visitantes')+' por día y plataforma';
+ columns($('visit-chart'),days.map(d=>({label:shortDay(d.day),segments:platformSegments(d[measure]),tooltip:platformTooltip(d.day,d[measure],unit)})),{labelEvery:range>14?3:1});
+ const sum=key=>days.reduce((total,d)=>total+(d[measure][key]||0),0),grand=days.reduce((total,d)=>total+d[totalKey],0);
+ $('visit-totals').replaceChildren();
+ const card=(label,value,color)=>{const k=node('article','','kpi'),title=node('small',label);if(color){const swatch=node('i','','swatch');swatch.style.background=color;title.prepend(swatch);}k.append(title,node('strong',number(value)));$('visit-totals').append(k);};
+ card('Total '+unit,grand);for(const [key,label] of Object.entries(PLATFORM_LABELS))card(label,sum(key),'var(--'+key+')');
+ bars($('visit-pages'),Object.entries(PAGE_LABELS).map(([key,label])=>({label,value:days.reduce((total,d)=>total+(d.pages?.[key]||0),0)})).sort((a,b)=>b.value-a.value));
+ const today=all[all.length-1];
+ columns($('visit-hours'),(today?.hours||Array(24).fill(0)).map((value,h)=>({label:String(h).padStart(2,'0'),value,tooltip:String(h).padStart(2,'0')+':00 · '+value+' visitas'})),{labelEvery:3});
+ const table=$('visit-table');table.replaceChildren();
+ const head=node('tr');head.append(node('th','Día'),...Object.values(PLATFORM_LABELS).map(label=>node('th',label)),node('th','Total','total'));table.append(head);
+ for(const d of [...days].reverse()){
+  const row=node('tr');row.append(node('td',new Intl.DateTimeFormat('es-UY',{weekday:'short',day:'2-digit',month:'2-digit',timeZone:'UTC'}).format(new Date(d.day+'T12:00:00Z'))));
+  for(const key of Object.keys(PLATFORM_LABELS)){const value=d[measure][key]||0;row.append(node('td',number(value),value?'':'zero'));}
+  row.append(node('td',number(d[totalKey]),'total'));table.append(row);
  }
 }
 function renderMetrics(){
  if(!metrics)return;
- $('metric-total').textContent=metrics.total;$('metric-active').textContent=metrics.active;$('metric-today').textContent=metrics.todayUsers;
+ $('metric-total').textContent=number(metrics.total);$('metric-active').textContent=number(metrics.active);$('metric-today').textContent=number(metrics.todayUsers);
+ const visitDays=metrics.visits?.days||[],today=visitDays[visitDays.length-1],yesterday=visitDays[visitDays.length-2];
+ $('kpi-visitors').textContent=number(today?.totalVisitors||0);$('kpi-visits').textContent=number(today?.totalVisits||0);
+ delta($('kpi-visitors-delta'),today?.totalVisitors||0,yesterday?.totalVisitors||0);delta($('kpi-visits-delta'),today?.totalVisits||0,yesterday?.totalVisits||0);
+ bars($('platform-today'),Object.entries(PLATFORM_LABELS).map(([key,label])=>({label,value:today?.visitors[key]||0,color:'var(--'+key+')'})));
+ columns($('visits-mini'),visitDays.slice(-14).map(d=>({label:shortDay(d.day),segments:platformSegments(d.visitors),tooltip:platformTooltip(d.day,d.visitors,'visitantes')})),{labelEvery:2});
  const selected=$('metric-day').value;$('metric-day').replaceChildren();
  const days=[...new Set([metrics.today,...metrics.days.map(d=>d.day)])];
- for(const day of days){const option=node('option',day);option.value=day;$('metric-day').append(option);}
+ for(const day of days){const option=node('option',day===metrics.today?'Hoy':shortDay(day));option.value=day;$('metric-day').append(option);}
  if(days.includes(selected))$('metric-day').value=selected;
- renderHours();$('day-chart').replaceChildren();
- for(const d of metrics.days){const card=node('article','','card');card.append(node('h3',d.day),node('strong',d.users+' usuarios únicos'));$('day-chart').append(card);}
- renderUsers();
+ renderHours();
+ const byDay=new Map(metrics.days.map(d=>[d.day,d.users]));
+ columns($('day-chart'),Array.from({length:30},(_,i)=>{const day=new Date(Date.parse(metrics.today+'T12:00:00Z')-(29-i)*86400000).toISOString().slice(0,10);return {label:shortDay(day),value:byDay.get(day)||0,tooltip:shortDay(day)+' · '+(byDay.get(day)||0)+' jugadores únicos'};}),{labelEvery:3});
+ renderVisits();renderUsers();
 }
+$('visit-range').addEventListener('change',renderVisits);$('visit-measure').addEventListener('change',renderVisits);
+legend();
 async function refreshMetrics(){
  if(metricsBusy)return;metricsBusy=true;const generation=epoch;
  try{const data=(await call({action:'metrics'})).data;if(generation!==epoch)return;metrics=data;renderMetrics();}
@@ -171,9 +242,9 @@ async function start(){
   auth=getAuth(initializeApp(config));call=httpsCallable(getFunctions(auth.app,'us-central1'),'adminConsole');
   await setPersistence(auth,browserLocalPersistence);
   $('login').onclick=async()=>{try{await signInWithPopup(auth,new GoogleAuthProvider());}catch(e){$('access-status').textContent=errorText(e);}};
-  $('logout').onclick=()=>signOut(auth);
+  $('logout').onclick=$('switch-account').onclick=()=>signOut(auth);
   onAuthStateChanged(auth,async user=>{
-   const generation=++epoch;pagesLoaded=1;userScope='all';$('user-scope').value='all';clearInterval(metricsTimer);metricsTimer=null;metrics=null;users=[];pageToken=null;$('console').hidden=true;$('access').hidden=false;$('logout').hidden=!user;$('login').hidden=!!user;
+   const generation=++epoch;pagesLoaded=1;userScope='all';$('user-scope').value='all';clearInterval(metricsTimer);metricsTimer=null;metrics=null;users=[];pageToken=null;$('console').hidden=true;$('access').hidden=false;$('logout').hidden=!user;$('switch-account').hidden=!user;$('login').hidden=!!user;
    $('identity').textContent=user?'Tu UID: '+user.uid:'';$('access-status').textContent=user?'Verificando permisos…':'Iniciá sesión con tu cuenta administradora.';
    if(!user)return;
    try{const result=await call({action:'users'});if(generation!==epoch)return;users=result.data.users;pageToken=result.data.pageToken;$('access').hidden=true;$('console').hidden=false;renderUsers();await refresh();if(generation===epoch)metricsTimer=setInterval(()=>{if(!document.hidden&&!$('edit').open)refresh(false,true);},60000);}

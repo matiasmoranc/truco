@@ -1,7 +1,7 @@
 'use strict';
 const crypto=require('node:crypto');
 const {initializeApp}=require('firebase-admin/app');
-const {getDatabase}=require('firebase-admin/database');
+const {getDatabase,ServerValue}=require('firebase-admin/database');
 const {onCall,HttpsError}=require('firebase-functions/v2/https');
 const {onSchedule}=require('firebase-functions/v2/scheduler');
 const {createTable,joinTable,tableOperation,publicTable,privateTableHand,passwordHash,tableFor}=require('./table-service.cjs');
@@ -232,8 +232,8 @@ exports.adminConsole=onCall({...options,secrets:[liveInternalSecret]},async requ
   const registeredUids=[];let token;
   do{const page=await getAuth().listUsers(1000,token);registeredUids.push(...page.users.filter(u=>u.providerData.some(p=>['google.com','apple.com','password'].includes(p.providerId))).map(u=>u.uid));token=page.pageToken;}while(token);
   const now=Date.now(),cutoff=uruguayDate(now-29*86400000).day;
-  const [days,presence,start]=await Promise.all([db.ref('adminMetrics/days').orderByKey().startAt(cutoff).get(),db.ref('adminMetrics/presence').get(),db.ref('adminMetrics/startedAt').get()]);
-  return activitySummary({registeredUids,now,metrics:{days:days.val()||{},presence:presence.val()||{},startedAt:start.val()}});
+  const [days,presence,start,visits]=await Promise.all([db.ref('adminMetrics/days').orderByKey().startAt(cutoff).get(),db.ref('adminMetrics/presence').get(),db.ref('adminMetrics/startedAt').get(),db.ref('adminMetrics/visits').orderByKey().startAt(cutoff).get()]);
+  return {...activitySummary({registeredUids,now,metrics:{days:days.val()||{},presence:presence.val()||{},startedAt:start.val()}}),visits:visitSummary({visits:visits.val()||{},now})};
  }
  if(action==='delete'){
   let failure;
@@ -350,11 +350,28 @@ exports.playerActivity=onCall({...options,maxInstances:3},async request=>{
  await db.ref('adminMetrics/startedAt').transaction(current=>current||now);
  return {ok:true};
 });
+// Anonymous visit counters for the admin panel. No login and no stored
+// identifiers; a per-instance limit keeps one address from inflating them.
+const {visitUpdates,visitSummary,VISIT_DAYS}=require('./visit-service.cjs');
+const visitLimits=new Map();
+exports.siteVisit=onCall({region:'us-central1',maxInstances:3,timeoutSeconds:10,cors:true},async request=>{
+ const now=Date.now(),ip=String(request.rawRequest?.ip||'');
+ const recent=(visitLimits.get(ip)||[]).filter(at=>now-at<60000);
+ if(recent.length>=20)throw new HttpsError('resource-exhausted','Demasiadas visitas.');
+ recent.push(now);visitLimits.set(ip,recent);
+ if(visitLimits.size>5000)for(const [key,list] of visitLimits)if(list.every(at=>now-at>=60000))visitLimits.delete(key);
+ let updates;
+ try{updates=visitUpdates({...request.data,now,increment:ServerValue.increment});}catch(e){throw new HttpsError('invalid-argument',e.message);}
+ await db.ref('adminMetrics/visits').update(updates);
+ return {ok:true};
+});
 exports.activityCleanup=onSchedule({schedule:'every day 04:00',timeZone:'America/Montevideo',region:'us-central1',maxInstances:1},async()=>{
  const now=Date.now(),cutoff=uruguayDate(now-29*86400000).day;
  await db.ref('adminMetrics').transaction(metrics=>{
   if(!metrics)return undefined;
   for(const day of Object.keys(metrics.days||{}))if(day<cutoff)delete metrics.days[day];
+  const visitCutoff=uruguayDate(now-(VISIT_DAYS-1)*86400000).day;
+  for(const day of Object.keys(metrics.visits||{}))if(day<visitCutoff)delete metrics.visits[day];
   for(const [uid,sessions] of Object.entries(metrics.presence||{})){
    for(const [id,session] of Object.entries(sessions))if(now-session.at>=90000)delete sessions[id];
    if(!Object.keys(sessions).length)delete metrics.presence[uid];

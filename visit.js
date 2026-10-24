@@ -1,0 +1,39 @@
+// Counts one anonymous visit per page load for the admin statistics. It sends
+// only the platform, the page and whether this device already came today.
+const ENDPOINT='https://us-central1-truco-6553d.cloudfunctions.net/siteVisit';
+const DAY_KEY='truco-visit-day';
+
+// Static pages inside the app have no trucoNative, but the native bridge still
+// injects Capacitor into every page.
+function nativePlatform(){
+ if(globalThis.trucoNative?.isNative)return globalThis.trucoNative.platform;
+ const bridge=globalThis.Capacitor;
+ return bridge?.isNativePlatform?.()?bridge.getPlatform():null;
+}
+export function visitPlatform(nav=globalThis.navigator,native=nativePlatform()){
+ if(native)return native==='ios'?'app-ios':'app-android';
+ const agent=nav?.userAgent||'';
+ if(/iPhone|iPad|iPod/.test(agent)||(/Macintosh/.test(agent)&&nav?.maxTouchPoints>1))return 'web-ios';
+ if(/Android/.test(agent))return 'web-android';
+ return 'web-desktop';
+}
+export function visitPage(path=globalThis.location?.pathname||''){
+ if(/anotador/.test(path))return 'anotador';
+ if(/aprender/.test(path))return 'aprender';
+ if(/\/$|index\.html$/.test(path))return 'juego';
+ return 'otra';
+}
+function uruguayDay(now=new Date()){return new Intl.DateTimeFormat('en-CA',{timeZone:'America/Montevideo'}).format(now);}
+function storedDay(){try{return localStorage.getItem(DAY_KEY);}catch{return null;}}
+function storeDay(day){try{localStorage.setItem(DAY_KEY,day);}catch{/* Private mode: every visit counts as new. */}}
+
+export function recordVisit({fetch=globalThis.fetch,nav=globalThis.navigator,location=globalThis.location}={}){
+ if(!location||typeof fetch!=='function')return null;
+ // Local copies, crawlers and automated browsers stay out of the numbers.
+ if(!nativePlatform()&&/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location?.hostname||''))return null;
+ if(nav?.webdriver||/bot|crawl|spider|slurp|lighthouse|headless/i.test(nav?.userAgent||''))return null;
+ const day=uruguayDay(),first=storedDay()!==day;storeDay(day);
+ const data={platform:visitPlatform(nav),page:visitPage(location?.pathname),first};
+ return fetch(ENDPOINT,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({data}),keepalive:true}).catch(()=>null);
+}
+recordVisit();

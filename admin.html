@@ -1,12 +1,71 @@
 <!doctype html>
 <html lang="es"><head><meta charset="utf-8">
-  <meta name="robots" content="noindex, nofollow"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Administración · Truco Uruguayo</title><link rel="stylesheet" href="admin.css?v=10"></head>
-<body><header><a href="./"><img src="assets/truco-v3.png" alt="Volver al juego"></a><div><small>TRUCO URUGUAYO</small><h1>Administración</h1></div><button id="logout" hidden>Cerrar sesión</button></header>
-<main><section id="access"><h2>Acceso de administrador</h2><p id="identity"></p><p id="access-status">Verificando sesión…</p><button id="login" hidden>Continuar con Google</button><a href="./">Volver al juego</a></section>
-<div id="console" hidden><nav><button data-tab="metrics" class="active">Estadísticas</button><button data-tab="users">Usuarios y créditos</button><button data-tab="tables">Mesas</button><button data-tab="audit">Historial</button><button data-tab="reports">Problemas reportados</button></nav>
-<section id="metrics"><h2>Actividad del juego</h2><div class="metrics-grid"><article class="card"><small>Usuarios registrados</small><strong id="metric-total">—</strong></article><button class="card metric-link" data-scope="active"><small>Activos ahora</small><strong id="metric-active">—</strong></button><button class="card metric-link" data-scope="today"><small>Usuarios únicos hoy</small><strong id="metric-today">—</strong></button></div><div class="section-heading"><h2>Usuarios únicos por hora</h2><label>Día<select id="metric-day"></select></label></div><div id="hour-chart" class="hour-chart"></div><h2>Últimos 30 días</h2><div id="day-chart" class="cards"></div></section><section id="users" hidden><div class="section-heading"><h2>Usuarios</h2><label>Mostrar<select id="user-scope"><option value="all">Todos los usuarios</option><option value="active">Activos ahora</option><option value="today">Usuarios únicos hoy</option></select></label><label>Buscar en usuarios cargados<input id="search" type="search" placeholder="Nombre, correo o UID"></label></div><p>El saldo disponible se puede editar. Los créditos reservados en partidas se conservan.</p><div id="user-list" class="cards"></div><button id="more" hidden>Cargar más usuarios</button></section>
-<section id="tables" hidden><h2>Mesas y partidas</h2><div id="reservation-alerts" class="cards"></div><label>Buscar por jugador o mesa<input id="table-search" type="search" placeholder="Jona, rival, código o ID"></label><div class="table-filters"><label>Mostrar<select id="table-state"><option value="all">Todas las mesas</option><option value="active">Mesas activas</option><option value="previous">Mesas anteriores</option><option value="finished">Partidas terminadas</option></select></label><label>Ordenar por<select id="table-order"><option value="newest">Más recientes primero</option><option value="oldest">Más antiguas primero</option><option value="stake">Mayor apuesta primero</option><option value="points">Más puntos primero</option></select></label></div><p class="table-timezone">Fechas y horas de Uruguay.</p><p>Cerrar una mesa en juego devuelve las apuestas a ambos jugadores.</p><div id="table-list"></div></section>
-<section id="reports" hidden><h2>Problemas reportados</h2><div id="reports-list" class="cards"></div></section><section id="audit" hidden><h2>Historial de cambios</h2><div id="audit-list" class="cards"></div></section></div>
-<p id="status" role="status" aria-live="polite"></p></main>
-<dialog id="edit"><form id="edit-form"><div class="section-heading"><h2 id="edit-title"></h2><button type="button" id="close" aria-label="Cerrar">×</button></div><p id="edit-description"></p><label id="value-label">Nuevo valor<input id="value" required></label><label id="delete-label" hidden>Escribí el nombre exacto para confirmar<input id="delete-confirm" autocomplete="off"></label><label>Motivo<input id="reason" required minlength="3" maxlength="200" placeholder="Por qué realizás este cambio"></label><p id="edit-error" role="alert"></p><button id="save" type="submit">Confirmar cambio</button><button id="cancel" type="button">Cancelar</button></form></dialog>
-<script type="module" src="admin.js?v=11"></script></body></html>
+  <meta name="robots" content="noindex, nofollow"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Administración · Truco Uruguayo</title><link rel="stylesheet" href="admin.css?v=12"></head>
+<body>
+<section id="access" class="access"><div class="access-card"><img src="assets/truco-v3.png" alt=""><small>TRUCO URUGUAYO</small><h1>Administración</h1><p id="identity"></p><p id="access-status">Verificando sesión…</p><button id="login" class="primary" hidden>Continuar con Google</button><button id="switch-account" hidden>Usar otra cuenta</button><a href="./">Volver al juego</a></div></section>
+<div id="console" class="shell" hidden>
+ <aside class="sidebar">
+  <a class="brand" href="./" title="Volver al juego"><img src="assets/truco-v3.png" alt=""><span><small>TRUCO URUGUAYO</small>Administración</span></a>
+  <nav aria-label="Secciones">
+   <button data-tab="metrics" class="active"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Resumen</button>
+   <button data-tab="visits"><svg viewBox="0 0 24 24"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>Visitas</button>
+   <button data-tab="users"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="4"/><path d="M2 21c0-4 3-7 7-7s7 3 7 7M16 4a4 4 0 0 1 0 8M22 21c0-3-2-6-5-7"/></svg>Usuarios</button>
+   <button data-tab="tables"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M8 5v14M16 5v14"/></svg>Mesas</button>
+   <button data-tab="reports"><svg viewBox="0 0 24 24"><path d="M12 3 2 20h20L12 3Zm0 6v5m0 3v.01"/></svg>Reportes<span id="reports-count" class="badge" hidden></span></button>
+   <button data-tab="audit"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Historial</button>
+  </nav>
+  <div class="sidebar-foot"><button id="logout" hidden>Cerrar sesión</button></div>
+ </aside>
+ <main>
+  <header class="topbar"><div><small id="page-kicker">Truco Uruguayo · Administración</small><h1 id="page-title">Resumen</h1></div><span id="updated" class="updated"></span><button id="refresh" type="button">Actualizar</button></header>
+
+  <section id="metrics">
+   <div class="kpis">
+    <article class="kpi"><small>Visitantes hoy</small><strong id="kpi-visitors">—</strong><span id="kpi-visitors-delta" class="delta"></span></article>
+    <article class="kpi"><small>Visitas hoy</small><strong id="kpi-visits">—</strong><span id="kpi-visits-delta" class="delta"></span></article>
+    <button class="kpi metric-link" data-scope="active"><small><i class="live-dot"></i>Jugando ahora</small><strong id="metric-active">—</strong><span class="delta">Ver lista</span></button>
+    <button class="kpi metric-link" data-scope="today"><small>Jugadores hoy</small><strong id="metric-today">—</strong><span class="delta">Ver lista</span></button>
+    <article class="kpi"><small>Usuarios registrados</small><strong id="metric-total">—</strong><span class="delta">Google y Apple</span></article>
+    <article class="kpi"><small>Mesas activas</small><strong id="kpi-tables">—</strong><span class="delta" id="kpi-tables-note"></span></article>
+   </div>
+   <div class="panels">
+    <article class="panel"><div class="panel-head"><h2>Visitantes de hoy por plataforma</h2></div><div id="platform-today" class="platform-bars"></div></article>
+    <article class="panel"><div class="panel-head"><h2>Visitantes · últimos 14 días</h2><div class="legend" data-legend></div></div><div id="visits-mini" class="bar-chart stacked"></div></article>
+   </div>
+   <article class="panel"><div class="panel-head"><h2>Jugadores con sesión por hora</h2><label>Día<select id="metric-day"></select></label></div><div id="hour-chart" class="bar-chart hours"></div></article>
+   <article class="panel"><div class="panel-head"><h2>Jugadores únicos · últimos 30 días</h2></div><div id="day-chart" class="bar-chart"></div></article>
+  </section>
+
+  <section id="visits" hidden>
+   <div class="toolbar"><label>Período<select id="visit-range"><option value="7">Últimos 7 días</option><option value="14">Últimos 14 días</option><option value="30" selected>Últimos 30 días</option></select></label><label>Mostrar<select id="visit-measure"><option value="visitors">Visitantes (dispositivos únicos por día)</option><option value="visits">Visitas (cada vez que abren el juego)</option></select></label></div>
+   <div id="visit-totals" class="kpis compact"></div>
+   <article class="panel"><div class="panel-head"><h2 id="visit-chart-title">Por día y plataforma</h2><div class="legend" data-legend></div></div><div id="visit-chart" class="bar-chart stacked tall"></div></article>
+   <div class="panels">
+    <article class="panel"><div class="panel-head"><h2>Páginas más visitadas</h2></div><div id="visit-pages" class="platform-bars"></div></article>
+    <article class="panel"><div class="panel-head"><h2>Visitas por hora · hoy</h2></div><div id="visit-hours" class="bar-chart hours"></div></article>
+   </div>
+   <article class="panel"><div class="panel-head"><h2>Detalle por día</h2></div><div class="table-scroll"><table id="visit-table" class="data-table"></table></div></article>
+   <p class="note">Horario de Uruguay. Las visitas son anónimas: no se guarda ningún dato de la persona. Se cuentan desde la web (trucouruguayo.uy y GitHub) y desde las apps a partir de la próxima versión publicada.</p>
+  </section>
+
+  <section id="users" hidden>
+   <div class="toolbar"><label>Mostrar<select id="user-scope"><option value="all">Todos los usuarios</option><option value="active">Jugando ahora</option><option value="today">Jugadores de hoy</option></select></label><label class="grow">Buscar<input id="search" type="search" placeholder="Nombre, correo o UID"></label></div>
+   <p class="note">El saldo disponible se puede editar. Los créditos reservados en partidas se conservan.</p>
+   <div class="data-list"><div class="list-head user-row"><span>Usuario</span><span>Correo</span><span class="num">Saldo</span><span class="num">Reservados</span><span>Estado</span><span>Alta</span></div><div id="user-list"></div></div>
+   <button id="more" hidden>Cargar más usuarios</button>
+  </section>
+
+  <section id="tables" hidden>
+   <div id="reservation-alerts" class="cards"></div>
+   <div class="toolbar"><label class="grow">Buscar por jugador o mesa<input id="table-search" type="search" placeholder="Jugador, código o ID"></label><label>Mostrar<select id="table-state"><option value="all">Todas las mesas</option><option value="active">Mesas activas</option><option value="previous">Mesas anteriores</option><option value="finished">Partidas terminadas</option></select></label><label>Ordenar por<select id="table-order"><option value="newest">Más recientes primero</option><option value="oldest">Más antiguas primero</option><option value="stake">Mayor apuesta primero</option><option value="points">Más puntos primero</option></select></label></div>
+   <p class="note">Fechas y horas de Uruguay. Cerrar una mesa en juego devuelve las apuestas a ambos jugadores.</p>
+   <div id="table-list"></div>
+  </section>
+
+  <section id="reports" hidden><div id="reports-list" class="cards"></div></section>
+  <section id="audit" hidden><div id="audit-list" class="cards"></div></section>
+  <p id="status" role="status" aria-live="polite"></p>
+ </main>
+</div>
+<dialog id="edit"><form id="edit-form"><div class="dialog-head"><h2 id="edit-title"></h2><button type="button" id="close" aria-label="Cerrar">×</button></div><p id="edit-description"></p><label id="value-label">Nuevo valor<input id="value" required></label><label id="delete-label" hidden>Escribí el nombre exacto para confirmar<input id="delete-confirm" autocomplete="off"></label><label>Motivo<input id="reason" required minlength="3" maxlength="200" placeholder="Por qué realizás este cambio"></label><p id="edit-error" role="alert"></p><div class="dialog-actions"><button id="cancel" type="button">Cancelar</button><button id="save" class="primary" type="submit">Confirmar cambio</button></div></form></dialog>
+<script type="module" src="admin.js?v=12"></script></body></html>

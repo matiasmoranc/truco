@@ -1,4 +1,5 @@
 import './chat-moderation.js?v=20261013-moderation1';
+import './visit.js?v=20261023-visits1';
 import { installPlayerPanel } from './player-panel.js?v=20261013-blocklist1';
 import { installScorer,renderCompactTally } from './scorer.js?v=20261023-seo1';
 import { installActivity } from './activity.js?v=20261010-adminstats32';

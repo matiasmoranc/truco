@@ -7,7 +7,7 @@ const root = path.resolve(__dirname, '..');
   const stage = path.join(root, '.mobile-web');
   await fs.rm(stage, { recursive: true, force: true });
   await fs.mkdir(stage, { recursive: true });
-  for (const file of ['index.html','style.css','app.js','team-table-ui.js','account.js','auth-init.js','activity.js','credits.js','scorer.js','player-panel.js','firebase-config.js','live-tables.js','chat-moderation.js','favicon.svg']) {
+  for (const file of ['index.html','style.css','app.js','team-table-ui.js','account.js','auth-init.js','activity.js','credits.js','scorer.js','player-panel.js','firebase-config.js','live-tables.js','chat-moderation.js','visit.js','favicon.svg']) {
     let content = await fs.readFile(path.join(root, file), 'utf8');
     if (file === 'index.html') {
       content = content.replace(/src="\.\/app\.js[^" ]*"/, 'src="./mobile/entry.js"');
@@ -33,7 +33,7 @@ const root = path.resolve(__dirname, '..');
   const nativeHtml = path.join(root,'www/index.html');
   await fs.writeFile(nativeHtml,(await fs.readFile(nativeHtml,'utf8')).replace('viewport-fit=cover','viewport-fit=auto'));
   await fs.copyFile(path.join(root,'favicon.svg'), path.join(root,'www/favicon.svg'));
-  await Promise.all(['privacidad.html','soporte.html','eliminar-cuenta.html','reglas.html','legal.css','aprender-truco-uruguayo.html','anotador-de-truco.html','scorer.js'].map(file=>fs.copyFile(path.join(root,file),path.join(root,'www',file))));
+  await Promise.all(['privacidad.html','soporte.html','eliminar-cuenta.html','reglas.html','legal.css','aprender-truco-uruguayo.html','anotador-de-truco.html','scorer.js','visit.js'].map(file=>fs.copyFile(path.join(root,file),path.join(root,'www',file))));
   // CSS dynamically selects card images; retain their original bytes and paths.
   await fs.cp(path.join(root,'assets'), path.join(root,'www/assets'), { recursive: true });
 })().catch(error => { console.error(error); process.exitCode = 1; });
