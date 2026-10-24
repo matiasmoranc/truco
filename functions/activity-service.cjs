@@ -5,6 +5,18 @@ function uruguayDate(now){
  return {day:local.toISOString().slice(0,10),hour:String(local.getUTCHours()).padStart(2,'0')};
 }
 const PLATFORMS=['app-ios','app-android','web-ios','web-android','web-desktop'];
+// Platform from the request itself, for clients that do not send one (older
+// web pages still open and app builds published before this field existed).
+// Capacitor serves the iOS app from capacitor://localhost and Android from
+// https://localhost.
+function requestPlatform({origin='',userAgent=''}={}){
+ const agent=String(userAgent);
+ if(/^capacitor:\/\/localhost$/i.test(origin))return 'app-ios';
+ if(/^https?:\/\/localhost(:\d+)?$/i.test(origin))return /Android/.test(agent)?'app-android':/iPhone|iPad|iPod/.test(agent)?'app-ios':'web-desktop';
+ if(/iPhone|iPad|iPod/.test(agent))return 'web-ios';
+ if(/Android/.test(agent))return 'web-android';
+ return 'web-desktop';
+}
 function activityUpdates({uid,sessionId,visible,now,platform}){
  if(typeof sessionId!=='string'||!/^[A-Za-z0-9_-]{1,80}$/.test(sessionId)||['__proto__','constructor','prototype'].includes(sessionId)||typeof visible!=='boolean')throw new Error('Sesión inválida.');
  const {day,hour}=uruguayDate(now);
@@ -26,4 +38,4 @@ function activitySummary({metrics,registeredUids,now}){
  const days=Object.entries(metrics.days||{}).sort(([a],[b])=>b.localeCompare(a)).map(([day,data])=>({day,users:Object.keys(data.users||{}).length,hours:Array.from({length:24},(_,h)=>({hour:h,users:Object.keys(data.hours?.[String(h).padStart(2,'0')]||{}).length}))}));
  return {total:registered.size,active:online.length,online,todayUsers:days.find(d=>d.day===today)?.users||0,today,days,startedAt:metrics.startedAt||null,updatedAt:now};
 }
-module.exports={PLATFORMS,activityUserIds,ACTIVE_MS,uruguayDate,activityUpdates,activitySummary};
+module.exports={PLATFORMS,requestPlatform,activityUserIds,ACTIVE_MS,uruguayDate,activityUpdates,activitySummary};

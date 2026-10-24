@@ -1920,6 +1920,10 @@ input,textarea,[contenteditable=""],[contenteditable="true"]{-webkit-user-select
 @media(max-width:380px){.lobby-team-row{gap:6px}.lobby-team{gap:3px}.lobby-team-name,.lobby-team-join{font-size:11px}.lobby-team-join{padding:6px}}
 .team-seat.is-turn .team-player-name{border-color:#f7d88b;box-shadow:0 0 14px #e8c98340;color:#fff}
 .team-seat.is-folded .team-backs{opacity:.2}
+/* Where a folded player's cards were. */
+.team-folded-text{display:flex;align-items:center;justify-content:center;min-height:calc(var(--team-card-width,52px)*1.2);font-size:13px;font-weight:700;color:#e8c983;letter-spacing:.5px;text-align:center}
+#hand.team-folded{display:flex;align-items:center;justify-content:center}
+#hand.team-folded::after{content:'Se fue al mazo';font-size:15px;font-weight:700;color:#e8c983;letter-spacing:.5px}
 .team-partner{left:50%;top:11%;width:140px}.team-right{left:86%;top:32%}.team-left{left:14%;top:32%}.team-self{left:50%;top:calc(72% - var(--team-hand-height)*.65 - 18px);width:140px}
 .team-backs{height:var(--team-card-height);position:relative;margin-top:10px}
 .team-backs .opponent-card-back{position:absolute;left:50%;top:0;width:var(--team-card-width);height:var(--team-card-height);transform:translateX(calc(-50% + var(--fan-index)*var(--team-card-width)*.36)) rotate(calc(var(--fan-index)*12deg));transform-origin:50% 85%;border-radius:4px}
@@ -2062,7 +2066,7 @@ input,textarea,[contenteditable=""],[contenteditable="true"]{-webkit-user-select
 .waiting-player.bot .waiting-player-name{border-color:#e8c98366;color:#e8c983}
 /* A bot partner waits for the pie's signal: the disc empties clockwise in 10 s. */
 @property --signal-sweep{syntax:'<angle>';inherits:false;initial-value:0deg}
-.signal-timer{position:absolute;z-index:5;width:36px;height:36px;border-radius:50%;background:conic-gradient(transparent 0 var(--signal-sweep),#e8c983 var(--signal-sweep) 360deg);box-shadow:0 0 0 2px #e8c98366;pointer-events:none}
+.signal-timer{position:absolute;z-index:30;width:36px;height:36px;border-radius:50%;background:conic-gradient(transparent 0 var(--signal-sweep),#e8c983 var(--signal-sweep) 360deg);box-shadow:0 0 0 2px #e8c98366;pointer-events:none}
 @keyframes signal-drain{from{--signal-sweep:0deg}to{--signal-sweep:360deg}}.played-card.trick-winner{overflow:visible}
 .played-card.trick-winner::after{content:"";position:absolute;inset:-7px;border:3px solid #e8c983;border-radius:12px;box-shadow:0 0 14px #e8c98355;pointer-events:none;animation:trick-winner-in .22s ease-out both}
 .trick-winner-label{position:absolute;top:50%;left:calc(100% + 12px);transform:translateY(-50%);display:flex;flex-direction:column;align-items:flex-start;gap:6px;width:max-content;max-width:84px;padding:0;color:#e8c983;font:700 16px/1.15 "DM Sans",sans-serif;text-align:left;text-shadow:0 1px 6px #00180ecc;pointer-events:none;animation:trick-winner-in .22s ease-out both}

@@ -349,11 +349,11 @@ exports.adminConsole=onCall({...options,secrets:[liveInternalSecret]},async requ
  throw new HttpsError('invalid-argument','Acción inválida.');
 });
 
-const {uruguayDate,activityUpdates,activitySummary}=require('./activity-service.cjs');
+const {uruguayDate,activityUpdates,activitySummary,requestPlatform,PLATFORMS}=require('./activity-service.cjs');
 exports.playerActivity=onCall({...options,maxInstances:3},async request=>{
  const user=await identity(request);await rateLimit(user.uid,10,'activity');
  const now=Date.now();let updates;
- try{updates=activityUpdates({uid:user.uid,sessionId:request.data?.sessionId,visible:request.data?.visible,platform:request.data?.platform,now});}catch(e){throw new HttpsError('invalid-argument',e.message);}
+ try{updates=activityUpdates({uid:user.uid,sessionId:request.data?.sessionId,visible:request.data?.visible,platform:PLATFORMS.includes(request.data?.platform)?request.data.platform:requestPlatform({origin:request.rawRequest?.headers?.origin,userAgent:request.rawRequest?.headers?.['user-agent']}),now});}catch(e){throw new HttpsError('invalid-argument',e.message);}
  await db.ref('adminMetrics').update(updates);
  await db.ref('adminMetrics/startedAt').transaction(current=>current||now);
  return {ok:true};

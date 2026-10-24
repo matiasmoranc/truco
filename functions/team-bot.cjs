@@ -18,7 +18,9 @@ function teamTantos(s,p){const r=s.room;return Math.max(...[p,partnerOf(p)].filt
 const canOpenEnvido=(r,p)=>r.trickNo===1&&!r.envidoClosed&&(r.playedBy?.[p]||0)===0;
 // The pie, the team's last player from the mano, is the one who sings envido.
 const isPie=(r,p)=>ordered(r.mano).filter(q=>team(q)===team(p)&&!r.folded?.[q]).at(-1)===p;
-const owesFlor=(s,p)=>(s.room.playedBy?.[p]||0)===0&&s.room.flors?.[p]==null&&flower(s.originals?.[p]||[],s.room.muestra);
+const owesFlor=(s,p)=>!s.room.florClosed&&(s.room.playedBy?.[p]||0)===0&&s.room.flors?.[p]==null&&flower(s.originals?.[p]||[],s.room.muestra);
+// Someone sang flor and no card followed yet: every other flower is sung now.
+const florWindow=(s,p)=>Object.keys(s.room.flors||{}).length>0&&!s.room.pendingBet?.revealMode&&owesFlor(s,p);
 
 // Every simulated player wins the trick as cheaply as possible, never overtakes
 // a partner, and otherwise throws its lowest card.
@@ -150,7 +152,7 @@ function mustAct(s,p){
  const r=s?.room;
  if(!r||r.status!=='started'||r.resolvingTrick||r.pendingNextHand||r.folded?.[p]||!s.hands?.[p])return false;
  const b=r.pendingBet;
- return b?.revealMode?b.revealTurn===p:b?b.responder===p:r.turn===p;
+ return b?.revealMode?b.revealTurn===p:b?b.responder===p||florWindow(s,p):r.turn===p||florWindow(s,p);
 }
 
 // A bot that plays first for its team waits this long for its partner's signal.
@@ -183,6 +185,7 @@ function botCommands(s,p,random=Math.random){
  if(!mustAct(s,p))return [];
  const r=s.room,b=r.pendingBet;
  if(b?.revealMode)return declarations(s,p);
+ if(florWindow(s,p)&&(b?b.responder!==p:r.turn!==p))return [call('flor')];
  if(b)return owesFlor(s,p)&&b.type!=='flor'?[call('flor'),...answers(s,p,random)]:answers(s,p,random);
  const moves=owesFlor(s,p)?[call('flor')]:[],tantos=teamTantos(s,p);
  // Now and then (about 15% of the time) the pie bluffs an envido with few points.

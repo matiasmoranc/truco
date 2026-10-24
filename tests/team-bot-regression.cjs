@@ -158,3 +158,40 @@ test('Team bots read son buenas and a quiet first card when guessing rival hands
  assert.ok(options.player2.length>0);
  for(const h of options.player2){const full=[tcard('♠',5),...h];assert.ok(teamEnvido(full,r.muestra)<=30);assert.equal(teamFlower(full,r.muestra),false);}
 });
+// Humans in seats 1 and 3, rival bots in 2 and 4; player1 and player3 hold flowers.
+function florTable(){
+ const humans={...people,player1:{uid:'u1',name:'Mati'},player3:{uid:'u3',name:'Compa'}};
+ const s=newTeamSession('ABCDE',humans,30,{id:'m8',stake:1,pot:4,matchNumber:1},1000),r=s.room;
+ Object.assign(r,{status:'started',mano:'player1',turn:'player1',trickNo:1,envidoClosed:false,playedBy:{},flors:{},folded:{},trickCards:[],tricks:[],trucoLevel:1,lastTrucoTeam:null,pendingBet:null,muestra:tcard('♦',6),turnClock:null});
+ s.hands={player1:[tcard('♥',4),tcard('♥',5),tcard('♥',7)],player2:[tcard('♠',4),tcard('♣',5),tcard('♥',2)],player3:[tcard('♣',1),tcard('♣',3),tcard('♣',7)],player4:[tcard('♠',5),tcard('♣',4),tcard('♥',3)]};
+ s.originals=structuredClone(s.hands);
+ return {s,r,ref:createTeamReferee(s,{now:1500})};
+}
+const {createTeamReferee}=require('../functions/team-referee.cjs');
+test('After a flor, the others sing theirs before the next card; once a card is played nobody can',()=>{
+ let {r,ref}=florTable();
+ ref.action('player1',{kind:'call',value:'flor'});
+ ref.action('player3',{kind:'call',value:'flor'});
+ assert.equal(r.flors.player3,true);
+ ({r,ref}=florTable());
+ ref.action('player1',{kind:'call',value:'flor'});
+ ref.action('player1',{kind:'play',cardId:'copa-4'});
+ assert.equal(r.florClosed,true);
+ assert.throws(()=>ref.action('player3',{kind:'call',value:'flor'}),/no se puede cantar/);
+ // The forgotten flower no longer blocks other calls.
+ r.turn='player3';assert.doesNotThrow(()=>ref.action('player3',{kind:'call',value:'truco'}));
+});
+test('A bot holding a flower sings it at once when someone sings flor',()=>{
+ const {s,r,ref}=florTable();
+ s.hands.player2=[tcard('♠',1),tcard('♠',4),tcard('♠',7)];s.originals.player2=structuredClone(s.hands.player2);
+ ref.action('player1',{kind:'call',value:'flor'});
+ assert.equal(r.flors.player2,true);
+});
+test('The server tells app and web platforms apart from the request',()=>{
+ const {requestPlatform}=require('../functions/activity-service.cjs');
+ assert.equal(requestPlatform({origin:'capacitor://localhost',userAgent:'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)'}),'app-ios');
+ assert.equal(requestPlatform({origin:'https://localhost',userAgent:'Mozilla/5.0 (Linux; Android 14; wv)'}),'app-android');
+ assert.equal(requestPlatform({origin:'https://trucouruguayo.uy',userAgent:'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)'}),'web-ios');
+ assert.equal(requestPlatform({origin:'https://matiasmoranc.github.io',userAgent:'Mozilla/5.0 (Linux; Android 14)'}),'web-android');
+ assert.equal(requestPlatform({origin:'https://trucouruguayo.uy',userAgent:'Mozilla/5.0 (Windows NT 10.0)'}),'web-desktop');
+});

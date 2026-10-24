@@ -97,6 +97,17 @@ export function installTeamTable({$,getState,command,runAction,renderPlayerHand,
    Object.assign(badge.style,{left:left+'px',top:(mid-base.top)+'px',right:'auto',bottom:'auto',transform:'translateY(-50%)'});
   });
  }
+ // What I say appears just above my own cards, centered on them, at any screen size.
+ function placeSelfSpeech(){
+  const s=getState(),speech=$('team-seat-'+s.playerId)?.querySelector('.team-speech');if(!speech)return;
+  requestAnimationFrame(()=>{
+   const cards=[...$('hand').children].map(card=>card.getBoundingClientRect()).filter(rect=>rect.width),area=cards.length?cards:[$('hand').getBoundingClientRect()];
+   const top=Math.min(...area.map(r=>r.top)),center=(Math.min(...area.map(r=>r.left))+Math.max(...area.map(r=>r.right)))/2,base=speech.parentElement.getBoundingClientRect();
+   if(!top&&!center)return;
+   Object.assign(speech.style,{top:'auto',bottom:(base.bottom-top+8)+'px',left:(center-base.left)+'px',right:'auto',transform:'translateX(-50%)'});
+  });
+ }
+ addEventListener('resize',()=>{if(getState().room?.mode==='2v2')placeSelfSpeech();});
  function renderSignalTimer(startedAt){
   const timer=ensure('signal-timer','div',$('felt-area'),'signal-timer hidden');
   const left=Number.isFinite(startedAt)?SIGNAL_WAIT_MS-(gameTime()-startedAt):0;
@@ -104,8 +115,9 @@ export function installTeamTable({$,getState,command,runAction,renderPlayerHand,
   if(left<=0){timer.classList.add('hidden');timer.dataset.key='';return;}
   if(timer.dataset.key!==String(startedAt)){timer.dataset.key=String(startedAt);timer.style.animation='none';void timer.offsetWidth;timer.style.animation=`signal-drain ${SIGNAL_WAIT_MS}ms linear ${left-SIGNAL_WAIT_MS}ms forwards`;}
   // Always the same spot: bottom left, just above the action buttons.
-  const felt=$('felt-area').getBoundingClientRect(),actions=$('player-actions').getBoundingClientRect(),floor=actions.height?actions.top:felt.bottom;
-  timer.style.left='16px';timer.style.top=(floor-felt.top-SIGNAL_TIMER_SIZE-14)+'px';
+  const place=()=>{const felt=$('felt-area').getBoundingClientRect(),buttons=[...$('player-actions').querySelectorAll('button')].map(b=>b.getBoundingClientRect()).filter(rect=>rect.height),floor=buttons.length?Math.min(...buttons.map(rect=>rect.top)):felt.bottom;
+   timer.style.left='16px';timer.style.top=(Math.min(floor,felt.bottom)-felt.top-SIGNAL_TIMER_SIZE-12)+'px';};
+  place();requestAnimationFrame(place);
   timer.classList.remove('hidden');
   signalTimerHide=setTimeout(()=>timer.classList.add('hidden'),left);
  }
@@ -138,11 +150,11 @@ export function installTeamTable({$,getState,command,runAction,renderPlayerHand,
    const flip=i===2&&partnerFaceScope===faceScope&&partnerWasFaceUp!==!!faceUp;
    if(i===2){partnerFaceScope=faceScope;partnerWasFaceUp=!!faceUp;}
    const fan=Array.from({length:count},(_,j)=>`<i class="${faceUp?'sprite-card teammate-card':'opponent-card-back'}" style="--fan-index:${j-(count-1)/2};${faceUp?cardImageStyle(s.partnerHand[j]):''}"${faceUp?` aria-label="${safe(cardAccessibleName(s.partnerHand[j]))}"`:''}></i>`).join('');
-   const backs=i===0?'':i===2?`<button class="team-backs team-partner-cards" type="button" aria-label="Ver cartas del compañero durante 3 segundos" aria-pressed="${faceUp}" ${count?'':'disabled'}>${fan}</button>`:`<div class="team-backs">${fan}</div>`;
-   const status=r.folded?.[q]?'AL MAZO':'';
+   // A folded player's cards go to the deck: the text takes their place.
+   const backs=i===0?'':r.folded?.[q]?'<div class="team-folded-text">Se fue al mazo</div>':i===2?`<button class="team-backs team-partner-cards" type="button" aria-label="Ver cartas del compañero durante 3 segundos" aria-pressed="${faceUp}" ${count?'':'disabled'}>${fan}</button>`:`<div class="team-backs">${fan}</div>`;
    // Everyone who sang flor shows it beside their cards, you and your partner included.
    const flor=i!==0&&r.status==='started'&&r.flors?.[q]!=null?`<span class="team-flor flor-badge" role="img" aria-label="${safe(seatName(r,q,p)||'Jugador')} cantó flor">${FLOR_ICON}</span>`:'';
-   el.innerHTML=`${i===0?(status?`<span class="team-self-status">${status}</span>`:''):`<span class="team-player-name">${safe(seatName(r,q,p)||'Jugador')}${status?`<small>${status}</small>`:''}</span>`}${backs}${flor}<div class="team-speech hidden"></div>`;
+   el.innerHTML=`${i===0?'':`<span class="team-player-name">${safe(seatName(r,q,p)||'Jugador')}</span>`}${backs}${flor}<div class="team-speech hidden"></div>`;
    placeSeatFlor(el,positions[i]==='right');
    if(i===2&&flip&&!matchMedia('(prefers-reduced-motion: reduce)').matches)for(const card of el.querySelectorAll('.team-backs>i'))card.animate([{rotate:'y 90deg',opacity:.3,scale:'.94'},{rotate:'y 0deg',opacity:1,scale:'1'}],{duration:280,easing:'ease-out'});
    if(i===2)el.querySelector('.team-partner-cards').onclick=()=>{showPartner();render();};
@@ -155,7 +167,7 @@ export function installTeamTable({$,getState,command,runAction,renderPlayerHand,
   if(notices.length)noticeTimer=setTimeout(()=>{if(getState().room?.mode==='2v2')render();},Math.max(1,Math.min(...notices.map(n=>n.time+5000-gameTime()))));
   const drawing=r.status==='drawing';game.classList.toggle('drawing-mode',drawing);game.classList.toggle('reveal-mode',r.status==='revealing');$('opening-draw').classList.add('hidden');
   const playing=r.status==='started'&&!r.resolvingTrick&&!r.pendingNextHand;
-  const myTurn=playing&&!pending&&r.turn===p&&!r.folded?.[p];if(!s.handGestureActive)renderPlayerHand(drawing?[]:orderedHand(),myTurn);
+  const myTurn=playing&&!pending&&r.turn===p&&!r.folded?.[p];if(!s.handGestureActive)renderPlayerHand(drawing||r.folded?.[p]?[]:orderedHand(),myTurn);$('hand').classList.toggle('team-folded',playing&&!!r.folded?.[p]);placeSelfSpeech();
   $('fold-hand').classList.toggle('hidden',!playing||!!r.folded?.[p]);$('fold-hand').textContent='IRSE AL MAZO';
   const sample=r.muestra;$('deck-stack').classList.toggle('hidden',drawing||!sample);$('muestra-card').classList.toggle('hidden',drawing||!sample);$('muestra-card').classList.toggle('sprite-card',!!sample);if(sample){const el=$('muestra-card'),key=s.roomCode+':'+r.matchNumber+':'+r.handNumber;const dx=el.dataset.dragHand===key?el.style.getPropertyValue('--muestra-dx'):'0px',dy=el.dataset.dragHand===key?el.style.getPropertyValue('--muestra-dy'):'0px';el.dataset.dragHand=key;el.style.cssText=cardImageStyle(sample);el.style.setProperty('--muestra-dx',dx);el.style.setProperty('--muestra-dy',dy);$('muestra-card').setAttribute('aria-label',cardAccessibleName(sample)+', muestra');}
   positionDealerDeck($,r.dealer||'player4',p,true,[s.roomCode,r.matchNumber,r.handNumber].join(':'));
@@ -173,11 +185,15 @@ export function installTeamTable({$,getState,command,runAction,renderPlayerHand,
   const buttons=[];
   const add=(value,label,primary=false)=>buttons.push(`<button class="${primary?'call-button':'pass-button'}" data-team-action="${value}">${label}</button>`);
   if(playing&&!r.folded?.[p]){
-   if(!pending&&r.turn===p){const flower=hasFlor(r,s.hand);if(!r.flors?.[p]&&(r.playedBy?.[p]||0)===0&&flower)add('flor','FLOR');if(!flower&&!r.envidoClosed&&(r.playedBy?.[p]||0)===0&&r.trickNo===1){add('envido','ENVIDO');add('real','REAL');add('falta','FALTA');}if((!flower||r.flors?.[p])&&r.trucoLevel<4&&r.lastTrucoTeam!==mineTeam)add(r.trucoLevel===1?'truco':r.trucoLevel===2?'retruco':'vale4',r.trucoLevel===1?'TRUCO':r.trucoLevel===2?'RETRUCO':'VALE 4',true);}
+   // A flower can be sung until a card follows the first flor of the hand.
+   const mayFlor=!r.florClosed&&!r.flors?.[p]&&(r.playedBy?.[p]||0)===0&&hasFlor(r,s.hand);
+   if(!pending&&r.turn===p){const flower=hasFlor(r,s.hand);if(mayFlor)add('flor','FLOR');if(!flower&&!r.envidoClosed&&(r.playedBy?.[p]||0)===0&&r.trickNo===1){add('envido','ENVIDO');add('real','REAL');add('falta','FALTA');}if(!mayFlor&&r.trucoLevel<4&&r.lastTrucoTeam!==mineTeam)add(r.trucoLevel===1?'truco':r.trucoLevel===2?'retruco':'vale4',r.trucoLevel===1?'TRUCO':r.trucoLevel===2?'RETRUCO':'VALE 4',true);}
    // Holding an unsung flor, the only answer is to sing it: no envido, no quiero / no quiero yet.
-   const owesFlor=pending&&!pending.revealMode&&pending.responder===p&&pending.type!=='flor'&&(r.playedBy?.[p]||0)===0&&hasFlor(r,s.hand)&&!r.flors?.[p];
+   const owesFlor=pending&&!pending.revealMode&&pending.responder===p&&pending.type!=='flor'&&mayFlor;
    if(owesFlor)add('flor','FLOR',true);
    else if(pending&&!pending.revealMode&&pending.responder===p){add('yes',pending.type==='flor'&&hasFlor(r,s.hand)?'LA MÍA ES FLOR':'QUIERO',true);add('no','NO QUIERO');if(pending.type==='truco'){if(pending.stake<4)add('raise',pending.stake===2?'RETRUCO':'VALE 4');if(!r.envidoClosed&&(r.playedBy?.[p]||0)===0){add('envido','ENVIDO');add('real','REAL');add('falta','FALTA');}}if(pending.type==='envido'&&pending.called!=='falta'){add('raise-envido','ENVIDO');add('raise-real','REAL');add('raise-falta','FALTA');}if(pending.type==='flor'&&pending.called==='flor'){add('raise-conflor','CON FLOR ENVIDO');add('raise-faltaflor','CONTRA FLOR AL RESTO');}}
+   // Someone sang flor: anyone else holding one sings it now, turn or not.
+   if(mayFlor&&Object.keys(r.flors||{}).length&&!pending?.revealMode&&!buttons.some(b=>b.includes('data-team-action="flor"')))add('flor','FLOR',true);
   }
   const signalButtons=playing&&!pending&&!r.folded?.[p]&&r.turn!==p&&playerTeam(r.turn)===mineTeam&&!r.folded?.[r.turn]&&teamPie(r,p)===p;
   const signaled=r.teamSignal?.to===r.turn&&r.teamSignal.handNumber===r.handNumber&&r.teamSignal.trickNo===r.trickNo;
@@ -189,12 +205,14 @@ export function installTeamTable({$,getState,command,runAction,renderPlayerHand,
    const hasWord=r.trucoLevel<4&&r.lastTrucoTeam!==mineTeam;
    for(const [value,label] of [['veni','Vení'],['juga','Jugá'],['grita','Gritá']].filter(([value])=>!(lastCard&&value==='veni')&&(value!=='grita'||hasWord)))buttons.push('<button class="pass-button team-signal-button" data-team-signal="'+value+'">'+label+'</button>');
   }
-  renderSignalTimer(signalButtons&&r.players[r.turn]?.bot&&!signaled&&signalSent!==signalKey?r.turnClock?.startedAt:null);
+  const signalTimerStart=signalButtons&&r.players[r.turn]?.bot&&!signaled&&signalSent!==signalKey?r.turnClock?.startedAt:null;
   $('player-actions').classList.toggle('hidden',drawing||r.status==='complete');$('player-actions').innerHTML=buttons.length?'<div class="action-buttons compact-actions team-actions">'+buttons.join('')+'</div>':'';
   // As in 1v1: quiero / no quiero always on the bottom row, every other call above.
   const actionBox=$('player-actions').querySelector('.team-actions'),answers=actionBox?[...actionBox.querySelectorAll('[data-team-action="yes"],[data-team-action="no"]')]:[];
   if(answers.length){const options=document.createElement('div'),response=document.createElement('div');options.className='bet-options-row';response.className='bet-answers-row';for(const b of actionBox.querySelectorAll('button'))(answers.includes(b)?response:options).append(b);actionBox.replaceChildren(...(options.children.length?[options]:[]),response);}for(const b of $('player-actions').querySelectorAll('[data-team-action]'))b.onclick=e=>send(e.currentTarget,{kind:'call',value:b.dataset.teamAction});
   for(const b of $('player-actions').querySelectorAll('[data-team-signal]'))b.onclick=e=>{const button=e.currentTarget;signalSent=signalKey;setTimeout(()=>{if(signalSent===signalKey){signalSent=null;render();}},4000);send(button,{kind:'team-signal',value:b.dataset.teamSignal});render();};
+  // Measured once the buttons are on screen, so the timer sits above them.
+  renderSignalTimer(signalTimerStart);
   const time=r.turnClock?Math.max(0,Math.ceil((45000-(gameTime()-r.turnClock.startedAt))/1000)):null;setTurnBadge(drawing?'SORTEO':r.status==='revealing'||r.pendingNextHand||r.resolvingTrick?'NUEVA JUGADA':turn===p?(pending?'RESPONDÉ':'TU TURNO'):'Turno de '+(r.players[turn]?.name||'…'));
   renderEnd();syncControls();
  }
