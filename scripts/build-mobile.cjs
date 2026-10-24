@@ -34,6 +34,21 @@ const root = path.resolve(__dirname, '..');
   await fs.writeFile(nativeHtml,(await fs.readFile(nativeHtml,'utf8')).replace('viewport-fit=cover','viewport-fit=auto'));
   await fs.copyFile(path.join(root,'favicon.svg'), path.join(root,'www/favicon.svg'));
   await Promise.all(['privacidad.html','soporte.html','eliminar-cuenta.html','reglas.html','legal.css','aprender-truco-uruguayo.html','anotador-de-truco.html','scorer.js','visit.js'].map(file=>fs.copyFile(path.join(root,file),path.join(root,'www',file))));
-  // CSS dynamically selects card images; retain their original bytes and paths.
-  await fs.cp(path.join(root,'assets'), path.join(root,'www/assets'), { recursive: true });
+  // Code and the static pages load some images and videos by path at runtime
+  // (card sprites, tutorial videos, page logos). Copy only what the packaged
+  // files mention, so source photos and unused art stay out of the app.
+  const www = path.join(root,'www'), wanted = new Set();
+  for (const file of await fs.readdir(www, { recursive: true })) {
+    if (!/\.(js|css|html)$/.test(file)) continue;
+    for (const [, ref] of (await fs.readFile(path.join(www,file),'utf8')).matchAll(/assets\/([\w./-]+)/g)) wanted.add(ref.replace(/\/[^/]*$/, m => m.includes('.') ? m : ''));
+  }
+  let copied = 0;
+  for (const ref of wanted) {
+    const source = path.join(root,'assets',ref);
+    const stat = await fs.stat(source).catch(() => null);
+    if (!stat) continue;
+    await fs.cp(source, path.join(www,'assets',ref), { recursive: true });
+    copied++;
+  }
+  console.log('Recursos copiados por ruta: '+copied);
 })().catch(error => { console.error(error); process.exitCode = 1; });
