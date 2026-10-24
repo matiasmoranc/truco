@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="es"><head><meta charset="utf-8">
-  <meta name="robots" content="noindex, nofollow"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Administración · Truco Uruguayo</title><link rel="stylesheet" href="admin.css?v=14"></head>
+  <meta name="robots" content="noindex, nofollow"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Administración · Truco Uruguayo</title><link rel="stylesheet" href="admin.css?v=15"></head>
 <body>
 <section id="access" class="access"><div class="access-card"><img src="assets/truco-v3.png" alt=""><small>TRUCO URUGUAYO</small><h1>Administración</h1><p id="identity"></p><p id="access-status">Verificando sesión…</p><button id="login" class="primary" hidden>Continuar con Google</button><button id="switch-account" hidden>Usar otra cuenta</button><a href="./">Volver al juego</a></div></section>
 <div id="console" class="shell" hidden>
@@ -17,7 +17,7 @@
   <div class="sidebar-foot"><button id="logout" hidden>Cerrar sesión</button></div>
  </aside>
  <main>
-  <header class="topbar"><div><small id="page-kicker">Truco Uruguayo · Administración</small><h1 id="page-title">Resumen</h1></div><span id="updated" class="updated"></span><button id="refresh" type="button">Actualizar</button></header>
+  <header class="topbar"><div><small id="page-kicker">Truco Uruguayo · Administración</small><h1 id="page-title">Resumen</h1></div><label class="switch" title="Deja fuera a los usuarios marcados como prueba y a sus dispositivos"><input id="hide-test" type="checkbox" checked><span>Ocultar pruebas</span></label><span id="updated" class="updated"></span><button id="refresh" type="button">Actualizar</button></header>
 
   <section id="metrics">
    <div class="kpis">
@@ -71,4 +71,4 @@
  </main>
 </div>
 <dialog id="edit"><form id="edit-form"><div class="dialog-head"><h2 id="edit-title"></h2><button type="button" id="close" aria-label="Cerrar">×</button></div><p id="edit-description"></p><label id="value-label">Nuevo valor<input id="value" required></label><label id="delete-label" hidden>Escribí el nombre exacto para confirmar<input id="delete-confirm" autocomplete="off"></label><label>Motivo<input id="reason" required minlength="3" maxlength="200" placeholder="Por qué realizás este cambio"></label><p id="edit-error" role="alert"></p><div class="dialog-actions"><button id="cancel" type="button">Cancelar</button><button id="save" class="primary" type="submit">Confirmar cambio</button></div></form></dialog>
-<script type="module" src="admin.js?v=14"></script></body></html>
+<script type="module" src="admin.js?v=15"></script></body></html>

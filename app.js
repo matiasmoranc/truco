@@ -1,5 +1,5 @@
 import './chat-moderation.js?v=20261013-moderation1';
-import { visitPlatform,takeVisit } from './visit.js?v=20261024-visits3';
+import { visitPlatform,takeVisit,markTestDevice } from './visit.js?v=20261024-visits4';
 import { installPlayerPanel } from './player-panel.js?v=20261013-blocklist1';
 import { installScorer,renderCompactTally } from './scorer.js?v=20261023-seo1';
 import { installActivity } from './activity.js?v=20261010-adminstats32';
@@ -640,7 +640,7 @@ function loadConfig() {
 }
 let firebaseReadyPromise=null;
 let creditFunctionsPromise=null,creditTickPending=false;
-const activity=installActivity({send:data=>creditApi('playerActivity',{...data,platform:visitPlatform(),...(data.visible?takeVisit():null)}),getUid:()=>state.uid,document});
+const activity=installActivity({send:async data=>{const result=await creditApi('playerActivity',{...data,platform:visitPlatform(),...(data.visible?takeVisit():null)});if(typeof result?.testDevice==='boolean')markTestDevice(result.testDevice);return result;},getUid:()=>state.uid,document});
 const account=installAccount({api:creditApi,services:firebaseServices,getState:()=>state,rememberName:rememberPlayerName,document,onReady:async()=>{
   const initialCredits=credits.start().then(()=>credits.whenReady());
   loadCreditFunctions().catch(()=>{});activity.start();

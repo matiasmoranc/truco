@@ -232,17 +232,33 @@ exports.adminConsole=onCall({...options,secrets:[liveInternalSecret]},async requ
   const registeredUids=[];let token;
   do{const page=await getAuth().listUsers(1000,token);registeredUids.push(...page.users.filter(u=>u.providerData.some(p=>['google.com','apple.com','password'].includes(p.providerId))).map(u=>u.uid));token=page.pageToken;}while(token);
   const now=Date.now(),cutoff=uruguayDate(now-29*86400000).day;
-  const [days,presence,start,visits]=await Promise.all([db.ref('adminMetrics/days').orderByKey().startAt(cutoff).get(),db.ref('adminMetrics/presence').get(),db.ref('adminMetrics/startedAt').get(),db.ref('adminMetrics/visits').orderByKey().startAt(uruguayDate(now-(VISIT_DAYS-1)*86400000).day).get()]);
-  return {...activitySummary({registeredUids,now,metrics:{days:days.val()||{},presence:presence.val()||{},startedAt:start.val()}}),visits:visitSummary({visits:visits.val()||{},now,days:VISIT_DAYS})};
+  const visitStart=uruguayDate(now-(VISIT_DAYS-1)*86400000).day;
+  const [days,presence,start,visits,testVisits,testUsers]=await Promise.all([db.ref('adminMetrics/days').orderByKey().startAt(cutoff).get(),db.ref('adminMetrics/presence').get(),db.ref('adminMetrics/startedAt').get(),db.ref('adminMetrics/visits').orderByKey().startAt(visitStart).get(),db.ref('adminMetrics/visitsTest').orderByKey().startAt(visitStart).get(),db.ref('adminConfig/testUsers').get()]);
+  const testUids=Object.keys(testUsers.val()||{}),include=data.includeTest===true;
+  // Without test data: test accounts leave the totals and test visits stay in their own counters.
+  const activity=include?{days:days.val()||{},presence:presence.val()||{}}:withoutTestActivity({days:days.val()||{},presence:presence.val()||{}},new Set(testUids));
+  const counted=include?registeredUids:registeredUids.filter(uid=>!testUids.includes(uid));
+  const visitCounters=include?mergeVisitCounters(visits.val()||{},testVisits.val()||{}):visits.val()||{};
+  return {...activitySummary({registeredUids:counted,now,metrics:{...activity,startedAt:start.val()}}),visits:visitSummary({visits:visitCounters,now,days:VISIT_DAYS}),testUids,includeTest:include};
  }
  if(action==='visitors'){
   let range;try{range=visitRange({...data,now:Date.now()});}catch(e){throw new HttpsError('invalid-argument',e.message);}
   const [log,activity]=await Promise.all(['visitLog','days'].map(key=>db.ref('adminMetrics/'+key).orderByKey().startAt(range.from).endAt(range.to).get()));
-  const result=visitorsInRange({log:log.val()||{},activity:activity.val()||{},platform:range.platform,page:range.page});
+  const testUids=data.includeTest===true?null:new Set(Object.keys((await db.ref('adminConfig/testUsers').get()).val()||{}));
+  const result=visitorsInRange({log:log.val()||{},activity:activity.val()||{},platform:range.platform,page:range.page,exclude:testUids});
   result.players=result.players.slice(0,300);
   const names=await Promise.all(result.players.map(p=>db.ref('profiles/'+p.uid+'/name').get()));
   result.players=result.players.map((p,i)=>({...p,name:names[i].val()||''}));
   return result;
+ }
+ if(action==='test-user'){
+  if(!validKey(data.uid)||typeof data.test!=='boolean')throw new HttpsError('invalid-argument','Usuario inválido.');
+  await db.ref('adminConfig/testUsers/'+data.uid).set(data.test||null);
+  // Their visits already logged move to (or back from) the test counters.
+  const log=(await db.ref('adminMetrics/visitLog').get()).val()||{},moved=[],flags={};
+  for(const [day,records] of Object.entries(log))for(const [id,r] of Object.entries(records||{}))if(r?.uid===data.uid&&Number.isFinite(r.at)&&!!r.test!==data.test){moved.push(r);flags['visitLog/'+day+'/'+id+'/test']=data.test||null;}
+  if(moved.length)await db.ref('adminMetrics').update({...moveVisitsUpdates(moved,data.test,ServerValue.increment),...flags});
+  return {ok:true,moved:moved.length};
  }
  if(action==='delete'){
   let failure;
@@ -358,13 +374,23 @@ exports.playerActivity=onCall({...options,maxInstances:3},async request=>{
  await db.ref('adminMetrics').update(updates);
  await db.ref('adminMetrics/startedAt').transaction(current=>current||now);
  // The visit that opened this page belongs to this player (only an unclaimed, recent one).
+ const testUser=(await db.ref('adminConfig/testUsers/'+user.uid).get()).val()===true;
  const visit=visitClaimPath(request.data);
- if(visit){const entry=db.ref(visit),at=(await entry.child('at').get()).val();if(Number.isFinite(at)&&now-at<12*3600000)await entry.child('uid').transaction(current=>current||user.uid);}
- return {ok:true};
+ if(visit){
+  const entry=db.ref(visit),record=(await entry.get()).val();
+  if(Number.isFinite(record?.at)&&now-record.at<12*3600000&&!record.uid){
+   await entry.child('uid').transaction(current=>current||user.uid);
+   // A test account's visit moves to the test counters.
+   if(testUser&&!record.test)await db.ref('adminMetrics').update({...moveVisitUpdates(record,true,ServerValue.increment),[visit.slice('adminMetrics/'.length)+'/test']:true});
+  }
+ }
+ // The page marks its device as a test device, so later visits count apart too.
+ return {ok:true,testDevice:testUser};
 });
 // Anonymous visit counters for the admin panel. No login and no stored
 // identifiers; a per-instance limit keeps one address from inflating them.
 const {visitUpdates,visitSummary,visitRecord,visitRange,visitorsInRange,visitClaimPath,VISIT_DAYS}=require('./visit-service.cjs');
+const {moveVisitUpdates,moveVisitsUpdates,mergeVisitCounters,withoutTestActivity}=require('./test-data.cjs');
 const visitLimits=new Map();
 exports.siteVisit=onCall({region:'us-central1',maxInstances:3,timeoutSeconds:10,cors:true},async request=>{
  const now=Date.now(),ip=String(request.rawRequest?.ip||'');
@@ -377,7 +403,8 @@ exports.siteVisit=onCall({region:'us-central1',maxInstances:3,timeoutSeconds:10,
  const {day}=uruguayDate(now),data=request.data||{};
  const record=visitRecord({...data,now,userAgent:request.rawRequest?.headers?.['user-agent']});
  const entry=db.ref('adminMetrics/visitLog/'+day).push();
- await Promise.all([db.ref('adminMetrics/visits').update(updates),entry.set(record)]);
+ // Devices flagged as test devices count apart from the real visits.
+ await Promise.all([db.ref(record.test?'adminMetrics/visitsTest':'adminMetrics/visits').update(updates),entry.set(record)]);
  // The page hands this id to the player's first signal after signing in.
  return {ok:true,id:entry.key,day};
 });
@@ -387,7 +414,7 @@ exports.activityCleanup=onSchedule({schedule:'every day 04:00',timeZone:'America
   if(!metrics)return undefined;
   // Daily activity, counters and visit details are kept for VISIT_DAYS.
   const visitCutoff=uruguayDate(now-(VISIT_DAYS-1)*86400000).day;
-  for(const key of ['days','visits','visitLog'])for(const day of Object.keys(metrics[key]||{}))if(day<visitCutoff)delete metrics[key][day];
+  for(const key of ['days','visits','visitsTest','visitLog'])for(const day of Object.keys(metrics[key]||{}))if(day<visitCutoff)delete metrics[key][day];
   for(const [uid,sessions] of Object.entries(metrics.presence||{})){
    for(const [id,session] of Object.entries(sessions))if(now-session.at>=90000)delete sessions[id];
    if(!Object.keys(sessions).length)delete metrics.presence[uid];

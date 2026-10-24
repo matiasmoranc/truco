@@ -44,8 +44,8 @@ function visitOrigin(ref){
  for(const [pattern,name] of known)if(pattern.test(value))return name;
  return value.replace(/^www\./,'');
 }
-function visitRecord({platform,page,first,ref,userAgent,now}){
- return {at:now,platform,page,first,origin:visitOrigin(ref),...deviceFacts(userAgent)};
+function visitRecord({platform,page,first,ref,userAgent,now,test}){
+ return {at:now,platform,page,first,origin:visitOrigin(ref),...deviceFacts(userAgent),...(test===true?{test:true}:{})};
 }
 const count=value=>Number.isSafeInteger(value)&&value>0?value:0;
 function visitSummary({visits,now,days=30}){
@@ -74,16 +74,18 @@ function visitClaimPath(data){
  return typeof id==='string'&&/^-[A-Za-z0-9_-]{19}$/.test(id)&&DAY.test(day||'')?'adminMetrics/visitLog/'+day+'/'+id:null;
 }
 // Who came in a period: visit details (with the player when one signed in) and signed-in players.
-function visitorsInRange({log,activity,platform,page=null,limit=1000}){
- const matches=p=>platform==='all'||p===platform;
+// exclude: test account uids to leave out, together with visits from test devices (null keeps everything).
+function visitorsInRange({log,activity,platform,page=null,exclude=null,limit=1000}){
+ const matches=p=>platform==='all'||p===platform,hidden=r=>exclude&&(r.test===true||exclude.has(r.uid));
  const visits=[];
- for(const records of Object.values(log||{}))for(const r of Object.values(records||{}))if(r&&Number.isFinite(r.at)&&matches(r.platform)&&(!page||r.page===page))visits.push(r);
+ for(const records of Object.values(log||{}))for(const r of Object.values(records||{}))if(r&&Number.isFinite(r.at)&&matches(r.platform)&&(!page||r.page===page)&&!hidden(r))visits.push(r);
  visits.sort((a,b)=>b.at-a.at);
  const players=new Map();
  const player=uid=>players.get(uid)||{uid,days:0,lastDay:'',platforms:[],visits:0};
  // Activity says which days and platforms a player used; a page filter only has the visits.
  if(!page)for(const [day,data] of Object.entries(activity||{})){
   for(const [uid,platforms] of Object.entries(data?.platforms||{})){
+   if(exclude?.has(uid))continue;
    const used=Object.keys(platforms||{}).filter(p=>PLATFORMS.includes(p)&&matches(p));
    if(!used.length)continue;
    const p=player(uid);

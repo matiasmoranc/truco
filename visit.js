@@ -1,7 +1,7 @@
 // Counts one anonymous visit per page load for the admin statistics. It sends
 // only the platform, the page and whether this device already came today.
 const ENDPOINT='https://us-central1-truco-6553d.cloudfunctions.net/siteVisit';
-const DAY_KEY='truco-visit-day';
+const DAY_KEY='truco-visit-day',TEST_KEY='truco-test-device';
 
 // Static pages inside the app have no trucoNative, but the native bridge still
 // injects Capacitor into every page.
@@ -32,6 +32,9 @@ export function visitReferrer(location=globalThis.location,referrer=globalThis.d
 function uruguayDay(now=new Date()){return new Intl.DateTimeFormat('en-CA',{timeZone:'America/Montevideo'}).format(now);}
 function storedDay(){try{return localStorage.getItem(DAY_KEY);}catch{return null;}}
 function storeDay(day){try{localStorage.setItem(DAY_KEY,day);}catch{/* Private mode: every visit counts as new. */}}
+// A device where a test account played: its visits count apart from the real ones.
+function testDevice(){try{return localStorage.getItem(TEST_KEY)==='1';}catch{return false;}}
+export function markTestDevice(test){try{if(test)localStorage.setItem(TEST_KEY,'1');else localStorage.removeItem(TEST_KEY);}catch{/* Storage unavailable. */}}
 
 export function recordVisit({fetch=globalThis.fetch,nav=globalThis.navigator,location=globalThis.location}={}){
  if(!location||typeof fetch!=='function')return null;
@@ -39,7 +42,7 @@ export function recordVisit({fetch=globalThis.fetch,nav=globalThis.navigator,loc
  if(!nativePlatform()&&/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location?.hostname||''))return null;
  if(nav?.webdriver||/bot|crawl|spider|slurp|lighthouse|headless/i.test(nav?.userAgent||''))return null;
  const day=uruguayDay(),first=storedDay()!==day;storeDay(day);
- const data={platform:visitPlatform(nav),page:visitPage(location?.pathname),first,ref:visitReferrer(location)};
+ const data={platform:visitPlatform(nav),page:visitPage(location?.pathname),first,ref:visitReferrer(location),...(testDevice()?{test:true}:{})};
  return fetch(ENDPOINT,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({data}),keepalive:true})
   .then(response=>response?.json?.()).then(body=>{const r=body?.result;if(r?.id&&r?.day)pendingVisit={visitId:r.id,visitDay:r.day};}).catch(()=>null);
 }

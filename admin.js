@@ -4,6 +4,14 @@ import {getFunctions,httpsCallable} from 'https://www.gstatic.com/firebasejs/12.
 const $=id=>document.getElementById(id);
 let auth,call,users=[],pageToken=null,selection=null,busy=false,epoch=0,metrics=null,metricsBusy=false,metricsTimer=null,pagesLoaded=1,userScope='all',tableData={tables:[],archivedTables:[]};
 function say(message){$('status').textContent=message;}
+// Test accounts and test devices stay out of every number unless this switch is off.
+function hideTest(){return $('hide-test').checked;}
+try{$('hide-test').checked=localStorage.getItem('admin-show-test')!=='1';}catch{/* Storage unavailable: hide by default. */}
+$('hide-test').onchange=()=>{try{localStorage.setItem('admin-show-test',hideTest()?'0':'1');}catch{}refresh(false,true).then(()=>{if(visitDetail)openVisitDetail(visitDetail.platform,{page:visitDetail.page});});};
+async function setTestUser(u,test){
+ try{say(test?'Marcando como prueba…':'Quitando de prueba…');const result=(await call({action:'test-user',uid:u.uid,test})).data;await refresh(false,true);say((u.name||'El usuario')+(test?' quedó marcado como prueba':' vuelve a contar en los números')+(result?.moved?' ('+result.moved+' visitas movidas).':'.'));}
+ catch(e){say(errorText(e));}
+}
 const number=value=>new Intl.NumberFormat('es-UY').format(Number(value)||0);
 const PLATFORM_LABELS={'app-ios':'App iPhone','app-android':'App Android','web-ios':'Web iPhone','web-android':'Web Android','web-desktop':'Web computadora'};
 const PAGE_LABELS={juego:'Juego',anotador:'Anotador',aprender:'Aprender a jugar',otra:'Reglas y otras'};
@@ -23,16 +31,19 @@ function openEdit(action,item){
 function renderUsers(){
  const expanded=new Set([...$('user-list').querySelectorAll('details[open]')].map(el=>el.dataset.uid));
  const query=$('search').value.toLocaleLowerCase();$('user-list').replaceChildren();
- for(const u of users.filter(u=>[u.name,u.email,u.uid].some(v=>v.toLocaleLowerCase().includes(query)))){
+ const tests=new Set(metrics?.testUids||[]);
+ // With test data hidden, test accounts leave the list too (show it to unmark one).
+ for(const u of users.filter(u=>(!hideTest()||!tests.has(u.uid))&&[u.name,u.email,u.uid].some(v=>v.toLocaleLowerCase().includes(query)))){
   const card=node('details','','user-card');card.dataset.uid=u.uid;card.open=expanded.has(u.uid);
   const online=metrics?.online.includes(u.uid);
   const state=node('span','',u.disabled?'state blocked':online?'state online':'state');state.append(node('i'),document.createTextNode(u.disabled?'Bloqueado':online?'Jugando':'Desconectado'));
   const summary=node('summary','','user-row');
-  summary.append(node('span',u.name||'Sin nombre','user-name'),node('span',u.email||'Sin correo','user-mail'),node('strong',number(u.balance),'num'),node('span',number(u.locked),'num reserved'),state,node('span',new Date(u.createdAt).toLocaleDateString('es-UY'),'joined'));card.append(summary);
+  const name=node('span',u.name||'Sin nombre','user-name');if(tests.has(u.uid))name.append(node('em','Prueba','test-badge'));
+  summary.append(name,node('span',u.email||'Sin correo','user-mail'),node('strong',number(u.balance),'num'),node('span',number(u.locked),'num reserved'),state,node('span',new Date(u.createdAt).toLocaleDateString('es-UY'),'joined'));card.append(summary);
   const detail=node('div','','user-detail');detail.append(node('small','UID: '+u.uid),node('small','Correo: '+(u.email||'Sin correo')),node('small','Saldo '+number(u.balance)+' · '+number(u.locked)+' reservados · Registro '+new Date(u.createdAt).toLocaleDateString('es-UY')));card.append(detail);
   const movements=node('details');movements.append(node('summary','Movimientos de créditos'));
   for(const e of Object.values(tableData.movements?.[u.uid]||{}).sort((a,b)=>b.at-a.at))movements.append(node('p',formatTableTime(e.at)+': saldo '+e.before+' → '+e.after+' · reservados '+e.reservedBefore+' → '+e.reservedAfter));detail.append(movements);
-  const actions=node('div','','actions');actions.append(button('Editar créditos',()=>openEdit('credits',u)),button('Cambiar nombre',()=>openEdit('rename',u)),button(u.disabled?'Desbloquear':'Bloquear',()=>openEdit('block',u)),button('Eliminar usuario',()=>openEdit('delete',u)));detail.append(actions);$('user-list').append(card);
+  const actions=node('div','','actions');actions.append(button('Editar créditos',()=>openEdit('credits',u)),button('Cambiar nombre',()=>openEdit('rename',u)),button(u.disabled?'Desbloquear':'Bloquear',()=>openEdit('block',u)),button('Eliminar usuario',()=>openEdit('delete',u)),button(tests.has(u.uid)?'Quitar de prueba':'Marcar como prueba',()=>setTestUser(u,!tests.has(u.uid))));detail.append(actions);$('user-list').append(card);
  }
  if(!$('user-list').children.length)$('user-list').append(node('p','No hay usuarios para mostrar.','empty'));
  $('more').hidden=!pageToken;
@@ -266,7 +277,7 @@ async function openVisitDetail(platform,{page=null}={}){
  $('visit-detail-body').replaceChildren(node('p','Cargando…','empty'));
  $('visit-detail').scrollIntoView({behavior:'smooth',block:'start'});
  let data;
- try{data=(await call({action:'visitors',from,to,platform,...(page?{page}:{})})).data;}
+ try{data=(await call({action:'visitors',from,to,platform,includeTest:!hideTest(),...(page?{page}:{})})).data;}
  catch(e){if(request===visitDetailRequest)$('visit-detail-body').replaceChildren(node('p',errorText(e),'empty'));return;}
  if(request!==visitDetailRequest)return;
  renderVisitDetail(data,platform);
@@ -322,7 +333,7 @@ for(const id of ['visit-range','visit-measure','visit-from','visit-to'])$(id).ad
 legend();
 async function refreshMetrics(){
  if(metricsBusy)return;metricsBusy=true;const generation=epoch;
- try{const data=(await call({action:'metrics'})).data;if(generation!==epoch)return;metrics=data;renderMetrics();}
+ try{const data=(await call({action:'metrics',includeTest:!hideTest()})).data;if(generation!==epoch)return;metrics=data;renderMetrics();}
  catch(e){if(generation===epoch)say(errorText(e));}
  finally{metricsBusy=false;}
 }

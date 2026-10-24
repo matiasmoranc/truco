@@ -98,6 +98,13 @@ tr.clickable:hover td{background:#e8c98310}
 .segmented button.active{background:var(--gold);color:#13251d}
 .detail-summary{font-size:14px;color:var(--text);margin:0}
 
+/* Test data switch and badge */
+.switch{display:inline-flex;align-items:center;gap:8px;font-size:12px;color:var(--text);cursor:pointer;white-space:nowrap}
+.switch input{appearance:none;width:34px;height:20px;min-height:0;margin:0;padding:0;border-radius:20px;background:#ffffff22;border:0;position:relative;cursor:pointer;transition:background .15s}
+.switch input::after{content:'';position:absolute;top:3px;left:3px;width:14px;height:14px;border-radius:50%;background:#fff;transition:transform .15s}
+.switch input:checked{background:var(--gold)}.switch input:checked::after{transform:translateX(14px)}
+.test-badge{font-style:normal;font-size:10px;font-weight:700;margin-left:6px;padding:1px 6px;border-radius:10px;background:#b79ce833;color:#d6c4ff;vertical-align:middle}
+
 /* Tables */
 .table-scroll{overflow-x:auto}
 .data-table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}
@@ -182,7 +189,7 @@ dialog label{margin:12px 0}.dialog-actions{display:flex;justify-content:flex-end
  .table-summary-date{grid-column:1;grid-row:2}.table-summary-stake{grid-column:2;grid-row:2}.table-summary::after{grid-column:3;grid-row:1/3}
  .pbar{grid-template-columns:110px minmax(0,1fr) 64px;gap:8px}
  .panels{grid-template-columns:1fr}
- .topbar h1{font-size:20px}.updated{display:none}
+ .topbar h1{font-size:20px}.updated{display:none}.topbar{flex-wrap:wrap}
  .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.kpi strong{font-size:24px}
  .bar-col .val{display:none}
 }
