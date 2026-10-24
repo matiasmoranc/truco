@@ -118,7 +118,8 @@ const tcard=(suit,rank)=>({id:({'♦':'oro','♥':'copa','♠':'espada','♣':'b
 function opening(){
  const s=newTeamSession('ABCDE',people,30,{id:'m9',stake:1,pot:4,matchNumber:1},1000),r=s.room;
  Object.assign(r,{mano:'player1',turn:'player1',trickNo:1,envidoClosed:false,playedBy:{},flors:{},trickCards:[],tricks:[],trucoLevel:1,lastTrucoTeam:null,pendingBet:null,muestra:tcard('♦',6)});
- s.hands.player1=[tcard('♥',4),tcard('♣',5),tcard('♠',6)];s.originals=structuredClone(s.hands);
+ // Fixed hands without flor: a random flower would make a bot sing it instead of the move under test.
+ s.hands={player1:[tcard('♥',4),tcard('♣',5),tcard('♠',6)],player2:[tcard('♠',3),tcard('♥',5),tcard('♣',12)],player3:[tcard('♣',2),tcard('♠',7),tcard('♥',11)],player4:[tcard('♥',1),tcard('♣',6),tcard('♠',10)]};s.originals=structuredClone(s.hands);
  return {s,r};
 }
 test('Bots never shout truco in the first round; later they shout with good cards or bluff now and then',()=>{
