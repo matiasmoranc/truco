@@ -80,3 +80,14 @@ test("Claude's own browser checking the live site does not count as a visit",asy
  const {recordVisit}=await import('data:text/javascript;base64,'+Buffer.from(require('node:fs').readFileSync(require('node:path').join(__dirname,'../visit.js'),'utf8')).toString('base64'));
  assert.equal(recordVisit({fetch:()=>Promise.resolve(),nav:{userAgent:'Mozilla/5.0 (Windows NT 10.0) Chrome/152 Claude/3.6556.2 Safari/537.36'},location:{hostname:'trucouruguayo.uy',pathname:'/'}}),null);
 });
+test('A device reporting twice within seconds is one visit, and a device seen today is not a new visitor',()=>{
+ const {dedupeVisit,rememberDevice}=require('../functions/visit-service.cjs');
+ const seen=new Map(),key='1.2.3.4|app-android|Android 11|OnePlus8Pro|App',day='2026-10-24',t=Date.parse('2026-10-24T12:00:00Z');
+ assert.deepEqual(dedupeVisit({seen,key,day,page:'juego',now:t}),{duplicateOf:null,known:false});
+ rememberDevice({seen,key,day,page:'juego',now:t,id:'-A'});
+ assert.deepEqual(dedupeVisit({seen,key,day,page:'juego',now:t+11000}),{duplicateOf:'-A'});
+ assert.deepEqual(dedupeVisit({seen,key,day,page:'juego',now:t+56000}),{duplicateOf:null,known:true});
+ assert.deepEqual(dedupeVisit({seen,key,day,page:'anotador',now:t+5000}),{duplicateOf:null,known:true});
+ assert.equal(dedupeVisit({seen,key:'other',day,page:'juego',now:t+1000}).known,false);
+ assert.equal(dedupeVisit({seen,key,day:'2026-10-25',page:'juego',now:t+5000}).known,false);
+});

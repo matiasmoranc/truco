@@ -389,20 +389,25 @@ exports.playerActivity=onCall({...options,maxInstances:3},async request=>{
 });
 // Anonymous visit counters for the admin panel. No login and no stored
 // identifiers; a per-instance limit keeps one address from inflating them.
-const {visitUpdates,visitSummary,visitRecord,visitRange,visitorsInRange,visitClaimPath,VISIT_DAYS}=require('./visit-service.cjs');
+const {visitUpdates,visitSummary,visitRecord,visitRange,visitorsInRange,visitClaimPath,deviceFacts,dedupeVisit,rememberDevice,VISIT_DAYS}=require('./visit-service.cjs');
 const {moveVisitUpdates,moveVisitsUpdates,mergeVisitCounters,withoutTestActivity}=require('./test-data.cjs');
-const visitLimits=new Map();
+const visitLimits=new Map(),visitDevices=new Map();
 exports.siteVisit=onCall({region:'us-central1',maxInstances:3,timeoutSeconds:10,cors:true},async request=>{
  const now=Date.now(),ip=String(request.rawRequest?.ip||'');
  const recent=(visitLimits.get(ip)||[]).filter(at=>now-at<60000);
  if(recent.length>=20)throw new HttpsError('resource-exhausted','Demasiadas visitas.');
  recent.push(now);visitLimits.set(ip,recent);
  if(visitLimits.size>5000)for(const [key,list] of visitLimits)if(list.every(at=>now-at>=60000))visitLimits.delete(key);
+ const {day}=uruguayDate(now),data={...(request.data||{})},agent=request.rawRequest?.headers?.['user-agent'];
+ const facts=deviceFacts(agent),key=[ip,data.platform,facts.os,facts.model,facts.browser].join('|');
+ const repeat=dedupeVisit({seen:visitDevices,key,day,page:data.page,now});
+ if(repeat.duplicateOf)return {ok:true,id:repeat.duplicateOf,day,duplicate:true};
+ if(repeat.known)data.first=false;
  let updates;
- try{updates=visitUpdates({...request.data,now,increment:ServerValue.increment});}catch(e){throw new HttpsError('invalid-argument',e.message);}
- const {day}=uruguayDate(now),data=request.data||{};
- const record=visitRecord({...data,now,userAgent:request.rawRequest?.headers?.['user-agent']});
+ try{updates=visitUpdates({...data,now,increment:ServerValue.increment});}catch(e){throw new HttpsError('invalid-argument',e.message);}
+ const record=visitRecord({...data,now,userAgent:agent});
  const entry=db.ref('adminMetrics/visitLog/'+day).push();
+ rememberDevice({seen:visitDevices,key,day,page:data.page,now,id:entry.key});
  // Devices flagged as test devices count apart from the real visits.
  await Promise.all([db.ref(record.test?'adminMetrics/visitsTest':'adminMetrics/visits').update(updates),entry.set(record)]);
  // The page hands this id to the player's first signal after signing in.

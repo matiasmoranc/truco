@@ -47,6 +47,20 @@ function visitOrigin(ref){
 function visitRecord({platform,page,first,ref,userAgent,now,test}){
  return {at:now,platform,page,first,origin:visitOrigin(ref),...deviceFacts(userAgent),...(test===true?{test:true}:{})};
 }
+// Same device seen again: a repeat within seconds is one visit (the app can load
+// twice when it opens), and a device already counted today is not a new visitor even
+// if the phone lost its note of it. Kept only in the server's memory, never stored.
+const REPEAT_MS=20000,DEVICE_MEMORY_MS=6*3600000;
+function dedupeVisit({seen,key,day,page,now}){
+ const last=seen.get(key);
+ if(last&&last.day===day&&now-last.at<REPEAT_MS&&last.page===page)return {duplicateOf:last.id};
+ const known=!!last&&last.day===day&&now-last.at<DEVICE_MEMORY_MS;
+ return {duplicateOf:null,known};
+}
+function rememberDevice({seen,key,day,page,now,id}){
+ seen.set(key,{at:now,day,page,id});
+ if(seen.size>5000)for(const [k,v] of seen)if(now-v.at>=DEVICE_MEMORY_MS)seen.delete(k);
+}
 const count=value=>Number.isSafeInteger(value)&&value>0?value:0;
 function visitSummary({visits,now,days=30}){
  const list=[];
@@ -102,4 +116,4 @@ function visitorsInRange({log,activity,platform,page=null,exclude=null,limit=100
  return {visits:visits.slice(0,limit),totalVisits:visits.length,signedVisits:visits.length-anonymous.length,anonymousVisits:anonymous.length,anonymousDevices:anonymous.filter(v=>v.first).length,
   players:[...players.values()].sort((a,b)=>b.visits-a.visits||b.lastDay.localeCompare(a.lastDay)||b.days-a.days)};
 }
-module.exports={PLATFORMS,PAGES,VISIT_DAYS,visitUpdates,visitSummary,deviceFacts,visitOrigin,visitRecord,visitRange,visitorsInRange,visitClaimPath};
+module.exports={dedupeVisit,rememberDevice,PLATFORMS,PAGES,VISIT_DAYS,visitUpdates,visitSummary,deviceFacts,visitOrigin,visitRecord,visitRange,visitorsInRange,visitClaimPath};
