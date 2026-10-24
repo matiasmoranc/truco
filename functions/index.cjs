@@ -238,9 +238,10 @@ exports.adminConsole=onCall({...options,secrets:[liveInternalSecret]},async requ
  if(action==='visitors'){
   let range;try{range=visitRange({...data,now:Date.now()});}catch(e){throw new HttpsError('invalid-argument',e.message);}
   const [log,activity]=await Promise.all(['visitLog','days'].map(key=>db.ref('adminMetrics/'+key).orderByKey().startAt(range.from).endAt(range.to).get()));
-  const result=visitorsInRange({log:log.val()||{},activity:activity.val()||{},platform:range.platform});
-  const names=await Promise.all(result.players.slice(0,300).map(p=>db.ref('profiles/'+p.uid+'/name').get()));
-  result.players=result.players.slice(0,300).map((p,i)=>({...p,name:names[i].val()||''}));
+  const result=visitorsInRange({log:log.val()||{},activity:activity.val()||{},platform:range.platform,page:range.page});
+  result.players=result.players.slice(0,300);
+  const names=await Promise.all(result.players.map(p=>db.ref('profiles/'+p.uid+'/name').get()));
+  result.players=result.players.map((p,i)=>({...p,name:names[i].val()||''}));
   return result;
  }
  if(action==='delete'){
@@ -356,11 +357,14 @@ exports.playerActivity=onCall({...options,maxInstances:3},async request=>{
  try{updates=activityUpdates({uid:user.uid,sessionId:request.data?.sessionId,visible:request.data?.visible,platform:PLATFORMS.includes(request.data?.platform)?request.data.platform:requestPlatform({origin:request.rawRequest?.headers?.origin,userAgent:request.rawRequest?.headers?.['user-agent']}),now});}catch(e){throw new HttpsError('invalid-argument',e.message);}
  await db.ref('adminMetrics').update(updates);
  await db.ref('adminMetrics/startedAt').transaction(current=>current||now);
+ // The visit that opened this page belongs to this player (only an unclaimed, recent one).
+ const visit=visitClaimPath(request.data);
+ if(visit){const entry=db.ref(visit),at=(await entry.child('at').get()).val();if(Number.isFinite(at)&&now-at<12*3600000)await entry.child('uid').transaction(current=>current||user.uid);}
  return {ok:true};
 });
 // Anonymous visit counters for the admin panel. No login and no stored
 // identifiers; a per-instance limit keeps one address from inflating them.
-const {visitUpdates,visitSummary,visitRecord,visitRange,visitorsInRange,VISIT_DAYS}=require('./visit-service.cjs');
+const {visitUpdates,visitSummary,visitRecord,visitRange,visitorsInRange,visitClaimPath,VISIT_DAYS}=require('./visit-service.cjs');
 const visitLimits=new Map();
 exports.siteVisit=onCall({region:'us-central1',maxInstances:3,timeoutSeconds:10,cors:true},async request=>{
  const now=Date.now(),ip=String(request.rawRequest?.ip||'');
@@ -372,8 +376,10 @@ exports.siteVisit=onCall({region:'us-central1',maxInstances:3,timeoutSeconds:10,
  try{updates=visitUpdates({...request.data,now,increment:ServerValue.increment});}catch(e){throw new HttpsError('invalid-argument',e.message);}
  const {day}=uruguayDate(now),data=request.data||{};
  const record=visitRecord({...data,now,userAgent:request.rawRequest?.headers?.['user-agent']});
- await Promise.all([db.ref('adminMetrics/visits').update(updates),db.ref('adminMetrics/visitLog/'+day).push(record)]);
- return {ok:true};
+ const entry=db.ref('adminMetrics/visitLog/'+day).push();
+ await Promise.all([db.ref('adminMetrics/visits').update(updates),entry.set(record)]);
+ // The page hands this id to the player's first signal after signing in.
+ return {ok:true,id:entry.key,day};
 });
 exports.activityCleanup=onSchedule({schedule:'every day 04:00',timeZone:'America/Montevideo',region:'us-central1',maxInstances:1},async()=>{
  const now=Date.now();

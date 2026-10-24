@@ -49,14 +49,14 @@ test('Visit details keep device type, browser and origin without identifiers',()
 test('The visitors list filters by platform and period and joins signed-in players',()=>{
  const {visitRange,visitorsInRange}=require('../functions/visit-service.cjs');
  const now=Date.parse('2026-10-24T15:00:00Z');
- assert.deepEqual(visitRange({from:'2026-10-20',to:'2026-10-24',platform:'web-ios',now}),{from:'2026-10-20',to:'2026-10-24',platform:'web-ios'});
+ assert.deepEqual(visitRange({from:'2026-10-20',to:'2026-10-24',platform:'web-ios',now}),{from:'2026-10-20',to:'2026-10-24',platform:'web-ios',page:null});
  for(const bad of [{from:'2026-10-24',to:'2026-10-20',platform:'all'},{from:'2026-01-01',to:'2026-10-24',platform:'all'},{from:'2026-10-20',to:'2026-10-24',platform:'x'},{from:'../',to:'2026-10-24',platform:'all'}])
   assert.throws(()=>visitRange({...bad,now}));
  const log={'2026-10-23':{a:{at:1,platform:'web-ios',page:'juego'},b:{at:3,platform:'web-android',page:'juego'}},'2026-10-24':{c:{at:2,platform:'web-ios',page:'anotador'}}};
  const activity={'2026-10-23':{platforms:{u1:{'web-ios':true},u2:{'app-android':true}}},'2026-10-24':{platforms:{u1:{'web-ios':true,'web-desktop':true}}}};
  const ios=visitorsInRange({log,activity,platform:'web-ios'});
  assert.deepEqual(ios.visits.map(v=>v.at),[2,1]);assert.equal(ios.totalVisits,2);
- assert.deepEqual(ios.players,[{uid:'u1',days:2,lastDay:'2026-10-24',platforms:['web-ios']}]);
+ assert.deepEqual(ios.players,[{uid:'u1',days:2,lastDay:'2026-10-24',platforms:['web-ios'],visits:0}]);
  const all=visitorsInRange({log,activity,platform:'all'});assert.equal(all.visits.length,3);assert.deepEqual(all.players.map(p=>p.uid),['u1','u2']);
 });
 test('Signed-in heartbeats remember the platform only when it is a known one',()=>{
@@ -64,4 +64,15 @@ test('Signed-in heartbeats remember the platform only when it is a known one',()
  assert.equal(activityUpdates({uid:'a',sessionId:'s',visible:true,now,platform:'app-ios'})['days/2026-10-24/platforms/a/app-ios'],true);
  assert.equal(Object.keys(activityUpdates({uid:'a',sessionId:'s',visible:true,now,platform:'../x'})).some(k=>k.includes('platforms')),false);
  assert.equal(Object.keys(activityUpdates({uid:'a',sessionId:'s',visible:false,now,platform:'app-ios'})).some(k=>k.includes('platforms')),false);
+});
+test('Visits claimed by a player count per player, and the rest stay anonymous',()=>{
+ const {visitorsInRange,visitClaimPath}=require('../functions/visit-service.cjs');
+ const at=Date.parse('2026-10-24T15:00:00Z');
+ const log={'2026-10-24':{a:{at,platform:'web-ios',page:'juego',uid:'u1',first:true},b:{at:at+1,platform:'web-ios',page:'juego',uid:'u1',first:false},c:{at:at+2,platform:'web-ios',page:'anotador',first:true},d:{at:at+3,platform:'web-ios',page:'juego',first:false}}};
+ const result=visitorsInRange({log,activity:{},platform:'web-ios'});
+ assert.equal(result.signedVisits,2);assert.equal(result.anonymousVisits,2);assert.equal(result.anonymousDevices,1);
+ assert.deepEqual(result.players.map(p=>[p.uid,p.visits,p.days]),[['u1',2,1]]);
+ const pages=visitorsInRange({log,activity:{},platform:'all',page:'anotador'});assert.equal(pages.totalVisits,1);assert.equal(pages.players.length,0);
+ assert.equal(visitClaimPath({visitId:'-NaBcDeFgHiJkLmNoPqR',visitDay:'2026-10-24'}),'adminMetrics/visitLog/2026-10-24/-NaBcDeFgHiJkLmNoPqR');
+ for(const bad of [{visitId:'../x',visitDay:'2026-10-24'},{visitId:'-NaBcDeFgHiJkLmNoPqR',visitDay:'../'},{}])assert.equal(visitClaimPath(bad),null);
 });

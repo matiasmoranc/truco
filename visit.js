@@ -40,6 +40,10 @@ export function recordVisit({fetch=globalThis.fetch,nav=globalThis.navigator,loc
  if(nav?.webdriver||/bot|crawl|spider|slurp|lighthouse|headless/i.test(nav?.userAgent||''))return null;
  const day=uruguayDay(),first=storedDay()!==day;storeDay(day);
  const data={platform:visitPlatform(nav),page:visitPage(location?.pathname),first,ref:visitReferrer(location)};
- return fetch(ENDPOINT,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({data}),keepalive:true}).catch(()=>null);
+ return fetch(ENDPOINT,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({data}),keepalive:true})
+  .then(response=>response?.json?.()).then(body=>{const r=body?.result;if(r?.id&&r?.day)pendingVisit={visitId:r.id,visitDay:r.day};}).catch(()=>null);
 }
+// The visit that opened this page, handed once to the first signal after signing in.
+let pendingVisit=null;
+export function takeVisit(){const visit=pendingVisit;pendingVisit=null;return visit;}
 recordVisit();

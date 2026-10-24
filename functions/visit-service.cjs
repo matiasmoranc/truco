@@ -40,7 +40,7 @@ function deviceFacts(agent=''){
 function visitOrigin(ref){
  const value=typeof ref==='string'&&/^[a-z0-9.-]{1,80}$/i.test(ref)?ref.toLowerCase():'';
  if(!value)return 'Directo';
- const known=[[/instagram/,'Instagram'],[/facebook|fb\.com|^fb$/,'Facebook'],[/google/,'Google'],[/bing/,'Bing'],[/whatsapp|wa\.me/,'WhatsApp'],[/^t\.co$|twitter|^x\.com$/,'X'],[/tiktok/,'TikTok'],[/youtube|youtu\.be/,'YouTube'],[/github/,'GitHub'],[/apple\.com|apps\.apple/,'App Store'],[/play\.google/,'Google Play']];
+ const known=[[/instagram|^ig$/,'Instagram'],[/facebook|fb\.com|^fb$/,'Facebook'],[/google/,'Google'],[/bing/,'Bing'],[/whatsapp|wa\.me/,'WhatsApp'],[/^t\.co$|twitter|^x\.com$/,'X'],[/tiktok/,'TikTok'],[/youtube|youtu\.be/,'YouTube'],[/github/,'GitHub'],[/apple\.com|apps\.apple/,'App Store'],[/play\.google/,'Google Play']];
  for(const [pattern,name] of known)if(pattern.test(value))return name;
  return value.replace(/^www\./,'');
 }
@@ -61,27 +61,43 @@ function visitSummary({visits,now,days=30}){
  }
  return {platforms:PLATFORMS,days:list};
 }
-function visitRange({from,to,platform,now}){
+function visitRange({from,to,platform,page,now}){
  if(!DAY.test(from||'')||!DAY.test(to||'')||from>to)throw new Error('Período inválido.');
  if(from<uruguayDate(now-(VISIT_DAYS-1)*86400000).day)throw new Error('El período puede abarcar hasta '+VISIT_DAYS+' días atrás.');
  if(platform!=='all'&&!PLATFORMS.includes(platform))throw new Error('Plataforma inválida.');
- return {from,to,platform};
+ if(page!=null&&!PAGES.includes(page))throw new Error('Página inválida.');
+ return {from,to,platform,page:page??null};
 }
-// Who came in a period: anonymous visit details and signed-in players.
-function visitorsInRange({log,activity,platform,limit=1000}){
+// The visit a signed-in player's first signal claims: only a well-formed id.
+function visitClaimPath(data){
+ const id=data?.visitId,day=data?.visitDay;
+ return typeof id==='string'&&/^-[A-Za-z0-9_-]{19}$/.test(id)&&DAY.test(day||'')?'adminMetrics/visitLog/'+day+'/'+id:null;
+}
+// Who came in a period: visit details (with the player when one signed in) and signed-in players.
+function visitorsInRange({log,activity,platform,page=null,limit=1000}){
  const matches=p=>platform==='all'||p===platform;
  const visits=[];
- for(const records of Object.values(log||{}))for(const r of Object.values(records||{}))if(r&&Number.isFinite(r.at)&&matches(r.platform))visits.push(r);
+ for(const records of Object.values(log||{}))for(const r of Object.values(records||{}))if(r&&Number.isFinite(r.at)&&matches(r.platform)&&(!page||r.page===page))visits.push(r);
  visits.sort((a,b)=>b.at-a.at);
  const players=new Map();
- for(const [day,data] of Object.entries(activity||{})){
+ const player=uid=>players.get(uid)||{uid,days:0,lastDay:'',platforms:[],visits:0};
+ // Activity says which days and platforms a player used; a page filter only has the visits.
+ if(!page)for(const [day,data] of Object.entries(activity||{})){
   for(const [uid,platforms] of Object.entries(data?.platforms||{})){
    const used=Object.keys(platforms||{}).filter(p=>PLATFORMS.includes(p)&&matches(p));
    if(!used.length)continue;
-   const player=players.get(uid)||{uid,days:0,lastDay:'',platforms:[]};
-   player.days++;if(day>player.lastDay)player.lastDay=day;player.platforms=[...new Set([...player.platforms,...used])];players.set(uid,player);
+   const p=player(uid);
+   p.days++;if(day>p.lastDay)p.lastDay=day;p.platforms=[...new Set([...p.platforms,...used])];players.set(uid,p);
   }
  }
- return {visits:visits.slice(0,limit),totalVisits:visits.length,players:[...players.values()].sort((a,b)=>b.lastDay.localeCompare(a.lastDay)||b.days-a.days)};
+ for(const v of visits){
+  if(typeof v.uid!=='string')continue;
+  const p=player(v.uid),day=uruguayDate(v.at).day;
+  p.visits++;if(!p.days)p.lastDay=day>p.lastDay?day:p.lastDay;if(!p.platforms.includes(v.platform))p.platforms.push(v.platform);players.set(v.uid,p);
+ }
+ for(const p of players.values())if(!p.days)p.days=new Set(visits.filter(v=>v.uid===p.uid).map(v=>uruguayDate(v.at).day)).size;
+ const anonymous=visits.filter(v=>typeof v.uid!=='string');
+ return {visits:visits.slice(0,limit),totalVisits:visits.length,signedVisits:visits.length-anonymous.length,anonymousVisits:anonymous.length,anonymousDevices:anonymous.filter(v=>v.first).length,
+  players:[...players.values()].sort((a,b)=>b.visits-a.visits||b.lastDay.localeCompare(a.lastDay)||b.days-a.days)};
 }
-module.exports={PLATFORMS,PAGES,VISIT_DAYS,visitUpdates,visitSummary,deviceFacts,visitOrigin,visitRecord,visitRange,visitorsInRange};
+module.exports={PLATFORMS,PAGES,VISIT_DAYS,visitUpdates,visitSummary,deviceFacts,visitOrigin,visitRecord,visitRange,visitorsInRange,visitClaimPath};
