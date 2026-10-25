@@ -1,6 +1,6 @@
 import './chat-moderation.js?v=20261013-moderation1';
 import { visitPlatform,takeVisit,markTestDevice } from './visit.js?v=20261024-visits5';
-import { installFriends } from './friends.js?v=20261025-friends1';
+import { installFriends } from './friends.js?v=20261025-friends2';
 import { installPlayerPanel } from './player-panel.js?v=20261013-blocklist1';
 import { installScorer,renderCompactTally } from './scorer.js?v=20261023-seo1';
 import { installActivity } from './activity.js?v=20261010-adminstats32';
@@ -11,7 +11,7 @@ import {installTeamTable,TEAM_SEATS,playerTeam,positionDealerDeck,renderTeamLobb
 import {createLiveTables,LiveError} from './live-tables.js?v=20261022-clock1';
 const FIREBASE_VERSION = '12.4.0';
 const $ = (id) => document.getElementById(id);
-const views = ['welcome-view', 'invite-view', 'setup-view', 'waiting-view', 'game-view', 'config-view', 'learn-view', 'scorer-view'];
+const views = ['welcome-view', 'invite-view', 'setup-view', 'waiting-view', 'game-view', 'config-view', 'learn-view', 'scorer-view', 'friends-view'];
 const storageKey = 'truco-firebase-config';
 let state = { joining: false, config: null, firebase: null, roomCode: null, selectedRoom: null, uid: null, playerId: null, unsubscribe: null, privateUnsubscribe: null, lobbyUnsubscribe: null, room: null, hand: [], handOrder: [], handOrderKey: null, localGame: false, localHands: {}, nextAction: null, resolutionTimer: null, resolutionTimerKey: null, playActionInFlight: false, legacyRepairKey: null, emptyHandRepairKey: null };
 const teamTable=installTeamTable({$,getState:()=>state,command:creditCommand,runAction:runLiveAction,renderPlayerHand,orderedHand,cardImageStyle,cardAccessibleName,escapeHtml,renderTally:renderCompactTally,syncHeader:syncMobileGameHeader,setTurnBadge,syncControls:syncLiveControls,gameTime,hasFlor:roomHasFlor,florPoints:florValue,speakCall});
@@ -645,11 +645,11 @@ let creditFunctionsPromise=null,creditTickPending=false;
 // friend request opens Amigos; a table invitation is shown by the live listener.
 async function registerPush(){
   const native=globalThis.trucoNative;if(!native?.registerPush||!state.uid)return;
-  const token=await native.registerPush(data=>{if(data?.type==='friend-request')friends.open('requests');});
+  const token=await native.registerPush(data=>{if(data?.type==='friend-request')friends.open();});
   if(token)await creditApi('playerSocial',{action:'register-push',token,platform:native.platform});
 }
 // Friends and table invitations (friends.js).
-const friends=installFriends({$,api:creditApi,services:firebaseServices,getState:()=>state,document,
+const friends=installFriends({$,api:creditApi,services:firebaseServices,getState:()=>state,document,showView,openLobby:()=>openLobby(),
   toast:(message,error=false,duration=2600)=>toast(message,true,duration),
   tableToInvite:()=>{const room=state.room;if(!state.roomCode||state.localGame||room?.status!=='waiting')return null;
     return {code:state.roomCode,mode:room.mode==='2v2'?'2v2':'1v1',targetPoints:Number(room.targetPoints)||null,stake:Number(room.creditMatch?.stake)||null,password:state.hostTablePassword?.code===state.roomCode?state.hostTablePassword.password:''};},
@@ -913,7 +913,8 @@ async function enterRoom() {
       let room=snap.val(),seat=roomSeatForUid(room,state.uid);
       if(room.status==='closed'||roomExpired(room)){if($('join-credit-dialog').open)throw new Error('La mesa ya está cerrada.');toast('La mesa ya está cerrada.',true);await openLobby();return;}
       if(room.managedCredits){
-        if(!seat&&(room.creditMatch.hasPassword||(room.mode==='2v2'&&!state.joinTeam))&&!state.joinConfirmed){openCreditJoin(code,room);return;}
+        // Entering a table spends credits: always confirm with its details first.
+        if(!seat&&!state.joinConfirmed){openCreditJoin(code,room);return;}
         const result=await creditApi('creditJoinTable',{code,password:state.joinPassword||'',...(room.mode==='2v2'?{team:state.joinConfirmed?$('join-credit-team').value:state.joinTeam}:{})});
         room=result.room;joinedHand=result.privateHand||null;seat=roomSeatForUid(room,state.uid);state.joinPassword='';state.joinConfirmed=false;
         if(!seat)throw new Error('La mesa ya no tiene lugares disponibles.');
@@ -4413,8 +4414,11 @@ async function creditCommand(command){
 function openCreditJoin(code,room){
   state.joining=true;state.selectedRoom=code;state.joinConfirmed=false;state.joinPassword='';
   $('join-credit-submit').textContent='Entrar';
-  let cost=$('join-credit-cost');if(!cost){cost=document.createElement('p');cost.id='join-credit-cost';$('join-credit-form').insertBefore(cost,$('join-credit-password-row'));}
-  cost.textContent=(room.mode==='2v2'?'2 vs 2 · ':'1 vs 1 · ')+room.creditMatch.stake+' crédito(s) por jugador. Pozo: '+room.creditMatch.pot+'.';
+  // What the table is and what entering costs, before any credit moves.
+  let cost=$('join-credit-cost');if(!cost){cost=document.createElement('dl');cost.id='join-credit-cost';cost.className='join-summary';$('join-credit-form').insertBefore(cost,$('join-credit-password-row'));}
+  const stake=Number(room.creditMatch.stake)||0,balance=credits.wallet()?.balance,plural=n=>n+' crédito'+(n===1?'':'s');
+  const rows=[['Mesa',(room.mode==='2v2'?'2 vs 2':'1 vs 1')+(room.creditMatch.hasPassword?' · privada':' · pública')],['Se juega a',(Number(room.targetPoints)||30)+' puntos'],['Apuesta',plural(stake)+' por jugador'],['Pozo',plural(Number(room.creditMatch.pot)||stake*(room.mode==='2v2'?4:2))],['Tus créditos',Number.isFinite(balance)?plural(balance)+(balance>=stake?' · te quedan '+(balance-stake)+' al entrar':''):'—']];
+  cost.replaceChildren(...rows.flatMap(([k,v])=>{const dt=document.createElement('dt'),dd=document.createElement('dd');dt.textContent=k;dd.textContent=v;return [dt,dd];}));
   let teams=$('join-credit-team-row');
   if(!teams){teams=document.createElement('label');teams.id='join-credit-team-row';teams.textContent='Elegí tu equipo';const select=document.createElement('select');select.id='join-credit-team';select.className='table-mode-select';teams.append(select);$('join-credit-form').insertBefore(teams,$('join-credit-password-row'));}
   teams.hidden=room.mode!=='2v2';
