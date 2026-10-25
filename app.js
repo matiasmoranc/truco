@@ -640,6 +640,16 @@ function loadConfig() {
 }
 let firebaseReadyPromise=null;
 let creditFunctionsPromise=null,creditTickPending=false;
+// In the apps: when Google Play or the App Store has a newer version, offer it once per start.
+async function offerAppUpdate(){
+  const native=globalThis.trucoNative;if(!native?.checkForUpdate)return;
+  const update=await native.checkForUpdate();if(!update)return;
+  const dialog=$('update-dialog');if(dialog.open)return;
+  $('update-now').onclick=async()=>{dialog.close();try{await native.installUpdate();}catch(error){console.error('[truco:update]',error);}};
+  $('update-later').onclick=()=>dialog.close();
+  dialog.showModal();
+}
+setTimeout(()=>{offerAppUpdate().catch(()=>{});},3000);
 const activity=installActivity({send:async data=>{const result=await creditApi('playerActivity',{...data,platform:visitPlatform(),...(data.visible?takeVisit():null)});if(typeof result?.testDevice==='boolean')markTestDevice(result.testDevice);return result;},getUid:()=>state.uid,document});
 const account=installAccount({api:creditApi,services:firebaseServices,getState:()=>state,rememberName:rememberPlayerName,document,onReady:async()=>{
   const initialCredits=credits.start().then(()=>credits.whenReady());
