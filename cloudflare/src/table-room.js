@@ -50,6 +50,15 @@ export class TableRoom extends DurableObject{
     return Response.json({ok:true});
    }catch(error){return Response.json({ok:false,error:error.message},{status:409});}
   }
+  // The lobby opening a table hosted by a house player (only from inside the worker).
+  if(url.pathname==='/house-create'&&request.method==='POST'){
+   if(!this.env.INTERNAL_SECRET||request.headers.get('x-internal-secret')!==this.env.INTERNAL_SECRET)return new Response('No autorizado.',{status:401});
+   const {uid,name,stake,targetPoints}=await request.json();
+   try{
+    await this.serial(async()=>{await this.engine.create({uid,name},{id:crypto.randomUUID(),stake,targetPoints,mode:'1v1',secret:null,house:true,initial:await this.bank.prefetch()});await this.commit();});
+    return Response.json({ok:true});
+   }catch(error){return Response.json({ok:false,error:error?.message||'error',code:error instanceof CodeTakenError||error?.message==='code-taken'?'code-taken':null},{status:409});}
+  }
   if(request.headers.get('upgrade')!=='websocket')return new Response('Se esperaba WebSocket.',{status:426});
   const pair=new WebSocketPair();
   this.ctx.acceptWebSocket(pair[1]);

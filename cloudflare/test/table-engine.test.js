@@ -301,3 +301,26 @@ test('A bot that follows another bot waits 3 s; after a person it answers in 1.5
  assert.ok(checkedBot&&checkedHuman);
 });
 test('Bots answer after 2 seconds, and wait longer after another bot',()=>{assert.equal(BOT_DELAY_MS,2000);assert.ok(BOT_AFTER_BOT_MS>BOT_DELAY_MS);});
+test('A person plays a whole match against the house host of a lobby table',async()=>{
+ const {default:duel}=await import('../../functions/duel-bot.cjs');
+ const {bank,engine,advance}=setup();
+ await engine.create({uid:'house_Nacho_Pereira',name:'Nacho_Pereira'},{id:'h1',stake:2,targetPoints:10,mode:'1v1',secret:null,house:true});
+ assert.equal(bank.economy.wallets.house_Nacho_Pereira,undefined);
+ assert.equal(engine.lobbyEntry().players.player1.name,'Nacho_Pereira');
+ await engine.join({uid:'b',name:'Ricky'},{});
+ assert.deepEqual(bank.economy.wallets.b,{balance:5,locked:2,lastGrantAt:1});
+ assert.equal(engine.presence.player1.online,true);
+ for(let step=0;step<3000&&engine.match.status==='reserved';step++){
+  const s=engine.match.session;
+  if(duel.mustAct(s,'player2')){
+   for(const command of duel.botCommands(s,'player2')){const before=JSON.stringify(engine.match.session);try{await engine.act('b',{command,requestId:'r'+step+command.kind+(command.value||command.cardId||'')});}catch{continue;}if(JSON.stringify(engine.match.session)!==before)break;}
+  }else{advance(4000);await engine.tick();}
+ }
+ assert.equal(engine.match.status,'settled');
+ const won=engine.match.winner==='b';
+ assert.deepEqual(bank.economy.wallets.b,{balance:won?9:5,locked:0,lastGrantAt:1});
+ // A rematch request is turned down by the house after a moment.
+ await engine.act('b',{command:{kind:'rematch',value:'request'},requestId:'again'});
+ await engine.tick();advance(3000);await engine.tick();
+ assert.equal(engine.match.session.room.rematch.status,'declined');
+});

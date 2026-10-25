@@ -4,6 +4,7 @@
 // never for an ordinary card or call.
 import tableService from '../../functions/table-service.cjs';
 import teamBot from '../../functions/team-bot.cjs';
+import duelBot from '../../functions/duel-bot.cjs';
 import {ACTIVE,CodeTakenError} from './ledger-ops.js';
 
 const {tableOperation,publicTable,privateTableHand}=tableService;
@@ -16,6 +17,8 @@ export const DISCONNECT_MS=45000;
 // another bot's move it waits longer, so a run of bot plays stays readable.
 export const BOT_DELAY_MS=2000;
 export const BOT_AFTER_BOT_MS=3000;
+// The house player of a lobby table thinks a little, like a person would.
+const houseDelay=()=>1500+Math.floor(Math.random()*2500);
 const PROBE_BALANCE=1000000;
 const findPlayer=(m,uid)=>Object.keys(m?.players||{}).find(p=>m.players[p]?.uid===uid)||null;
 
@@ -23,11 +26,16 @@ export function createTableEngine({code,bank,clock=()=>Date.now()}){
  let m=null,presence={},botDueAt=null,botKey=null,lastMoveByBot=false;
 
  // The bot seat the table is waiting for, if any.
- const botSeat=()=>m?.status==='reserved'&&m.session?Object.keys(m.players||{}).find(p=>m.players[p]?.bot&&mustAct(m.session,p))||null:null;
+ const botSeat=()=>{
+  if(m?.status!=='reserved'||!m.session)return null;
+  if(m.house)return duelBot.mustAct(m.session,m.house)?m.house:null;
+  return Object.keys(m.players||{}).find(p=>m.players[p]?.bot&&mustAct(m.session,p))||null;
+ };
  // When the bot moves: after a short pause, or, if its human partner may signal
  // it, once the signal arrives or 12 s after its turn started.
  function scheduleBot(){
   const seat=botSeat();if(!seat){botDueAt=null;botKey=null;return;}
+  if(m.house){const r=m.session.room,key=[seat,r.turnClock?.key||'',r.pendingBet?.id||r.pendingBet?.type||'',r.pendingBet?.revealTurn||''].join('|');if(key===botKey&&botDueAt!=null)return;botKey=key;botDueAt=clock()+houseDelay();return;}
   const r=m.session.room,signal=signalFor(r,seat),key=[seat,r.turnClock?.key||'',signal||''].join('|');
   if(key===botKey&&botDueAt!=null)return;
   const now=clock(),waitUntil=!signal&&awaitsSignal(m.session,seat)?(r.turnClock?.startedAt??now)+SIGNAL_WAIT_MS:0;
@@ -37,8 +45,11 @@ export function createTableEngine({code,bank,clock=()=>Date.now()}){
  async function playBot(){
   const seat=botSeat();botDueAt=null;botKey=null;if(!seat)return false;
   let failure=null;
-  for(const command of botCommands(m.session,seat)){
-   try{await operate({uid:m.players[seat].uid,command,requestId:null,presence});lastMoveByBot=true;return true;}
+  const commands=m.house?duelBot.botCommands(m.session,seat):botCommands(m.session,seat);
+  for(const command of commands){
+   // A move the referee ignores without an error leaves the game as it was: try the next one.
+   const before=JSON.stringify(m.session);
+   try{await operate({uid:m.players[seat].uid,command,requestId:null,presence});if(JSON.stringify(m?.session)===before)continue;lastMoveByBot=true;return true;}
    catch(error){failure=error;}
   }
   console.error('bot move failed',code,seat,failure?.message);
@@ -80,16 +91,17 @@ export function createTableEngine({code,bank,clock=()=>Date.now()}){
   load(saved){m=saved?.match||null;presence=saved?.presence||{};botDueAt=null;botKey=null;scheduleBot();},
   snapshot(){return {match:m,presence};},
   playerFor(uid){return findPlayer(m,uid);},
-  async create(user,{id,stake,targetPoints,mode,secret,initial}){
+  async create(user,{id,stake,targetPoints,mode,secret,house=false,initial}){
    if(m&&!(m.closedAt||['settled','refunded'].includes(m.status)))throw new CodeTakenError();
    const previous=m;m=null;presence={};
-   try{await accounting('create',{id,uid:user.uid,name:user.name,stake,targetPoints,mode,secret},{creating:true,initial});}
+   try{await accounting('create',{id,uid:user.uid,name:user.name,stake,targetPoints,mode,secret,...(house?{house:true}:{})},{creating:true,initial});}
    catch(error){if(!m)m=previous;throw error;}
   },
   async join(user,{password='',team,initial}){
    if(!m)throw new Error('La mesa ya no está disponible.');
    if(findPlayer(m,user.uid))return;
    await accounting('join',{uid:user.uid,name:user.name,password,team},{initial});
+   if(m.house){const host=m.players[m.house];presence={...presence,[m.house]:{uid:host.uid,matchNumber:m.matchNumber,online:true}};}
    scheduleBot();
   },
   async act(uid,{command,requestId,expectedMatchId}){
@@ -100,6 +112,12 @@ export function createTableEngine({code,bank,clock=()=>Date.now()}){
    scheduleBot();
   },
   async tick(){
+   // The house does not play a rematch: it turns the request down after a moment.
+   const rematch=m?.house&&m.status==='settled'?m.session?.room?.rematch:null;
+   if(rematch?.status==='pending'&&rematch.requester!==m.house){
+    if(clock()-(m.houseRematchSeenAt??=clock())>=2500){delete m.houseRematchSeenAt;await operate({uid:m.players[m.house].uid,command:{kind:'rematch',value:'decline'},requestId:null,presence});}
+    return;
+   }
    if(!m||!ACTIVE.includes(m.status))return;
    if(!(botDueAt!=null&&clock()>=botDueAt&&await playBot()))await operate({uid:m.player1,command:{kind:'tick'},presence});
    scheduleBot();
@@ -132,6 +150,7 @@ export function createTableEngine({code,bank,clock=()=>Date.now()}){
   nextDeadline(){
    if(!m)return null;
    const now=clock(),times=[];
+   if(m.house&&m.status==='settled'&&m.session?.room?.rematch?.status==='pending'&&m.session.room.rematch.requester!==m.house)times.push(now+1000);
    if(m.status==='waiting')times.push(m.createdAt+WAIT_MS);
    const r=m.session?.room;
    if(m.status==='reserved'&&r){

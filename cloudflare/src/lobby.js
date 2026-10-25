@@ -2,15 +2,35 @@
 // the lobby receives each change as soon as it happens.
 import {DurableObject} from 'cloudflare:workers';
 import {verifyIdToken} from './firebase.js';
+import {tableStub} from './routing.js';
+import botSeat from '../../functions/bot-seat.cjs';
+
+const {isHouseUid,houseUid}=botSeat;
 
 const send=(ws,message)=>{try{ws.send(JSON.stringify(message));}catch{}};
+
+// Open 1 vs 1 tables hosted by house players, so there is always someone to play.
+// Each one waits the usual 10 minutes and closes; the lobby opens new ones with
+// other names, keeping between 5 and 7 open and staggered a minute apart.
+const HOUSE_NAMES=['Nacho_Pereira','Facu.Rodriguez','ElGordoMartinez','Santi_Fernandez','Gonza_Silva22','Juanma.Sosa','PepeCabrera','Rodri_Acosta','Mati.Olivera','ChinoNunez','Andres_Viera','Bruno.Correa94','Lu_Gonzalez','Caro.Suarez','Vale_Rodriguez'];
+const HOUSE_MIN=5,HOUSE_MAX=7,HOUSE_TICK_MS=60000,HOUSE_TARGET_MS=30*60000;
+const CODE_ALPHABET='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const randomCode=()=>Array.from(crypto.getRandomValues(new Uint32Array(5)),n=>CODE_ALPHABET[n%CODE_ALPHABET.length]).join('');
+const pick=weights=>{let r=Math.random()*weights.reduce((n,[,w])=>n+w,0);for(const [value,w] of weights){if((r-=w)<0)return value;}return weights[0][0];};
+// Mostly 20-point games, some of 10 and 30; mostly 1 credit, some of 2.
+const housePoints=()=>pick([[20,6],[10,2],[30,2]]);
+const houseStake=()=>pick([[1,3],[2,1]]);
 
 export class Lobby extends DurableObject{
  constructor(ctx,env){
   super(ctx,env);
   this.rooms={};
   ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair('ping','pong'));
-  ctx.blockConcurrencyWhile(async()=>{this.rooms=(await ctx.storage.get('rooms'))||{};});
+  ctx.blockConcurrencyWhile(async()=>{
+   this.rooms=(await ctx.storage.get('rooms'))||{};
+   this.house=(await ctx.storage.get('house'))||{target:0,targetAt:0,recent:[]};
+   if(this.env.INTERNAL_SECRET&&!(await ctx.storage.getAlarm()))await ctx.storage.setAlarm(Date.now()+5000);
+  });
  }
  async fetch(request){
   const url=new URL(request.url);
@@ -34,6 +54,30 @@ export class Lobby extends DurableObject{
   this.ctx.acceptWebSocket(pair[1]);
   pair[1].serializeAttachment({uid:null});
   return new Response(null,{status:101,webSocket:pair[0]});
+ }
+ async alarm(){
+  try{await this.keepHouseTables();}catch(error){console.error('house tables',error);}
+  await this.ctx.storage.setAlarm(Date.now()+HOUSE_TICK_MS);
+ }
+ async keepHouseTables(){
+  const now=Date.now(),house=this.house;
+  if(!house.target||now-house.targetAt>=HOUSE_TARGET_MS){house.target=HOUSE_MIN+Math.floor(Math.random()*(HOUSE_MAX-HOUSE_MIN+1));house.targetAt=now;}
+  const open=Object.values(this.rooms).filter(r=>r?.status==='waiting'&&isHouseUid(r.players?.player1?.uid));
+  const missing=house.target-open.length;if(missing<=0){await this.ctx.storage.put('house',house);return;}
+  // One new table a minute (two while far below), so they close at different times.
+  for(let i=0;i<Math.min(missing,missing>2?2:1);i++){
+   const busy=new Set(open.map(r=>r.players.player1.name));
+   // Names not at a table now, the least recently used first.
+   const free=HOUSE_NAMES.filter(n=>!busy.has(n)).sort((a,b)=>house.recent.indexOf(a)-house.recent.indexOf(b));
+   const name=free.filter(n=>!house.recent.includes(n))[0]||free[Math.floor(Math.random()*Math.min(free.length,4))];if(!name)break;
+   for(let attempt=0;attempt<3;attempt++){
+    const code=randomCode();
+    const response=await tableStub(this.env,code).fetch(new Request('https://table/house-create',{method:'POST',headers:{'x-table-code':code,'x-internal-secret':this.env.INTERNAL_SECRET},body:JSON.stringify({uid:houseUid(name),name,stake:houseStake(),targetPoints:housePoints()})}));
+    if(response.ok){house.recent=[...house.recent.filter(n=>n!==name),name].slice(-HOUSE_NAMES.length);open.push({players:{player1:{name}}});break;}
+    const body=await response.json().catch(()=>({}));if(body.code!=='code-taken'){console.error('house table failed',body.error);break;}
+   }
+  }
+  await this.ctx.storage.put('house',house);
  }
  async webSocketMessage(ws,raw){
   let message;try{message=JSON.parse(raw);}catch{return;}
