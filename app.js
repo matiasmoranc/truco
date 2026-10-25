@@ -634,6 +634,7 @@ function configureSetup() {
   $('target-points').value='20';renderPointsPicker();
   $('play-bot').checked=false;updateBotSetup();
   state.joining = false;
+  if(!state.enteringRoom)$('enter-room').disabled=false;
   showView('setup-view');
 }
 function firebaseConfigValid(config) { return !!(config && config.apiKey && config.databaseURL && config.projectId && config.appId); }
@@ -896,10 +897,12 @@ async function enterRoom() {
   // Do not serialize the entry request behind all thirteen image decodes.
   void prepareCardImages();
   if(state.navigationEpoch!==entryEpoch){state.enteringRoom=false;$('enter-room').disabled=false;return;}
-  if(state.invitationEntry&&!$('player-name').value.trim()){showInvitationForm();$('invite-name').focus();return;}
+  // Leaving before the table request (bot game, missing name or setup) frees the button again.
+  const release=()=>{state.enteringRoom=false;$('enter-room').disabled=false;};
+  if(state.invitationEntry&&!$('player-name').value.trim()){release();showInvitationForm();$('invite-name').focus();return;}
   const name=cleanName($('player-name').value,'Jugador');
-  if(!state.joining&&$('play-bot').checked){await startBotGame(name);return;}
-  if(!firebaseConfigValid(state.config)){state.nextAction='enter';showConfig();return;}
+  if(!state.joining&&$('play-bot').checked){try{await startBotGame(name);}finally{release();}return;}
+  if(!firebaseConfigValid(state.config)){release();state.nextAction='enter';showConfig();return;}
   state.enteringRoom=true;
   state.navigationEpoch=(state.navigationEpoch||0)+1;
   const request={joining:state.joining,code:state.selectedRoom};
