@@ -1053,7 +1053,7 @@ setInterval(()=>{
 },1000);
 function renderLobby(rooms) {
   Object.entries(rooms).forEach(([code,value])=>{if(roomExpired(value?.public))closeExpiredRoom(code);});
-  const open = Object.entries(rooms).filter(([, value]) => value?.public?.status === 'waiting' && !roomExpired(value.public) && (value.public.mode==='2v2'?Object.keys(value.public.players||{}).length<4:(!value.public.players?.player1 || !value.public.players?.player2))).sort((a,b) => (b[1].public.createdAt || 0) - (a[1].public.createdAt || 0));
+  const open = Object.entries(rooms).filter(([, value]) => value?.public?.status === 'waiting' && !roomExpired(value.public) && (value.public.mode==='2v2'?Object.keys(value.public.players||{}).length<4:(!value.public.players?.player1 || !value.public.players?.player2))).sort((a,b) => houseTable(a[1].public)-houseTable(b[1].public) || (b[1].public.createdAt || 0) - (a[1].public.createdAt || 0));
   if (!open.length) { $('open-room-list').innerHTML = '<div class="empty-lobby"><svg class="empty-table-icon" viewBox="0 0 64 64" aria-hidden="true"><ellipse cx="32" cy="29" rx="18" ry="12"/><path d="M32 41v14M23 55h18M25 15V9c0-7 14-7 14 0v6M9 25v16q0 7 9 7l-2 9M55 25v16q0 7-9 7l2 9"/></svg><strong>No hay mesas abiertas todavía</strong></div>'; setupSuitIcons($('open-room-list')); return; }
   $('open-room-list').innerHTML = open.map(([code, value]) => {
     const room = value.public, players = room.players || {}, seats = [['player1','Jugador 1',players.player1],['player2','Jugador 2',players.player2]];
@@ -1087,6 +1087,8 @@ function syncLobbyJoinFeedback(){
     }
   }
 }
+// Open tables hosted by the lobby's house players: listed after the ones people opened.
+const houseTable=room=>String(room?.players?.player1?.uid||'').startsWith('house_')?1:0;
 function joinOpenRoom(code, seat, team=null) {
   if(state.enteringRoom||state.joinSubmitting||state.joinIntent)return;
   state.joinIntent={code,seat,team};state.directJoin=code;

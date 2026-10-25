@@ -181,7 +181,7 @@ exports.creditExpireTables=onSchedule({schedule:'every 1 minutes',region:'us-cen
 const {getAuth}=require('firebase-admin/auth');
 const adminMessages=require('./admin-messages.cjs');
 const pushToPlayer=require('./social.cjs').pushSender(db);
-const {requireAdmin,adminLedgerChange,validKey,prepareUserDeletion,finishUserDeletion,legacyTableActive,closeLegacyTable,adminTableCurrent}=require('./admin-service.cjs');
+const {tableStats,requireAdmin,adminLedgerChange,validKey,prepareUserDeletion,finishUserDeletion,legacyTableActive,closeLegacyTable,adminTableCurrent}=require('./admin-service.cjs');
 async function adminIdentity(request){
  const uid=request.auth?.uid;
  if(!uid)throw new HttpsError('unauthenticated','Iniciá sesión primero.');
@@ -233,8 +233,8 @@ exports.adminConsole=onCall({...options,secrets:[liveInternalSecret]},async requ
   return {ok:true};
  }
  if(action==='metrics'){
-  const registeredUids=[];let token;
-  do{const page=await getAuth().listUsers(1000,token);registeredUids.push(...page.users.filter(u=>u.providerData.some(p=>['google.com','apple.com','password'].includes(p.providerId))).map(u=>u.uid));token=page.pageToken;}while(token);
+  const registeredUids=[],signups=[];let token;
+  do{const page=await getAuth().listUsers(1000,token);const real=page.users.filter(u=>u.providerData.some(p=>['google.com','apple.com','password'].includes(p.providerId)));registeredUids.push(...real.map(u=>u.uid));for(const u of real)signups.push({uid:u.uid,email:u.email||'',at:Date.parse(u.metadata.creationTime)||0});token=page.pageToken;}while(token);
   const now=Date.now(),cutoff=uruguayDate(now-29*86400000).day;
   const visitStart=uruguayDate(now-(VISIT_DAYS-1)*86400000).day;
   const [days,presence,start,visits,testVisits,testUsers]=await Promise.all([db.ref('adminMetrics/days').orderByKey().startAt(cutoff).get(),db.ref('adminMetrics/presence').get(),db.ref('adminMetrics/startedAt').get(),db.ref('adminMetrics/visits').orderByKey().startAt(visitStart).get(),db.ref('adminMetrics/visitsTest').orderByKey().startAt(visitStart).get(),db.ref('adminConfig/testUsers').get()]);
@@ -243,13 +243,18 @@ exports.adminConsole=onCall({...options,secrets:[liveInternalSecret]},async requ
   const activity=include?{days:days.val()||{},presence:presence.val()||{}}:withoutTestActivity({days:days.val()||{},presence:presence.val()||{}},new Set(testUids));
   const counted=include?registeredUids:registeredUids.filter(uid=>!testUids.includes(uid));
   const visitCounters=include?mergeVisitCounters(visits.val()||{},testVisits.val()||{}):visits.val()||{};
-  return {...activitySummary({registeredUids:counted,now,metrics:{...activity,startedAt:start.val()}}),visits:visitSummary({visits:visitCounters,now,days:VISIT_DAYS}),testUids,includeTest:include};
+  // Who signed up each day of the visits window, with their game name.
+  const windowStart=Date.parse(visitStart+'T03:00:00Z'),recent=signups.filter(s=>s.at>=windowStart&&(include||!testUids.includes(s.uid)));
+  const signupNames=await Promise.all(recent.map(s=>db.ref('profiles/'+s.uid+'/name').get()));
+  const registrations={};recent.forEach((s,i)=>{const day=uruguayDate(s.at).day;(registrations[day]??=[]).push({uid:s.uid,name:signupNames[i].val()||'',email:s.email,at:s.at});});
+  for(const list of Object.values(registrations))list.sort((a,b)=>a.at-b.at);
+  return {registrations,...activitySummary({registeredUids:counted,now,metrics:{...activity,startedAt:start.val()}}),visits:visitSummary({visits:visitCounters,now,days:VISIT_DAYS}),testUids,includeTest:include};
  }
  if(action==='visitors'){
   let range;try{range=visitRange({...data,now:Date.now()});}catch(e){throw new HttpsError('invalid-argument',e.message);}
   const [log,activity]=await Promise.all(['visitLog','days'].map(key=>db.ref('adminMetrics/'+key).orderByKey().startAt(range.from).endAt(range.to).get()));
   const testUids=data.includeTest===true?null:new Set(Object.keys((await db.ref('adminConfig/testUsers').get()).val()||{}));
-  const result=visitorsInRange({log:log.val()||{},activity:activity.val()||{},platform:range.platform,page:range.page,exclude:testUids});
+  const result=visitorsInRange({log:log.val()||{},activity:activity.val()||{},platform:range.platform,page:range.page,hour:range.hour,exclude:testUids});
   result.players=result.players.slice(0,300);
   const names=await Promise.all(result.players.map(p=>db.ref('profiles/'+p.uid+'/name').get()));
   result.players=result.players.map((p,i)=>({...p,name:names[i].val()||''}));
@@ -334,7 +339,7 @@ exports.adminConsole=onCall({...options,secrets:[liveInternalSecret]},async requ
    if(ledger.tables?.[code]===id&&adminTableCurrent(m,now))tables.push({...entry,status:m.status==='waiting'?'Esperando rival':'En juego'});
    else archivedTables.push({...entry,status:m.status==='settled'?'Terminada':m.status==='refunded'?'Créditos devueltos':m.closedAt?'Cerrada':m.status==='waiting'?'Vencida':'Finalizando'});
   }
-  return {tables,archivedTables,movements:ledger.walletMovements||{},alerts:reservationAlerts(ledger,now),reports:Object.entries(reports).map(([id,r])=>({id,...r})).sort((a,b)=>b.at-a.at),
+  return {tables,archivedTables,stats:tableStats(ledger,now),movements:ledger.walletMovements||{},alerts:reservationAlerts(ledger,now),reports:Object.entries(reports).map(([id,r])=>({id,...r})).sort((a,b)=>b.at-a.at),
    audit:[...Object.values(ledger.adminAudit||{}),...Object.values(userAudit)].sort((a,b)=>b.at-a.at).slice(0,100)};
  }
  if(action==='close-table'&&!validKey(data.code))throw new HttpsError('invalid-argument','Mesa inválida.');

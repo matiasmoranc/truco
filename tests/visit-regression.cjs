@@ -49,7 +49,7 @@ test('Visit details keep device type, browser and origin without identifiers',()
 test('The visitors list filters by platform and period and joins signed-in players',()=>{
  const {visitRange,visitorsInRange}=require('../functions/visit-service.cjs');
  const now=Date.parse('2026-10-24T15:00:00Z');
- assert.deepEqual(visitRange({from:'2026-10-20',to:'2026-10-24',platform:'web-ios',now}),{from:'2026-10-20',to:'2026-10-24',platform:'web-ios',page:null});
+ assert.deepEqual(visitRange({from:'2026-10-20',to:'2026-10-24',platform:'web-ios',now}),{from:'2026-10-20',to:'2026-10-24',platform:'web-ios',page:null,hour:null});
  for(const bad of [{from:'2026-10-24',to:'2026-10-20',platform:'all'},{from:'2026-01-01',to:'2026-10-24',platform:'all'},{from:'2026-10-20',to:'2026-10-24',platform:'x'},{from:'../',to:'2026-10-24',platform:'all'}])
   assert.throws(()=>visitRange({...bad,now}));
  const log={'2026-10-23':{a:{at:1,platform:'web-ios',page:'juego'},b:{at:3,platform:'web-android',page:'juego'}},'2026-10-24':{c:{at:2,platform:'web-ios',page:'anotador'}}};
@@ -90,4 +90,14 @@ test('A device reporting twice within seconds is one visit, and a device seen to
  assert.deepEqual(dedupeVisit({seen,key,day,page:'anotador',now:t+5000}),{duplicateOf:null,known:true});
  assert.equal(dedupeVisit({seen,key:'other',day,page:'juego',now:t+1000}).known,false);
  assert.equal(dedupeVisit({seen,key,day:'2026-10-25',page:'juego',now:t+5000}).known,false);
+});
+test('The visitors of one hour of the day are those whose visit started then (Uruguay time)',()=>{
+ const {visitRange,visitorsInRange}=require('../functions/visit-service.cjs');
+ const now=Date.parse('2026-10-24T15:00:00Z');
+ assert.equal(visitRange({from:'2026-10-20',to:'2026-10-24',platform:'all',hour:9,now}).hour,9);
+ assert.throws(()=>visitRange({from:'2026-10-20',to:'2026-10-24',platform:'all',hour:24,now}));
+ const at9=Date.parse('2026-10-23T12:10:00Z'),at10=Date.parse('2026-10-23T13:10:00Z');
+ const log={'2026-10-23':{a:{at:at9,platform:'web-ios',page:'juego',uid:'u1'},b:{at:at10,platform:'web-ios',page:'juego',uid:'u2'}}};
+ const nine=visitorsInRange({log,activity:{'2026-10-23':{platforms:{u2:{'web-ios':true}}}},platform:'all',hour:9});
+ assert.deepEqual(nine.visits.map(v=>v.uid),['u1']);assert.deepEqual(nine.players.map(p=>p.uid),['u1']);
 });

@@ -75,12 +75,13 @@ function visitSummary({visits,now,days=30}){
  }
  return {platforms:PLATFORMS,days:list};
 }
-function visitRange({from,to,platform,page,now}){
+function visitRange({from,to,platform,page,hour,now}){
  if(!DAY.test(from||'')||!DAY.test(to||'')||from>to)throw new Error('Período inválido.');
  if(from<uruguayDate(now-(VISIT_DAYS-1)*86400000).day)throw new Error('El período puede abarcar hasta '+VISIT_DAYS+' días atrás.');
  if(platform!=='all'&&!PLATFORMS.includes(platform))throw new Error('Plataforma inválida.');
  if(page!=null&&!PAGES.includes(page))throw new Error('Página inválida.');
- return {from,to,platform,page:page??null};
+ if(hour!=null&&!(Number.isInteger(hour)&&hour>=0&&hour<24))throw new Error('Hora inválida.');
+ return {from,to,platform,page:page??null,hour:hour??null};
 }
 // The visit a signed-in player's first signal claims: only a well-formed id.
 function visitClaimPath(data){
@@ -89,15 +90,17 @@ function visitClaimPath(data){
 }
 // Who came in a period: visit details (with the player when one signed in) and signed-in players.
 // exclude: test account uids to leave out, together with visits from test devices (null keeps everything).
-function visitorsInRange({log,activity,platform,page=null,exclude=null,limit=1000}){
+// hour: only the visits that started in that hour of the day (Uruguay), on any day of the range.
+function visitorsInRange({log,activity,platform,page=null,hour=null,exclude=null,limit=1000}){
  const matches=p=>platform==='all'||p===platform,hidden=r=>exclude&&(r.test===true||exclude.has(r.uid));
+ const inHour=r=>hour==null||Number(uruguayDate(r.at).hour)===hour;
  const visits=[];
- for(const records of Object.values(log||{}))for(const r of Object.values(records||{}))if(r&&Number.isFinite(r.at)&&matches(r.platform)&&(!page||r.page===page)&&!hidden(r))visits.push(r);
+ for(const records of Object.values(log||{}))for(const r of Object.values(records||{}))if(r&&Number.isFinite(r.at)&&matches(r.platform)&&(!page||r.page===page)&&inHour(r)&&!hidden(r))visits.push(r);
  visits.sort((a,b)=>b.at-a.at);
  const players=new Map();
  const player=uid=>players.get(uid)||{uid,days:0,lastDay:'',platforms:[],visits:0};
  // Activity says which days and platforms a player used; a page filter only has the visits.
- if(!page)for(const [day,data] of Object.entries(activity||{})){
+ if(!page&&hour==null)for(const [day,data] of Object.entries(activity||{})){
   for(const [uid,platforms] of Object.entries(data?.platforms||{})){
    if(exclude?.has(uid))continue;
    const used=Object.keys(platforms||{}).filter(p=>PLATFORMS.includes(p)&&matches(p));

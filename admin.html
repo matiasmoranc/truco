@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="es"><head><meta charset="utf-8">
-  <meta name="robots" content="noindex, nofollow"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Administración · Truco Uruguayo</title><link rel="stylesheet" href="admin.css?v=16"></head>
+  <meta name="robots" content="noindex, nofollow"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Administración · Truco Uruguayo</title><link rel="stylesheet" href="admin.css?v=17"></head>
 <body>
 <section id="access" class="access"><div class="access-card"><img src="assets/truco-v3.png" alt=""><small>TRUCO URUGUAYO</small><h1>Administración</h1><p id="identity"></p><p id="access-status">Verificando sesión…</p><button id="login" class="primary" hidden>Continuar con Google</button><button id="switch-account" hidden>Usar otra cuenta</button><a href="./">Volver al juego</a></div></section>
 <div id="console" class="shell" hidden>
@@ -48,6 +48,7 @@
     <article class="panel"><div class="panel-head"><h2>Páginas más visitadas</h2></div><div id="visit-pages" class="platform-bars"></div></article>
     <article class="panel"><div class="panel-head"><h2>Visitas por hora · período</h2></div><div id="visit-hours" class="bar-chart hours"></div></article>
    </div>
+   <article class="panel"><div class="panel-head"><h2>Usuarios registrados por día · período</h2></div><div id="signup-chart" class="bar-chart"></div></article>
    <article class="panel"><div class="panel-head"><h2>Detalle por día</h2></div><div class="table-scroll"><table id="visit-table" class="data-table"></table></div></article>
    <p class="note">Horario de Uruguay. Tocá una plataforma para ver quién entró en el período. Las visitas sin sesión son anónimas: se guarda el tipo de dispositivo, navegador, página y de dónde llegó, pero no datos de la persona. Se cuentan desde la web (trucouruguayo.uy y GitHub) y desde las apps a partir de la próxima versión publicada.</p>
   </section>
@@ -60,6 +61,7 @@
   </section>
 
   <section id="tables" hidden>
+   <div id="table-stats" class="kpis compact"></div>
    <div id="reservation-alerts" class="cards"></div>
    <div class="toolbar"><label class="grow">Buscar por jugador o mesa<input id="table-search" type="search" placeholder="Jugador, código o ID"></label><label>Mostrar<select id="table-state"><option value="all">Todas las mesas</option><option value="active">Mesas activas</option><option value="previous">Mesas anteriores</option><option value="finished">Partidas terminadas</option></select></label><label>Ordenar por<select id="table-order"><option value="newest">Más recientes primero</option><option value="oldest">Más antiguas primero</option><option value="stake">Mayor apuesta primero</option><option value="points">Más puntos primero</option></select></label></div>
    <p class="note">Fechas y horas de Uruguay. Cerrar una mesa en juego devuelve las apuestas a ambos jugadores.</p>
@@ -79,4 +81,4 @@
  </main>
 </div>
 <dialog id="edit"><form id="edit-form"><div class="dialog-head"><h2 id="edit-title"></h2><button type="button" id="close" aria-label="Cerrar">×</button></div><p id="edit-description"></p><label id="value-label">Nuevo valor<input id="value" required></label><label id="delete-label" hidden>Escribí el nombre exacto para confirmar<input id="delete-confirm" autocomplete="off"></label><label>Motivo<input id="reason" required minlength="3" maxlength="200" placeholder="Por qué realizás este cambio"></label><p id="edit-error" role="alert"></p><div class="dialog-actions"><button id="cancel" type="button">Cancelar</button><button id="save" class="primary" type="submit">Confirmar cambio</button></div></form></dialog>
-<script type="module" src="admin.js?v=16"></script></body></html>
+<script type="module" src="admin.js?v=17"></script></body></html>

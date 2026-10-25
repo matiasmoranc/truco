@@ -7,7 +7,7 @@ import teamBot from '../../functions/team-bot.cjs';
 import duelBot from '../../functions/duel-bot.cjs';
 import {ACTIVE,CodeTakenError} from './ledger-ops.js';
 
-const {tableOperation,publicTable,privateTableHand}=tableService;
+const {tableOperation,publicTable,privateTableHand,createTable}=tableService;
 const {SIGNAL_WAIT_MS,mustAct,awaitsSignal,signalFor,botCommands}=teamBot;
 export {CodeTakenError,slimMatch} from './ledger-ops.js';
 
@@ -17,6 +17,7 @@ export const DISCONNECT_MS=45000;
 // another bot's move it waits longer, so a run of bot plays stays readable.
 export const BOT_DELAY_MS=2000;
 export const BOT_AFTER_BOT_MS=3000;
+export const BOT_OVERDUE_MS=8000;
 // The house player of a lobby table thinks a little, like a person would.
 const houseDelay=()=>1500+Math.floor(Math.random()*2500);
 const PROBE_BALANCE=1000000;
@@ -41,6 +42,8 @@ export function createTableEngine({code,bank,clock=()=>Date.now()}){
   const now=clock(),waitUntil=!signal&&awaitsSignal(m.session,seat)?(r.turnClock?.startedAt??now)+SIGNAL_WAIT_MS:0;
   botKey=key;botDueAt=Math.max(now+(lastMoveByBot?BOT_AFTER_BOT_MS:BOT_DELAY_MS),waitUntil);
  }
+ // How long a bot may wait in its turn: a 2v2 bot also waits for its partner's signal.
+ const overdueAfter=()=>m?.house?BOT_OVERDUE_MS:SIGNAL_WAIT_MS+BOT_OVERDUE_MS;
  // Tries the bot's moves best first; the referee rejects an illegal one unchanged.
  async function playBot(){
   const seat=botSeat();botDueAt=null;botKey=null;if(!seat)return false;
@@ -76,6 +79,8 @@ export function createTableEngine({code,bank,clock=()=>Date.now()}){
    const next=op(ledger,now),nm=next.matches[next.tables[code]];
    const moved=next.tables[code]!==m.id||nm.status!==m.status||JSON.stringify(next.wallets)!==JSON.stringify(wallets);
    if(!moved){m=nm;return;}
+   // A house table nobody joined closes without ever reaching the credit records.
+   if(m.house&&m.status==='waiting'&&nm.status==='refunded'){m=nm;return;}
   }
   await accounting('operation',args);
  }
@@ -88,12 +93,15 @@ export function createTableEngine({code,bank,clock=()=>Date.now()}){
  return {
   get match(){return m;},
   get presence(){return presence;},
-  load(saved){m=saved?.match||null;presence=saved?.presence||{};botDueAt=null;botKey=null;scheduleBot();},
-  snapshot(){return {match:m,presence};},
+  // The bot's pending move is saved too: a table put to sleep between moves must not push it back on every wake-up.
+  load(saved){m=saved?.match||null;presence=saved?.presence||{};botDueAt=saved?.botDueAt??null;botKey=saved?.botKey??null;scheduleBot();},
+  snapshot(){return {match:m,presence,botDueAt,botKey};},
   playerFor(uid){return findPlayer(m,uid);},
   async create(user,{id,stake,targetPoints,mode,secret,house=false,initial}){
    if(m&&!(m.closedAt||['settled','refunded'].includes(m.status)))throw new CodeTakenError();
    const previous=m;m=null;presence={};
+   // A house table moves no credits until someone joins, so it lives only here until then.
+   if(house){const next=createTable({wallets:{},matches:{},tables:{}},{code,id,uid:user.uid,name:user.name,stake,targetPoints,mode,secret,house:true,now:clock()});m=next.matches[id];return;}
    try{await accounting('create',{id,uid:user.uid,name:user.name,stake,targetPoints,mode,secret,...(house?{house:true}:{})},{creating:true,initial});}
    catch(error){if(!m)m=previous;throw error;}
   },
@@ -119,7 +127,9 @@ export function createTableEngine({code,bank,clock=()=>Date.now()}){
     return;
    }
    if(!m||!ACTIVE.includes(m.status))return;
-   if(!(botDueAt!=null&&clock()>=botDueAt&&await playBot()))await operate({uid:m.player1,command:{kind:'tick'},presence});
+   // Safety net: a bot that has waited well past its pause plays now, whatever the schedule says.
+   const r=m.session?.room,waited=botSeat()&&Number.isFinite(r?.turnClock?.startedAt)&&clock()-r.turnClock.startedAt>=overdueAfter();
+   if(!((waited||botDueAt!=null&&clock()>=botDueAt)&&await playBot()))await operate({uid:m.player1,command:{kind:'tick'},presence});
    scheduleBot();
   },
   async adminClose({actor,requestId,reason}){
@@ -157,6 +167,7 @@ export function createTableEngine({code,bank,clock=()=>Date.now()}){
     times.push(r.resolutionEndsAt,r.pendingNextHand?.endsAt,r.status==='revealing'?r.endReveal?.endsAt:null,r.openingDraw?.resolveAt,r.openingDraw?.endsAt);
     if(r.turnClock?.startedAt)times.push(r.turnClock.startedAt+45000);
     times.push(botDueAt);
+    if(botSeat()&&Number.isFinite(r.turnClock?.startedAt))times.push(r.turnClock.startedAt+overdueAfter());
     for(const p of Object.values(presence))if(p?.online===false&&Number.isFinite(p.disconnectedAt))times.push(p.disconnectedAt+DISCONNECT_MS);
     // Safety net for any timer the projection above does not know about.
     times.push(now+15000);

@@ -25,7 +25,20 @@ function adminLedgerChange(ledger,{actor,action,uid,balance,expectedBalance,code
  next.adminAudit??={};next.adminAudit[requestId]={actor,action,uid:uid||null,code:code||null,before,after,reason:reason.trim(),at:now};
  return next;
 }
-module.exports={requireAdmin,adminLedgerChange,validKey};
+// Tables created by players and games played to the end, for today, the last 7 days and in total
+// (Uruguay days). Games against the lobby's house players are counted apart.
+function tableStats(ledger,now){
+ const day=t=>new Date(t-10800000).toISOString().slice(0,10),today=day(now),week=day(now-6*86400000);
+ const count=()=>({today:0,week:0,total:0}),out={created:count(),finished:count(),finishedHouse:count()};
+ const add=(bucket,at)=>{bucket.total++;if(!Number.isFinite(at))return;const d=day(at);if(d>=week)bucket.week++;if(d===today)bucket.today++;};
+ for(const m of Object.values(ledger?.matches||{})){
+  if(!m)continue;
+  if(!m.house&&(m.matchNumber||1)===1)add(out.created,m.createdAt);
+  if(m.status==='settled')add(m.house?out.finishedHouse:out.finished,m.settledAt||m.createdAt);
+ }
+ return out;
+}
+module.exports={tableStats,requireAdmin,adminLedgerChange,validKey};
 
 function legacyTableActive(room,now){
  if(!room||room.managedCredits||room.closedAt||!['waiting','drawing','started','revealing','timed-out'].includes(room.status))return false;

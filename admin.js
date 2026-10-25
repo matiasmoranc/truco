@@ -7,7 +7,7 @@ function say(message){$('status').textContent=message;}
 // Test accounts and test devices stay out of every number unless this switch is off.
 function hideTest(){return $('hide-test').checked;}
 try{$('hide-test').checked=localStorage.getItem('admin-show-test')!=='1';}catch{/* Storage unavailable: hide by default. */}
-$('hide-test').onchange=()=>{try{localStorage.setItem('admin-show-test',hideTest()?'0':'1');}catch{}refresh(false,true).then(()=>{if(visitDetail)openVisitDetail(visitDetail.platform,{page:visitDetail.page});});};
+$('hide-test').onchange=()=>{try{localStorage.setItem('admin-show-test',hideTest()?'0':'1');}catch{}refresh(false,true).then(()=>{if(visitDetail)openVisitDetail(visitDetail.platform,{page:visitDetail.page,hour:visitDetail.hour});});};
 async function setTestUser(u,test){
  try{say(test?'Marcando como prueba…':'Quitando de prueba…');const result=(await call({action:'test-user',uid:u.uid,test})).data;await refresh(false,true);say((u.name||'El usuario')+(test?' quedó marcado como prueba':' vuelve a contar en los números')+(result?.moved?' ('+result.moved+' visitas movidas).':'.'));}
  catch(e){say(errorText(e));}
@@ -63,7 +63,7 @@ async function refresh(more=false,preservePages=false){
   if(more)pagesLoaded++;else if(!preservePages)pagesLoaded=1;
   users=more?[...users,...result.users]:result.users;pageToken=result.pageToken;renderUsers();
   const data=(await call({action:'tables'})).data;if(generation!==epoch)return;
-  tableData=data;renderUsers();renderTables();
+  tableData=data;renderUsers();renderTables();renderTableStats(data.stats);
   $('reservation-alerts').replaceChildren();
   for(const a of data.alerts||[]){const card=node('article','','card');card.append(node('h3','Créditos reservados: '+(users.find(u=>u.uid===a.uid)?.name||a.uid)),node('p',a.locked+' créditos · '+a.reason));if(a.repairable)card.append(button('Resolver reserva',async()=>{try{await call({action:'repair-reservation',uid:a.uid});await refresh();}catch(e){say(errorText(e));}}));$('reservation-alerts').append(card);}
   $('reports-list').replaceChildren();
@@ -77,6 +77,14 @@ async function refresh(more=false,preservePages=false){
   }await refreshMetrics();await loadMessages();say('');
   $('updated').textContent='Actualizado '+new Intl.DateTimeFormat('es-UY',{timeZone:'America/Montevideo',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date());
  }catch(e){if(generation===epoch)say(errorText(e));}finally{busy=false;$('more').disabled=false;$('user-scope').disabled=false;for(const b of document.querySelectorAll('[data-scope]'))b.disabled=false;}
+}
+// Tables created by players and games finished; games against the lobby's house players apart.
+function renderTableStats(stats){
+ const box=$('table-stats');box.replaceChildren();if(!stats)return;
+ const card=(label,b,note)=>{const k=node('div','','kpi');k.append(node('small',label),node('strong',number(b.today)),node('span','Hoy · '+number(b.week)+' en 7 días · '+number(b.total)+' en total'+(note?' · '+note:''),'delta'));box.append(k);};
+ card('Mesas creadas por jugadores',stats.created);
+ card('Partidas terminadas entre jugadores',stats.finished);
+ card('Partidas terminadas contra la casa',stats.finishedHouse,'mesas abiertas del lobby');
 }
 function tableTime(table){return Number(table.finishedAt||table.createdAt)||0;}
 function formatTableTime(value){
@@ -251,7 +259,11 @@ function renderVisits(){
  card('all','Total '+unit,grand);for(const [key,label] of Object.entries(PLATFORM_LABELS))card(key,label,sum(key),'var(--'+key+')');
  bars($('visit-pages'),Object.entries(PAGE_LABELS).map(([key,label])=>({label,value:days.reduce((total,d)=>total+(d.pages?.[key]||0),0),onClick:()=>openVisitDetail('all',{page:key})})).sort((a,b)=>b.value-a.value));
  const hours=Array.from({length:24},(_,h)=>days.reduce((total,d)=>total+(d.hours?.[h]||0),0));
- columns($('visit-hours'),hours.map((value,h)=>({label:String(h).padStart(2,'0'),value,tooltip:String(h).padStart(2,'0')+':00 · '+value+' visitas'})),{labelEvery:3});
+ columns($('visit-hours'),hours.map((value,h)=>({label:String(h).padStart(2,'0'),value,tooltip:String(h).padStart(2,'0')+':00 · '+value+' visitas · tocá para ver quién entró',onClick:()=>openVisitDetail('all',{hour:h})})),{labelEvery:3});
+ // Sign-ups per day of the period; a day shows who registered.
+ const signups=metrics?.registrations||{};
+ const periodDays=[];for(let d=from;d<=to;d=addDays(d,1))periodDays.push(d);
+ columns($('signup-chart'),periodDays.map(d=>({label:shortDay(d),value:(signups[d]||[]).length,tooltip:shortDay(d)+' · '+(signups[d]||[]).length+' registrados',onClick:()=>openSignupDetail(d)})),{labelEvery:Math.max(1,Math.ceil(periodDays.length/12))});
  const table=$('visit-table');table.replaceChildren();
  const head=node('tr');head.append(node('th','Día'),...Object.values(PLATFORM_LABELS).map(label=>node('th',label)),node('th','Total','total'));table.append(head);
  for(const d of [...days].reverse()){
@@ -259,7 +271,7 @@ function renderVisits(){
   for(const key of Object.keys(PLATFORM_LABELS)){const value=d[measure][key]||0;row.append(node('td',number(value),value?'':'zero'));}
   row.append(node('td',number(d[totalKey]),'total'));table.append(row);
  }
- if(visitDetail&&(visitDetail.from!==from||visitDetail.to!==to))openVisitDetail(visitDetail.platform,{page:visitDetail.page});
+ if(visitDetail&&(visitDetail.from!==from||visitDetail.to!==to))openVisitDetail(visitDetail.platform,{page:visitDetail.page,hour:visitDetail.hour});
 }
 function simpleTable(headers,rows){
  const wrap=node('div','','table-scroll'),table=node('table','','data-table'),head=node('tr');
@@ -268,19 +280,30 @@ function simpleTable(headers,rows){
  wrap.append(table);return wrap;
 }
 // Who came through one platform or page (or all) in the selected period.
-async function openVisitDetail(platform,{page=null}={}){
+async function openVisitDetail(platform,{page=null,hour=null}={}){
  const {from,to}=visitPeriod(),request=++visitDetailRequest;
- visitDetail={platform,from,to,page};
- for(const k of $('visit-totals').children)k.classList.toggle('selected',!page&&k.dataset.platform===platform);
- const label=page?'Página: '+PAGE_LABELS[page]:platform==='all'?'Todas las plataformas':PLATFORM_LABELS[platform];
+ visitDetail={platform,from,to,page,hour};
+ for(const k of $('visit-totals').children)k.classList.toggle('selected',!page&&hour==null&&k.dataset.platform===platform);
+ const hh=h=>String(h).padStart(2,'0')+':00';
+ const label=hour!=null?'De '+hh(hour)+' a '+hh((hour+1)%24):page?'Página: '+PAGE_LABELS[page]:platform==='all'?'Todas las plataformas':PLATFORM_LABELS[platform];
  $('visit-detail').hidden=false;$('visit-detail-title').textContent=label+' · '+(from===to?longDay(from):shortDay(from)+' al '+shortDay(to));
  $('visit-detail-body').replaceChildren(node('p','Cargando…','empty'));
  $('visit-detail').scrollIntoView({behavior:'smooth',block:'start'});
  let data;
- try{data=(await call({action:'visitors',from,to,platform,includeTest:!hideTest(),...(page?{page}:{})})).data;}
+ try{data=(await call({action:'visitors',from,to,platform,includeTest:!hideTest(),...(page?{page}:{}),...(hour!=null?{hour}:{})})).data;}
  catch(e){if(request===visitDetailRequest)$('visit-detail-body').replaceChildren(node('p',errorText(e),'empty'));return;}
  if(request!==visitDetailRequest)return;
  renderVisitDetail(data,platform);
+}
+// Who registered on one day, in the detail panel.
+function openSignupDetail(day){
+ visitDetail=null;visitDetailRequest++;for(const k of $('visit-totals').children)k.classList.remove('selected');
+ const list=metrics?.registrations?.[day]||[];
+ $('visit-detail').hidden=false;$('visit-detail-title').textContent='Registrados el '+longDay(day)+' ('+list.length+')';
+ const body=$('visit-detail-body');body.replaceChildren();
+ if(list.length)body.append(simpleTable(['Hora','Jugador','Correo'],list.map(u=>[visitTime(u.at).slice(-5),u.name||'Sin nombre todavía',u.email||'—'])));
+ else body.append(node('p','Nadie se registró ese día.','empty'));
+ $('visit-detail').scrollIntoView({behavior:'smooth',block:'start'});
 }
 function renderVisitDetail(data,platform){
  const body=$('visit-detail-body');body.replaceChildren();

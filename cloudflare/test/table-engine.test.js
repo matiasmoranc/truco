@@ -324,3 +324,21 @@ test('A person plays a whole match against the house host of a lobby table',asyn
  await engine.tick();advance(3000);await engine.tick();
  assert.equal(engine.match.session.room.rematch.status,'declined');
 });
+test('A house bot still plays when the table was put to sleep before its move',async()=>{
+ const {default:duel}=await import('../../functions/duel-bot.cjs');
+ const {bank,engine,advance,now}=setup();
+ await engine.create({uid:'house_Lu',name:'Lu'},{id:'h2',stake:1,targetPoints:10,mode:'1v1',secret:null,house:true});
+ await engine.join({uid:'b',name:'Ricky'},{});
+ // Let the person play until it is the house's move.
+ for(let i=0;i<20&&!duel.mustAct(engine.match.session,'player1');i++){
+  const s=engine.match.session;
+  if(duel.mustAct(s,'player2')){for(const command of duel.botCommands(s,'player2')){const before=JSON.stringify(engine.match.session);try{await engine.act('b',{command,requestId:'p'+i+JSON.stringify(command)});}catch{continue;}if(JSON.stringify(engine.match.session)!==before)break;}}
+  else{advance(100);await engine.tick();}
+ }
+ assert.equal(duel.mustAct(engine.match.session,'player1'),true);
+ const saved=JSON.parse(JSON.stringify(engine.snapshot())),before=JSON.stringify(saved.match.session);
+ // A fresh engine (the table woke up) a few seconds later plays the house move at once.
+ let later=now()+5000;const woken=createTableEngine({code:'ABCDE',bank:createFirebaseBank(bank),clock:()=>later});
+ woken.load(saved);await woken.tick();
+ assert.notEqual(JSON.stringify(woken.match.session),before);
+});
