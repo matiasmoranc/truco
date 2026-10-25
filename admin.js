@@ -298,6 +298,13 @@ function renderVisits(){
  // Sign-ups per day of the period; a day shows who registered.
  const signups=metrics?.registrations||{};
  const periodDays=[];for(let d=from;d<=to;d=addDays(d,1))periodDays.push(d);
+ // The most players connected at once each day of the period, and the record day.
+ const concurrentByDay=new Map((metrics?.days||[]).map(d=>[d.day,d.concurrent]));
+ const peakTime=at=>at?new Intl.DateTimeFormat('es-UY',{timeZone:'America/Montevideo',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(at)):'';
+ const periodPeaks=periodDays.map(d=>({day:d,peak:concurrentByDay.get(d)||null}));
+ columns($('concurrent-chart'),periodPeaks.map(({day,peak})=>({label:shortDay(day),value:peak?.count||0,tooltip:shortDay(day)+' · '+(peak?.count||0)+' a la vez'+(peak?.at?' (a las '+peakTime(peak.at)+')':'')})),{labelEvery:Math.max(1,Math.ceil(periodDays.length/12))});
+ const best=periodPeaks.reduce((a,b)=>(b.peak?.count||0)>(a?.peak?.count||0)?b:a,null),record=metrics?.concurrentRecord;
+ $('concurrent-record').textContent=(best?.peak?.count?'En el período: máximo de '+best.peak.count+' el '+longDay(best.day)+' a las '+peakTime(best.peak.at)+'. ':'En el período todavía no hay datos. ')+(record?.count?'Récord histórico: '+record.count+' el '+longDay(new Date(record.at-10800000).toISOString().slice(0,10))+' a las '+peakTime(record.at)+'.':'');
  columns($('signup-chart'),periodDays.map(d=>({label:shortDay(d),value:(signups[d]||[]).length,tooltip:shortDay(d)+' · '+(signups[d]||[]).length+' registrados',onClick:()=>openSignupDetail(d)})),{labelEvery:Math.max(1,Math.ceil(periodDays.length/12))});
  const table=$('visit-table');table.replaceChildren();
  const head=node('tr');head.append(node('th','Día'),...Object.values(PLATFORM_LABELS).map(label=>node('th',label)),node('th','Total','total'));table.append(head);

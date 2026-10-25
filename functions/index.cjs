@@ -248,7 +248,8 @@ exports.adminConsole=onCall({...options,secrets:[liveInternalSecret]},async requ
   const signupNames=await Promise.all(recent.map(s=>db.ref('profiles/'+s.uid+'/name').get()));
   const registrations={};recent.forEach((s,i)=>{const day=uruguayDate(s.at).day;(registrations[day]??=[]).push({uid:s.uid,name:signupNames[i].val()||'',email:s.email,at:s.at});});
   for(const list of Object.values(registrations))list.sort((a,b)=>a.at-b.at);
-  return {registrations,...activitySummary({registeredUids:counted,now,metrics:{...activity,startedAt:start.val()}}),visits:visitSummary({visits:visitCounters,now,days:VISIT_DAYS}),testUids,includeTest:include};
+  const record=(await db.ref('adminMetrics/concurrentRecord/'+(include?'all':'real')).get()).val()||null;
+  return {registrations,concurrentRecord:record,...activitySummary({registeredUids:counted,now,concurrentKey:include?'all':'real',metrics:{...activity,startedAt:start.val()}}),visits:visitSummary({visits:visitCounters,now,days:VISIT_DAYS}),testUids,includeTest:include};
  }
  if(action==='visitors'){
   let range;try{range=visitRange({...data,now:Date.now()});}catch(e){throw new HttpsError('invalid-argument',e.message);}
@@ -397,7 +398,19 @@ exports.adminConsole=onCall({...options,secrets:[liveInternalSecret]},async requ
  throw new HttpsError('invalid-argument','Acción inválida.');
 });
 
-const {uruguayDate,activityUpdates,activitySummary,requestPlatform,PLATFORMS}=require('./activity-service.cjs');
+const {uruguayDate,activityUpdates,activitySummary,requestPlatform,PLATFORMS,onlineUids,higherPeak}=require('./activity-service.cjs');
+// The most players connected at once, per day and the all-time record, with and without
+// test accounts. Checked at most every 30 seconds per server instance.
+let lastPeakCheck=0;
+async function recordConcurrentPeak(now){
+ if(now-lastPeakCheck<30000)return;lastPeakCheck=now;
+ const [presence,tests]=await Promise.all([db.ref('adminMetrics/presence').get(),db.ref('adminConfig/testUsers').get()]);
+ const online=onlineUids(presence.val()||{},now),testSet=new Set(Object.keys(tests.val()||{}));
+ const counts={all:online.length,real:online.filter(uid=>!testSet.has(uid)).length},day=uruguayDate(now).day;
+ await Promise.all(Object.entries(counts).flatMap(([key,count])=>[
+  db.ref('adminMetrics/days/'+day+'/concurrent/'+key).transaction(current=>higherPeak(current,count,now)),
+  db.ref('adminMetrics/concurrentRecord/'+key).transaction(current=>higherPeak(current,count,now))]));
+}
 exports.playerActivity=onCall({...options,maxInstances:3},async request=>{
  const user=await identity(request);await rateLimit(user.uid,10,'activity');
  const now=Date.now();let updates;
@@ -406,6 +419,7 @@ exports.playerActivity=onCall({...options,maxInstances:3},async request=>{
  await db.ref('adminMetrics/startedAt').transaction(current=>current||now);
  // The visit that opened this page belongs to this player (only an unclaimed, recent one).
  const testUser=(await db.ref('adminConfig/testUsers/'+user.uid).get()).val()===true;
+ await recordConcurrentPeak(now).catch(error=>console.error('concurrent peak',error));
  const visit=visitClaimPath(request.data);
  if(visit){
   const entry=db.ref(visit),record=(await entry.get()).val();

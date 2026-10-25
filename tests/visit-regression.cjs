@@ -101,3 +101,10 @@ test('The visitors of one hour of the day are those whose visit started then (Ur
  const nine=visitorsInRange({log,activity:{'2026-10-23':{platforms:{u2:{'web-ios':true}}}},platform:'all',hour:9});
  assert.deepEqual(nine.visits.map(v=>v.uid),['u1']);assert.deepEqual(nine.players.map(p=>p.uid),['u1']);
 });
+test('The most players online at once only goes up, and counts each player once',()=>{
+ const {onlineUids,higherPeak}=require('../functions/activity-service.cjs');
+ const now=1000000;
+ assert.deepEqual(onlineUids({a:{s1:{at:now-1000},s2:{at:now-2000}},b:{s:{at:now-200000}},c:{s:{at:now}}},now).sort(),['a','c']);
+ assert.deepEqual(higherPeak(null,2,now),{count:2,at:now});
+ assert.equal(higherPeak({count:3,at:1},2,now),undefined);assert.equal(higherPeak(null,0,now),undefined);
+});
