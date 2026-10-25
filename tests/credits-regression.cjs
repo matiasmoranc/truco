@@ -165,3 +165,15 @@ test('While credits move to the bank, Firebase refuses every daily claim',()=>{
  assert.equal(permitted(null,grant,today),true);assert.equal(permitted(null,grant,today,{frozen:true}),false);
  assert.equal(permitted({balance:0,locked:0,lastGrantAt:today-86400000},grant,today,{frozen:true}),false);
 });
+test('With credits, the credits window says so and closes by itself after 5 seconds',async()=>{
+ const m=await modulePromise,elements={},listeners={},timers=[];
+ for(const id of ['credits-panel','credits-balance','credits-status','credits-claim','credits-ad','credits-ad-note','credits-open','credits-title'])elements[id]={hidden:false,disabled:false,textContent:'',classList:{add(){},remove(){}},scrollIntoView(){},focus(){},addEventListener(name,fn){listeners[id+':'+name]=fn;}};
+ const value={balance:250,locked:0,lastGrantAt:today};
+ const fb={db:{},ref:(_db,p)=>p,onValue(_ref,onValue){onValue({val:()=>value});return ()=>{};},get:async()=>({val:()=>value})};
+ const api=m.installCredits({services:async()=>fb,getState:()=>({uid:'a',firebaseConnected:true,serverTimeOffset:0}),document:{getElementById:id=>elements[id]},now:()=>today,setTimer:(fn,ms)=>{timers.push({fn,ms});return timers.length;},clearTimer(){}});
+ await api.start();assert.equal(elements['credits-panel'].hidden,true);
+ listeners['credits-open:click']();
+ assert.equal(elements['credits-panel'].hidden,false);assert.equal(elements['credits-title'].textContent,'Ya tenés créditos');
+ const close=timers.find(t=>t.ms===5000);assert.ok(close);
+ close.fn();assert.equal(elements['credits-panel'].hidden,true);
+});

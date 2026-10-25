@@ -30,7 +30,7 @@ export function dailyCreditChanges(wallet,timestamp) {
 // the server keeps credits in Cloudflare, or to null to keep using Firebase.
 export function installCredits({services,getState,document,api,walletSource=async()=>null,now=()=>Date.now(),setTimer=setTimeout,clearTimer=clearTimeout,onChange=()=>{},notify=()=>{}}) {
   const el=id=>document.getElementById(id);
-  let uid=null,generation=0,unsubscribe=null,timer=null,wallet,busy=false,error='',available=false,detailsOpen=false,initialAttempted=false;
+  let uid=null,generation=0,unsubscribe=null,timer=null,wallet,busy=false,error='',available=false,detailsOpen=false,closeTimer=null,initialAttempted=false;
   const clock=()=>now()+(Number(getState().serverTimeOffset)||0);
   let syncing=null,firstLoad=Promise.resolve(false),finishFirstLoad=null;
   function settled(value){const finish=finishFirstLoad;finishFirstLoad=null;finish?.(value);}
@@ -58,6 +58,11 @@ export function installCredits({services,getState,document,api,walletSource=asyn
     const loading=wallet===undefined||(wallet===null&&busy);
     panel.hidden=!uid||(loading&&!error)||(!detailsOpen&&['balance','claimed'].includes(eligibility));
     el('credits-balance').textContent=loading?(error?'—':'…'):String(wallet?.balance??0);
+    const hasCredits=!loading&&(wallet?.balance??0)>0;
+    const title=el('credits-title');if(title)title.textContent=hasCredits?'Ya tenés créditos':'Créditos disponibles';
+    // Opened while there are credits: it only informs, so it closes by itself.
+    if(detailsOpen&&hasCredits&&['balance','claimed'].includes(eligibility)){if(!closeTimer)closeTimer=setTimer(()=>{closeTimer=null;detailsOpen=false;render();},5000);}
+    else if(closeTimer){clearTimer(closeTimer);closeTimer=null;}
     const setupBalance=el('table-stake-available');if(setupBalance)setupBalance.textContent=el('credits-balance').textContent;
     const headerBalance=el('credits-header-balance');if(headerBalance){headerBalance.textContent=el('credits-balance').textContent;headerBalance.setAttribute?.('aria-busy',String(loading&&!error));}
     const open=el('credits-open');if(open)open.disabled=!available||loading;
@@ -72,7 +77,7 @@ export function installCredits({services,getState,document,api,walletSource=asyn
     if(uid&&available&&wallet===null&&!busy&&!initialAttempted&&getState().firebaseConnected===true){initialAttempted=true;void claim(true);}
   }
   function stop() {
-    settled(false);firstLoad=Promise.resolve(false);
+    settled(false);if(closeTimer){clearTimer(closeTimer);closeTimer=null;}firstLoad=Promise.resolve(false);
     ++generation;unsubscribe?.();unsubscribe=null;clearTimer(timer);timer=null;
     uid=null;wallet=undefined;busy=false;error='';available=false;detailsOpen=false;initialAttempted=false;syncing=null;render();
   }
@@ -138,11 +143,11 @@ export function installCredits({services,getState,document,api,walletSource=asyn
   }
   el('credits-open')?.addEventListener('click',()=>{
     if(!uid)return;
-    if((wallet?.balance??0)>0){detailsOpen=false;render();notify('Ya tenés créditos disponibles.');return;}
+    if(closeTimer){clearTimer(closeTimer);closeTimer=null;}
     detailsOpen=true;render();
     const panel=el('credits-panel');
     panel.scrollIntoView({behavior:'smooth',block:'center'});
-    el('credits-claim').focus({preventScroll:true});
+    if(!el('credits-claim').hidden)el('credits-claim').focus({preventScroll:true});
     panel.classList.remove('credits-highlight');void panel.offsetWidth;panel.classList.add('credits-highlight');
   });
   el('credits-claim').addEventListener('click',()=>claim());

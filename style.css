@@ -2160,3 +2160,13 @@ input,textarea,[contenteditable=""],[contenteditable="true"]{-webkit-user-select
 @media(max-width:700px){#welcome-view .home-topbar{gap:10px}#welcome-view .home-topbar .brand-lockup{flex:0 0 70px}#welcome-view .home-topbar .truco-logo{width:70px;height:48px}#welcome-view .home-player-wallet #account-open{gap:7px;padding:7px 8px 7px 7px}#welcome-view .home-player-wallet .home-wallet-summary{gap:5px;padding:0 6px 0 9px}#welcome-view .home-wallet-summary .credit-coin-icon{width:20px;height:20px}#welcome-view .home-wallet-summary strong{font-size:16px}}
 /* The table cards use the same three-coin icon as the rest of the game */
 .compact-room-stat svg.credit-coin-icon{fill:#ecc97c;stroke:#6e4e17;stroke-width:3;stroke-linejoin:round}
+/* Credits window: title, the balance in a centered pill, and the gold claim button */
+#welcome-view #credits-panel{display:flex;flex-direction:column;align-items:center;gap:12px;padding:18px;text-align:center}
+#welcome-view #credits-panel .credits-heading{display:flex;flex-direction:column;align-items:center;gap:12px;margin:0;color:#dfe6e1;font-size:15px;font-weight:600}
+#welcome-view #credits-panel .credits-amount{display:flex;align-items:center;gap:10px;padding:8px 20px 8px 14px;border:1px solid #d8b87566;border-radius:999px;background:#0b2c21}
+#welcome-view #credits-panel .credits-amount .credit-coin-icon{width:34px;height:34px}
+#welcome-view #credits-panel .credits-amount strong{font-size:34px;line-height:1;color:#e8c983;font-variant-numeric:tabular-nums}
+#welcome-view #credits-panel #credits-status{margin:0;padding:0;text-align:center}
+#welcome-view #credits-panel #credits-claim{width:100%;min-height:56px;margin:0}
+#welcome-view #credits-panel #credits-claim:not(:disabled){background:linear-gradient(180deg,#f0d596,#dcb565);border:0;color:#14301f;-webkit-text-fill-color:currentColor;box-shadow:0 6px 16px #e8c98330,inset 0 1px 0 #fff6}
+#welcome-view #credits-panel #credits-claim:not(:disabled):hover{background:linear-gradient(180deg,#f4dda4,#e2bd6f)}
