@@ -8,7 +8,7 @@ import { installCredits } from './credits.js?v=20261025-credits1';
 import { installAccount } from './account.js?v=20261022-ios-redirect';
 import { initializeGameAuth } from './auth-init.js?v=20261016-android-google';
 import {installTeamTable,TEAM_SEATS,playerTeam,positionDealerDeck,renderTeamLobbySeats,renderWaitingSeats} from './team-table-ui.js?v=20261024-ui6';
-import {createLiveTables,LiveError} from './live-tables.js?v=20261022-clock1';
+import {createLiveTables,LiveError} from './live-tables.js?v=20261025-close1';
 const FIREBASE_VERSION = '12.4.0';
 const $ = (id) => document.getElementById(id);
 const views = ['welcome-view', 'invite-view', 'setup-view', 'waiting-view', 'game-view', 'config-view', 'learn-view', 'scorer-view', 'friends-view'];
@@ -320,7 +320,7 @@ async function confirmCreatedTable(code,data){
     console.error('[truco:create] failed',error);
     if(state.pendingCreate===code)state.pendingCreate=null;
     if(state.roomCode===code)returnToLobby();else liveTables().closeTable(code);
-    toast(error.code==='code-taken'?'No pudimos crear la mesa. Volvé a intentar.':firebaseError(error),true);
+    if(error?.code!=='closed')toast(error.code==='code-taken'?'No pudimos crear la mesa. Volvé a intentar.':firebaseError(error),true);
   }
 }
 async function liveTableApi(name,data){
@@ -4410,7 +4410,7 @@ async function creditCommand(command){
   if(command.kind==='tick'&&(creditTickPending||state.liveAction||state.playActionInFlight||state.foldInFlight))return;
   if(command.kind==='tick')creditTickPending=true;
   try{const result=await creditApi('creditTableAction',{code,command,expectedMatchId:matchId,requestId:crypto.randomUUID()});applyActionReceipt(result,code);return result;}
-  catch(error){if(command.kind!=='tick')toast(firebaseError(error),true);throw error;}
+  catch(error){if(command.kind!=='tick'&&error?.code!=='closed')toast(firebaseError(error),true);throw error;}
   finally{if(command.kind==='tick')creditTickPending=false;}
 }
 function openCreditJoin(code,room){

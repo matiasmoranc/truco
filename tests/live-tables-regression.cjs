@@ -35,3 +35,17 @@ test('Browser modules for live tables and credits parse as ES modules',async()=>
  for(const name of ['watchTable','readTable','call','watchLobby','creditsBackend'])assert.equal(typeof api[name],'function',name);
  for(const name of ['watch','get','claim'])assert.equal(typeof api.wallet[name],'function',name);
 });
+test('Leaving a table ends its pending calls quietly, not as a lost connection',async()=>{
+ const fs=require('node:fs'),path=require('node:path');
+ const sockets=[];
+ class FakeSocket{constructor(url){this.url=url;this.readyState=0;this.sent=[];sockets.push(this);}send(m){this.sent.push(m);}close(){this.readyState=3;setTimeout(()=>this.onclose?.(),5);}}
+ const previous=globalThis.WebSocket;globalThis.WebSocket=FakeSocket;
+ try{
+  const {createLiveTables}=await import('data:text/javascript;base64,'+Buffer.from(fs.readFileSync(path.join(__dirname,'../live-tables.js'),'utf8')).toString('base64')+'#close');
+  const api=createLiveTables({url:'http://127.0.0.1:1',token:async()=>'x'});
+  const pending=api.call('ABCDE','act',{command:{kind:'cancel'}});
+  api.closeTable('ABCDE');
+  await assert.rejects(pending,error=>error.code==='closed');
+  await new Promise(r=>setTimeout(r,20));
+ }finally{globalThis.WebSocket=previous;}
+});

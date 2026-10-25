@@ -65,7 +65,14 @@ class Channel{
       if(this.ws?.readyState===1&&this.authSent)this.ws.send(message);else this.outbox.push(message);
     });
   }
-  close(){this.closed=true;clearTimeout(this.retry);clearInterval(this.pinger);this.outbox.length=0;try{this.ws?.close();}catch{}}
+  // Closed on purpose (the player left the table): calls still waiting end quietly with
+  // code 'closed' instead of looking like a lost connection when the socket finishes closing.
+  close(){
+    this.closed=true;clearTimeout(this.retry);clearInterval(this.pinger);this.outbox.length=0;
+    const ws=this.ws;this.ws=null;this.authed=false;this.authSent=false;this.setConnected(false);
+    for(const [id,call] of this.pending){clearTimeout(call.timer);call.reject(new LiveError('La mesa se cerró.','closed'));this.pending.delete(id);}
+    try{ws?.close();}catch{}
+  }
 }
 
 export function createLiveTables({url=LIVE_SERVER_URL,token}){
