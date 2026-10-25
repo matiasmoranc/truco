@@ -125,3 +125,15 @@ test('An hour-old abandoned legacy game cannot block deleting the user',()=>{
  const changed=prepareUserDeletion(root,{...deletion,now});assert.equal(changed.rooms.BN6QZ.public.status,'closed');assert.equal(root.rooms.BN6QZ.public.status,'started');
  root.rooms.BN6QZ.public.feed[0].time=now-1000;assert.throws(()=>prepareUserDeletion(root,{...deletion,now}),/BN6QZ/);
 });
+test('Admin table events list created tables and finished games by Uruguay day, house games marked',()=>{
+ const {tableEvents}=require('../functions/admin-service.cjs');
+ const now=Date.parse('2026-10-26T15:00:00Z'),yesterday=now-86400000,old=now-100*86400000;
+ const ledger={matches:{
+  a:{code:'AAAAA',createdAt:yesterday,status:'settled',settledAt:yesterday+600000,winner:'u1',players:{player1:{uid:'u1',name:'Ana'},player2:{uid:'u2',name:'Beto'}},matchNumber:1},
+  b:{code:'BBBBB',createdAt:now,status:'settled',settledAt:now,house:'player1',winner:'u3',players:{player1:{uid:'house_X',name:'X'},player2:{uid:'u3',name:'Caro'}}},
+  c:{code:'CCCCC',createdAt:now,status:'refunded',players:{player1:{uid:'u4',name:'Dani'}},matchNumber:1},
+  d:{code:'DDDDD',createdAt:old,status:'settled',settledAt:old,players:{}}}};
+ const e=tableEvents(ledger,now);
+ assert.deepEqual(e.created.map(x=>x.id),['c','a']);
+ assert.deepEqual(e.finished.map(x=>[x.id,x.house,x.day,x.winner]),[['b',true,'2026-10-26','Caro'],['a',false,'2026-10-25','Ana']]);
+});

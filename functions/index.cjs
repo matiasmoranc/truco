@@ -181,7 +181,7 @@ exports.creditExpireTables=onSchedule({schedule:'every 1 minutes',region:'us-cen
 const {getAuth}=require('firebase-admin/auth');
 const adminMessages=require('./admin-messages.cjs');
 const pushToPlayer=require('./social.cjs').pushSender(db);
-const {tableStats,requireAdmin,adminLedgerChange,validKey,prepareUserDeletion,finishUserDeletion,legacyTableActive,closeLegacyTable,adminTableCurrent}=require('./admin-service.cjs');
+const {tableEvents,requireAdmin,adminLedgerChange,validKey,prepareUserDeletion,finishUserDeletion,legacyTableActive,closeLegacyTable,adminTableCurrent}=require('./admin-service.cjs');
 async function adminIdentity(request){
  const uid=request.auth?.uid;
  if(!uid)throw new HttpsError('unauthenticated','Iniciá sesión primero.');
@@ -339,7 +339,7 @@ exports.adminConsole=onCall({...options,secrets:[liveInternalSecret]},async requ
    if(ledger.tables?.[code]===id&&adminTableCurrent(m,now))tables.push({...entry,status:m.status==='waiting'?'Esperando rival':'En juego'});
    else archivedTables.push({...entry,status:m.status==='settled'?'Terminada':m.status==='refunded'?'Créditos devueltos':m.closedAt?'Cerrada':m.status==='waiting'?'Vencida':'Finalizando'});
   }
-  return {tables,archivedTables,stats:tableStats(ledger,now),movements:ledger.walletMovements||{},alerts:reservationAlerts(ledger,now),reports:Object.entries(reports).map(([id,r])=>({id,...r})).sort((a,b)=>b.at-a.at),
+  return {tables,archivedTables,events:tableEvents(ledger,now),movements:ledger.walletMovements||{},alerts:reservationAlerts(ledger,now),reports:Object.entries(reports).map(([id,r])=>({id,...r})).sort((a,b)=>b.at-a.at),
    audit:[...Object.values(ledger.adminAudit||{}),...Object.values(userAudit)].sort((a,b)=>b.at-a.at).slice(0,100)};
  }
  if(action==='close-table'&&!validKey(data.code))throw new HttpsError('invalid-argument','Mesa inválida.');

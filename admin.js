@@ -63,7 +63,7 @@ async function refresh(more=false,preservePages=false){
   if(more)pagesLoaded++;else if(!preservePages)pagesLoaded=1;
   users=more?[...users,...result.users]:result.users;pageToken=result.pageToken;renderUsers();
   const data=(await call({action:'tables'})).data;if(generation!==epoch)return;
-  tableData=data;renderUsers();renderTables();renderTableStats(data.stats);
+  tableData=data;renderUsers();renderTables();renderTableStats();
   $('reservation-alerts').replaceChildren();
   for(const a of data.alerts||[]){const card=node('article','','card');card.append(node('h3','Créditos reservados: '+(users.find(u=>u.uid===a.uid)?.name||a.uid)),node('p',a.locked+' créditos · '+a.reason));if(a.repairable)card.append(button('Resolver reserva',async()=>{try{await call({action:'repair-reservation',uid:a.uid});await refresh();}catch(e){say(errorText(e));}}));$('reservation-alerts').append(card);}
   $('reports-list').replaceChildren();
@@ -78,14 +78,49 @@ async function refresh(more=false,preservePages=false){
   $('updated').textContent='Actualizado '+new Intl.DateTimeFormat('es-UY',{timeZone:'America/Montevideo',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date());
  }catch(e){if(generation===epoch)say(errorText(e));}finally{busy=false;$('more').disabled=false;$('user-scope').disabled=false;for(const b of document.querySelectorAll('[data-scope]'))b.disabled=false;}
 }
-// Tables created by players and games finished; games against the lobby's house players apart.
-function renderTableStats(stats){
- const box=$('table-stats');box.replaceChildren();if(!stats)return;
- const card=(label,b,note)=>{const k=node('div','','kpi');k.append(node('small',label),node('strong',number(b.today)),node('span','Hoy · '+number(b.week)+' en 7 días · '+number(b.total)+' en total'+(note?' · '+note:''),'delta'));box.append(k);};
- card('Mesas creadas por jugadores',stats.created);
- card('Partidas terminadas entre jugadores',stats.finished);
- card('Partidas terminadas contra la casa',stats.finishedHouse,'mesas abiertas del lobby');
+// Tables created by players and games finished in the chosen period (Uruguay days);
+// games against the lobby's house players apart. A card opens the list, day by day.
+const TABLE_KINDS={created:'Mesas creadas por jugadores',finished:'Partidas terminadas entre jugadores',house:'Partidas terminadas contra la casa'};
+let tableDetail=null;
+function tablePeriod(){
+ const today=metrics?.today||new Date(Date.now()-10800000).toISOString().slice(0,10),oldest=addDays(today,-89),choice=$('table-range').value,custom=choice==='custom';
+ for(const field of document.querySelectorAll('.table-date-field'))field.hidden=!custom;
+ for(const id of ['table-from','table-to']){$(id).min=oldest;$(id).max=today;}
+ let from,to=today;
+ if(choice==='today')from=today;else if(choice==='yesterday')from=to=addDays(today,-1);
+ else if(custom){if(!$('table-from').value)$('table-from').value=addDays(today,-6);if(!$('table-to').value)$('table-to').value=today;from=$('table-from').value;to=$('table-to').value;if(from>to)[from,to]=[to,from];}
+ else from=addDays(today,-(Number(choice)-1));
+ if(from<oldest)from=oldest;if(to>today)to=today;return {from,to};
 }
+function tableItems(kind,{from,to}){
+ const e=tableData.events||{created:[],finished:[]},list=kind==='created'?e.created:e.finished.filter(x=>kind==='house'?x.house:!x.house);
+ return list.filter(x=>x.day>=from&&x.day<=to);
+}
+function renderTableStats(){
+ const period=tablePeriod(),box=$('table-stats');box.replaceChildren();
+ $('table-period').textContent=period.from===period.to?'Período: '+longDay(period.from):'Período: del '+longDay(period.from)+' al '+longDay(period.to);
+ for(const [kind,label] of Object.entries(TABLE_KINDS)){
+  const k=node('button','','kpi metric-link');k.type='button';k.classList.toggle('selected',tableDetail?.kind===kind);
+  k.append(node('small',label),node('strong',number(tableItems(kind,period).length)),node('span','Ver detalle','delta'));k.onclick=()=>openTableDetail(kind);box.append(k);
+ }
+ if(tableDetail)openTableDetail(tableDetail.kind,tableDetail.day);
+}
+function openTableDetail(kind,day=null){
+ const period=tablePeriod(),items=tableItems(kind,period);tableDetail={kind,day};
+ for(const k of $('table-stats').children)k.classList.toggle('selected',k.querySelector('small')?.textContent===TABLE_KINDS[kind]);
+ $('table-detail').hidden=false;$('table-detail-title').textContent=TABLE_KINDS[kind]+(day?' · '+longDay(day):'');
+ const days=[];for(let d=period.from;d<=period.to;d=addDays(d,1))days.push(d);
+ columns($('table-detail-chart'),days.map(d=>({label:shortDay(d),value:items.filter(x=>x.day===d).length,tooltip:shortDay(d)+' · '+items.filter(x=>x.day===d).length+' · tocá para ver ese día',onClick:()=>openTableDetail(kind,d)})),{labelEvery:Math.max(1,Math.ceil(days.length/12))});
+ const shown=day?items.filter(x=>x.day===day):items,body=$('table-detail-body');body.replaceChildren();
+ if(day)body.append(button('Ver todo el período',()=>openTableDetail(kind)));
+ if(!shown.length){body.append(node('p','No hay nada en este período.','empty'));return;}
+ const status={waiting:'Esperando rival',reserved:'En juego',settled:'Terminada',refunded:'Sin rival (devuelta)'};
+ const reason={abandon:'abandono',disconnect:'desconexión',inactivity:'inactividad',timeout:'inactividad'};
+ const rows=shown.map(x=>[formatTableTime(x.at),x.code,x.players.join(' vs ')||'—',(x.targetPoints||'—')+' pts · '+x.stake+' créd.',kind==='created'?status[x.status]||x.status:'Ganó '+(x.winner||'—')+(x.scores?' ('+Object.values(x.scores).join(' a ')+')':'')+(reason[x.reason]?' por '+reason[x.reason]:'')]);
+ body.append(simpleTable(['Fecha y hora','Mesa','Jugadores','Partida',kind==='created'?'Estado':'Resultado'],rows));
+}
+for(const id of ['table-range','table-from','table-to'])$(id).addEventListener('change',renderTableStats);
+$('table-detail-close').onclick=()=>{tableDetail=null;$('table-detail').hidden=true;renderTableStats();};
 function tableTime(table){return Number(table.finishedAt||table.createdAt)||0;}
 function formatTableTime(value){
  if(!value)return 'Sin fecha registrada';

@@ -25,20 +25,23 @@ function adminLedgerChange(ledger,{actor,action,uid,balance,expectedBalance,code
  next.adminAudit??={};next.adminAudit[requestId]={actor,action,uid:uid||null,code:code||null,before,after,reason:reason.trim(),at:now};
  return next;
 }
-// Tables created by players and games played to the end, for today, the last 7 days and in total
-// (Uruguay days). Games against the lobby's house players are counted apart.
-function tableStats(ledger,now){
- const day=t=>new Date(t-10800000).toISOString().slice(0,10),today=day(now),week=day(now-6*86400000);
- const count=()=>({today:0,week:0,total:0}),out={created:count(),finished:count(),finishedHouse:count()};
- const add=(bucket,at)=>{bucket.total++;if(!Number.isFinite(at))return;const d=day(at);if(d>=week)bucket.week++;if(d===today)bucket.today++;};
- for(const m of Object.values(ledger?.matches||{})){
+// Tables created by players and games played to the end over the last 90 days, one
+// entry each with its Uruguay day, so the panel counts and lists any period.
+// Games against the lobby's house players are marked apart.
+function tableEvents(ledger,now,days=90){
+ const day=t=>new Date(t-10800000).toISOString().slice(0,10),since=day(now-(days-1)*86400000);
+ const created=[],finished=[];
+ for(const [id,m] of Object.entries(ledger?.matches||{})){
   if(!m)continue;
-  if(!m.house&&(m.matchNumber||1)===1)add(out.created,m.createdAt);
-  if(m.status==='settled')add(m.house?out.finishedHouse:out.finished,m.settledAt||m.createdAt);
+  const players=Object.values(m.players||{}).map(p=>p?.name||'').filter(Boolean);
+  const base={id,code:m.code||'',players,stake:Number(m.stake)||0,targetPoints:Number(m.targetPoints)||null,mode:m.mode||'1v1',house:!!m.house};
+  if(!m.house&&(m.matchNumber||1)===1&&Number.isFinite(m.createdAt)&&day(m.createdAt)>=since)created.push({...base,at:m.createdAt,day:day(m.createdAt),status:m.status});
+  const at=Number(m.settledAt)||null;
+  if(m.status==='settled'&&at&&day(at)>=since){const winner=Object.values(m.players||{}).find(p=>p?.uid===m.winner)?.name||'';const scores=m.session?.room?.scores||null;finished.push({...base,at,day:day(at),winner,scores,reason:m.session?.room?.matchResult?.reason||null});}
  }
- return out;
+ return {created:created.sort((x,y)=>y.at-x.at),finished:finished.sort((x,y)=>y.at-x.at)};
 }
-module.exports={tableStats,requireAdmin,adminLedgerChange,validKey};
+module.exports={tableEvents,requireAdmin,adminLedgerChange,validKey};
 
 function legacyTableActive(room,now){
  if(!room||room.managedCredits||room.closedAt||!['waiting','drawing','started','revealing','timed-out'].includes(room.status))return false;

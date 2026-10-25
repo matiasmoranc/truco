@@ -61,7 +61,10 @@
   </section>
 
   <section id="tables" hidden>
+   <div class="toolbar"><label>Período<select id="table-range"><option value="today">Hoy</option><option value="yesterday">Ayer</option><option value="7" selected>Últimos 7 días</option><option value="14">Últimos 14 días</option><option value="30">Últimos 30 días</option><option value="90">Últimos 90 días</option><option value="custom">Entre fechas…</option></select></label><label class="table-date-field" hidden>Desde<input id="table-from" type="date"></label><label class="table-date-field" hidden>Hasta<input id="table-to" type="date"></label></div>
+   <p id="table-period" class="note"></p>
    <div id="table-stats" class="kpis compact"></div>
+   <article id="table-detail" class="panel" hidden><div class="panel-head"><h2 id="table-detail-title"></h2><button id="table-detail-close" type="button">Cerrar</button></div><div id="table-detail-chart" class="bar-chart"></div><div id="table-detail-body"></div></article>
    <div id="reservation-alerts" class="cards"></div>
    <div class="toolbar"><label class="grow">Buscar por jugador o mesa<input id="table-search" type="search" placeholder="Jugador, código o ID"></label><label>Mostrar<select id="table-state"><option value="all">Todas las mesas</option><option value="active">Mesas activas</option><option value="previous">Mesas anteriores</option><option value="finished">Partidas terminadas</option></select></label><label>Ordenar por<select id="table-order"><option value="newest">Más recientes primero</option><option value="oldest">Más antiguas primero</option><option value="stake">Mayor apuesta primero</option><option value="points">Más puntos primero</option></select></label></div>
    <p class="note">Fechas y horas de Uruguay. Cerrar una mesa en juego devuelve las apuestas a ambos jugadores.</p>
@@ -81,4 +84,4 @@
  </main>
 </div>
 <dialog id="edit"><form id="edit-form"><div class="dialog-head"><h2 id="edit-title"></h2><button type="button" id="close" aria-label="Cerrar">×</button></div><p id="edit-description"></p><label id="value-label">Nuevo valor<input id="value" required></label><label id="delete-label" hidden>Escribí el nombre exacto para confirmar<input id="delete-confirm" autocomplete="off"></label><label>Motivo<input id="reason" required minlength="3" maxlength="200" placeholder="Por qué realizás este cambio"></label><p id="edit-error" role="alert"></p><div class="dialog-actions"><button id="cancel" type="button">Cancelar</button><button id="save" class="primary" type="submit">Confirmar cambio</button></div></form></dialog>
-<script type="module" src="admin.js?v=17"></script></body></html>
+<script type="module" src="admin.js?v=18"></script></body></html>
