@@ -31,6 +31,10 @@ for key in ["GADApplicationIdentifier", "SKAdNetworkItems", "NSUserTrackingUsage
     info.pop(key, None)
 # Table invitations arrive as push notifications (Firebase Cloud Messaging over APNs).
 info["UIBackgroundModes"] = ["remote-notification"]
+# The match photo: the camera to take it, and the photo library to save it from the share sheet.
+info["NSCameraUsageDescription"] = "Para sacar una foto con el resultado de la partida y compartirla."
+info["NSPhotoLibraryUsageDescription"] = "Para elegir una foto y compartir el resultado de la partida."
+info["NSPhotoLibraryAddUsageDescription"] = "Para guardar en tus fotos la imagen con el resultado de la partida."
 info["UISupportedInterfaceOrientations"] = ["UIInterfaceOrientationPortrait"]
 # The first App Store release is iPhone only (portrait); iPad comes in a later version.
 info.pop("UISupportedInterfaceOrientations~ipad", None)

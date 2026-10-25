@@ -1,14 +1,15 @@
 import './chat-moderation.js?v=20261013-moderation1';
 import { visitPlatform,takeVisit,markTestDevice } from './visit.js?v=20261024-visits5';
-import { installFriends } from './friends.js?v=20261025-invite1';
+import { installFriends } from './friends.js?v=20261025-claim1';
 import { installPlayerPanel } from './player-panel.js?v=20261013-blocklist1';
 import { installScorer,renderCompactTally } from './scorer.js?v=20261023-seo1';
 import { installActivity } from './activity.js?v=20261010-adminstats32';
-import { installCredits } from './credits.js?v=20261025-credits1';
+import { installCredits } from './credits.js?v=20261025-claim1';
 import { installAccount } from './account.js?v=20261022-ios-redirect';
 import { initializeGameAuth } from './auth-init.js?v=20261016-android-google';
 import {installTeamTable,TEAM_SEATS,playerTeam,positionDealerDeck,renderTeamLobbySeats,renderWaitingSeats} from './team-table-ui.js?v=20261024-ui6';
 import {createLiveTables,LiveError} from './live-tables.js?v=20261025-close1';
+import {installMatchPhoto} from './share-photo.js?v=20261025-photo2';
 const FIREBASE_VERSION = '12.4.0';
 const $ = (id) => document.getElementById(id);
 const views = ['welcome-view', 'invite-view', 'setup-view', 'waiting-view', 'game-view', 'config-view', 'learn-view', 'scorer-view', 'friends-view'];
@@ -649,7 +650,7 @@ async function registerPush(){
   if(token)await creditApi('playerSocial',{action:'register-push',token,platform:native.platform});
 }
 // Friends and table invitations (friends.js).
-const friends=installFriends({$,api:creditApi,services:firebaseServices,getState:()=>state,document,showView,isPlaying:()=>!!state.room&&!state.learning&&$("game-view").classList.contains("active")&&!["waiting","complete"].includes(state.room.status),balance:()=>credits.wallet()?.balance,openLobby:()=>openLobby(),
+const friends=installFriends({$,api:creditApi,services:firebaseServices,getState:()=>state,document,showView,isPlaying:()=>!!state.room&&!state.learning&&$("game-view").classList.contains("active")&&!["waiting","complete"].includes(state.room.status),balance:()=>credits.wallet()?.balance,canClaim:()=>credits.canClaim(),claimCredits:()=>credits.claim(),openLobby:()=>openLobby(),
   toast:(message,error=false,duration=2600)=>toast(message,true,duration),
   tableToInvite:()=>{const room=state.room;if(!state.roomCode||state.localGame||room?.status!=='waiting')return null;
     return {code:state.roomCode,mode:room.mode==='2v2'?'2v2':'1v1',targetPoints:Number(room.targetPoints)||null,stake:Number(room.creditMatch?.stake)||null,password:state.hostTablePassword?.code===state.roomCode?state.hostTablePassword.password:''};},
@@ -658,6 +659,8 @@ const friends=installFriends({$,api:creditApi,services:firebaseServices,getState
     state.invitePassword=password?{code,password}:null;
     await openInvitation(code);$('invite-form').requestSubmit();
   }});
+// Share the final score on a photo (share-photo.js), read from the result panel.
+installMatchPhoto({$,document,toast:message=>toast(message,true,2600),score:()=>({target:normalizeTargetPoints(state.room?.targetPoints),sides:[...$('match-end-score').querySelectorAll(':scope>div')].map(d=>({name:d.querySelector('span')?.textContent||'',points:Number(d.querySelector('strong')?.textContent)||0,winner:d.classList.contains('match-score-winner')}))})});
 // In the apps: when Google Play or the App Store has a newer version, offer it once per start.
 async function offerAppUpdate(){
   const native=globalThis.trucoNative;if(!native?.checkForUpdate)return;

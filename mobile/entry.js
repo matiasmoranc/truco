@@ -6,6 +6,8 @@ import * as authSdk from 'firebase/auth';
 import * as functionsSdk from 'firebase/functions';
 import { AppUpdate, AppUpdateAvailability, AppUpdateResultCode } from '@capawesome/capacitor-app-update';
 import { FirebaseMessaging } from '@capacitor-firebase/messaging';
+import { Filesystem, Directory } from '@capacitor/filesystem';
+import { Share } from '@capacitor/share';
 import { rewardedAds } from './no-ads.js';
 
 // App Store id, needed on iPhone to look up and open the listing.
@@ -17,6 +19,11 @@ globalThis.trucoNative = {
   platform: Capacitor.getPlatform(),
   rewardedAds,
   publicUrl: 'https://trucouruguayo.uy/',
+  // The match photo goes to the phone's share sheet (Instagram, WhatsApp…) from a cache file.
+  async shareImage(base64, name, text) {
+    const { uri } = await Filesystem.writeFile({ path: name, data: base64, directory: Directory.Cache });
+    await Share.share({ files: [uri], text, dialogTitle: 'Compartir resultado' });
+  },
   // A newer version in Google Play or the App Store: { version } or null. Never throws.
   async checkForUpdate() {
     try {

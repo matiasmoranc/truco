@@ -3,7 +3,8 @@
 // or a new friendship shows on both sides at once. From a waiting table, invite a
 // friend, who gets the invitation live in the game (and as a phone notification)
 // with Entrar / Rechazar.
-export function installFriends({$,api,services,getState,toast,tableToInvite,joinInvite,showView,openLobby,isPlaying=()=>false,balance=()=>undefined,document}){
+const coinIcon='<svg class="credit-coin-icon" viewBox="-2 -2 52 54" aria-hidden="true"><g transform="rotate(-9 21 35)"><path d="M6 35v7a15 6 0 0 0 30 0v-7"/><ellipse cx="21" cy="35" rx="15" ry="6"/></g><g transform="rotate(9 27 23)"><path d="M12 23v7a15 6 0 0 0 30 0v-7"/><ellipse cx="27" cy="23" rx="15" ry="6"/></g><g transform="rotate(-12 20 12)"><path d="M5 12v7a15 6 0 0 0 30 0v-7"/><ellipse cx="20" cy="12" rx="15" ry="6"/></g></svg>';
+export function installFriends({$,api,services,getState,toast,tableToInvite,joinInvite,showView,openLobby,isPlaying=()=>false,balance=()=>undefined,canClaim=()=>false,claimCredits=async()=>{},document}){
  let overview={friends:[],incoming:[],outgoing:[]},recent=null,unsubscribers=[],listening=null,statusTimer=null;
  const shownInvites=new Set(),shownReplies=new Set(),invited=new Map();
  const el=(tag,cls,text)=>{const node=document.createElement(tag);if(cls)node.className=cls;if(text!=null)node.textContent=text;return node;};
@@ -88,13 +89,21 @@ export function installFriends({$,api,services,getState,toast,tableToInvite,join
   if(getState().room&&!['waiting','complete'].includes(getState().room.status))return;
   shownInvites.add(id);current={id,invite};
   $('table-invite-text').textContent=invite.fromName+' te invita a jugar en su mesa.';
-  // The same facts as when creating or entering a table: players, points and credits.
-  const plural=n=>n+' crédito'+(n===1?'':'s'),stake=Number(invite.stake)||0,mine=balance();
-  const rows=[['Jugadores',invite.mode==='2v2'?'2 vs 2 · 4 jugadores':'1 vs 1 · 2 jugadores'],['Puntos',invite.targetPoints?invite.targetPoints+' puntos':'—'],['Apuesta',stake?plural(stake)+' por jugador':'Sin créditos']];
-  if(stake)rows.push(['Tus créditos',Number.isFinite(mine)?mine+(mine>=stake?' · te quedan '+(mine-stake):' · no te alcanzan'):'—']);
-  $('table-invite-summary').replaceChildren(...rows.flatMap(([k,v])=>[el('dt','',k),el('dd','',v)]));
-  $('table-invite-dialog').showModal();
+  renderInviteCredits(invite);
+  $('table-invite-dialog').showModal();$('table-invite-accept').focus({preventScroll:true});
   setTimeout(()=>{if(current?.id===id&&$('table-invite-dialog').open){$('table-invite-dialog').close();toast('La invitación de '+invite.fromName+' venció.');}},Math.max(0,invite.expiresAt-Date.now()));
+ }
+ // The table's facts, and whether my credits let me enter: with none left I can claim
+ // the daily 5 right here, or Entrar stays blocked and says why.
+ function renderInviteCredits(invite){
+  const stake=Number(invite.stake)||0,mine=balance(),known=Number.isFinite(mine);
+  const amount=n=>{const dd=el('dd','credit-amount');dd.innerHTML=coinIcon;dd.append(String(n));return dd;};
+  const rows=[['Jugadores',el('dd','',invite.mode==='2v2'?'2 vs 2':'1 vs 1')],['Puntos',el('dd','',invite.targetPoints?invite.targetPoints+' puntos':'—')],['Apuesta',stake?amount(stake):el('dd','','Sin créditos')]];
+  if(stake)rows.push(['Tus créditos',known?amount(mine):el('dd','','—')]);
+  $('table-invite-summary').replaceChildren(...rows.flatMap(([k,v])=>[el('dt','',k),v]));
+  const short=!!stake&&known&&mine<stake,claimable=short&&canClaim(),accept=$('table-invite-accept'),claim=$('table-invite-claim');
+  claim.hidden=!claimable;
+  accept.disabled=short;accept.textContent=short&&!claimable?(mine>0?'No te alcanzan los créditos':'No tenés créditos'):'Entrar';
  }
  async function answer(accept){
   const invite=current;if(!invite)return;current=null;$('table-invite-dialog').close();
@@ -102,6 +111,11 @@ export function installFriends({$,api,services,getState,toast,tableToInvite,join
   catch(error){toast(error?.message||'No se pudo responder la invitación.',true);}
  }
  $('table-invite-accept').onclick=()=>answer(true);
+ $('table-invite-claim').onclick=async()=>{
+  const b=$('table-invite-claim');if(b.disabled)return;b.disabled=true;b.lastChild.textContent='Reclamando…';
+  try{await claimCredits();}catch(error){toast(error?.message||'No se pudieron reclamar los créditos.',true);}
+  finally{b.disabled=false;b.lastChild.textContent='Reclamar 5 créditos';if(current)renderInviteCredits(current.invite);}
+ };
  $('table-invite-decline').onclick=()=>answer(false);
  // The host hears when a friend cannot come.
  function showReply(id,reply){

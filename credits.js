@@ -153,5 +153,6 @@ export function installCredits({services,getState,document,api,walletSource=asyn
   el('credits-claim').addEventListener('click',()=>claim());
   document.addEventListener?.('visibilitychange',()=>{if(document.visibilityState==='visible')void sync();});
   globalThis.addEventListener?.('pageshow',()=>{void sync();});
-  return {start,stop,whenReady:()=>firstLoad,refresh:render,sync,claim,wallet:()=>wallet};
+  return {start,stop,whenReady:()=>firstLoad,refresh:render,sync,claim,wallet:()=>wallet,
+    canClaim:()=>!!uid&&available&&creditEligibility(wallet,clock())==='available'};
 }
