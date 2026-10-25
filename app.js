@@ -656,7 +656,7 @@ const friends=installFriends({$,api:creditApi,services:firebaseServices,getState
     return {code:state.roomCode,mode:room.mode==='2v2'?'2v2':'1v1',targetPoints:Number(room.targetPoints)||null,stake:Number(room.creditMatch?.stake)||null,password:state.hostTablePassword?.code===state.roomCode?state.hostTablePassword.password:''};},
   joinInvite:async(code,password)=>{
     if(state.roomCode){toast('Salí de tu mesa actual para entrar a la invitación.',true);return;}
-    state.invitePassword=password?{code,password}:null;
+    state.invitePassword=password?{code,password}:null;state.directJoin=code;
     await openInvitation(code);$('invite-form').requestSubmit();
   }});
 // Share the final score on a photo (share-photo.js), read from the result panel.
@@ -919,8 +919,12 @@ async function enterRoom() {
       if(!seat&&!roomSeats(room).some(p=>!room.players?.[p])){if($('join-credit-dialog').open)throw new Error('La mesa ya se llenó.');toast('La mesa ya se llenó.',true);await openLobby();return;}
       if(room.managedCredits){
         // Entering a table spends credits: always confirm with its details first.
-        if(!seat&&!state.joinConfirmed){openCreditJoin(code,room);return;}
-        const result=await creditApi('creditJoinTable',{code,password:state.joinPassword||'',...(room.mode==='2v2'?{team:state.joinConfirmed?$('join-credit-team').value:state.joinTeam}:{})});
+        // From the open tables list or a friend's invitation the player already saw the table's
+        // details, so they go straight in; a shared link, or a private table without its key, asks first.
+        const known=state.invitePassword?.code===code?state.invitePassword.password:'';
+        const direct=state.directJoin===code&&(!room.creditMatch?.hasPassword||!!known);state.directJoin=null;
+        if(!seat&&!state.joinConfirmed&&!direct){openCreditJoin(code,room);return;}
+        const result=await creditApi('creditJoinTable',{code,password:(state.joinConfirmed?state.joinPassword:known||state.joinPassword)||'',...(room.mode==='2v2'?{team:state.joinConfirmed?$('join-credit-team').value:state.joinTeam}:{})});
         room=result.room;joinedHand=result.privateHand||null;seat=roomSeatForUid(room,state.uid);state.joinPassword='';state.joinConfirmed=false;
         if(!seat)throw new Error('La mesa ya no tiene lugares disponibles.');
       }
@@ -1082,7 +1086,7 @@ function syncLobbyJoinFeedback(){
 }
 function joinOpenRoom(code, seat, team=null) {
   if(state.enteringRoom||state.joinSubmitting||state.joinIntent)return;
-  state.joinIntent={code,seat,team};
+  state.joinIntent={code,seat,team};state.directJoin=code;
   state.joinTeam=['player1','player2'].includes(team)?team:null;
   state.joining = true; state.selectedRoom = code;
   const name = cleanName($('player-name').value||savedPlayerName(), 'Jugador');
