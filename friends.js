@@ -72,13 +72,16 @@ export function installFriends({$,api,services,getState,toast,tableToInvite,join
    const state=invited.get(f.uid);
    return row(f.name,state==='sent'?'Invitación enviada':state==='declined'?'No puede ahora':state==='busy'?'Está en una partida':null,[button(state==='sent'?'Reenviar':'Invitar',async()=>{
     const table=tableToInvite();if(!table)throw new Error('La mesa ya no está esperando jugadores.');
+    // Problems show inside the window (a toast would sit behind it) and fade after 5 seconds.
     try{await call('invite',{uid:f.uid,table});}
-    catch(error){if(/ya está en una partida/.test(error?.message||'')){invited.set(f.uid,'busy');renderInviteList();}throw error;}
+    catch(error){if(/ya está en una partida/.test(error?.message||'')){invited.set(f.uid,'busy');renderInviteList();}inviteError(error?.message||'No se pudo enviar la invitación.');return;}
     invited.set(f.uid,'sent');toast('Invitación enviada a '+f.name+'.');renderInviteList();
    },state!=='sent')]);
   }),overview.friends.length?'Ningún amigo con ese nombre.':'Todavía no tenés amigos. Agregalos desde "Amigos" en la pantalla principal.');
  }
- $('invite-friend').onclick=()=>{$('invite-friend-search').value='';$('invite-friend-dialog').showModal();renderInviteList();};
+ let inviteErrorTimer=null;
+ function inviteError(message){const box=$('invite-friend-error');box.textContent=message;box.hidden=false;clearTimeout(inviteErrorTimer);inviteErrorTimer=setTimeout(()=>{box.hidden=true;},5000);}
+ $('invite-friend').onclick=()=>{$('invite-friend-error').hidden=true;$('invite-friend-search').value='';$('invite-friend-dialog').showModal();renderInviteList();};
  $('invite-friend-close').onclick=()=>$('invite-friend-dialog').close();
  $('invite-friend-search').oninput=renderInviteList;
 
@@ -157,5 +160,5 @@ export function installFriends({$,api,services,getState,toast,tableToInvite,join
   unsubscribers.push(()=>{if(reported)fb.set(statusRef,null).catch(()=>{});});
  }
  function stop(){clearInterval(statusTimer);statusTimer=null;for(const off of unsubscribers)off?.();unsubscribers=[];listening=null;overview={friends:[],incoming:[],outgoing:[]};badge();}
- return {start,stop,open};
+ return {start,stop,open,friendNames:()=>overview.friends.map(f=>f.name)};
 }

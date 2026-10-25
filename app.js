@@ -1,15 +1,15 @@
 import './chat-moderation.js?v=20261013-moderation1';
 import { visitPlatform,takeVisit,markTestDevice } from './visit.js?v=20261024-visits5';
-import { installFriends } from './friends.js?v=20261025-claim1';
+import { installFriends } from './friends.js?v=20261026-people1';
 import { installPlayerPanel } from './player-panel.js?v=20261013-blocklist1';
-import { installScorer,renderCompactTally } from './scorer.js?v=20261023-seo1';
+import { installScorer,renderCompactTally } from './scorer.js?v=20261026-people1';
 import { installActivity } from './activity.js?v=20261010-adminstats32';
 import { installCredits } from './credits.js?v=20261025-claim1';
 import { installAccount } from './account.js?v=20261022-ios-redirect';
 import { initializeGameAuth } from './auth-init.js?v=20261016-android-google';
 import {installTeamTable,TEAM_SEATS,playerTeam,positionDealerDeck,renderTeamLobbySeats,renderWaitingSeats} from './team-table-ui.js?v=20261024-ui6';
 import {createLiveTables,LiveError} from './live-tables.js?v=20261025-close1';
-import {installMatchPhoto} from './share-photo.js?v=20261025-photo3';
+import {installMatchPhoto} from './share-photo.js?v=20261026-people1';
 const FIREBASE_VERSION = '12.4.0';
 const $ = (id) => document.getElementById(id);
 const views = ['welcome-view', 'invite-view', 'setup-view', 'waiting-view', 'game-view', 'config-view', 'learn-view', 'scorer-view', 'friends-view'];
@@ -660,7 +660,7 @@ const friends=installFriends({$,api:creditApi,services:firebaseServices,getState
     await openInvitation(code);$('invite-form').requestSubmit();
   }});
 // Share the final score on a photo (share-photo.js), read from the result panel.
-installMatchPhoto({$,document,toast:message=>toast(message,true,2600),score:()=>({target:normalizeTargetPoints(state.room?.targetPoints),sides:[...$('match-end-score').querySelectorAll(':scope>div')].map(d=>({name:d.querySelector('span')?.textContent||'',points:Number(d.querySelector('strong')?.textContent)||0,winner:d.classList.contains('match-score-winner')}))})});
+const matchPhoto=installMatchPhoto({$,document,toast:message=>toast(message,true,2600),score:()=>({target:normalizeTargetPoints(state.room?.targetPoints),sides:[...$('match-end-score').querySelectorAll(':scope>div')].map(d=>({name:d.querySelector('span')?.textContent||'',points:Number(d.querySelector('strong')?.textContent)||0,winner:d.classList.contains('match-score-winner')}))})});
 // In the apps: when Google Play or the App Store has a newer version, offer it once per start.
 async function offerAppUpdate(){
   const native=globalThis.trucoNative;if(!native?.checkForUpdate)return;
@@ -4524,7 +4524,9 @@ for(const button of document.querySelectorAll('[data-password-toggle]')){
   });
 }
 
-installScorer({document,showView,renderTally:renderCompactTally});
+installScorer({document,showView,renderTally:renderCompactTally,
+  people:()=>[$('account-username').textContent,...friends.friendNames()],
+  onShare:score=>matchPhoto.start(()=>score)});
 
 installPlayerPanel({document,api:creditApi,getState:()=>state});
 

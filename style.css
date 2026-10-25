@@ -2201,3 +2201,17 @@ input,textarea,[contenteditable=""],[contenteditable="true"]{-webkit-user-select
 .match-photo-actions .button{width:100%;min-height:52px;border-radius:16px;font:inherit;font-size:17px;font-weight:700;justify-content:center}
 .match-photo-actions #match-photo-share{background:linear-gradient(180deg,#f0d596,#dcb565);border:0;color:#14301f;box-shadow:0 6px 16px #e8c98330,inset 0 1px 0 #fff6}
 .match-photo-actions #match-photo-retake{background:transparent;border:1px solid #e8c98399;color:#e8c983}
+/* Invite a friend: a refusal (limit reached, friend playing) shows in red inside the window */
+.invite-friend-error{margin:0 0 12px;padding:10px 12px;border:1px solid #e8806f88;border-radius:12px;background:#e8806f1f;color:#ffb3a6;font-size:14px;font-weight:600;line-height:1.4}
+.invite-friend-error[hidden]{display:none}
+/* Lobby: a larger credits number */
+#welcome-view .home-wallet-summary strong{font-size:20px}
+@media(max-width:700px){#welcome-view .home-wallet-summary strong{font-size:19px}}
+/* Anotador: who plays on each side, and sharing the final score */
+.scorer-people{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:0 0 18px;text-align:left}
+.scorer-people[hidden]{display:none}
+.scorer-people label{display:grid;gap:6px;color:#cbbf9f;font-size:14px;font-weight:600}
+.scorer-people select{width:100%;min-height:48px;padding:10px 12px;border:1px solid #d9bd7966;border-radius:14px;background:#0b2c21;color:#f1e9d7;font:inherit;font-size:16px}
+.scorer-share{display:flex;align-items:center;justify-content:center;gap:10px;align-self:center;flex:none;margin:0 auto 12px;padding:10px 20px;min-height:48px;border:0;border-radius:999px;background:linear-gradient(180deg,#f0d596,#dcb565);color:#14301f;font:inherit;font-size:16px;font-weight:700;box-shadow:0 6px 16px #e8c98330,inset 0 1px 0 #fff6;cursor:pointer}
+.scorer-share[hidden]{display:none}
+.scorer-share svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}

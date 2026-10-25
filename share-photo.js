@@ -28,12 +28,12 @@ export async function composeMatchPhoto(photo,{sides,target=30},logo){
   const canvas=document.createElement('canvas');canvas.width=W;canvas.height=H;
   const ctx=canvas.getContext('2d');ctx.drawImage(photo,(pw-sw)/2,(ph-sh)/2,sw,sh,0,0,W,H);
   await document.fonts?.ready;
-  target=[10,20,30,40].includes(Number(target))?Number(target):30;
+  target=[10,20,30,40,50,60].includes(Number(target))?Number(target):30;
   const u=Math.min(W,H)/100,pad=3.6*u,colW=16.8*u,cardW=pad*2+colW*sides.length,logoH=logo?8*u:0;
   const size=Math.min(3.6*u,30*u/(target/5)),gap=size*.45,tallyH=(target/10)*(size+gap)*2+gap,nameH=7*u,footH=7*u;
   const cardH=pad+(logo?logoH+2.5*u:0)+nameH+tallyH+2*u+footH+pad*.6,margin=7*u,x=W-cardW-margin,y=H-cardH-margin;
   ctx.save();ctx.shadowColor='rgba(0,0,0,.55)';ctx.shadowBlur=5*u;ctx.shadowOffsetY=1.5*u;
-  roundRect(ctx,x,y,cardW,cardH,3.5*u);ctx.fillStyle='rgba(9,38,28,.92)';ctx.fill();ctx.restore();
+  roundRect(ctx,x,y,cardW,cardH,3.5*u);ctx.fillStyle='rgba(9,38,28,.82)';ctx.fill();ctx.restore();
   roundRect(ctx,x,y,cardW,cardH,3.5*u);ctx.lineWidth=Math.max(1,.35*u);ctx.strokeStyle='rgba(232,201,131,.75)';ctx.stroke();
   let cy=y+pad;
   if(logo){const lw=logoH*(logo.naturalWidth/logo.naturalHeight);ctx.drawImage(logo,x+(cardW-lw)/2,cy,lw,logoH);cy+=logoH+2.5*u;}
@@ -57,21 +57,23 @@ export async function composeMatchPhoto(photo,{sides,target=30},logo){
 
 export function installMatchPhoto({$,document,toast,score}){
   const input=$('match-photo-input'),dialog=$('match-photo-dialog'),preview=$('match-photo-preview');
-  let blob=null,logo=null;
-  $('share-match').onclick=()=>{input.value='';input.click();};
+  let blob=null,logo=null,currentScore=score;
+  // Opens the camera; the score comes from the match panel unless another screen passes its own.
+  const start=(provider=score)=>{currentScore=provider;input.value='';input.click();};
+  $('share-match').onclick=()=>start();
   input.onchange=async()=>{
     const file=input.files?.[0];if(!file)return;
     const url=URL.createObjectURL(file);
     try{
       logo??=await loadImage('assets/truco-v3.png').catch(()=>null);
-      const canvas=await composeMatchPhoto(await loadImage(url),score(),logo);
+      const canvas=await composeMatchPhoto(await loadImage(url),currentScore(),logo);
       blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/jpeg',.9));
       preview.src=canvas.toDataURL('image/jpeg',.85);
       if(!dialog.open)dialog.showModal();
     }catch(error){console.error('[truco:photo]',error);toast('No pudimos preparar la foto.',true);}
     finally{URL.revokeObjectURL(url);}
   };
-  $('match-photo-retake').onclick=()=>{input.value='';input.click();};
+  $('match-photo-retake').onclick=()=>start(currentScore);
   $('match-photo-close').onclick=()=>dialog.close();
   $('match-photo-share').onclick=async()=>{
     if(!blob)return;
@@ -88,4 +90,5 @@ export function installMatchPhoto({$,document,toast,score}){
       }
     }catch(error){if(error?.name!=='AbortError'&&!/cancel/i.test(error?.message||''))toast('No se pudo compartir la foto.',true);}
   };
+  return {start};
 }

@@ -1,6 +1,8 @@
 // Standalone scorekeeper: never writes game state or credits to Firebase.
 // standalone: the scorer is the whole page (anotador page), so it shows at once.
-export function installScorer({document,storage=globalThis.localStorage,showView,renderTally=renderCompactTally,now=()=>Date.now(),standalone=false}) {
+// people: names offered for Nosotros and Ellos (the player and their friends), when signed in.
+// onShare: called with the final score when the player wants to share it on a photo.
+export function installScorer({document,storage=globalThis.localStorage,showView,renderTally=renderCompactTally,now=()=>Date.now(),standalone=false,people=null,onShare=null}) {
   const $=id=>document.getElementById(id),key='truco-manual-score-v1';
   const screen = installScorerScreen({document});
   $('scorer-colors')?.addEventListener('click',()=>{
@@ -8,18 +10,33 @@ export function installScorer({document,storage=globalThis.localStorage,showView
     $('scorer-colors').setAttribute('aria-pressed',String(inverted));
   });
   let match=null;
-  try {const saved=JSON.parse(storage.getItem(key));if(Number.isFinite(saved?.startedAt)&&now()-saved.startedAt>=0&&now()-saved.startedAt<86400000&&[10,20,30,40,50,60].includes(saved?.target)&&Array.isArray(saved.scores)&&saved.scores.length===2&&saved.scores.every(n=>Number.isInteger(n)&&n>=0&&n<=saved.target))match=saved;else storage.removeItem(key);}catch{}
+  try {const saved=JSON.parse(storage.getItem(key));if(Number.isFinite(saved?.startedAt)&&now()-saved.startedAt>=0&&now()-saved.startedAt<86400000&&[10,20,30,40,50,60].includes(saved?.target)&&Array.isArray(saved.scores)&&saved.scores.length===2&&saved.scores.every(n=>Number.isInteger(n)&&n>=0&&n<=saved.target)){match=saved;if(!Array.isArray(match.names)||match.names.length!==2||!match.names.every(n=>typeof n==='string'))match.names=DEFAULT_NAMES.slice();}else storage.removeItem(key);}catch{}
   const save=()=>{try{storage.setItem(key,JSON.stringify(match));}catch{}};
+  // The setup offers Nosotros/Ellos plus the people the app knows; the choice names each side.
+  function fillPeople(){
+    const box=$('scorer-people');if(!box)return;
+    const names=[...new Set((people?.()||[]).map(n=>String(n||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));
+    box.hidden=!names.length;if(!names.length)return;
+    for(let team=0;team<2;team++){
+      const select=$('scorer-person-'+team),previous=select.value;
+      select.replaceChildren(...[DEFAULT_NAMES[team],...names].map(name=>{const o=document.createElement('option');o.value=o.textContent=name;return o;}));
+      select.value=[...select.options].some(o=>o.value===previous)?previous:DEFAULT_NAMES[team];
+    }
+  }
+  const sideName=team=>match?.names?.[team]||DEFAULT_NAMES[team];
   function render(){
     const playing=!!match;
     $('scorer-setup').hidden=playing;$('scorer-board').hidden=!playing;
     $('scorer-new').hidden=!playing;
-    if(!playing){$('scorer-status').hidden=false;$('scorer-status').textContent='¿A cuántos puntos jugamos?';return;}
+    if(!playing){$('scorer-status').hidden=false;$('scorer-status').textContent='¿A cuántos puntos jugamos?';fillPeople();if($('scorer-share'))$('scorer-share').hidden=true;return;}
     const winner=match.scores.findIndex(n=>n===match.target);
     $('scorer-status').hidden=winner<0;
-    $('scorer-status').textContent=winner<0?'':`Ganó ${winner===0?'Nosotros':'Ellos'}`;
+    $('scorer-status').textContent=winner<0?'':`Ganó ${sideName(winner)}`;
+    if($('scorer-share'))$('scorer-share').hidden=winner<0||!onShare;
     for(let team=0;team<2;team++){
       $(`scorer-tally-${team}`).innerHTML=renderTally(match.scores[team],match.target);
+      const label=$(`scorer-add-${team}`).querySelector?.('.scorer-team-name');if(label)label.textContent=sideName(team);
+      $(`scorer-add-${team}`).setAttribute('aria-label','Sumar un punto a '+sideName(team));$(`scorer-minus-${team}`).setAttribute('aria-label','Restar un punto a '+sideName(team));
       $(`scorer-add-${team}`).disabled=winner>=0;
       $(`scorer-minus-${team}`).disabled=match.scores[team]===0;
       $(`scorer-add-${team}`).classList.toggle('scorer-winner',winner===team);
@@ -28,7 +45,8 @@ export function installScorer({document,storage=globalThis.localStorage,showView
   $('open-scorer')?.addEventListener('click',()=>{if(match&&now()-match.startedAt>=86400000){match=null;save();}render();showView('scorer-view');screen.setActive(true);});
   $('scorer-back')?.addEventListener('click',()=>{screen.setActive(false);showView('welcome-view');});
   $('scorer-new').addEventListener('click',()=>{match=null;save();render();});
-  document.querySelectorAll('[data-scorer-target]').forEach(button=>button.addEventListener('click',()=>{match={target:Number(button.dataset.scorerTarget),scores:[0,0],startedAt:now()};save();render();}));
+  document.querySelectorAll('[data-scorer-target]').forEach(button=>button.addEventListener('click',()=>{match={target:Number(button.dataset.scorerTarget),scores:[0,0],startedAt:now(),names:[0,1].map(team=>$('scorer-people')?.hidden===false&&$('scorer-person-'+team)?.value||DEFAULT_NAMES[team])};save();render();}));
+  $('scorer-share')?.addEventListener('click',()=>{if(!match||!onShare)return;const winner=match.scores.findIndex(n=>n===match.target);onShare({target:match.target,sides:[0,1].map(team=>({name:sideName(team),points:match.scores[team],winner:team===winner}))});});
   if(standalone){if(match&&now()-match.startedAt>=86400000){match=null;save();}render();screen.setActive(true);}
   for(let team=0;team<2;team++){
     $(`scorer-add-${team}`).addEventListener('click',()=>{
@@ -40,6 +58,8 @@ export function installScorer({document,storage=globalThis.localStorage,showView
     });
   }
 }
+
+const DEFAULT_NAMES=['Nosotros','Ellos'];
 
 // The compact stick tally: groups of five drawn as a square and its diagonal.
 export function renderCompactTally(points,target){
