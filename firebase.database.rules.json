@@ -85,6 +85,13 @@
       }
     },
     "tableInviteLog": {".read": false, ".write": false},
+    "adminMessages": {
+      "$uid": {
+        ".read": "auth != null && auth.uid == $uid",
+        ".write": false
+      }
+    },
+    "adminThreads": {".read": false, ".write": false},
     "playerStatus": {
       "$uid": {
         ".read": false,

@@ -129,6 +129,33 @@ export function installFriends({$,api,services,getState,toast,tableToInvite,join
   if(getState().room?.code===reply.code||getState().roomCode===reply.code)toast((reply.name||'Tu amigo')+' no puede jugar ahora.',true,4000);
   if($('invite-friend-dialog').open)renderInviteList();
  }
+ // Messages from the administrator, one at a time and never in the middle of a game:
+ // when one arrives during a match it waits until the player is back out of it.
+ let adminInbox=[],adminShowing=null;
+ const adminDate=at=>at?new Intl.DateTimeFormat('es-UY',{timeZone:'America/Montevideo',day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(at)):'';
+ function showAdminMessage(){
+  if(adminShowing||!adminInbox.length||isPlaying()||document.querySelector('dialog[open]'))return;
+  const m=adminInbox[0];adminShowing=m;
+  $('admin-message-text').textContent=m.text;$('admin-message-date').textContent=adminDate(m.at);
+  $('admin-message-reply').value='';$('admin-message-error').hidden=true;
+  $('admin-message-dialog').showModal();document.activeElement?.blur?.();
+ }
+ async function answerAdmin(withText){
+  const m=adminShowing;if(!m)return;
+  const text=withText?$('admin-message-reply').value.trim():'';
+  if(withText&&!text){$('admin-message-reply').focus();return;}
+  const buttons=[$('admin-message-send'),$('admin-message-close')];buttons.forEach(b=>b.disabled=true);
+  try{
+   await call('admin-answer',{messageId:m.id,...(text?{text}:{})});
+   adminInbox=adminInbox.filter(x=>x.id!==m.id);adminShowing=null;$('admin-message-dialog').close();
+   if(text)toast('Respuesta enviada.');
+   setTimeout(showAdminMessage,400);
+  }catch(error){const box=$('admin-message-error');box.textContent=error?.message||'No se pudo enviar.';box.hidden=false;}
+  finally{buttons.forEach(b=>b.disabled=false);}
+ }
+ $('admin-message-send').onclick=()=>answerAdmin(true);
+ $('admin-message-close').onclick=()=>answerAdmin(false);
+ $('admin-message-dialog').addEventListener('cancel',event=>{event.preventDefault();answerAdmin(false);});
  // Live listeners for the signed-in player; restarted when the account changes.
  async function start(){
   const uid=getState().uid;if(!uid||listening===uid)return;stop();listening=uid;
@@ -146,6 +173,7 @@ export function installFriends({$,api,services,getState,toast,tableToInvite,join
   follow('friendRequestsSent',value=>{overview.outgoing=asList(value);render();});
   follow('tableInvites',value=>{for(const [id,v] of Object.entries(value||{}))showInvite(id,v);});
   follow('tableInviteReplies',value=>{for(const [id,v] of Object.entries(value||{}))showReply(id,v);});
+  follow('adminMessages',value=>{adminInbox=Object.entries(value||{}).filter(([,m])=>m&&!m.readAt&&m.text).map(([id,m])=>({id,text:String(m.text),at:Number(m.at)||0})).sort((a,b)=>a.at-b.at);showAdminMessage();});
   // While I am in a game the server turns friends' invitations away; the report is
   // refreshed while playing and removed when the game ends or the connection drops.
   const statusRef=fb.ref(fb.db,'playerStatus/'+uid);let reported=false,reportedAt=0;
@@ -156,9 +184,9 @@ export function installFriends({$,api,services,getState,toast,tableToInvite,join
    reported=playing;reportedAt=Date.now();
    fb.set(statusRef,playing?{playing:true,at:fb.serverTimestamp()}:null).catch(()=>{reported=!playing;});
   };
-  report();statusTimer=setInterval(report,4000);
+  report();statusTimer=setInterval(()=>{report();showAdminMessage();},4000);
   unsubscribers.push(()=>{if(reported)fb.set(statusRef,null).catch(()=>{});});
  }
- function stop(){clearInterval(statusTimer);statusTimer=null;for(const off of unsubscribers)off?.();unsubscribers=[];listening=null;overview={friends:[],incoming:[],outgoing:[]};badge();}
+ function stop(){clearInterval(statusTimer);adminInbox=[];if(adminShowing){adminShowing=null;$('admin-message-dialog').close();}statusTimer=null;for(const off of unsubscribers)off?.();unsubscribers=[];listening=null;overview={friends:[],incoming:[],outgoing:[]};badge();}
  return {start,stop,open,friendNames:()=>overview.friends.map(f=>f.name)};
 }

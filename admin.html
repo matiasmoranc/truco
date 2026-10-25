@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="es"><head><meta charset="utf-8">
-  <meta name="robots" content="noindex, nofollow"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Administración · Truco Uruguayo</title><link rel="stylesheet" href="admin.css?v=15"></head>
+  <meta name="robots" content="noindex, nofollow"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Administración · Truco Uruguayo</title><link rel="stylesheet" href="admin.css?v=16"></head>
 <body>
 <section id="access" class="access"><div class="access-card"><img src="assets/truco-v3.png" alt=""><small>TRUCO URUGUAYO</small><h1>Administración</h1><p id="identity"></p><p id="access-status">Verificando sesión…</p><button id="login" class="primary" hidden>Continuar con Google</button><button id="switch-account" hidden>Usar otra cuenta</button><a href="./">Volver al juego</a></div></section>
 <div id="console" class="shell" hidden>
@@ -12,6 +12,7 @@
    <button data-tab="users"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="4"/><path d="M2 21c0-4 3-7 7-7s7 3 7 7M16 4a4 4 0 0 1 0 8M22 21c0-3-2-6-5-7"/></svg>Usuarios</button>
    <button data-tab="tables"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M8 5v14M16 5v14"/></svg>Mesas</button>
    <button data-tab="reports"><svg viewBox="0 0 24 24"><path d="M12 3 2 20h20L12 3Zm0 6v5m0 3v.01"/></svg>Reportes<span id="reports-count" class="badge" hidden></span></button>
+   <button data-tab="messages"><svg viewBox="0 0 24 24"><path d="M4 5h16v11H8l-4 4V5Z"/></svg>Mensajes<span id="messages-count" class="badge" hidden></span></button>
    <button data-tab="audit"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Historial</button>
   </nav>
   <div class="sidebar-foot"><button id="logout" hidden>Cerrar sesión</button></div>
@@ -66,9 +67,16 @@
   </section>
 
   <section id="reports" hidden><div id="reports-list" class="cards"></div></section>
+  <section id="messages" hidden>
+   <article class="panel"><div class="panel-head"><h2>Nuevo mensaje</h2></div>
+    <form id="message-form" class="message-form"><label>Jugador<input id="message-to" list="message-people" placeholder="Escribí el nombre del jugador" autocomplete="off" required></label><datalist id="message-people"></datalist><label>Mensaje<textarea id="message-text" maxlength="800" rows="4" placeholder="Le aparece en el juego cuando no está en una partida." required></textarea></label><div class="message-send-row"><button class="primary" type="submit" id="message-send">Enviar mensaje</button><p id="message-error" role="alert"></p></div></form>
+   </article>
+   <h2 class="section-title">Conversaciones</h2>
+   <div id="message-threads" class="thread-list"></div>
+  </section>
   <section id="audit" hidden><div id="audit-list" class="cards"></div></section>
   <p id="status" role="status" aria-live="polite"></p>
  </main>
 </div>
 <dialog id="edit"><form id="edit-form"><div class="dialog-head"><h2 id="edit-title"></h2><button type="button" id="close" aria-label="Cerrar">×</button></div><p id="edit-description"></p><label id="value-label">Nuevo valor<input id="value" required></label><label id="delete-label" hidden>Escribí el nombre exacto para confirmar<input id="delete-confirm" autocomplete="off"></label><label>Motivo<input id="reason" required minlength="3" maxlength="200" placeholder="Por qué realizás este cambio"></label><p id="edit-error" role="alert"></p><div class="dialog-actions"><button id="cancel" type="button">Cancelar</button><button id="save" class="primary" type="submit">Confirmar cambio</button></div></form></dialog>
-<script type="module" src="admin.js?v=15"></script></body></html>
+<script type="module" src="admin.js?v=16"></script></body></html>

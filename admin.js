@@ -15,7 +15,7 @@ async function setTestUser(u,test){
 const number=value=>new Intl.NumberFormat('es-UY').format(Number(value)||0);
 const PLATFORM_LABELS={'app-ios':'App iPhone','app-android':'App Android','web-ios':'Web iPhone','web-android':'Web Android','web-desktop':'Web computadora'};
 const PAGE_LABELS={juego:'Juego',anotador:'Anotador',aprender:'Aprender a jugar',otra:'Reglas y otras'};
-const TAB_TITLES={metrics:'Resumen',visits:'Visitas',users:'Usuarios y créditos',tables:'Mesas y partidas',reports:'Problemas reportados',audit:'Historial de cambios'};
+const TAB_TITLES={metrics:'Resumen',visits:'Visitas',users:'Usuarios y créditos',tables:'Mesas y partidas',reports:'Problemas reportados',messages:'Mensajes a jugadores',audit:'Historial de cambios'};
 function errorText(e){return e.code==='functions/not-found'?'Falta publicar las funciones de administración en Firebase.':e.message||'No se pudo completar el cambio.';}
 function node(tag,text,className){const el=document.createElement(tag);el.textContent=text;if(className)el.className=className;return el;}
 function button(text,handler){const el=node('button',text);if(text==='Eliminar usuario')el.classList.add('danger');el.type='button';el.addEventListener('click',handler);return el;}
@@ -43,7 +43,7 @@ function renderUsers(){
   const detail=node('div','','user-detail');detail.append(node('small','UID: '+u.uid),node('small','Correo: '+(u.email||'Sin correo')),node('small','Saldo '+number(u.balance)+' · '+number(u.locked)+' reservados · Registro '+new Date(u.createdAt).toLocaleDateString('es-UY')));card.append(detail);
   const movements=node('details');movements.append(node('summary','Movimientos de créditos'));
   for(const e of Object.values(tableData.movements?.[u.uid]||{}).sort((a,b)=>b.at-a.at))movements.append(node('p',formatTableTime(e.at)+': saldo '+e.before+' → '+e.after+' · reservados '+e.reservedBefore+' → '+e.reservedAfter));detail.append(movements);
-  const actions=node('div','','actions');actions.append(button('Editar créditos',()=>openEdit('credits',u)),button('Cambiar nombre',()=>openEdit('rename',u)),button(u.disabled?'Desbloquear':'Bloquear',()=>openEdit('block',u)),button('Eliminar usuario',()=>openEdit('delete',u)),button(tests.has(u.uid)?'Quitar de prueba':'Marcar como prueba',()=>setTestUser(u,!tests.has(u.uid))));detail.append(actions);$('user-list').append(card);
+  const actions=node('div','','actions');actions.append(button('Editar créditos',()=>openEdit('credits',u)),button('Cambiar nombre',()=>openEdit('rename',u)),button(u.disabled?'Desbloquear':'Bloquear',()=>openEdit('block',u)),button('Eliminar usuario',()=>openEdit('delete',u)),button(tests.has(u.uid)?'Quitar de prueba':'Marcar como prueba',()=>setTestUser(u,!tests.has(u.uid))),button('Escribir mensaje',()=>writeTo(u)));detail.append(actions);$('user-list').append(card);
  }
  if(!$('user-list').children.length)$('user-list').append(node('p','No hay usuarios para mostrar.','empty'));
  $('more').hidden=!pageToken;
@@ -74,7 +74,7 @@ async function refresh(more=false,preservePages=false){
   $('audit-list').replaceChildren();for(const a of data.audit){
    const card=node('article','','card');card.append(node('h3',a.action),node('p',a.reason),node('p',a.uid||a.code||''),node('small',new Date(a.at).toLocaleString('es-UY')),node('small','Administrador: '+a.actor));
    if(a.before!==undefined)card.append(node('p',String(a.before)+' → '+String(a.after)));$('audit-list').append(card);
-  }await refreshMetrics();say('');
+  }await refreshMetrics();await loadMessages();say('');
   $('updated').textContent='Actualizado '+new Intl.DateTimeFormat('es-UY',{timeZone:'America/Montevideo',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date());
  }catch(e){if(generation===epoch)say(errorText(e));}finally{busy=false;$('more').disabled=false;$('user-scope').disabled=false;for(const b of document.querySelectorAll('[data-scope]'))b.disabled=false;}
 }
@@ -338,6 +338,46 @@ async function refreshMetrics(){
  finally{metricsBusy=false;}
 }
 $('metric-day').addEventListener('change',renderHours);
+// Messages to players: a player sees them in the game (never mid-match) and can answer.
+let threads=[];const openThreads=new Set();
+function peopleList(){
+ const list=$('message-people');list.replaceChildren();
+ for(const u of users.filter(u=>u.name))list.append(Object.assign(document.createElement('option'),{value:u.name}));
+}
+function writeTo(u){showTab('messages');$('message-to').value=u.name||'';$('message-text').focus();}
+async function loadMessages(){
+ try{threads=(await call({action:'messages'})).data.threads||[];}catch(e){return;}
+ const unread=threads.reduce((n,t)=>n+t.unread,0);$('messages-count').hidden=!unread;$('messages-count').textContent=unread||'';
+ renderThreads();
+}
+function renderThreads(){
+ peopleList();const box=$('message-threads');box.replaceChildren();
+ if(!threads.length){box.append(node('p','Todavía no le escribiste a ningún jugador.','empty'));return;}
+ for(const t of threads){
+  const card=node('details','','card thread');card.open=openThreads.has(t.uid);
+  const summary=node('summary','','thread-head');summary.append(node('strong',t.name||t.uid));
+  if(t.unread)summary.append(node('span',t.unread+(t.unread===1?' respuesta nueva':' respuestas nuevas'),'badge'));
+  summary.append(node('small',formatTableTime(t.lastAt)));card.append(summary);
+  // Opening a conversation marks the player's answers as seen.
+  card.addEventListener('toggle',()=>{if(card.open){openThreads.add(t.uid);if(t.unread){t.unread=0;call({action:'messages-seen',uid:t.uid}).then(loadMessages).catch(()=>{});}}else openThreads.delete(t.uid);});
+  const log=node('div','','thread-log');
+  for(const m of t.messages){const bubble=node('div','',m.from==='admin'?'bubble mine':'bubble theirs');bubble.append(node('p',m.text),node('small',(m.from==='admin'?'Vos':t.name||'Jugador')+' · '+formatTableTime(m.at)+(m.from==='admin'?(m.readAt?' · Leído':' · Sin leer'):'')));log.append(bubble);}
+  const form=node('form','','thread-reply'),field=node('textarea','');field.maxLength=800;field.rows=2;field.placeholder='Responder a '+(t.name||'este jugador');field.required=true;
+  const send=node('button','Enviar','primary');send.type='submit';const error=node('p','','thread-error');
+  form.append(field,send,error);
+  form.onsubmit=async event=>{event.preventDefault();send.disabled=true;error.textContent='';try{await call({action:'send-message',uid:t.uid,text:field.value});field.value='';openThreads.add(t.uid);await loadMessages();}catch(e){error.textContent=errorText(e);}finally{send.disabled=false;}};
+  card.append(log,form);box.append(card);
+ }
+}
+$('message-form').onsubmit=async event=>{
+ event.preventDefault();const name=$('message-to').value.trim().toLocaleLowerCase('es');
+ const matches=users.filter(u=>(u.name||'').toLocaleLowerCase('es')===name);
+ if(matches.length!==1){$('message-error').textContent=matches.length?'Hay más de un jugador con ese nombre.':'Elegí un jugador de la lista.';return;}
+ $('message-send').disabled=true;$('message-error').textContent='';
+ try{await call({action:'send-message',uid:matches[0].uid,text:$('message-text').value});$('message-text').value='';$('message-to').value='';openThreads.add(matches[0].uid);await loadMessages();say('Mensaje enviado a '+matches[0].name+'.');}
+ catch(e){$('message-error').textContent=errorText(e);}
+ finally{$('message-send').disabled=false;}
+};
 async function start(){
  try{
   let config;try{config=(await import('./firebase-config.js')).firebaseConfig;}catch{config=JSON.parse(localStorage.getItem('truco-firebase-config')||'null');}

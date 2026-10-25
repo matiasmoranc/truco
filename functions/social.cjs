@@ -5,7 +5,23 @@ const crypto=require('node:crypto');
 const {onCall,HttpsError}=require('firebase-functions/v2/https');
 const {getMessaging}=require('firebase-admin/messaging');
 const S=require('./social-service.cjs');
+const M=require('./admin-messages.cjs');
 const validUid=uid=>typeof uid==='string'&&/^[A-Za-z0-9_-]{6,128}$/.test(uid);
+// Phone notifications to every device a player registered; tokens Google reports as gone are removed.
+function pushSender(db){
+ const val=async path=>(await db.ref(path).get()).val();
+ return async function push(uid,{title,body,data}){
+  const tokens=Object.entries(await val('pushTokens/'+uid)||{}).map(([id,t])=>({id,token:t?.token})).filter(t=>typeof t.token==='string');
+  if(!tokens.length)return 0;
+  const result=await getMessaging().sendEachForMulticast({tokens:tokens.map(t=>t.token),notification:{title,body},data,
+   android:{priority:'high',notification:{channelId:'invitaciones',sound:'default'}},apns:{headers:{'apns-priority':'10'},payload:{aps:{sound:'default'}}}}).catch(()=>null);
+  if(!result)return 0;
+  const dead={};result.responses.forEach((r,i)=>{if(!r.success&&/registration-token-not-registered|invalid-registration-token|invalid-argument/.test(r.error?.code||''))dead['pushTokens/'+uid+'/'+tokens[i].id]=null;});
+  if(Object.keys(dead).length)await db.ref().update(dead);
+  return result.successCount;
+ }
+}
+
 function createSocialFunctions({db,identity,rateLimit,options,readLedger,usersBlockEachOther}){
  const val=async path=>(await db.ref(path).get()).val();
  const names=async uids=>{const list=await Promise.all(uids.map(uid=>val('profiles/'+uid+'/name')));return Object.fromEntries(uids.map((uid,i)=>[uid,list[i]||'']));};
@@ -18,16 +34,7 @@ function createSocialFunctions({db,identity,rateLimit,options,readLedger,usersBl
   return name;
  }
  // Every phone the player registered; tokens Google says are gone are removed.
- async function push(uid,{title,body,data}){
-  const tokens=Object.entries(await val('pushTokens/'+uid)||{}).map(([id,t])=>({id,token:t?.token})).filter(t=>typeof t.token==='string');
-  if(!tokens.length)return 0;
-  const result=await getMessaging().sendEachForMulticast({tokens:tokens.map(t=>t.token),notification:{title,body},data,
-   android:{priority:'high',notification:{channelId:'invitaciones',sound:'default'}},apns:{headers:{'apns-priority':'10'},payload:{aps:{sound:'default'}}}}).catch(()=>null);
-  if(!result)return 0;
-  const dead={};result.responses.forEach((r,i)=>{if(!r.success&&/registration-token-not-registered|invalid-registration-token|invalid-argument/.test(r.error?.code||''))dead['pushTokens/'+uid+'/'+tokens[i].id]=null;});
-  if(Object.keys(dead).length)await db.ref().update(dead);
-  return result.successCount;
- }
+ const push=pushSender(db);
  const playerSocial=onCall(options,async request=>{
   const user=await identity(request),data=request.data||{},now=Date.now();
   await rateLimit(user.uid,40,'social');
@@ -98,6 +105,14 @@ function createSocialFunctions({db,identity,rateLimit,options,readLedger,usersBl
     if(validUid(invite.from))await db.ref('tableInviteReplies/'+invite.from+'/'+data.inviteId).set({to:user.uid,name:user.name,code:invite.code,accepted:data.accept===true,at:now});
     return {ok:true,...(data.accept===true?{code:invite.code,password:invite.password||null}:{})};
    }
+   case 'admin-answer':{
+    // Reading (and optionally answering) a message from the administrator.
+    if(!M.validId(data.messageId))throw new HttpsError('invalid-argument','Mensaje inválido.');
+    if(!(await val('adminMessages/'+user.uid+'/'+data.messageId)))return {ok:true};
+    let text='';if(data.text!=null&&String(data.text).trim()){try{text=M.cleanText(data.text);}catch(e){throw new HttpsError('invalid-argument',e.message);}await rateLimit(user.uid,10,'admin-answer');}
+    await db.ref().update(M.answerUpdates({uid:user.uid,messageId:data.messageId,replyId:crypto.randomUUID(),text,now}));
+    return {ok:true,answered:!!text};
+   }
    case 'register-push':{
     if(typeof data.token!=='string'||data.token.length<20||data.token.length>4096)throw new HttpsError('invalid-argument','Token inválido.');
     const id=crypto.createHash('sha256').update(data.token).digest('hex').slice(0,32);
@@ -109,4 +124,4 @@ function createSocialFunctions({db,identity,rateLimit,options,readLedger,usersBl
  });
  return {playerSocial};
 }
-module.exports={createSocialFunctions};
+module.exports={createSocialFunctions,pushSender};

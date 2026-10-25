@@ -179,6 +179,8 @@ exports.creditExpireTables=onSchedule({schedule:'every 1 minutes',region:'us-cen
 
 // Admin permissions are server-only. Clients cannot write administrators.
 const {getAuth}=require('firebase-admin/auth');
+const adminMessages=require('./admin-messages.cjs');
+const pushToPlayer=require('./social.cjs').pushSender(db);
 const {requireAdmin,adminLedgerChange,validKey,prepareUserDeletion,finishUserDeletion,legacyTableActive,closeLegacyTable,adminTableCurrent}=require('./admin-service.cjs');
 async function adminIdentity(request){
  const uid=request.auth?.uid;
@@ -274,6 +276,28 @@ exports.adminConsole=onCall({...options,secrets:[liveInternalSecret]},async requ
   const job=next.accountDeletionJobs?.[data.uid];
   if(!job&&next.userAccess?.[data.uid]?.deletionRequestId===data.requestId)return {ok:true};
   try{await completeSelfDeletion(data.uid,job);}catch(e){console.error('Admin account deletion pending',e.code||'internal');throw new HttpsError('internal','La eliminación está en proceso. Se completará automáticamente.');}
+  return {ok:true};
+ }
+ // Messages to players: send one, list the conversations, mark a player's answers as seen.
+ if(action==='send-message'){
+  if(!validKey(data.uid))throw new HttpsError('invalid-argument','Usuario inválido.');
+  let text;try{text=adminMessages.cleanText(data.text);}catch(e){throw new HttpsError('invalid-argument',e.message);}
+  try{await getAuth().getUser(data.uid);}catch{throw new HttpsError('not-found','No encontramos a ese jugador.');}
+  const id=crypto.randomUUID(),now=Date.now();
+  await db.ref().update(adminMessages.sendUpdates({uid:data.uid,id,text,now,actor}));
+  await pushToPlayer(data.uid,{title:'Mensaje del administrador',body:text.length>120?text.slice(0,117)+'…':text,data:{type:'admin-message',messageId:id}}).catch(()=>0);
+  return {ok:true,id};
+ }
+ if(action==='messages'){
+  const threads=(await db.ref('adminThreads').get()).val()||{},uids=Object.keys(threads);
+  const names=Object.fromEntries(await Promise.all(uids.map(async uid=>[uid,(await db.ref('profiles/'+uid+'/name').get()).val()||''])));
+  return {threads:adminMessages.threadList(threads,names)};
+ }
+ if(action==='messages-seen'){
+  if(!validKey(data.uid))throw new HttpsError('invalid-argument','Usuario inválido.');
+  const thread=(await db.ref('adminThreads/'+data.uid).get()).val()||{},updates={};
+  for(const [id,m] of Object.entries(thread))if(m?.from==='player'&&m.seen===false)updates['adminThreads/'+data.uid+'/'+id+'/seen']=true;
+  if(Object.keys(updates).length)await db.ref().update(updates);
   return {ok:true};
  }
  if(action==='users'){

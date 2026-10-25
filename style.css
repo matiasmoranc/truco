@@ -2215,3 +2215,11 @@ input,textarea,[contenteditable=""],[contenteditable="true"]{-webkit-user-select
 .scorer-share{display:flex;align-items:center;justify-content:center;gap:10px;align-self:center;flex:none;margin:0 auto 12px;padding:10px 20px;min-height:48px;border:0;border-radius:999px;background:linear-gradient(180deg,#f0d596,#dcb565);color:#14301f;font:inherit;font-size:16px;font-weight:700;box-shadow:0 6px 16px #e8c98330,inset 0 1px 0 #fff6;cursor:pointer}
 .scorer-share[hidden]{display:none}
 .scorer-share svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+/* A message from the administrator, with an optional answer */
+.admin-message-date{display:block;margin:-4px 0 12px;color:#a9b8ad;font-size:13px}
+.admin-message-text{margin:0 0 16px!important;padding:14px 16px;border:1px solid #d9bd7944;border-radius:14px;background:#0b2c21;color:#f1e9d7;font-size:16px;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere;max-height:40dvh;overflow:auto}
+.admin-message-label{display:block;margin:0 0 6px;color:#cbbf9f;font-size:14px;font-weight:600}
+.admin-message-reply{display:block;width:100%;box-sizing:border-box;min-height:84px;margin:0 0 14px;padding:12px;border:1px solid #d9bd7966;border-radius:12px;background:#103b2c;color:#f1e9d7;font:inherit;font-size:16px;resize:vertical}
+.admin-message-reply:focus-visible{outline:2px solid #e8c983;outline-offset:2px}
+.table-invite-dialog #admin-message-send{background:linear-gradient(180deg,#f0d596,#dcb565);border:0;color:#14301f;box-shadow:0 6px 16px #e8c98330,inset 0 1px 0 #fff6}
+.table-invite-dialog #admin-message-close{background:transparent;border:1px solid #e8c98399;color:#e8c983}

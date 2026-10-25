@@ -194,3 +194,18 @@ dialog label{margin:12px 0}.dialog-actions{display:flex;justify-content:flex-end
  .bar-col .val{display:none}
 }
 @media(prefers-reduced-motion:reduce){button{transition:none}}
+/* Messages to players */
+textarea{font:inherit;font-size:14px;background:#0a1f18;color:var(--text);border:1px solid var(--line-2);border-radius:8px;padding:9px 11px;width:100%;margin-top:6px;resize:vertical}
+textarea:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.message-form{display:grid;gap:12px;max-width:640px}
+.message-send-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}#message-error,.thread-error{color:var(--red);font-size:13px;margin:0}
+.section-title{font-size:15px;margin:22px 0 10px}
+.thread-list{display:grid;gap:12px}
+.thread>summary{display:flex;align-items:center;gap:10px;cursor:pointer;list-style:none}.thread>summary::-webkit-details-marker{display:none}
+.thread-head strong{font-size:15px}.thread-head small{margin:0 0 0 auto!important}.thread-head .badge{margin-left:0}
+.thread-log{display:grid;gap:8px;margin:14px 0}
+.bubble{max-width:min(520px,85%);padding:10px 12px;border-radius:12px;border:1px solid var(--line)}
+.bubble p{margin:0 0 4px;white-space:pre-wrap}.bubble small{margin:0!important}
+.bubble.mine{justify-self:end;background:#e8c9831a;border-color:#e8c98344}
+.bubble.theirs{justify-self:start;background:var(--surface-2)}
+.thread-reply{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:end}.thread-reply textarea{margin:0}.thread-reply .thread-error{grid-column:1/-1}
