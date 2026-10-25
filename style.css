@@ -2192,8 +2192,9 @@ input,textarea,[contenteditable=""],[contenteditable="true"]{-webkit-user-select
 .table-invite-dialog #table-invite-accept:disabled{background:#ffffff14;border:1px solid #ffffff2e;color:#b9c6be;box-shadow:none;cursor:default}
 /* End of match: share the result on a photo */
 .match-end-panel{position:relative}
-.match-end-share{position:absolute;top:12px;left:12px;display:flex;align-items:center;justify-content:center;width:40px;height:40px;padding:0;border:1px solid #e8c98366;border-radius:12px;background:#e8c98314;color:#e8c983;cursor:pointer}
-.match-end-share svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+/* A clear call to share the result, between the score and the rematch */
+.match-end-share{display:flex;align-items:center;justify-content:center;gap:10px;margin:4px auto 14px;padding:12px 22px;min-height:50px;border:0;border-radius:999px;background:linear-gradient(180deg,#f0d596,#dcb565);color:#14301f;font:inherit;font-size:16px;font-weight:700;box-shadow:0 6px 16px #e8c98340,inset 0 1px 0 #fff6;cursor:pointer}
+.match-end-share svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .match-end-share:focus-visible{outline:2px solid #e8c983;outline-offset:2px}
 .match-photo-dialog{width:min(440px,calc(100% - 24px));max-height:92dvh;overflow:auto}
 .match-photo-dialog img{display:block;width:100%;max-height:58dvh;object-fit:contain;margin:4px 0 16px;border-radius:14px;background:#0b2c21}

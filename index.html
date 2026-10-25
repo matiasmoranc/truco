@@ -21,7 +21,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="./style.css?v=20261026-msg1" />
+    <link rel="stylesheet" href="./style.css?v=20261026-share2" />
   </head>
   <body>
     <section id="startup-loading" class="startup-loading" role="status" aria-live="polite"><img class="startup-animation" src="assets/loading-reparto.webp?v=2" alt="Dos manos repartiendo cartas" width="240" height="240" fetchpriority="high"><p>Preparando las mesas</p></section>
@@ -231,10 +231,10 @@
         </section>
         <section id="match-end" class="match-end hidden" role="dialog" aria-modal="true" aria-labelledby="match-end-title">
           <div class="match-end-panel">
-            <button id="close-match-end" class="match-end-close" type="button" aria-label="Cerrar resultado">×</button><button id="share-match" class="match-end-share" type="button" aria-label="Compartir el resultado con una foto"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V3m0 0L7.5 7.5M12 3l4.5 4.5"/><path d="M8 11H6a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6a2 2 0 0 0-2-2h-2"/></svg></button><input id="match-photo-input" type="file" accept="image/*" capture="environment" hidden>
+            <button id="close-match-end" class="match-end-close" type="button" aria-label="Cerrar resultado">×</button><input id="match-photo-input" type="file" accept="image/*" capture="environment" hidden>
             <h2 id="match-end-title"></h2>
             <div id="match-end-score" class="match-end-score"></div>
-            <p id="match-end-message" role="status"></p><p id="match-session-score" class="session-score"></p>
+            <p id="match-end-message" role="status"></p><p id="match-session-score" class="session-score"></p><button id="share-match" class="match-end-share" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V3m0 0L7.5 7.5M12 3l4.5 4.5"/><path d="M8 11H6a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6a2 2 0 0 0-2-2h-2"/></svg><span>Compartir resultado</span></button>
             <div class="match-end-actions">
               <button id="request-rematch" class="button primary" type="button">Revancha</button>
               <button id="accept-rematch" class="button primary hidden" type="button">Aceptar revancha</button>
