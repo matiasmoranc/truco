@@ -29,6 +29,7 @@
   "homepage": "https://github.com/matiasmoranc/truco#readme",
   "dependencies": {
     "@capacitor-firebase/authentication": "8.5.2",
+    "@capacitor-firebase/messaging": "8.5.2",
     "@capacitor/android": "8.5.3",
     "@capacitor/core": "8.5.3",
     "@capacitor/ios": "8.5.3",

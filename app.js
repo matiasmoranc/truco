@@ -1,5 +1,6 @@
 import './chat-moderation.js?v=20261013-moderation1';
 import { visitPlatform,takeVisit,markTestDevice } from './visit.js?v=20261024-visits5';
+import { installFriends } from './friends.js?v=20261025-friends1';
 import { installPlayerPanel } from './player-panel.js?v=20261013-blocklist1';
 import { installScorer,renderCompactTally } from './scorer.js?v=20261023-seo1';
 import { installActivity } from './activity.js?v=20261010-adminstats32';
@@ -640,6 +641,23 @@ function loadConfig() {
 }
 let firebaseReadyPromise=null;
 let creditFunctionsPromise=null,creditTickPending=false;
+// In the apps: register this phone for push notifications after signing in. A tap on a
+// friend request opens Amigos; a table invitation is shown by the live listener.
+async function registerPush(){
+  const native=globalThis.trucoNative;if(!native?.registerPush||!state.uid)return;
+  const token=await native.registerPush(data=>{if(data?.type==='friend-request')friends.open('requests');});
+  if(token)await creditApi('playerSocial',{action:'register-push',token,platform:native.platform});
+}
+// Friends and table invitations (friends.js).
+const friends=installFriends({$,api:creditApi,services:firebaseServices,getState:()=>state,document,
+  toast:(message,error=false,duration=2600)=>toast(message,true,duration),
+  tableToInvite:()=>{const room=state.room;if(!state.roomCode||state.localGame||room?.status!=='waiting')return null;
+    return {code:state.roomCode,mode:room.mode==='2v2'?'2v2':'1v1',targetPoints:Number(room.targetPoints)||null,stake:Number(room.creditMatch?.stake)||null,password:state.hostTablePassword?.code===state.roomCode?state.hostTablePassword.password:''};},
+  joinInvite:async(code,password)=>{
+    if(state.roomCode){toast('Salí de tu mesa actual para entrar a la invitación.',true);return;}
+    state.invitePassword=password?{code,password}:null;
+    await openInvitation(code);$('invite-form').requestSubmit();
+  }});
 // In the apps: when Google Play or the App Store has a newer version, offer it once per start.
 async function offerAppUpdate(){
   const native=globalThis.trucoNative;if(!native?.checkForUpdate)return;
@@ -653,9 +671,9 @@ setTimeout(()=>{offerAppUpdate().catch(()=>{});},3000);
 const activity=installActivity({send:async data=>{const result=await creditApi('playerActivity',{...data,platform:visitPlatform(),...(data.visible?takeVisit():null)});if(typeof result?.testDevice==='boolean')markTestDevice(result.testDevice);return result;},getUid:()=>state.uid,document});
 const account=installAccount({api:creditApi,services:firebaseServices,getState:()=>state,rememberName:rememberPlayerName,document,onReady:async()=>{
   const initialCredits=credits.start().then(()=>credits.whenReady());
-  loadCreditFunctions().catch(()=>{});activity.start();
+  loadCreditFunctions().catch(()=>{});activity.start();friends?.start().catch(()=>{});registerPush().catch(()=>{});
   await Promise.all([openInitialRoom(),initialCredits]);showLobbyOnboarding();
-},onIdentityChange:resetAccountRoom,onNameChanged:()=>showView('welcome-view'),onRegistered:uid=>{state.lobbyOnboardingUid=uid;requestAnimationFrame(showLobbyOnboarding);},inRoom:()=>!!state.room&&!$('welcome-view').classList.contains('active')});
+},onIdentityChange:(...args)=>{friends?.stop();return resetAccountRoom(...args);},onNameChanged:()=>showView('welcome-view'),onRegistered:uid=>{state.lobbyOnboardingUid=uid;requestAnimationFrame(showLobbyOnboarding);},inRoom:()=>!!state.room&&!$('welcome-view').classList.contains('active')});
 const credits=installCredits({services:firebaseServices,walletSource:creditWalletSource,api:creditApi,getState:()=>state,document,notify:message=>toast(message,true,2000),onChange:()=>{showLobbyOnboarding();if(state.lobbyRooms)renderLobby(state.lobbyRooms);
   if(state.room)renderMatchEnd();$('table-stake-available').textContent=String(credits.wallet()?.balance??'—');updateStakeControl();}});
 let lobbyWelcomeDialog=null,lobbyWelcomeStep=0,lobbyWelcomeTarget=null;
@@ -918,6 +936,8 @@ async function enterRoom() {
       // The table appears at once; the server confirms the credit reservation behind it.
       const code=newTableCode();
       state.pendingCreate=code;state.cancelAfterCreate=null;
+      // Kept so the host can hand a private table's password to an invited friend.
+      state.hostTablePassword=data.password?{code,password:data.password}:null;
       rememberPlayerName(name);
       attachLiveRoom(code,'player1',provisionalTable(data,name),null);
       void confirmCreatedTable(code,data);
@@ -951,6 +971,7 @@ function invitationLink(code){
 function updateInvitation(){
   const link=$('invite-whatsapp');
   link.classList.toggle('hidden',!state.roomCode||state.localGame||state.room?.status!=='waiting');
+  $('invite-friend').classList.toggle('hidden',!state.roomCode||state.localGame||state.room?.status!=='waiting'||!state.uid);
   if(state.roomCode){const message=`Te da para un truquito? Entra a mi mesa: ${invitationLink(state.roomCode)}`;link.href=`https://wa.me/?text=${encodeURIComponent(message)}`;}
 }
 function showInvitationForm(){
@@ -4401,6 +4422,8 @@ function openCreditJoin(code,room){
   if(room.mode==='2v2'){const select=$('join-credit-team'),choice=[...select.options].find(option=>!option.disabled&&option.value===state.joinTeam)||[...select.options].find(option=>!option.disabled);if(choice)select.value=choice.value;}
   $('join-credit-password-row').hidden=!room.creditMatch.hasPassword;
   $('join-credit-password').value='';setPasswordVisible('join-credit-password',false);$('join-credit-error').textContent='';
+  // A friend's invitation brings the password of a private table.
+  if(state.invitePassword?.code===code){$('join-credit-password').value=state.invitePassword.password;state.invitePassword=null;}
   const wallet=credits.wallet();$('join-credit-submit').disabled=!wallet||(wallet.balance<room.creditMatch.stake)||wallet.locked>0;
   if($('join-credit-submit').disabled)$('join-credit-error').textContent='No tenés créditos disponibles para esta apuesta.';
   $('join-credit-dialog').showModal();

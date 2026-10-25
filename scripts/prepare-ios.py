@@ -29,11 +29,36 @@ info["ITSAppUsesNonExemptEncryption"] = False
 # Remove legacy advertising metadata when regenerating an existing project.
 for key in ["GADApplicationIdentifier", "SKAdNetworkItems", "NSUserTrackingUsageDescription"]:
     info.pop(key, None)
+# Table invitations arrive as push notifications (Firebase Cloud Messaging over APNs).
+info["UIBackgroundModes"] = ["remote-notification"]
 info["UISupportedInterfaceOrientations"] = ["UIInterfaceOrientationPortrait"]
 # The first App Store release is iPhone only (portrait); iPad comes in a later version.
 info.pop("UISupportedInterfaceOrientations~ipad", None)
 info_path.write_bytes(plistlib.dumps(info))
-(app / "App.entitlements").write_bytes(plistlib.dumps({"com.apple.developer.applesignin": ["Default"]}))
+(app / "App.entitlements").write_bytes(plistlib.dumps({"com.apple.developer.applesignin": ["Default"], "aps-environment": "production"}))
+
+# The messaging plugin needs the APNs device token forwarded from the app delegate.
+delegate_path = app / "AppDelegate.swift"
+delegate = delegate_path.read_text()
+if "capacitorDidRegisterForRemoteNotifications" not in delegate:
+    hooks = """
+    func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        NotificationCenter.default.post(name: .capacitorDidRegisterForRemoteNotifications, object: deviceToken)
+    }
+
+    func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
+        NotificationCenter.default.post(name: .capacitorDidFailToRegisterForRemoteNotifications, object: error)
+    }
+
+    func application(_ application: UIApplication, didReceiveRemoteNotification userInfo: [AnyHashable: Any], fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void) {
+        NotificationCenter.default.post(name: Notification.Name.init("didReceiveRemoteNotification"), object: completionHandler, userInfo: userInfo)
+    }
+"""
+    end = delegate.rstrip().rfind("}")
+    if end < 0:
+        raise SystemExit("No se encontro AppDelegate.swift para las notificaciones.")
+    delegate = delegate[:end] + hooks + "}\n"
+    delegate_path.write_text(delegate)
 
 # Capacitor's generated project is not committed. Attach the Firebase plist
 # explicitly to its App resource phase, rather than merely copying a file.
@@ -59,4 +84,4 @@ project, families = re.subn(r"TARGETED_DEVICE_FAMILY = [^;]+;", "TARGETED_DEVICE
 if not families:
     project = project.replace("INFOPLIST_FILE = App/Info.plist;", "INFOPLIST_FILE = App/Info.plist;\n\t\t\t\tTARGETED_DEVICE_FAMILY = 1;")
 project_path.write_text(project)
-print("iOS configurado: Firebase, acceso Google, Sign in with Apple y solo iPhone.")
+print("iOS configurado: Firebase, acceso Google, Sign in with Apple, notificaciones y solo iPhone.")

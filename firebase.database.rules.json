@@ -60,6 +60,36 @@
       ".read": "(auth != null && root.child('userAccess').child(auth.uid).child('blocked').val() != true)",
       ".write": false
     },
+    "friends": {
+      "$uid": {
+        ".read": "auth != null && auth.uid == $uid && root.child('userAccess').child(auth.uid).child('blocked').val() != true",
+        ".write": false
+      }
+    },
+    "friendRequests": {
+      "$uid": {
+        ".read": "auth != null && auth.uid == $uid && root.child('userAccess').child(auth.uid).child('blocked').val() != true",
+        ".write": false
+      }
+    },
+    "friendRequestsSent": {
+      "$uid": {
+        ".read": "auth != null && auth.uid == $uid && root.child('userAccess').child(auth.uid).child('blocked').val() != true",
+        ".write": false
+      }
+    },
+    "tableInvites": {
+      "$uid": {
+        ".read": "auth != null && auth.uid == $uid && root.child('userAccess').child(auth.uid).child('blocked').val() != true",
+        ".write": false
+      }
+    },
+    "tableInviteReplies": {
+      "$uid": {
+        ".read": "auth != null && auth.uid == $uid && root.child('userAccess').child(auth.uid).child('blocked').val() != true",
+        ".write": false
+      }
+    },
     "userBlocks": {
       "$uid": {
         ".read": "auth != null && auth.uid == $uid && root.child('userAccess').child(auth.uid).child('blocked').val() != true",

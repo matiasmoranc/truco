@@ -5,6 +5,7 @@ import * as dbSdk from 'firebase/database';
 import * as authSdk from 'firebase/auth';
 import * as functionsSdk from 'firebase/functions';
 import { AppUpdate, AppUpdateAvailability, AppUpdateResultCode } from '@capawesome/capacitor-app-update';
+import { FirebaseMessaging } from '@capacitor-firebase/messaging';
 import { rewardedAds } from './no-ads.js';
 
 // App Store id, needed on iPhone to look up and open the listing.
@@ -22,6 +23,20 @@ globalThis.trucoNative = {
       const info = await AppUpdate.getAppUpdateInfo(Capacitor.getPlatform() === 'ios' ? { country: 'uy' } : undefined);
       if (info.updateAvailability !== AppUpdateAvailability.UPDATE_AVAILABLE) return null;
       return { version: info.availableVersionName || info.availableVersionCode || '' };
+    } catch { return null; }
+  },
+  // Push notifications for friend requests and table invitations. Asks permission once,
+  // returns the phone's token (or null) and reports taps on a notification.
+  async registerPush(onTap) {
+    try {
+      if (Capacitor.getPlatform() === 'android') await FirebaseMessaging.createChannel({ id: 'invitaciones', name: 'Invitaciones', description: 'Invitaciones a jugar y solicitudes de amistad', importance: 5, sound: 'default' }).catch(() => {});
+      let { receive } = await FirebaseMessaging.checkPermissions();
+      if (receive === 'prompt' || receive === 'prompt-with-rationale') ({ receive } = await FirebaseMessaging.requestPermissions());
+      if (receive !== 'granted') return null;
+      await FirebaseMessaging.removeAllListeners();
+      await FirebaseMessaging.addListener('notificationActionPerformed', event => onTap?.(event.notification?.data || {}));
+      const { token } = await FirebaseMessaging.getToken();
+      return token || null;
     } catch { return null; }
   },
   // Android installs it inside the app (Google Play); iPhone opens the App Store page.

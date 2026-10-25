@@ -28,6 +28,8 @@ const {closeLiveTable}=require('./live-server.cjs');
 // Ad rewards credit Firebase wallets; they stay off once credits live in the bank.
 const rewardIdentity=async request=>{if(await creditStore.isActive())throw new HttpsError('failed-precondition','Las recompensas no están disponibles.');return identity(request);};
 Object.assign(exports,require('./ad-rewards.cjs').createRewardFunctions({db,identity:rewardIdentity,rateLimit,options}));
+// Friends and table invitations with push notifications.
+Object.assign(exports,require('./social.cjs').createSocialFunctions({db,identity,rateLimit,options,readLedger:()=>creditStore.readLedger(),usersBlockEachOther}));
 async function identity(request){
  const auth=request.auth,provider=auth?.token?.firebase?.sign_in_provider;
  if(!auth||!['google.com','apple.com','password'].includes(provider))throw new HttpsError('unauthenticated','Iniciá sesión con tu cuenta.');
@@ -415,6 +417,8 @@ exports.siteVisit=onCall({region:'us-central1',maxInstances:3,timeoutSeconds:10,
 });
 exports.activityCleanup=onSchedule({schedule:'every day 04:00',timeZone:'America/Montevideo',region:'us-central1',maxInstances:1},async()=>{
  const now=Date.now();
+ // Table invitations and their answers older than a day are not useful anymore.
+ for(const root of ['tableInvites','tableInviteReplies']){const all=(await db.ref(root).get()).val()||{},gone={};for(const [uid,list] of Object.entries(all))for(const [id,v] of Object.entries(list||{}))if(!(now-(v?.at||0)<86400000))gone[root+'/'+uid+'/'+id]=null;if(Object.keys(gone).length)await db.ref().update(gone);}
  await db.ref('adminMetrics').transaction(metrics=>{
   if(!metrics)return undefined;
   // Daily activity, counters and visit details are kept for VISIT_DAYS.
