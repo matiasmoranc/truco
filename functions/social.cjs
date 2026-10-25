@@ -76,7 +76,13 @@ function createSocialFunctions({db,identity,rateLimit,options,readLedger,usersBl
    }
    case 'invite':{
     if(!validUid(data.uid)||!(await val('friends/'+user.uid+'/'+data.uid)))throw new HttpsError('permission-denied','Solo podés invitar a tus amigos.');
-    await peer(user,data.uid);await rateLimit(user.uid,12,'table-invite');
+    const peerName=await peer(user,data.uid);
+    // Someone in the middle of a game is not interrupted: the host hears it and nothing is sent.
+    if(S.isPlaying(await val('playerStatus/'+data.uid),now))throw new HttpsError('failed-precondition',peerName+' ya está en una partida.');
+    await rateLimit(user.uid,12,'table-invite');
+    let allowance;
+    await db.ref('tableInviteLog/'+user.uid+'/'+data.uid).transaction(current=>{allowance=S.inviteAllowance(current,now);return allowance.allowed?allowance.next:undefined;});
+    if(!allowance?.allowed)throw new HttpsError('resource-exhausted','Ya le enviaste '+S.INVITES_PER_FRIEND+' invitaciones a '+peerName+'. Esperá '+allowance.waitMinutes+' minuto'+(allowance.waitMinutes===1?'':'s')+' para enviar otra.');
     let invite;try{invite=S.inviteRecord({from:user.uid,fromName:user.name,table:data.table,now});}catch(e){throw new HttpsError('invalid-argument',e.message);}
     const id=crypto.randomUUID();
     await db.ref('tableInvites/'+data.uid+'/'+id).set(invite);

@@ -2170,3 +2170,16 @@ input,textarea,[contenteditable=""],[contenteditable="true"]{-webkit-user-select
 #welcome-view #credits-panel #credits-claim{width:100%;min-height:56px;margin:0}
 #welcome-view #credits-panel #credits-claim:not(:disabled){background:linear-gradient(180deg,#f0d596,#dcb565);border:0;color:#14301f;-webkit-text-fill-color:currentColor;box-shadow:0 6px 16px #e8c98330,inset 0 1px 0 #fff6}
 #welcome-view #credits-panel #credits-claim:not(:disabled):hover{background:linear-gradient(180deg,#f4dda4,#e2bd6f)}
+/* Table invitation: the table's facts and rounded game buttons */
+.table-invite-dialog .join-summary{margin:0 0 18px}
+.table-invite-dialog .table-invite-actions .button{width:100%;min-height:54px;padding:12px 18px;border-radius:16px;font:inherit;font-size:17px;font-weight:700;text-align:center;justify-content:center}
+.table-invite-dialog #table-invite-accept{background:linear-gradient(180deg,#f0d596,#dcb565);border:0;color:#14301f;box-shadow:0 6px 16px #e8c98330,inset 0 1px 0 #fff6}
+.table-invite-dialog #table-invite-decline{background:transparent;border:1px solid #e8c98399;color:#e8c983}
+.table-invite-dialog .table-invite-actions .button:focus-visible{outline:2px solid #e8c983;outline-offset:2px}
+/* Waiting room: WhatsApp right under Invitar amigo, with the same look and its own logo */
+#waiting-view .invite-whatsapp{width:100%;min-height:48px;margin:10px 0 0;padding:12px 16px;gap:10px;border:1px solid #e8c98366;border-radius:12px;background:#e8c98312;color:#ead39b;font-size:16px;font-weight:700}
+#waiting-view .invite-whatsapp:hover{background:#e8c98322}
+#waiting-view .invite-whatsapp .whatsapp-brand-icon{width:24px;height:24px}
+/* Invite a friend: the note sits right under the title, apart from the search box */
+#invite-friend-dialog .friends-head{margin-bottom:4px}
+#invite-friend-dialog .invite-friend-note{margin:0 0 16px;color:#cbd6cf;font-size:14px;line-height:1.4}

@@ -3,8 +3,8 @@
 // or a new friendship shows on both sides at once. From a waiting table, invite a
 // friend, who gets the invitation live in the game (and as a phone notification)
 // with Entrar / Rechazar.
-export function installFriends({$,api,services,getState,toast,tableToInvite,joinInvite,showView,openLobby,document}){
- let overview={friends:[],incoming:[],outgoing:[]},recent=null,unsubscribers=[],listening=null;
+export function installFriends({$,api,services,getState,toast,tableToInvite,joinInvite,showView,openLobby,isPlaying=()=>false,balance=()=>undefined,document}){
+ let overview={friends:[],incoming:[],outgoing:[]},recent=null,unsubscribers=[],listening=null,statusTimer=null;
  const shownInvites=new Set(),shownReplies=new Set(),invited=new Map();
  const el=(tag,cls,text)=>{const node=document.createElement(tag);if(cls)node.className=cls;if(text!=null)node.textContent=text;return node;};
  const call=(action,data={})=>api('playerSocial',{action,...data});
@@ -69,9 +69,11 @@ export function installFriends({$,api,services,getState,toast,tableToInvite,join
   const friends=overview.friends.filter(f=>f.name.toLocaleLowerCase('es').includes(query));
   list($('invite-friend-list'),friends.map(f=>{
    const state=invited.get(f.uid);
-   return row(f.name,state==='sent'?'Invitación enviada':state==='declined'?'No puede ahora':null,[button(state==='sent'?'Reenviar':'Invitar',async()=>{
+   return row(f.name,state==='sent'?'Invitación enviada':state==='declined'?'No puede ahora':state==='busy'?'Está en una partida':null,[button(state==='sent'?'Reenviar':'Invitar',async()=>{
     const table=tableToInvite();if(!table)throw new Error('La mesa ya no está esperando jugadores.');
-    await call('invite',{uid:f.uid,table});invited.set(f.uid,'sent');toast('Invitación enviada a '+f.name+'.');renderInviteList();
+    try{await call('invite',{uid:f.uid,table});}
+    catch(error){if(/ya está en una partida/.test(error?.message||'')){invited.set(f.uid,'busy');renderInviteList();}throw error;}
+    invited.set(f.uid,'sent');toast('Invitación enviada a '+f.name+'.');renderInviteList();
    },state!=='sent')]);
   }),overview.friends.length?'Ningún amigo con ese nombre.':'Todavía no tenés amigos. Agregalos desde "Amigos" en la pantalla principal.');
  }
@@ -85,7 +87,12 @@ export function installFriends({$,api,services,getState,toast,tableToInvite,join
   if(shownInvites.has(id)||!(invite?.expiresAt>Date.now()))return;
   if(getState().room&&!['waiting','complete'].includes(getState().room.status))return;
   shownInvites.add(id);current={id,invite};
-  $('table-invite-text').textContent=invite.fromName+' te invita a jugar'+(invite.mode==='2v2'?' una mesa de 2 vs 2':' una mesa de 1 vs 1')+(invite.targetPoints?' a '+invite.targetPoints+' puntos':'')+(invite.stake?' ('+invite.stake+' crédito'+(invite.stake===1?'':'s')+')':'')+'.';
+  $('table-invite-text').textContent=invite.fromName+' te invita a jugar en su mesa.';
+  // The same facts as when creating or entering a table: players, points and credits.
+  const plural=n=>n+' crédito'+(n===1?'':'s'),stake=Number(invite.stake)||0,mine=balance();
+  const rows=[['Jugadores',invite.mode==='2v2'?'2 vs 2 · 4 jugadores':'1 vs 1 · 2 jugadores'],['Puntos',invite.targetPoints?invite.targetPoints+' puntos':'—'],['Apuesta',stake?plural(stake)+' por jugador':'Sin créditos']];
+  if(stake)rows.push(['Tus créditos',Number.isFinite(mine)?mine+(mine>=stake?' · te quedan '+(mine-stake):' · no te alcanzan'):'—']);
+  $('table-invite-summary').replaceChildren(...rows.flatMap(([k,v])=>[el('dt','',k),el('dd','',v)]));
   $('table-invite-dialog').showModal();
   setTimeout(()=>{if(current?.id===id&&$('table-invite-dialog').open){$('table-invite-dialog').close();toast('La invitación de '+invite.fromName+' venció.');}},Math.max(0,invite.expiresAt-Date.now()));
  }
@@ -122,7 +129,19 @@ export function installFriends({$,api,services,getState,toast,tableToInvite,join
   follow('friendRequestsSent',value=>{overview.outgoing=asList(value);render();});
   follow('tableInvites',value=>{for(const [id,v] of Object.entries(value||{}))showInvite(id,v);});
   follow('tableInviteReplies',value=>{for(const [id,v] of Object.entries(value||{}))showReply(id,v);});
+  // While I am in a game the server turns friends' invitations away; the report is
+  // refreshed while playing and removed when the game ends or the connection drops.
+  const statusRef=fb.ref(fb.db,'playerStatus/'+uid);let reported=false,reportedAt=0;
+  fb.onDisconnect(statusRef).set(null).catch(()=>{});
+  const report=()=>{
+   if(listening!==uid)return;const playing=!!isPlaying();
+   if(playing===reported&&(!playing||Date.now()-reportedAt<5*60000))return;
+   reported=playing;reportedAt=Date.now();
+   fb.set(statusRef,playing?{playing:true,at:fb.serverTimestamp()}:null).catch(()=>{reported=!playing;});
+  };
+  report();statusTimer=setInterval(report,4000);
+  unsubscribers.push(()=>{if(reported)fb.set(statusRef,null).catch(()=>{});});
  }
- function stop(){for(const off of unsubscribers)off?.();unsubscribers=[];listening=null;overview={friends:[],incoming:[],outgoing:[]};badge();}
+ function stop(){clearInterval(statusTimer);statusTimer=null;for(const off of unsubscribers)off?.();unsubscribers=[];listening=null;overview={friends:[],incoming:[],outgoing:[]};badge();}
  return {start,stop,open};
 }

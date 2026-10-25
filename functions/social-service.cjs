@@ -50,5 +50,17 @@ function inviteRecord({from,fromName,table,now}){
  const password=typeof table.password==='string'?table.password.slice(0,40):'';
  return {from,fromName,code:table.code,mode:table.mode==='2v2'?'2v2':'1v1',targetPoints:Number.isSafeInteger(table.targetPoints)?table.targetPoints:null,stake:Number.isSafeInteger(table.stake)?table.stake:null,...(password?{password}:{}),at:now,expiresAt:now+INVITE_MS};
 }
-const inviteText=invite=>`${invite.fromName} te invita a jugar al truco`+(invite.mode==='2v2'?' (2 vs 2':' (1 vs 1')+(invite.targetPoints?`, a ${invite.targetPoints} puntos)`:')');
-module.exports={INVITE_MS,nameKey,keyName,searchPrefix,recentOpponents,relation,requestUpdates,acceptUpdates,declineUpdates,removeUpdates,inviteRecord,inviteText};
+// A player reports while they are in a game; a report older than this is stale (the
+// app was closed without a clean disconnect) and no longer blocks invitations.
+const PLAYING_FRESH_MS=20*60000;
+const isPlaying=(status,now)=>status?.playing===true&&Number(status.at)>now-PLAYING_FRESH_MS;
+// The same friend gets at most this many invitations in a window; different friends
+// can all be invited at once.
+const INVITES_PER_FRIEND=2,INVITE_WINDOW_MS=20*60000;
+function inviteAllowance(sentAt,now){
+ const recent=(Array.isArray(sentAt)?sentAt:Object.values(sentAt||{})).map(Number).filter(t=>t>now-INVITE_WINDOW_MS).sort((a,b)=>a-b);
+ if(recent.length<INVITES_PER_FRIEND)return {allowed:true,next:[...recent,now]};
+ return {allowed:false,waitMinutes:Math.max(1,Math.ceil((recent[recent.length-INVITES_PER_FRIEND]+INVITE_WINDOW_MS-now)/60000)),next:recent};
+}
+const inviteText=invite=>`${invite.fromName} te invita a jugar al truco: `+[invite.mode==='2v2'?'2 vs 2':'1 vs 1',invite.targetPoints?`a ${invite.targetPoints} puntos`:null,invite.stake?`${invite.stake} crédito${invite.stake===1?'':'s'} por jugador`:'sin créditos'].filter(Boolean).join(', ')+'.';
+module.exports={INVITE_MS,nameKey,keyName,searchPrefix,recentOpponents,relation,requestUpdates,acceptUpdates,declineUpdates,removeUpdates,inviteRecord,inviteText,PLAYING_FRESH_MS,isPlaying,INVITES_PER_FRIEND,INVITE_WINDOW_MS,inviteAllowance};

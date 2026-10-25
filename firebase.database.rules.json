@@ -84,6 +84,17 @@
         ".write": false
       }
     },
+    "tableInviteLog": {".read": false, ".write": false},
+    "playerStatus": {
+      "$uid": {
+        ".read": false,
+        ".write": "auth != null && auth.uid == $uid",
+        ".validate": "!newData.exists() || (newData.child('playing').val() == true && newData.child('at').val() == now && newData.hasChildren(['playing','at']))",
+        "playing": {".validate": true},
+        "at": {".validate": true},
+        "$other": {".validate": false}
+      }
+    },
     "tableInviteReplies": {
       "$uid": {
         ".read": "auth != null && auth.uid == $uid && root.child('userAccess').child(auth.uid).child('blocked').val() != true",

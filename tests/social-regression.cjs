@@ -21,7 +21,20 @@ test('Friendship steps write both sides and a crossed request becomes a friendsh
 test('A table invitation carries the code, the private password and expires in minutes',()=>{
  const invite=S.inviteRecord({from:'a',fromName:'Ana',table:{code:'ABCDE',mode:'2v2',targetPoints:30,stake:5,password:'clave'},now:1000});
  assert.equal(invite.code,'ABCDE');assert.equal(invite.password,'clave');assert.equal(invite.expiresAt,1000+S.INVITE_MS);
- assert.equal(S.inviteText(invite),'Ana te invita a jugar al truco (2 vs 2, a 30 puntos)');
+ assert.equal(S.inviteText(invite),'Ana te invita a jugar al truco: 2 vs 2, a 30 puntos, 5 créditos por jugador.');
  assert.equal(S.inviteRecord({from:'a',fromName:'Ana',table:{code:'ABCDE'},now:1}).password,undefined);
  assert.throws(()=>S.inviteRecord({from:'a',fromName:'Ana',table:{code:'../x'},now:1}));
+});
+test('A fresh "playing" report blocks invitations; a missing or stale one does not',()=>{
+ const now=10*3600000;
+ assert.equal(S.isPlaying({playing:true,at:now-60000},now),true);
+ assert.equal(S.isPlaying({playing:true,at:now-S.PLAYING_FRESH_MS-1},now),false);
+ assert.equal(S.isPlaying(null,now),false);assert.equal(S.isPlaying({playing:false,at:now},now),false);
+});
+test('The same friend gets at most 2 invitations every 20 minutes',()=>{
+ const now=5*3600000,min=60000;
+ assert.deepEqual(S.inviteAllowance(null,now),{allowed:true,next:[now]});
+ assert.equal(S.inviteAllowance([now-5*min],now).allowed,true);
+ const full=S.inviteAllowance([now-5*min,now-2*min],now);assert.equal(full.allowed,false);assert.equal(full.waitMinutes,15);
+ assert.equal(S.inviteAllowance([now-25*min,now-21*min],now).allowed,true);
 });

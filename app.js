@@ -1,6 +1,6 @@
 import './chat-moderation.js?v=20261013-moderation1';
 import { visitPlatform,takeVisit,markTestDevice } from './visit.js?v=20261024-visits5';
-import { installFriends } from './friends.js?v=20261025-friends2';
+import { installFriends } from './friends.js?v=20261025-invite1';
 import { installPlayerPanel } from './player-panel.js?v=20261013-blocklist1';
 import { installScorer,renderCompactTally } from './scorer.js?v=20261023-seo1';
 import { installActivity } from './activity.js?v=20261010-adminstats32';
@@ -649,7 +649,7 @@ async function registerPush(){
   if(token)await creditApi('playerSocial',{action:'register-push',token,platform:native.platform});
 }
 // Friends and table invitations (friends.js).
-const friends=installFriends({$,api:creditApi,services:firebaseServices,getState:()=>state,document,showView,openLobby:()=>openLobby(),
+const friends=installFriends({$,api:creditApi,services:firebaseServices,getState:()=>state,document,showView,isPlaying:()=>!!state.room&&!state.learning&&$("game-view").classList.contains("active")&&!["waiting","complete"].includes(state.room.status),balance:()=>credits.wallet()?.balance,openLobby:()=>openLobby(),
   toast:(message,error=false,duration=2600)=>toast(message,true,duration),
   tableToInvite:()=>{const room=state.room;if(!state.roomCode||state.localGame||room?.status!=='waiting')return null;
     return {code:state.roomCode,mode:room.mode==='2v2'?'2v2':'1v1',targetPoints:Number(room.targetPoints)||null,stake:Number(room.creditMatch?.stake)||null,password:state.hostTablePassword?.code===state.roomCode?state.hostTablePassword.password:''};},
@@ -912,6 +912,8 @@ async function enterRoom() {
       if(!snap.exists()){if($('join-credit-dialog').open)throw new Error('La invitación ya no está disponible.');toast('La invitación ya no está disponible.',true);await openLobby();return;}
       let room=snap.val(),seat=roomSeatForUid(room,state.uid);
       if(room.status==='closed'||roomExpired(room)){if($('join-credit-dialog').open)throw new Error('La mesa ya está cerrada.');toast('La mesa ya está cerrada.',true);await openLobby();return;}
+      // Several friends may be invited at once: whoever arrives after the last seat is taken hears it plainly.
+      if(!seat&&!roomSeats(room).some(p=>!room.players?.[p])){if($('join-credit-dialog').open)throw new Error('La mesa ya se llenó.');toast('La mesa ya se llenó.',true);await openLobby();return;}
       if(room.managedCredits){
         // Entering a table spends credits: always confirm with its details first.
         if(!seat&&!state.joinConfirmed){openCreditJoin(code,room);return;}
