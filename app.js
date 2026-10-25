@@ -1035,8 +1035,10 @@ async function openLobby() {
   }
 }
 const ROOM_WAIT_LIMIT=10*60*1000;
+// Tables say how long they wait for a rival (house tables wait longer); older ones wait 10 minutes.
 function roomExpired(room,now=Date.now()){
-  return room?.status==='waiting' && !(room.mode==='2v2'?['player1','player2','player3','player4']:['player1','player2']).every(p=>room.players?.[p]) && Number.isFinite(room.createdAt) && now-room.createdAt>=ROOM_WAIT_LIMIT;
+  const limit=Number(room?.waitLimit)||ROOM_WAIT_LIMIT;
+  return room?.status==='waiting' && !(room.mode==='2v2'?['player1','player2','player3','player4']:['player1','player2']).every(p=>room.players?.[p]) && Number.isFinite(room.createdAt) && now-room.createdAt>=limit;
 }
 const closingRooms=new Set();
 async function closeExpiredRoom(code){

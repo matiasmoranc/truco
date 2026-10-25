@@ -7,7 +7,7 @@ import teamBot from '../../functions/team-bot.cjs';
 import duelBot from '../../functions/duel-bot.cjs';
 import {ACTIVE,CodeTakenError} from './ledger-ops.js';
 
-const {tableOperation,publicTable,privateTableHand,createTable}=tableService;
+const {tableOperation,publicTable,privateTableHand,createTable,waitFor}=tableService;
 const {SIGNAL_WAIT_MS,mustAct,awaitsSignal,signalFor,botCommands}=teamBot;
 export {CodeTakenError,slimMatch} from './ledger-ops.js';
 
@@ -161,7 +161,7 @@ export function createTableEngine({code,bank,clock=()=>Date.now()}){
    if(!m)return null;
    const now=clock(),times=[];
    if(m.house&&m.status==='settled'&&m.session?.room?.rematch?.status==='pending'&&m.session.room.rematch.requester!==m.house)times.push(now+1000);
-   if(m.status==='waiting')times.push(m.createdAt+WAIT_MS);
+   if(m.status==='waiting')times.push(m.createdAt+waitFor(m));
    const r=m.session?.room;
    if(m.status==='reserved'&&r){
     times.push(r.resolutionEndsAt,r.pendingNextHand?.endsAt,r.status==='revealing'?r.endReveal?.endsAt:null,r.openingDraw?.resolveAt,r.openingDraw?.endsAt);

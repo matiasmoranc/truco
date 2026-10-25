@@ -39,6 +39,14 @@ test('House tables: no wallet for the host, a win pays twice the stake, a loss k
  assert.deepEqual(finish(l,'player2').wallets.u2,{balance:7,locked:0});
  assert.deepEqual(finish(l,'player1').wallets.u2,{balance:3,locked:0});
  // Nobody joined: the table closes without touching any wallet.
- const idle=T.tableOperation(T.createTable(base,{code:'BCDEF',id:'m2',uid:houseUid('Lu_Gonzalez'),name:'Lu_Gonzalez',stake:1,targetPoints:10,house:true,now:1}),{code:'BCDEF',uid:houseUid('Lu_Gonzalez'),command:{kind:'tick'},now:700000});
+ const idle=T.tableOperation(T.createTable(base,{code:'BCDEF',id:'m2',uid:houseUid('Lu_Gonzalez'),name:'Lu_Gonzalez',stake:1,targetPoints:10,house:true,now:1}),{code:'BCDEF',uid:houseUid('Lu_Gonzalez'),command:{kind:'tick'},now:1300000});
  assert.equal(idle.matches.m2.status,'refunded');assert.deepEqual(idle.wallets,base.wallets);
+});
+test('A house table waits 20 minutes for a rival and says so to the lobby',()=>{
+ const base={wallets:{u2:{balance:5,locked:0}},matches:{},tables:{}};
+ const l=T.createTable(base,{code:'CDEFG',id:'m3',uid:houseUid('Caro.Suarez'),name:'Caro.Suarez',stake:1,targetPoints:20,house:true,now:0});
+ assert.equal(T.publicTable(l.matches.m3).waitLimit,20*60000);
+ assert.equal(T.tableOperation(l,{code:'CDEFG',uid:houseUid('Caro.Suarez'),command:{kind:'tick'},now:15*60000}).matches.m3.status,'waiting');
+ assert.equal(T.joinTable(l,{code:'CDEFG',uid:'u2',name:'Pinar',now:19*60000}).matches.m3.status,'reserved');
+ assert.throws(()=>T.joinTable(l,{code:'CDEFG',uid:'u2',name:'Pinar',now:20*60000}),/no está disponible/);
 });
