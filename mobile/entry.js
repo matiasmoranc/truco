@@ -20,9 +20,9 @@ globalThis.trucoNative = {
   rewardedAds,
   publicUrl: 'https://trucouruguayo.uy/',
   // The match photo goes to the phone's share sheet (Instagram, WhatsApp…) from a cache file.
-  async shareImage(base64, name, text) {
+  async shareImage(base64, name) {
     const { uri } = await Filesystem.writeFile({ path: name, data: base64, directory: Directory.Cache });
-    await Share.share({ files: [uri], text, dialogTitle: 'Compartir resultado' });
+    await Share.share({ files: [uri], dialogTitle: 'Compartir resultado' });
   },
   // A newer version in Google Play or the App Store: { version } or null. Never throws.
   async checkForUpdate() {

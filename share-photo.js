@@ -19,16 +19,17 @@ function drawTally(ctx,x,y,points,target,size,gap){
   return half*2+gap;
 }
 
-// The photo, at most 1600 px on its long side, with the scoreboard card on top, kept
+// The photo, cropped to 9:16, with the scoreboard card on top, kept
 // well inside the lower-right corner.
 export async function composeMatchPhoto(photo,{sides,target=30},logo){
-  const scale=Math.min(1,1600/Math.max(photo.naturalWidth||photo.width,photo.naturalHeight||photo.height));
-  const W=Math.round((photo.naturalWidth||photo.width)*scale),H=Math.round((photo.naturalHeight||photo.height)*scale);
+  // Always a vertical 9:16 picture (stories size), cropped from the middle of the photo.
+  const pw=photo.naturalWidth||photo.width,ph=photo.naturalHeight||photo.height,W=1080,H=1920;
+  const cover=Math.max(W/pw,H/ph),sw=W/cover,sh=H/cover;
   const canvas=document.createElement('canvas');canvas.width=W;canvas.height=H;
-  const ctx=canvas.getContext('2d');ctx.drawImage(photo,0,0,W,H);
+  const ctx=canvas.getContext('2d');ctx.drawImage(photo,(pw-sw)/2,(ph-sh)/2,sw,sh,0,0,W,H);
   await document.fonts?.ready;
   target=[10,20,30,40].includes(Number(target))?Number(target):30;
-  const u=Math.min(W,H)/100,pad=4.5*u,colW=21*u,cardW=pad*2+colW*sides.length,logoH=logo?8*u:0;
+  const u=Math.min(W,H)/100,pad=3.6*u,colW=16.8*u,cardW=pad*2+colW*sides.length,logoH=logo?8*u:0;
   const size=Math.min(3.6*u,30*u/(target/5)),gap=size*.45,tallyH=(target/10)*(size+gap)*2+gap,nameH=7*u,footH=7*u;
   const cardH=pad+(logo?logoH+2.5*u:0)+nameH+tallyH+2*u+footH+pad*.6,margin=7*u,x=W-cardW-margin,y=H-cardH-margin;
   ctx.save();ctx.shadowColor='rgba(0,0,0,.55)';ctx.shadowBlur=5*u;ctx.shadowOffsetY=1.5*u;
@@ -39,7 +40,7 @@ export async function composeMatchPhoto(photo,{sides,target=30},logo){
   ctx.textBaseline='middle';ctx.textAlign='center';
   sides.forEach((side,i)=>{
     const cx=x+pad+colW*i+colW/2;
-    ctx.font=`${side.winner?700:500} ${3.4*u}px 'DM Sans',sans-serif`;ctx.fillStyle=side.winner?'#f0d596':'#dfe6e1';
+    ctx.font=`${side.winner?700:500} ${3*u}px 'DM Sans',sans-serif`;ctx.fillStyle=side.winner?'#f0d596':'#dfe6e1';
     ctx.fillText(fitText(ctx,side.name,colW-2*u),cx,cy+nameH/2-u);
     ctx.lineWidth=Math.max(1.5,.55*u);ctx.lineCap='round';ctx.strokeStyle=side.winner?'#f0d596':'#f0eee2';
     drawTally(ctx,cx-size/2,cy+nameH,side.points,target,size,gap);
@@ -74,14 +75,15 @@ export function installMatchPhoto({$,document,toast,score}){
   $('match-photo-close').onclick=()=>dialog.close();
   $('match-photo-share').onclick=async()=>{
     if(!blob)return;
-    const name='truco-uruguayo-'+Date.now()+'.jpg',text='Jugá conmigo en '+SITE;
+    // Only the photo travels: no text is attached to the message.
+    const name='truco-uruguayo-'+Date.now()+'.jpg';
     try{
       if(globalThis.trucoNative?.shareImage){
         const base64=await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(String(r.result).split(',')[1]);r.onerror=reject;r.readAsDataURL(blob);});
-        await globalThis.trucoNative.shareImage(base64,name,text);
+        await globalThis.trucoNative.shareImage(base64,name);
       }else{
         const file=new File([blob],name,{type:'image/jpeg'});
-        if(navigator.canShare?.({files:[file]}))await navigator.share({files:[file],text});
+        if(navigator.canShare?.({files:[file]}))await navigator.share({files:[file]});
         else{const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),5000);toast('Guardamos la foto en tu dispositivo.');}
       }
     }catch(error){if(error?.name!=='AbortError'&&!/cancel/i.test(error?.message||''))toast('No se pudo compartir la foto.',true);}
