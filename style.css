@@ -1360,7 +1360,7 @@ body { min-height:100dvh; }
 #welcome-view .account-user-icon{width:36px;height:36px;flex-basis:36px;color:#e8c983}
 .home-wallet-summary{display:flex;align-items:center;gap:10px;border-left:1px solid #b5d0be66;padding-left:14px;color:#fff;font-size:15px}
 .home-wallet-summary strong{display:block;color:#e8c983;font-size:27px;line-height:1.1}
-.credit-coin-icon{width:40px;height:40px;fill:#e8c983;stroke:#a8833d;stroke-width:2;flex-shrink:0}
+.credit-coin-icon{width:40px;height:40px;fill:#ecc97c;stroke:#6e4e17;stroke-width:3;stroke-linejoin:round;flex-shrink:0}
 #credits-open{background:#e8c983;color:#082d22;border:1px solid #f4db9a;border-radius:13px;width:46px;height:46px;font:500 34px 'DM Sans',sans-serif;cursor:pointer;flex-shrink:0}
 #welcome-view .home-content{display:flex;flex-direction:column;width:min(820px,100%);gap:28px;flex:none}
 #welcome-view .home-intro{display:flex;width:100%;padding:0;gap:22px}
@@ -2158,3 +2158,5 @@ input,textarea,[contenteditable=""],[contenteditable="true"]{-webkit-user-select
 #welcome-view .home-tiles .friends-badge{position:absolute;top:-7px;right:-7px;margin:0;border:2px solid #0f3024}
 @media(min-width:701px){#welcome-view .home-player-wallet #account-open{font-size:17px;padding:10px 12px 10px 10px}.account-user-badge{width:34px;height:34px}#welcome-view .home-wallet-summary strong{font-size:20px}#welcome-view .home-wallet-summary #credits-open{width:34px;height:34px}#welcome-view .home-actions .home-tiles :is(#learn-game,#open-scorer,#open-friends){min-height:96px;font-size:16px}}
 @media(max-width:700px){#welcome-view .home-topbar{gap:10px}#welcome-view .home-topbar .brand-lockup{flex:0 0 70px}#welcome-view .home-topbar .truco-logo{width:70px;height:48px}#welcome-view .home-player-wallet #account-open{gap:7px;padding:7px 8px 7px 7px}#welcome-view .home-player-wallet .home-wallet-summary{gap:5px;padding:0 6px 0 9px}#welcome-view .home-wallet-summary .credit-coin-icon{width:20px;height:20px}#welcome-view .home-wallet-summary strong{font-size:16px}}
+/* The table cards use the same three-coin icon as the rest of the game */
+.compact-room-stat svg.credit-coin-icon{fill:#ecc97c;stroke:#6e4e17;stroke-width:3;stroke-linejoin:round}
