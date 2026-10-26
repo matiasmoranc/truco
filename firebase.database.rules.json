@@ -98,6 +98,7 @@
         ".write": "auth != null && auth.uid == $uid && root.child('userAccess').child(auth.uid).child('blocked').val() != true",
         "icon": {".validate": "newData.isString() && (newData.val() == 'persona' && true || newData.val() == 'mate' && root.child('levels').child($uid).child('points').isNumber() && root.child('levels').child($uid).child('points').val() >= 30 || newData.val() == 'espada' && root.child('levels').child($uid).child('points').isNumber() && root.child('levels').child($uid).child('points').val() >= 60 || newData.val() == 'bandera' && root.child('levels').child($uid).child('points').isNumber() && root.child('levels').child($uid).child('points').val() >= 90 || newData.val() == 'gaucho' && root.child('levels').child($uid).child('points').isNumber() && root.child('levels').child($uid).child('points').val() >= 150 || newData.val() == 'termo' && root.child('levels').child($uid).child('points').isNumber() && root.child('levels').child($uid).child('points').val() >= 250)"},
         "photo": {".validate": "newData.isString() && newData.val().beginsWith('data:image/jpeg;base64,') && newData.val().length < 60000 && root.child('levels').child($uid).child('points').isNumber() && root.child('levels').child($uid).child('points').val() >= 350"},
+        "use": {".validate": "newData.isString() && (newData.val() == 'icon' || newData.val() == 'photo')"},
         "$other": {".validate": false}
       }
     },

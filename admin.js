@@ -1,7 +1,11 @@
 import {initializeApp} from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js';
 import {getAuth,onAuthStateChanged,GoogleAuthProvider,signInWithPopup,signOut,browserLocalPersistence,setPersistence} from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js';
 import {getFunctions,httpsCallable} from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-functions.js';
+import {levelFor} from './levels.js?v=20261027-levels1';
 const $=id=>document.getElementById(id);
+const points=tenths=>(tenths/10).toLocaleString('es-UY',{maximumFractionDigits:1});
+// Level filter: "from-to" levels, empty for all.
+function inLevel(u){const [from,to]=($('level-filter').value||'').split('-').map(Number);if(!from)return true;const level=levelFor(u.points||0).level;return level>=from&&level<=to;}
 let auth,call,users=[],pageToken=null,selection=null,busy=false,epoch=0,metrics=null,metricsBusy=false,metricsTimer=null,pagesLoaded=1,userScope='all',tableData={tables:[],archivedTables:[]};
 function say(message){$('status').textContent=message;}
 // Test accounts and test devices stay out of every number unless this switch is off.
@@ -33,17 +37,15 @@ function renderUsers(){
  const query=$('search').value.toLocaleLowerCase();$('user-list').replaceChildren();
  const tests=new Set(metrics?.testUids||[]);
  // With test data hidden, test accounts leave the list too (show it to unmark one).
- for(const u of users.filter(u=>(!hideTest()||!tests.has(u.uid))&&[u.name,u.email,u.uid].some(v=>v.toLocaleLowerCase().includes(query)))){
+ for(const u of users.filter(u=>(!hideTest()||!tests.has(u.uid))&&inLevel(u)&&[u.name,u.email,u.uid].some(v=>v.toLocaleLowerCase().includes(query)))){
   const card=node('details','','user-card');card.dataset.uid=u.uid;card.open=expanded.has(u.uid);
   const online=metrics?.online.includes(u.uid);
   const state=node('span','',u.disabled?'state blocked':online?'state online':'state');state.append(node('i'),document.createTextNode(u.disabled?'Bloqueado':online?'Jugando':'Desconectado'));
   const summary=node('summary','','user-row');
   const name=node('span',u.name||'Sin nombre','user-name');if(tests.has(u.uid))name.append(node('em','Prueba','test-badge'));
-  summary.append(name,node('span',u.email||'Sin correo','user-mail'),node('strong',number(u.balance),'num'),node('span',number(u.locked),'num reserved'),state,node('span',new Date(u.createdAt).toLocaleDateString('es-UY'),'joined'));card.append(summary);
-  const detail=node('div','','user-detail');detail.append(node('small','UID: '+u.uid),node('small','Correo: '+(u.email||'Sin correo')),node('small','Saldo '+number(u.balance)+' · '+number(u.locked)+' reservados · Registro '+new Date(u.createdAt).toLocaleDateString('es-UY')));card.append(detail);
-  const movements=node('details');movements.append(node('summary','Movimientos de créditos'));
-  for(const e of Object.values(tableData.movements?.[u.uid]||{}).sort((a,b)=>b.at-a.at))movements.append(node('p',formatTableTime(e.at)+': saldo '+e.before+' → '+e.after+' · reservados '+e.reservedBefore+' → '+e.reservedAfter));detail.append(movements);
-  const actions=node('div','','actions');actions.append(button('Editar créditos',()=>openEdit('credits',u)),button('Cambiar nombre',()=>openEdit('rename',u)),button(u.disabled?'Desbloquear':'Bloquear',()=>openEdit('block',u)),button('Eliminar usuario',()=>openEdit('delete',u)),button(tests.has(u.uid)?'Quitar de prueba':'Marcar como prueba',()=>setTestUser(u,!tests.has(u.uid))),button('Escribir mensaje',()=>writeTo(u)));detail.append(actions);$('user-list').append(card);
+  summary.append(name,node('span',u.email||'Sin correo','user-mail'),node('strong',String(levelFor(u.points||0).level),'num'),node('span',points(u.points||0),'num reserved'),state,node('span',new Date(u.createdAt).toLocaleDateString('es-UY'),'joined'));card.append(summary);
+  const detail=node('div','','user-detail');detail.append(node('small','UID: '+u.uid),node('small','Correo: '+(u.email||'Sin correo')),node('small','Nivel '+levelFor(u.points||0).level+' · '+points(u.points||0)+' puntos · Registro '+new Date(u.createdAt).toLocaleDateString('es-UY')));card.append(detail);
+  const actions=node('div','','actions');actions.append(button('Cambiar nombre',()=>openEdit('rename',u)),button(u.disabled?'Desbloquear':'Bloquear',()=>openEdit('block',u)),button('Eliminar usuario',()=>openEdit('delete',u)),button(tests.has(u.uid)?'Quitar de prueba':'Marcar como prueba',()=>setTestUser(u,!tests.has(u.uid))),button('Escribir mensaje',()=>writeTo(u)));detail.append(actions);$('user-list').append(card);
  }
  if(!$('user-list').children.length)$('user-list').append(node('p','No hay usuarios para mostrar.','empty'));
  $('more').hidden=!pageToken;
@@ -178,7 +180,7 @@ function renderTables(){
 $('table-search').addEventListener('input',renderTables);
 $('table-order').addEventListener('change',renderTables);
 $('table-state').addEventListener('change',renderTables);
-$('search').addEventListener('input',renderUsers);$('more').onclick=()=>refresh(true);
+$('search').addEventListener('input',renderUsers);$('level-filter').onchange=renderUsers;$('more').onclick=()=>refresh(true);
 function showTab(name){for(const section of Object.keys(TAB_TITLES))$(section).hidden=section!==name;for(const tab of document.querySelectorAll('[data-tab]'))tab.classList.toggle('active',tab.dataset.tab===name);$('page-title').textContent=TAB_TITLES[name];}
 $('refresh').onclick=()=>refresh(false,true);
 for(const b of document.querySelectorAll('[data-tab]'))b.onclick=()=>showTab(b.dataset.tab);

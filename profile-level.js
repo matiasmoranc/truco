@@ -20,8 +20,9 @@ export function installProfiles({$,document,services,getState,toast,onChange=()=
  const cache=new Map();let mine=null,unsubscribers=[],listening=null;
  const levelOf=points=>levelFor(points||0);
  // An avatar: the chosen icon or the photo, with the badge of the level over its edge.
- function avatarHtml({icon,photo,points}={},cls='player-avatar'){
-  const {level}=levelOf(points),badge=badgeFor(level);
+ const showsPhoto=p=>!!p?.photo&&p.use!=='icon';
+ function avatarHtml(profile={},cls='player-avatar'){
+  const {icon,points}=profile,photo=showsPhoto(profile)?profile.photo:null,{level}=levelOf(points),badge=badgeFor(level);
   const inner=photo?`<img src="${escapeAttr(photo)}" alt="">`:`<svg viewBox="0 0 24 24" aria-hidden="true">${ICON_SVG[icon]||ICON_SVG.persona}</svg>`;
   return `<span class="${cls}${photo?' has-photo':''}">${inner}${badge?`<span class="level-badge badge-${badge.id}" title="${escapeAttr(badge.name)}">${BADGE_STAR}</span>`:''}</span>`;
  }
@@ -51,6 +52,7 @@ export function installProfiles({$,document,services,getState,toast,onChange=()=
   if($('level-bar'))$('level-bar').style.width=Math.round(info.progress*100)+'%';
   if($('level-open'))$('level-open').setAttribute('aria-label','Nivel '+info.level+': '+fmt(info.points)+' de '+fmt(info.need)+' puntos. Ver detalles');
   const slot=$('account-avatar-slot');if(slot)slot.innerHTML=avatarHtml(p,'player-avatar header-avatar');
+  const own=$('player-account-avatar');if(own)own.innerHTML=avatarHtml(p,'player-avatar account-profile-avatar');
   if($('level-dialog')?.open)renderDetails();
  }
  const fmt=tenths=>(tenths/10).toLocaleString('es-UY',{maximumFractionDigits:1});
@@ -61,14 +63,27 @@ export function installProfiles({$,document,services,getState,toast,onChange=()=
   $('level-detail-number').textContent=String(info.level);
   $('level-detail-bar').style.width=Math.round(info.progress*100)+'%';
   $('level-detail-progress').textContent=fmt(info.points)+' de '+fmt(info.need)+' puntos para el nivel '+(info.level+1);
+  // Without a photo yet: when it unlocks, or a shortcut to upload it once it has.
+  const hint=$('level-photo-hint');
+  if(hint){hint.hidden=!!p.photo;hint.replaceChildren();
+   if(!p.photo){if(info.level>=PHOTO_LEVEL){hint.append('Ya podés subir tu foto de perfil.');const b=document.createElement('button');b.type='button';b.className='unlock-photo-button';b.textContent='Subir foto';b.onclick=()=>$('avatar-photo-input').click();hint.append(b);}else hint.append('Subí tu foto de perfil a partir del nivel '+PHOTO_LEVEL+'.');}}
   const list=$('level-unlocks');list.replaceChildren();
   for(const u of unlocks()){
    const got=info.level>=u.level,li=document.createElement('li');li.className='level-unlock'+(got?' unlocked':' locked');
-   const chosen=u.kind==='icon'&&!p.photo&&(p.icon||'persona')===u.id;
+   const chosen=u.kind==='icon'?!showsPhoto(p)&&(p.icon||'persona')===u.id:u.kind==='photo'&&showsPhoto(p);
    const preview=u.kind==='icon'?`<span class="player-avatar unlock-avatar"><svg viewBox="0 0 24 24" aria-hidden="true">${ICON_SVG[u.id]}</svg></span>`:u.kind==='badge'?`<span class="unlock-badge level-badge badge-${u.id}">${BADGE_STAR}</span>`:`<span class="player-avatar unlock-avatar"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="6" width="17" height="13" rx="2.5"/><circle cx="12" cy="12.5" r="3.5"/><path d="M8.5 6l1.5-2h4l1.5 2"/></svg></span>`;
-   li.innerHTML=`${preview}<span class="unlock-name">${escapeAttr(u.name)}</span><span class="unlock-level">${got?(chosen?'En uso':'Nivel '+u.level+' ✓'):'Nivel '+u.level}</span>`;
-   if(got&&u.kind==='icon'&&!chosen){li.classList.add('choosable');li.tabIndex=0;li.setAttribute('role','button');li.title='Usar este ícono';li.onclick=()=>saveAvatar({icon:u.id,photo:null});}
-   if(got&&u.kind==='photo'){const b=document.createElement('button');b.type='button';b.className='unlock-photo-button';b.textContent=p.photo?'Cambiar foto':'Elegir foto';b.onclick=()=>$('avatar-photo-input').click();li.querySelector('.unlock-level').replaceWith(b);if(p.photo){const r=document.createElement('button');r.type='button';r.className='unlock-photo-button secondary';r.textContent='Quitar';r.onclick=()=>saveAvatar({photo:null});li.append(r);}}
+   li.innerHTML=`${preview}<span class="unlock-name">${escapeAttr(u.name)}</span><span class="unlock-level${chosen?' in-use':''}">${got?(chosen?'En uso':u.kind==='badge'?'Nivel '+u.level+' ✓':'Usar'):'Nivel '+u.level}</span>`;
+   if(got&&u.kind==='icon'&&!chosen){li.classList.add('choosable');li.tabIndex=0;li.setAttribute('role','button');li.title='Usar este ícono';li.onclick=()=>saveAvatar({icon:u.id,use:'icon'});}
+   if(got&&u.kind==='photo'){
+    // The photo stays saved while an icon is in use, so it can come back with one tap.
+    const actions=document.createElement('span');actions.className='unlock-photo-actions';
+    const add=(text,cls,fn)=>{const b=document.createElement('button');b.type='button';b.className='unlock-photo-button'+(cls?' '+cls:'');b.textContent=text;b.onclick=event=>{event.stopPropagation();fn();};actions.append(b);};
+    if(p.photo&&!chosen)add('Usar','',()=>saveAvatar({use:'photo'}));
+    add(p.photo?'Cambiar':'Elegir foto',p.photo?'secondary':'',()=>$('avatar-photo-input').click());
+    if(p.photo)add('Quitar','secondary',()=>saveAvatar({photo:null,use:null}));
+    const tag=li.querySelector('.unlock-level');if(chosen)tag.after(actions);else tag.replaceWith(actions);
+    if(p.photo)li.querySelector('.unlock-avatar').outerHTML=avatarHtml({photo:p.photo,use:'photo',points:0},'player-avatar unlock-avatar');
+   }
    list.append(li);
   }
  }
@@ -83,15 +98,66 @@ export function installProfiles({$,document,services,getState,toast,onChange=()=
   const url=URL.createObjectURL(file);
   try{
    const img=await new Promise((resolve,reject)=>{const i=new Image();i.onload=()=>resolve(i);i.onerror=reject;i.src=url;});
-   const side=Math.min(img.naturalWidth,img.naturalHeight),canvas=document.createElement('canvas');canvas.width=canvas.height=160;
-   canvas.getContext('2d').drawImage(img,(img.naturalWidth-side)/2,(img.naturalHeight-side)/2,side,side,0,0,160,160);
-   let quality=0.82,data=canvas.toDataURL('image/jpeg',quality);while(data.length>58000&&quality>0.4){quality-=0.1;data=canvas.toDataURL('image/jpeg',quality);}
-   await saveAvatar({photo:data});
+   const frame=await framePhoto(img);if(!frame)return;
+   const canvas=document.createElement('canvas');canvas.width=canvas.height=200;
+   canvas.getContext('2d').drawImage(img,frame.x,frame.y,frame.side,frame.side,0,0,200,200);
+   let quality=0.85,data=canvas.toDataURL('image/jpeg',quality);while(data.length>58000&&quality>0.4){quality-=0.1;data=canvas.toDataURL('image/jpeg',quality);}
+   await saveAvatar({photo:data,use:'photo'});
   }catch(error){console.error('[truco:photo]',error);toast('No se pudo usar esa foto.');}
   finally{URL.revokeObjectURL(url);}
  }
+ // Framing: drag the photo and zoom it inside the circle; resolves with the square to keep.
+ function framePhoto(img){
+  return new Promise(resolve=>{
+   const dialog=document.createElement('dialog');dialog.className='credit-join-dialog photo-frame-dialog';
+   dialog.innerHTML='<h2>Acomodá tu foto</h2><p class="level-dialog-note">Arrastrá la foto para centrarla y usá el control para acercarla.</p><div class="photo-frame"><canvas width="560" height="560"></canvas></div><label class="photo-zoom">Acercar<input type="range" min="1" max="4" step="0.01" value="1"></label><div class="photo-frame-actions"><button type="button" class="button secondary" data-cancel>Cancelar</button><button type="button" class="button primary" data-ok>Usar foto</button></div>';
+   document.body.append(dialog);
+   const canvas=dialog.querySelector('canvas'),ctx=canvas.getContext('2d'),zoom=dialog.querySelector('input'),size=canvas.width;
+   const W=img.naturalWidth,H=img.naturalHeight,min=Math.min(W,H);
+   let side=min,cx=W/2,cy=H/2;
+   const clamp=()=>{side=min/Number(zoom.value);cx=Math.min(W-side/2,Math.max(side/2,cx));cy=Math.min(H-side/2,Math.max(side/2,cy));};
+   const draw=()=>{clamp();ctx.clearRect(0,0,size,size);ctx.drawImage(img,cx-side/2,cy-side/2,side,side,0,0,size,size);
+    ctx.save();ctx.fillStyle='rgba(4,20,14,.6)';ctx.beginPath();ctx.rect(0,0,size,size);ctx.arc(size/2,size/2,size/2-4,0,Math.PI*2,true);ctx.fill();
+    ctx.strokeStyle='#e8c983';ctx.lineWidth=4;ctx.beginPath();ctx.arc(size/2,size/2,size/2-4,0,Math.PI*2);ctx.stroke();ctx.restore();};
+   // One finger drags, two fingers pinch to zoom.
+   const points=new Map();let start=null;
+   const begin=()=>{const list=[...points.values()];start={cx,cy,zoom:Number(zoom.value),x:list.reduce((a,p)=>a+p.x,0)/list.length,y:list.reduce((a,p)=>a+p.y,0)/list.length,gap:list.length>1?Math.hypot(list[0].x-list[1].x,list[0].y-list[1].y):0};};
+   canvas.onpointerdown=e=>{canvas.setPointerCapture(e.pointerId);points.set(e.pointerId,{x:e.clientX,y:e.clientY});begin();};
+   canvas.onpointermove=e=>{if(!points.has(e.pointerId))return;points.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    const list=[...points.values()],x=list.reduce((a,p)=>a+p.x,0)/list.length,y=list.reduce((a,p)=>a+p.y,0)/list.length;
+    if(list.length>1&&start.gap){zoom.value=String(Math.min(4,Math.max(1,start.zoom*Math.hypot(list[0].x-list[1].x,list[0].y-list[1].y)/start.gap)));side=min/Number(zoom.value);}
+    const k=side/canvas.getBoundingClientRect().width;cx=start.cx-(x-start.x)*k;cy=start.cy-(y-start.y)*k;draw();};
+   canvas.onpointerup=canvas.onpointercancel=e=>{points.delete(e.pointerId);if(points.size)begin();};
+   canvas.onwheel=e=>{e.preventDefault();zoom.value=String(Math.min(4,Math.max(1,Number(zoom.value)*(e.deltaY<0?1.08:1/1.08))));draw();};
+   zoom.oninput=draw;
+   const finish=value=>{dialog.close();dialog.remove();resolve(value);};
+   dialog.querySelector('[data-cancel]').onclick=()=>finish(null);
+   dialog.querySelector('[data-ok]').onclick=()=>{clamp();finish({x:cx-side/2,y:cy-side/2,side});};
+   dialog.oncancel=e=>{e.preventDefault();finish(null);};
+   draw();dialog.showModal();
+  });
+ }
+ // A player's photo, big, when its avatar is tapped on a lobby table.
+ function showPhoto(src,name){
+  const dialog=document.createElement('dialog');dialog.className='credit-join-dialog photo-view-dialog';
+  dialog.innerHTML='<img alt=""><strong></strong><button type="button" class="button secondary">Cerrar</button>';
+  dialog.querySelector('img').src=src;dialog.querySelector('strong').textContent=name||'';
+  dialog.querySelector('button').onclick=()=>dialog.close();dialog.onclick=e=>{if(e.target===dialog)dialog.close();};dialog.onclose=()=>dialog.remove();
+  document.body.append(dialog);dialog.showModal();
+ }
+ document.addEventListener('click',event=>{
+  const avatar=event.target.closest?.('.room-avatar.has-photo');if(!avatar)return;
+  event.preventDefault();event.stopPropagation();
+  showPhoto(avatar.querySelector('img').src,avatar.closest('.compact-room-owner')?.querySelector('h3')?.textContent);
+ },true);
+ // Own profile: the summary (name, level and picture) opens the level details.
+ const openDetails=()=>{renderDetails();$('level-dialog').showModal();};
+ const summary=document.querySelector('.player-account-summary');
+ if(summary){summary.setAttribute('role','button');summary.tabIndex=0;summary.setAttribute('aria-label','Ver tu nivel');
+  const go=()=>{summary.closest('dialog')?.close();openDetails();};
+  summary.onclick=go;summary.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();go();}};}
  $('avatar-photo-input').onchange=()=>{const file=$('avatar-photo-input').files?.[0];$('avatar-photo-input').value='';void choosePhoto(file);};
- $('level-open').onclick=()=>{renderDetails();$('level-dialog').showModal();};
+ $('level-open').onclick=openDetails;
  $('level-close').onclick=()=>$('level-dialog').close();
  $('level-up-close').onclick=()=>$('level-up-dialog').close();
 

@@ -2275,3 +2275,20 @@ input,textarea,[contenteditable=""],[contenteditable="true"]{-webkit-user-select
 
 /* Free tables: no stake on the setup screen. */
 #setup-view .stake-stepper[hidden],#setup-view .setup-subtitle[hidden]{display:none}
+
+/* Level details: points per win, photo hint, own avatar and photo tools. */
+.level-rules{display:grid;gap:8px}.level-rules-title{font-size:14px;color:#ead39b}
+.level-rule{display:flex;align-items:center;gap:12px}.level-rule-points{min-width:54px;padding:4px 8px;border-radius:10px;background:#e8c98322;text-align:center;font-size:18px;color:#e8c983}
+.level-rules small{color:#a9b8ad;font-size:12.5px}
+.level-photo-hint{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 14px;padding:11px 14px;border-radius:14px;border:1px dashed #e8c98377;background:#e8c98312;color:#f1e3bd;font-size:14px;font-weight:600}.level-photo-hint[hidden]{display:none}
+.unlock-level.in-use{color:#e8c983!important}.unlock-photo-actions{margin-left:auto;display:flex;gap:6px}.unlock-photo-actions .unlock-photo-button{margin:0}
+.account-avatar-holder .account-profile-avatar{width:52px;height:52px}.account-avatar-holder .account-profile-avatar .level-badge{border-color:#123c2e}
+.player-account-summary[role=button]{cursor:pointer;border-radius:14px}.player-account-summary[role=button]:focus-visible{outline:2px solid #e8c983;outline-offset:3px}
+.photo-frame-dialog{width:min(380px,calc(100% - 24px));text-align:center}.photo-frame-dialog h2{margin:0 0 4px;color:#ead39b}
+.photo-frame{width:min(280px,100%);aspect-ratio:1;margin:8px auto 14px;border-radius:16px;overflow:hidden;background:#0b2c21}.photo-frame canvas{display:block;width:100%;height:100%;touch-action:none;cursor:grab}
+.photo-zoom{display:flex;align-items:center;gap:10px;justify-content:center;color:#cbd6cf;font-size:14px;margin-bottom:16px}.photo-zoom input{width:60%;accent-color:#e8c983}
+.photo-frame-actions{display:flex;gap:10px}.photo-frame-actions .button{flex:1}
+.room-avatar.has-photo{cursor:zoom-in}
+.photo-view-dialog{width:min(360px,calc(100% - 32px));display:grid;justify-items:center;gap:12px;text-align:center}.photo-view-dialog[open]{display:grid}
+.photo-view-dialog img{width:100%;aspect-ratio:1;border-radius:50%;object-fit:cover;border:3px solid #e8c983}.photo-view-dialog strong{font-size:18px;color:#f4eedc}.photo-view-dialog .button{width:100%}
+.level-unlock:has(.unlock-photo-actions){flex-wrap:wrap}.level-unlock .unlock-name{flex:1;min-width:0}.level-unlock:has(.unlock-photo-actions) .unlock-photo-actions{flex-basis:100%;justify-content:flex-end}
