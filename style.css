@@ -2292,3 +2292,10 @@ input,textarea,[contenteditable=""],[contenteditable="true"]{-webkit-user-select
 .photo-view-dialog{width:min(360px,calc(100% - 32px));display:grid;justify-items:center;gap:12px;text-align:center}.photo-view-dialog[open]{display:grid}
 .photo-view-dialog img{width:100%;aspect-ratio:1;border-radius:50%;object-fit:cover;border:3px solid #e8c983}.photo-view-dialog strong{font-size:18px;color:#f4eedc}.photo-view-dialog .button{width:100%}
 .level-unlock:has(.unlock-photo-actions){flex-wrap:wrap}.level-unlock .unlock-name{flex:1;min-width:0}.level-unlock:has(.unlock-photo-actions) .unlock-photo-actions{flex-basis:100%;justify-content:flex-end}
+/* Lobby card: narrow privacy column so the name has room; level reads "nivel 4"; same name box width for every 1 vs 1 table. */
+#welcome-view .compact-room.has-team-seats{grid-template-columns:minmax(0,1fr) auto auto auto}
+#welcome-view .compact-room.has-team-seats>.compact-room-stat{padding:0 10px}
+#welcome-view .compact-room.has-team-seats>.compact-room-privacy{padding:0 2px 0 8px}
+#welcome-view .compact-room>.level-stat{flex-direction:row;align-items:baseline;gap:5px}
+#welcome-view .compact-room>.level-stat span{font-size:12px}
+#welcome-view .compact-room .lobby-solo-row .lobby-team-name{display:block;width:9.5em;max-width:100%;box-sizing:border-box;text-align:center;line-height:22px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
