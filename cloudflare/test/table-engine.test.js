@@ -342,3 +342,30 @@ test('A house bot still plays when the table was put to sleep before its move',a
  woken.load(saved);await woken.tick();
  assert.notEqual(JSON.stringify(woken.match.session),before);
 });
+test('The house answers a truco called after it played its last card',async()=>{
+ const {default:duel}=await import('../../functions/duel-bot.cjs');
+ let checked=false;
+ for(let g=0;g<30&&!checked;g++){
+  const {engine,advance}=setup();
+  await engine.create({uid:'house_Lu',name:'Lu'},{id:'late'+g,stake:0,targetPoints:10,mode:'1v1',secret:null,house:true});
+  await engine.join({uid:'b',name:'Ricky'},{});
+  for(let step=0;step<3000&&engine.match.status==='reserved'&&!checked;step++){
+   const s=engine.match.session,r=s.room;
+   if(!duel.mustAct(s,'player2')){advance(500);await engine.tick();continue;}
+   if(!r.pendingBet&&!s.hands.player1.length){
+    for(const value of ['truco','retruco','vale4']){
+     const before=JSON.stringify(s);
+     try{await engine.act('b',{command:{kind:'call',value},requestId:'late'+g+step+value});}catch{continue;}
+     if(JSON.stringify(engine.match.session)===before)continue;
+     assert.equal(engine.match.session.room.pendingBet.responder,'player1');
+     for(let k=0;k<20&&engine.match.session.room.pendingBet?.responder==='player1';k++){advance(500);await engine.tick();}
+     assert.notEqual(engine.match.session.room.pendingBet?.responder,'player1');
+     checked=true;break;
+    }
+    if(checked)break;
+   }
+   for(const command of duel.botCommands(s,'player2')){const before=JSON.stringify(engine.match.session);try{await engine.act('b',{command,requestId:'p'+g+step+JSON.stringify(command)});}catch{continue;}if(JSON.stringify(engine.match.session)!==before)break;}
+  }
+ }
+ assert.ok(checked);
+});

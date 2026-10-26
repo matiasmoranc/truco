@@ -15,7 +15,9 @@ const unique=list=>{const seen=new Set();return list.filter(c=>{const k=JSON.str
 function rank(card,m){const all=DECK.map(c=>strength(c,m)),mine=strength(card,m);return all.filter(v=>v<mine).length/(all.length-1);}
 // How good the cards left look, counting the tricks already won or lost.
 function power(s,p){
- const r=s.room,m=r.muestra,hand=s.hands[p]||[];
+ const r=s.room,m=r.muestra,held=s.hands[p]||[];
+ // With no cards left, the card it already put on the table is what it still has.
+ const hand=held.length?held:(r.trickCards||[]).filter(c=>c.playerId===p).map(c=>c.card);
  const ranks=hand.map(c=>rank(c,m)).sort((a,b)=>b-a),base=ranks.length?(ranks[0]*0.6+(ranks[1]??ranks[0])*0.4):0;
  const won=(r.tricks||[]).filter(t=>t.winner===p).length,lost=(r.tricks||[]).filter(t=>t.winner===other(p)).length;
  return Math.max(0,Math.min(1,base+0.18*won-0.2*lost));
@@ -37,12 +39,13 @@ function cardOrder(s,p){
  return [...hand].reverse();
 }
 
-// Whether the table is waiting for `p` to play, answer or declare.
+// Whether the table is waiting for `p` to play, answer or declare. A call must be
+// answered even after its last card is down (a truco before the rival's last card).
 function mustAct(s,p){
  const r=s?.room;
- if(!r||r.status!=='started'||r.resolvingTrick||r.pendingNextHand||!s.hands?.[p]?.length)return false;
+ if(!r||r.status!=='started'||r.resolvingTrick||r.pendingNextHand||!s.hands?.[p])return false;
  const b=r.pendingBet;
- return b?(b.revealMode?b.revealTurn===p:b.responder===p):r.turn===p;
+ return b?(b.revealMode?b.revealTurn===p:b.responder===p):r.turn===p&&s.hands[p].length>0;
 }
 
 function declarations(s,p){
