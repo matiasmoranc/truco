@@ -2,18 +2,13 @@
 // were, the level details with what each level unlocks, the icon or photo of every
 // player with its badge on the edge, and the "you went up a level" celebration.
 // Levels are written only by the table server; a player writes only its own avatar.
-import {levelFor,badgeFor,ICONS,PHOTO_LEVEL,unlocks,BADGES,houseLevel,houseIcon,pointsToReach} from './levels.js?v=20261027-photo6';
+import {levelFor,badgeFor,ICONS,PHOTO_LEVEL,unlocks,BADGES,houseLevel,houseIcon,pointsToReach} from './levels.js?v=20261027-icons1';
 
-// Profile icons, drawn in the game's gold line style.
-const ICON_SVG={
- persona:'<circle cx="12" cy="8.5" r="3.5"/><path d="M5 20c.5-3.8 3-5.5 7-5.5s6.5 1.7 7 5.5"/>',
- mate:'<path d="M7 9h10l-1 9a3 3 0 0 1-3 2.6h-2A3 3 0 0 1 8 18L7 9Z"/><path d="M6.5 9h11M14 9l3-6"/><path d="M9.5 12.5c1 .8 4 .8 5 0"/>',
- espada:'<path d="M12 2.5v13.5"/><path d="M9.5 6 12 2.5 14.5 6"/><path d="M8 16h8M12 16v4.5M10.5 21.5h3"/>',
- bandera:'<path d="M5 3.5v17"/><path d="M5 4.5h14v9H5"/><path d="M9.5 4.5h9.5M9.5 7.5h9.5M9.5 10.5h9.5M5 13.5h14"/><circle cx="7.3" cy="6.8" r="1.6"/>',
- gaucho:'<path d="M3.5 13.5c2.5 1.5 14.5 1.5 17 0"/><path d="M7 13.5c0-4 1.5-7 5-7s5 3 5 7"/><path d="M7.5 11h9"/>',
- termo:'<rect x="8" y="6" width="8" height="15" rx="2.5"/><path d="M9.5 6V4h5v2M12 2.5V4"/><path d="M8 10h8M8 17h8"/>'
-};
-const BADGE_STAR='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 4 2.3 5 5.4.5-4.1 3.6 1.2 5.3L12 15.6l-4.8 2.8 1.2-5.3-4.1-3.6 5.4-.5Z"/></svg>';
+// Profile icons and badges: pictures in assets/profile. The "gaucho" id is kept for
+// players who already chose it; it now shows the coat of arms of Uruguay.
+const ICON_FILE={persona:'persona',mate:'mate',espada:'espada',bandera:'bandera',gaucho:'escudo',termo:'termo'};
+const iconImg=id=>`<img class="avatar-icon" src="assets/profile/${ICON_FILE[id]||'persona'}.webp" alt="">`;
+const badgeImg=id=>`<img src="assets/profile/insignia-${id}.webp" alt="">`;
 const escapeAttr=s=>String(s).replace(/[&"<>]/g,c=>({'&':'&amp;','"':'&quot;','<':'&lt;','>':'&gt;'}[c]));
 
 export function installProfiles({$,document,services,getState,toast,onChange=()=>{}}){
@@ -25,8 +20,8 @@ export function installProfiles({$,document,services,getState,toast,onChange=()=
  const shownBadge=p=>{const level=levelOf(p?.points).level;if(p?.badge==='none')return null;const picked=BADGES.find(b=>b.id===p?.badge&&level>=b.level);return picked||badgeFor(level);};
  function avatarHtml(profile={},cls='player-avatar'){
   const {icon}=profile,photo=showsPhoto(profile)?profile.photo:null,badge=shownBadge(profile);
-  const inner=photo?`<img src="${escapeAttr(photo)}" alt="">`:`<svg viewBox="0 0 24 24" aria-hidden="true">${ICON_SVG[icon]||ICON_SVG.persona}</svg>`;
-  return `<span class="${cls}${photo?' has-photo':''}">${inner}${badge?`<span class="level-badge badge-${badge.id}" title="${escapeAttr(badge.name)}">${BADGE_STAR}</span>`:''}</span>`;
+  const inner=photo?`<img src="${escapeAttr(photo)}" alt="">`:iconImg(icon);
+  return `<span class="${cls}${photo?' has-photo':' has-icon'}">${inner}${badge?`<span class="level-badge badge-${badge.id}" title="${escapeAttr(badge.name)}">${badgeImg(badge.id)}</span>`:''}</span>`;
  }
  // Other players: level and avatar read once a minute at most, then the lobby re-renders.
  function profileOf(uid,name){
@@ -74,7 +69,7 @@ export function installProfiles({$,document,services,getState,toast,onChange=()=
   for(const u of unlocks()){
    const got=info.level>=u.level,li=document.createElement('li');li.className='level-unlock'+(got?' unlocked':' locked');
    const chosen=u.kind==='icon'?!showsPhoto(p)&&(p.icon||'persona')===u.id:u.kind==='photo'?showsPhoto(p):shownBadge(p)?.id===u.id;
-   const preview=u.kind==='icon'?`<span class="player-avatar unlock-avatar"><svg viewBox="0 0 24 24" aria-hidden="true">${ICON_SVG[u.id]}</svg></span>`:u.kind==='badge'?`<span class="unlock-badge level-badge badge-${u.id}">${BADGE_STAR}</span>`:`<span class="player-avatar unlock-avatar"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="6" width="17" height="13" rx="2.5"/><circle cx="12" cy="12.5" r="3.5"/><path d="M8.5 6l1.5-2h4l1.5 2"/></svg></span>`;
+   const preview=u.kind==='icon'?`<span class="player-avatar unlock-avatar has-icon">${iconImg(u.id)}</span>`:u.kind==='badge'?`<span class="unlock-badge level-badge badge-${u.id}">${badgeImg(u.id)}</span>`:`<span class="player-avatar unlock-avatar"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="6" width="17" height="13" rx="2.5"/><circle cx="12" cy="12.5" r="3.5"/><path d="M8.5 6l1.5-2h4l1.5 2"/></svg></span>`;
    li.innerHTML=`${preview}<span class="unlock-name">${escapeAttr(u.name)}</span><span class="unlock-level${chosen?' in-use':''}">${got?(chosen?'En uso':'Usar'):'Nivel '+u.level}</span>`;
    if(got&&u.kind==='icon'&&!chosen){li.classList.add('choosable');li.tabIndex=0;li.setAttribute('role','button');li.title='Usar este ícono';li.onclick=()=>saveAvatar({icon:u.id,use:'icon'});}
    // Badges: tap one to wear it; the one in use can be taken off.

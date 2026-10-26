@@ -1,7 +1,7 @@
 import {initializeApp} from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js';
 import {getAuth,onAuthStateChanged,GoogleAuthProvider,signInWithPopup,signOut,browserLocalPersistence,setPersistence} from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js';
 import {getFunctions,httpsCallable} from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-functions.js';
-import {levelFor} from './levels.js?v=20261027-photo6';
+import {levelFor} from './levels.js?v=20261027-icons1';
 const $=id=>document.getElementById(id);
 const points=tenths=>(tenths/10).toLocaleString('es-UY',{maximumFractionDigits:1});
 // Level filter: "from-to" levels, empty for all.

@@ -2304,3 +2304,11 @@ input,textarea,[contenteditable=""],[contenteditable="true"]{-webkit-user-select
 .level-detail-progress small{text-align:right}
 .credit-join-dialog .level-photo-hint{margin:0 0 22px}.level-dialog .level-unlocks-title{margin-top:4px}
 .level-unlock .unlock-photo-button.secondary{margin:0}
+
+/* Profile pictures: the icon art brings its own green disc and gold ring, a bit larger than
+   the avatar so the sword and the sun of the coat of arms can stick out. */
+.player-avatar.has-icon{background:none;overflow:visible}
+.player-avatar>img.avatar-icon{width:120.7%;height:120.7%;margin:-10.35%;border-radius:0;object-fit:contain;pointer-events:none}
+.level-badge{background:none!important;border:0!important;border-radius:0;width:50%;height:50%;right:-7px;bottom:-6px;filter:drop-shadow(0 2px 3px #0009)}
+.level-badge img{width:100%;height:100%;object-fit:contain}
+.unlock-badge{width:30px;height:30px}

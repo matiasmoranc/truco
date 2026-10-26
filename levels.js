@@ -23,7 +23,7 @@ export function houseLevel(name){let h=0;for(const ch of String(name||''))h=(h*3
 export const BADGES=[{level:30,id:'diamante',name:'Insignia de diamante'},{level:20,id:'oro',name:'Insignia de oro'},{level:10,id:'plata',name:'Insignia de plata'},{level:5,id:'bronce',name:'Insignia de bronce'}];
 export const badgeFor=level=>BADGES.find(b=>level>=b.level)||null;
 // Profile icons and the level that unlocks each; the own photo comes at PHOTO_LEVEL.
-export const ICONS=[{id:'persona',level:1,name:'Muñequito'},{id:'mate',level:2,name:'Mate'},{id:'espada',level:3,name:'Ancho de espada'},{id:'bandera',level:4,name:'Bandera'},{id:'gaucho',level:6,name:'Gaucho'},{id:'termo',level:8,name:'Termo'}];
+export const ICONS=[{id:'persona',level:1,name:'Muñequito'},{id:'mate',level:2,name:'Mate'},{id:'espada',level:3,name:'Ancho de espada'},{id:'bandera',level:4,name:'Bandera'},{id:'gaucho',level:6,name:'Escudo de Uruguay'},{id:'termo',level:8,name:'Termo'}];
 export const PHOTO_LEVEL=6;
 // Everything a level unlocks, in order, for the level details.
 export function unlocks(){
