@@ -2,7 +2,7 @@
 // were, the level details with what each level unlocks, the icon or photo of every
 // player with its badge on the edge, and the "you went up a level" celebration.
 // Levels are written only by the table server; a player writes only its own avatar.
-import {levelFor,badgeFor,ICONS,PHOTO_LEVEL,unlocks,BADGES,houseLevel,houseIcon,pointsToReach} from './levels.js?v=20261027-levels1';
+import {levelFor,badgeFor,ICONS,PHOTO_LEVEL,unlocks,BADGES,houseLevel,houseIcon,pointsToReach} from './levels.js?v=20261027-photo6';
 
 // Profile icons, drawn in the game's gold line style.
 const ICON_SVG={

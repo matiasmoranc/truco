@@ -23,3 +23,9 @@ test('A win is worth 1 point, or 1,2 against a higher level; only people on the 
  assert.deepEqual(team,{b:12});
  assert.deepEqual(L.levelAwards({status:'reserved'}),{});
 });
+test('The own photo opens at level 6, 15 points, in the game and in the database rules',async()=>{
+ const L=await load();
+ assert.equal(L.PHOTO_LEVEL,6);assert.equal(L.pointsToReach(L.PHOTO_LEVEL),150);
+ const rules=JSON.parse(fs.readFileSync(path.join(__dirname,'../firebase.database.rules.json'),'utf8'));
+ assert.match(rules.rules.avatars.$uid.photo['.validate'],/val\(\) >= 150$/);
+});

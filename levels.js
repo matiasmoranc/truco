@@ -24,7 +24,7 @@ export const BADGES=[{level:30,id:'diamante',name:'Insignia de diamante'},{level
 export const badgeFor=level=>BADGES.find(b=>level>=b.level)||null;
 // Profile icons and the level that unlocks each; the own photo comes at PHOTO_LEVEL.
 export const ICONS=[{id:'persona',level:1,name:'Muñequito'},{id:'mate',level:2,name:'Mate'},{id:'espada',level:3,name:'Ancho de espada'},{id:'bandera',level:4,name:'Bandera'},{id:'gaucho',level:6,name:'Gaucho'},{id:'termo',level:8,name:'Termo'}];
-export const PHOTO_LEVEL=10;
+export const PHOTO_LEVEL=6;
 // Everything a level unlocks, in order, for the level details.
 export function unlocks(){
  return [...ICONS.map(i=>({level:i.level,kind:'icon',id:i.id,name:'Ícono: '+i.name})),...BADGES.map(b=>({level:b.level,kind:'badge',id:b.id,name:b.name})),{level:PHOTO_LEVEL,kind:'photo',id:'photo',name:'Tu foto de perfil'}].sort((a,b)=>a.level-b.level||(a.kind==='badge'?-1:1));
