@@ -2272,3 +2272,6 @@ input,textarea,[contenteditable=""],[contenteditable="true"]{-webkit-user-select
 .level-up-dialog h2{margin:0 0 6px;color:#ead39b}.level-up-dialog p{margin:0 0 12px;color:#cbd6cf}
 .level-up-unlocks{list-style:none;margin:0 0 14px;padding:10px 12px;border-radius:12px;background:#0b2c21;display:grid;gap:6px;color:#e8c983;font-weight:600}
 .level-up-dialog .button{width:100%;min-height:52px;border-radius:16px;border:0;background:linear-gradient(180deg,#f0d596,#dcb565);color:#14301f;font:inherit;font-size:17px;font-weight:700}
+
+/* Free tables: no stake on the setup screen. */
+#setup-view .stake-stepper[hidden],#setup-view .setup-subtitle[hidden]{display:none}
