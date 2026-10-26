@@ -15,7 +15,7 @@ export function installPlayerPanel({document,api,getState}){
    const finished=(data.matches||[]).filter(m=>m.status==='settled');
    const won=finished.filter(m=>m.winner===true).length,lost=finished.length-won;
    const percentage=finished.length?Math.round(won/finished.length*100):0;
-   for(const [label,value] of [['Partidas ganadas',won],['Partidas perdidas',lost],['Porcentaje de victorias',percentage+'%'],['Máximo de créditos',data.peak??0]]){
+   for(const [label,value] of [['Partidas ganadas',won],['Partidas perdidas',lost],['Porcentaje de victorias',percentage+'%']]){
     const box=node('div','','player-stat');box.append(node('strong',String(value)),node('small',label));stats.append(box);
    }
    body.append(stats);
@@ -57,5 +57,5 @@ export function installPlayerPanel({document,api,getState}){
  $('player-blocked-users').onclick=blockedUsers;
  for(const id of ['lobby-report','account-report'])$(id).onclick=()=>report();
  $('match-report').onclick=()=>report(true);
- $('account-open').addEventListener('click',()=>{$('player-account-name').textContent=$('account-username').textContent;$('player-account-balance').textContent=$('credits-header-balance').textContent;});
+ $('account-open').addEventListener('click',()=>{$('player-account-name').textContent=$('account-username').textContent;$('player-account-balance').textContent='Nivel '+($('level-number')?.textContent||'1');});
 }

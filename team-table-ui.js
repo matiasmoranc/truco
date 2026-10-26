@@ -125,7 +125,8 @@ export function installTeamTable({$,getState,command,runAction,renderPlayerHand,
   const names=t=>TEAM_SEATS.filter(p=>playerTeam(p)===t).map(p=>seatName(r,p,s.playerId)).join(' + '),won=r.matchResult.winner;
   $('match-end-title').textContent=playerTeam(s.playerId)===won?'¡Ganó tu equipo!':'Ganó el equipo rival';
   $('match-end-score').innerHTML=['player1','player2'].map(t=>`<div class="${won===t?'match-score-winner':''}"><strong>${r.scores[t]}</strong><span>${safe(names(t))}</span></div>`).join('<b>–</b>');
-  $('match-session-score').textContent=r.creditResult?'Cada ganador recibe '+r.creditResult.payout+' créditos.':'Confirmando los créditos…';$('match-session-score').classList.remove('hidden');
+  // Without stake there is nothing to pay: the winners add points to their level.
+  const paid=Number(r.creditMatch?.stake)>0;$('match-session-score').textContent=paid?(r.creditResult?'Cada ganador recibe '+r.creditResult.payout+' créditos.':'Confirmando los créditos…'):'Los ganadores suman puntos para su nivel.';$('match-session-score').classList.remove('hidden');
   const votes=r.rematch?.status==='pending'?r.rematch.votes||{}:{};const voted=!!votes[s.playerId];
   $('match-end-message').textContent=Object.keys(votes).length?'Revancha: '+Object.keys(votes).length+' de 4 confirmaron.':'La revancha necesita la confirmación de los cuatro.';
   $('request-rematch').classList.toggle('hidden',voted);$('accept-rematch').classList.add('hidden');$('decline-rematch').classList.add('hidden');

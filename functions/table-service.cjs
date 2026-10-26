@@ -13,7 +13,8 @@ function fail(message){throw new Error(message);}
 function validCode(code){if(typeof code!=='string'||!/^[A-Z2-9]{5}$/.test(code))fail('Mesa inválida.');return code;}
 function passwordHash(password){if(typeof password!=='string'||password.trim().length<4||password.length>64)fail('La clave debe tener entre 4 y 64 caracteres.');const salt=crypto.randomBytes(16).toString('hex');return {salt,hash:crypto.scryptSync(password,salt,32).toString('hex')};}
 function passwordMatches(password,secret){if(!secret)return true;if(typeof password!=='string'||password.length>64)return false;const actual=crypto.scryptSync(password,secret.salt,32);return crypto.timingSafeEqual(actual,Buffer.from(secret.hash,'hex'));}
-function checkWallet(ledger,uid,stake){const w=ledger.wallets?.[uid];if(w?.deleting||w?.deletedAt)fail('La cuenta fue eliminada.');if(!w||!Number.isSafeInteger(w.balance)||!Number.isSafeInteger(w.locked))fail('Reclamá tus créditos antes de crear o entrar a una mesa.');if(w.locked!==0)fail('Ya tenés créditos reservados en otra mesa.');if(!Number.isSafeInteger(stake)||stake<1||stake>w.balance)fail('No tenés créditos suficientes para esta apuesta.');return w;}
+// A table without stake (stake 0) never touches a wallet.
+function checkWallet(ledger,uid,stake){if(stake===0)return null;const w=ledger.wallets?.[uid];if(w?.deleting||w?.deletedAt)fail('La cuenta fue eliminada.');if(!w||!Number.isSafeInteger(w.balance)||!Number.isSafeInteger(w.locked))fail('Reclamá tus créditos antes de crear o entrar a una mesa.');if(w.locked!==0)fail('Ya tenés créditos reservados en otra mesa.');if(!Number.isSafeInteger(stake)||stake<1||stake>w.balance)fail('No tenés créditos suficientes para esta apuesta.');return w;}
 function tableFor(ledger,code){validCode(code);const id=ledger.tables?.[code],m=id&&ledger.matches?.[id];if(!m)fail('La mesa ya no está disponible.');return m;}
 function findPlayer(m,uid){return Object.keys(m.players||{}).find(p=>m.players[p]?.uid===uid)||null;}
 function createTable(ledger,{code,id,uid,name,stake,targetPoints,mode='1v1',secret=null,house=false,now}){
@@ -21,8 +22,8 @@ function createTable(ledger,{code,id,uid,name,stake,targetPoints,mode='1v1',secr
  validCode(code);if(![10,20,30,40,50,60].includes(targetPoints))fail('Puntaje inválido.');
  const next=structuredClone(ledger||{});if(next.tables?.[code])fail('La mesa cambió. Volvé a intentar.');
  // A house table (opened by the lobby) has a host without a wallet.
- if(house){if(mode!=='1v1'||!isHouseUid(uid)||!Number.isSafeInteger(stake)||stake<1)fail('Mesa inválida.');}
- else{const wallet=checkWallet(next,uid,stake);wallet.balance-=stake;wallet.locked=stake;}
+ if(house){if(mode!=='1v1'||!isHouseUid(uid)||!Number.isSafeInteger(stake)||stake<0)fail('Mesa inválida.');}
+ else{const wallet=checkWallet(next,uid,stake);if(wallet){wallet.balance-=stake;wallet.locked=stake;}}
  next.matches??={};next.tables??={};next.tables[code]=id;
  next.matches[id]={id,code,mode,player1:uid,player2:null,stake,targetPoints,status:'waiting',createdAt:now,secret,revision:1,players:{player1:{uid,name,online:true}},requests:{},matchNumber:1,...(house?{house:'player1'}:{})};return next;
 }
@@ -33,28 +34,29 @@ function joinTable(ledger,{code,uid,name,password='',team,now}){
  if(!passwordMatches(password,m.secret))fail('La clave no es correcta.');
  if(m.mode==='2v2')return teams.join(next,m,{uid,name,team,now});
  const wallet=checkWallet(next,uid,m.stake),host=next.wallets[m.player1];
- if(!m.house&&host?.locked!==m.stake)fail('La reserva de la mesa no es válida.');
- wallet.balance-=m.stake;wallet.locked=m.stake;m.player2=uid;m.players.player2={uid,name,online:true};m.status='reserved';
+ if(!m.house&&m.stake>0&&host?.locked!==m.stake)fail('La reserva de la mesa no es válida.');
+ if(wallet){wallet.balance-=m.stake;wallet.locked=m.stake;}m.player2=uid;m.players.player2={uid,name,online:true};m.status='reserved';
  m.session=newSession(code,m.players,m.targetPoints,{id:m.id,stake:m.stake,pot:m.stake*2,hasPassword:!!m.secret,matchNumber:1},now);m.revision++;return next;
 }
-function cancelWaiting(ledger,m,now){if(!m.house){const wallet=ledger.wallets[m.player1];if(wallet.locked!==m.stake)fail('La reserva cambió.');wallet.balance+=m.stake;wallet.locked=0;}m.status='refunded';m.closedAt=now;m.closeReason='waiting-canceled';m.revision++;}
+function cancelWaiting(ledger,m,now){if(!m.house&&m.stake>0){const wallet=ledger.wallets[m.player1];if(wallet.locked!==m.stake)fail('La reserva cambió.');wallet.balance+=m.stake;wallet.locked=0;}m.status='refunded';m.closedAt=now;m.closeReason='waiting-canceled';m.revision++;}
 function finishAccounting(ledger,m,now){
  const room=m.session.room;
  if(!m.startedAt&&room.status==='started'&&Number(room.handNumber)>0)m.startedAt=now;
- if(m.house&&m.status==='reserved'&&(room.status==='closed'||room.status==='complete'&&room.endReveal?.done))return houseAccounting(ledger,m,room,now);
+ if((m.house||m.stake===0)&&m.status==='reserved'&&(room.status==='closed'||room.status==='complete'&&room.endReveal?.done))return houseAccounting(ledger,m,room,now);
  if(room.status==='closed'&&m.status==='reserved'){const next=refundCanceledMatch(ledger,{id:m.id,now});next.matches[m.id].revision++;return next;}
  if(room.status==='complete'&&room.endReveal?.done&&m.status==='reserved'){
   const winner=room.matchResult?.winner||['player1','player2'].find(p=>room.scores[p]>=room.targetPoints);
   if(!winner)fail('No hay resultado válido.');const next=settleVerifiedMatch(ledger,{id:m.id,winner:m.players[winner].uid,now});next.matches[m.id].revision++;return next;
  }return ledger;
 }
-// Against the house only the person's wallet moves: a refund returns the stake, a win pays twice the stake, a loss keeps nothing.
+// Against the house, or without stake, only the people's wallets can move: a refund returns
+// the stake, a win pays twice the stake, a loss keeps nothing. Without stake nothing moves.
 function houseAccounting(ledger,m,room,now){
- const person=m.house==='player1'?'player2':'player1',uid=m.players[person].uid,wallet=ledger.wallets[uid];
- if(wallet.locked!==m.stake)fail('La reserva cambió.');
- if(room.status==='closed'){wallet.balance+=m.stake;wallet.locked=0;Object.assign(m,{status:'refunded',refundedAt:now});m.revision++;return ledger;}
+ const people=['player1','player2'].filter(p=>p!==m.house),wallets=m.stake>0?people.map(p=>ledger.wallets[m.players[p].uid]):[];
+ for(const wallet of wallets)if(wallet.locked!==m.stake)fail('La reserva cambió.');
+ if(room.status==='closed'){for(const wallet of wallets){wallet.balance+=m.stake;wallet.locked=0;}Object.assign(m,{status:'refunded',refundedAt:now});m.revision++;return ledger;}
  const winner=room.matchResult?.winner||['player1','player2'].find(p=>room.scores[p]>=room.targetPoints);if(!winner)fail('No hay resultado válido.');
- if(winner===person)wallet.balance+=2*m.stake;wallet.locked=0;
+ people.forEach((p,i)=>{const wallet=wallets[i];if(!wallet)return;if(p===winner)wallet.balance+=2*m.stake;wallet.locked=0;});
  Object.assign(m,{status:'settled',winner:m.players[winner].uid,settledAt:now});m.revision++;return ledger;
 }
 function tableOperation(ledger,{code,uid,command,requestId,expectedMatchId,presence,now}){
@@ -108,7 +110,7 @@ function tableOperation(ledger,{code,uid,command,requestId,expectedMatchId,prese
   if(m.status!=='settled')fail('Primero debe terminar la partida.');
   const r=m.session.room;if(['request','accept'].includes(command.value))checkWallet(next,uid,m.stake);if(command.value==='request'&&!r.rematch){r.rematch={id:requestId,requester:player,status:'pending'};}
   else if(r.rematch?.status==='pending'&&r.rematch.requester!==player&&['request','accept'].includes(command.value)){
-   const newId=code+'_'+now+'_m'+(m.matchNumber+1),funded=reserveStakes(next,{id:newId,player1:m.player1,player2:m.player2,stake:m.stake,now});
+   const newId=code+'_'+now+'_m'+(m.matchNumber+1),funded=m.stake>0?reserveStakes(next,{id:newId,player1:m.player1,player2:m.player2,stake:m.stake,now}):{...next,matches:{...next.matches,[newId]:{player1:m.player1,player2:m.player2,stake:0,status:'reserved',reservedAt:now}}};
    const record=funded.matches[newId];Object.assign(record,{id:newId,code,players:m.players,targetPoints:m.targetPoints,secret:m.secret??null,createdAt:now,revision:m.revision+1,requests:{},matchNumber:m.matchNumber+1});
    record.session=newSession(code,m.players,m.targetPoints,{id:newId,stake:m.stake,pot:m.stake*2,hasPassword:!!m.secret,matchNumber:record.matchNumber},now);
    record.session.room.sessionResults={...(r.sessionResults||{}),[m.matchNumber]:{winner:r.matchResult?.winner||['player1','player2'].find(p=>r.scores[p]>=r.targetPoints),scores:r.scores}};

@@ -137,3 +137,7 @@ test('Admin table events list created tables and finished games by Uruguay day, 
  assert.deepEqual(e.created.map(x=>x.id),['c','a']);
  assert.deepEqual(e.finished.map(x=>[x.id,x.house,x.day,x.winner]),[['b',true,'2026-10-26','Caro'],['a',false,'2026-10-25','Ana']]);
 });
+test('Past wins per person, for the starting levels, leave bots and house players out',()=>{
+ const {pastWins}=require('../functions/admin-service.cjs');
+ assert.deepEqual(pastWins({matches:{a:{status:'settled',winner:'u1'},b:{status:'settled',winner:'u1'},c:{status:'refunded',winner:'u2'},d:{status:'settled',winners:['u2','bot:player3']},e:{status:'settled',winner:'house_X'}}}),{u1:2,u2:1});
+});

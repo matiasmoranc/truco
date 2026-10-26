@@ -101,7 +101,7 @@ export function installFriends({$,api,services,getState,toast,tableToInvite,join
  function renderInviteCredits(invite){
   const stake=Number(invite.stake)||0,mine=balance(),known=Number.isFinite(mine);
   const amount=n=>{const dd=el('dd','credit-amount');dd.innerHTML=coinIcon;dd.append(String(n));return dd;};
-  const rows=[['Jugadores',el('dd','',invite.mode==='2v2'?'2 vs 2':'1 vs 1')],['Puntos',el('dd','',invite.targetPoints?invite.targetPoints+' puntos':'—')],['Apuesta',stake?amount(stake):el('dd','','Sin créditos')]];
+  const rows=[['Jugadores',el('dd','',invite.mode==='2v2'?'2 vs 2':'1 vs 1')],['Puntos',el('dd','',invite.targetPoints?invite.targetPoints+' puntos':'—')],...(stake?[['Apuesta',amount(stake)]]:[])];
   if(stake)rows.push(['Tus créditos',known?amount(mine):el('dd','','—')]);
   $('table-invite-summary').replaceChildren(...rows.flatMap(([k,v])=>[el('dt','',k),v]));
   const short=!!stake&&known&&mine<stake,claimable=short&&canClaim(),accept=$('table-invite-accept'),claim=$('table-invite-claim');

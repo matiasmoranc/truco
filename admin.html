@@ -59,6 +59,7 @@
    <p class="note">El saldo disponible se puede editar. Los créditos reservados en partidas se conservan.</p>
    <div class="data-list"><div class="list-head user-row"><span>Usuario</span><span>Correo</span><span class="num">Saldo</span><span class="num">Reservados</span><span>Estado</span><span>Alta</span></div><div id="user-list"></div></div>
    <button id="more" hidden>Cargar más usuarios</button>
+   <div class="panel levels-seed"><div class="panel-head"><h2>Niveles iniciales</h2></div><p class="note">Da a cada jugador 1 punto de nivel por cada partida que ya ganó en línea. Solo cambia a quien todavía no tiene nivel, así que se puede tocar más de una vez sin duplicar.</p><button id="levels-seed" type="button" class="primary">Calcular niveles iniciales</button> <span id="levels-seed-status"></span></div>
   </section>
 
   <section id="tables" hidden>
@@ -85,4 +86,4 @@
  </main>
 </div>
 <dialog id="edit"><form id="edit-form"><div class="dialog-head"><h2 id="edit-title"></h2><button type="button" id="close" aria-label="Cerrar">×</button></div><p id="edit-description"></p><label id="value-label">Nuevo valor<input id="value" required></label><label id="delete-label" hidden>Escribí el nombre exacto para confirmar<input id="delete-confirm" autocomplete="off"></label><label>Motivo<input id="reason" required minlength="3" maxlength="200" placeholder="Por qué realizás este cambio"></label><p id="edit-error" role="alert"></p><div class="dialog-actions"><button id="cancel" type="button">Cancelar</button><button id="save" class="primary" type="submit">Confirmar cambio</button></div></form></dialog>
-<script type="module" src="admin.js?v=19"></script></body></html>
+<script type="module" src="admin.js?v=20"></script></body></html>

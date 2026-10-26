@@ -2224,3 +2224,51 @@ input,textarea,[contenteditable=""],[contenteditable="true"]{-webkit-user-select
 .admin-message-reply:focus-visible{outline:2px solid #e8c983;outline-offset:2px}
 .table-invite-dialog #admin-message-send{background:linear-gradient(180deg,#f0d596,#dcb565);border:0;color:#14301f;box-shadow:0 6px 16px #e8c98330,inset 0 1px 0 #fff6}
 .table-invite-dialog #admin-message-close{background:transparent;border:1px solid #e8c98399;color:#e8c983}
+/* Levels (no credits any more): level and bar in the header, avatars with a badge on the edge */
+#credits-panel,#setup-view .setup-wallet{display:none!important}
+#welcome-view .home-player-wallet .home-level{display:flex;flex-direction:column;justify-content:center;gap:6px;flex:none;min-width:84px;margin:8px 0;padding:0 12px 0 11px;border:0;border-left:1px solid #d8b87566;background:transparent;color:#f7f3e9;font:inherit;cursor:pointer}
+.home-level-number{display:flex;align-items:baseline;gap:5px;font-size:12px;font-weight:600;color:#a9b8ad;white-space:nowrap}
+.home-level-number b{font-size:19px;line-height:1;color:#e8c983;font-variant-numeric:tabular-nums}
+.level-bar{display:block;width:100%;height:6px;border-radius:4px;background:#ffffff1f;overflow:hidden}
+.level-bar i{display:block;height:100%;width:0;border-radius:4px;background:linear-gradient(90deg,#dcb565,#f0d596);transition:width .4s}
+.level-bar.big{height:10px}
+.home-level:focus-visible{outline:2px solid #e8c983;outline-offset:-2px}
+.player-avatar{position:relative;display:inline-flex;align-items:center;justify-content:center;flex:none;width:34px;height:34px;border-radius:50%;background:#1a4334;color:#e8c983}
+.player-avatar>svg{width:58%;height:58%;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.player-avatar>img{width:100%;height:100%;border-radius:50%;object-fit:cover}
+.level-badge{position:absolute;right:-4px;bottom:-3px;display:flex;align-items:center;justify-content:center;width:44%;height:44%;min-width:15px;min-height:15px;border-radius:50%;border:2px solid #0b2c21;box-sizing:content-box}
+.level-badge svg{width:70%;height:70%;fill:#2a1d07;stroke:none}
+.badge-bronce{background:radial-gradient(circle at 35% 30%,#f3c9a0,#b8703a)}
+.badge-plata{background:radial-gradient(circle at 35% 30%,#ffffff,#a9b4bd)}
+.badge-oro{background:radial-gradient(circle at 35% 30%,#fff2c4,#d9a93c)}
+.badge-diamante{background:radial-gradient(circle at 35% 30%,#e9fbff,#5fc3e6)}
+.account-avatar-slot{display:flex;flex:none}
+.header-avatar{width:32px;height:32px}
+@media(min-width:701px){.header-avatar{width:36px;height:36px}#welcome-view .home-player-wallet .home-level{min-width:96px}}
+.compact-room-owner .room-avatar{width:34px;height:34px}.compact-room-owner .room-avatar .level-badge{border-color:#103b2c}
+.level-stat strong{color:#e8c983}
+/* Level details */
+.level-dialog{width:min(460px,calc(100% - 24px));max-height:90dvh;overflow:auto}
+.level-dialog-note{margin:0 0 12px;color:#a9b8ad;font-size:14px}
+.level-detail{display:flex;align-items:center;gap:14px;margin:4px 0 14px}
+.big-avatar{width:60px;height:60px}.big-avatar .level-badge{border-color:#143d2e}
+.level-detail-number{font-size:13px;color:#a9b8ad}.level-detail-number b{display:block;font-size:32px;line-height:1.05;color:#e8c983}
+.level-detail-progress{flex:1;display:grid;gap:6px}.level-detail-progress small{font-size:13px;color:#cbd6cf}
+.level-rules{margin:0 0 16px;padding:12px 14px;border-radius:14px;background:#0b2c21;border:1px solid #d9bd7944;font-size:14px;line-height:1.55;color:#dfe6e1}.level-rules b{color:#e8c983}
+.level-unlocks-title{margin:0 0 4px;font-size:16px;color:#ead39b}
+.level-unlocks{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.level-unlock{display:flex;align-items:center;gap:12px;padding:9px 12px;border-radius:12px;background:#0b2c21;border:1px solid #d9bd7922;font-size:14px}
+.level-unlock.unlocked{border-color:#e8c98355}.level-unlock.locked{opacity:.55}
+.level-unlock.choosable{cursor:pointer}.level-unlock.choosable:hover{background:#12392b}.level-unlock.choosable:focus-visible{outline:2px solid #e8c983;outline-offset:2px}
+.unlock-avatar{width:32px;height:32px}
+.unlock-badge{position:static;width:24px;height:24px;min-width:0;min-height:0;border-color:transparent;flex:none}
+.unlock-name{flex:1;min-width:0}
+.unlock-level{font-size:12px;font-weight:700;color:#a9b8ad;white-space:nowrap}.level-unlock.unlocked .unlock-level{color:#7fd6a3}
+.unlock-photo-button{flex:none;padding:7px 12px;border:0;border-radius:10px;background:#e8c983;color:#14301f;font:inherit;font-size:13px;font-weight:700;cursor:pointer}
+.unlock-photo-button.secondary{background:transparent;border:1px solid #e8c98399;color:#e8c983}
+/* Level up */
+.level-up-dialog{text-align:center}
+.level-up-burst{width:64px;height:64px;margin:0 auto 8px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:34px;color:#14301f;background:radial-gradient(circle at 35% 30%,#fff2c4,#d9a93c);box-shadow:0 0 30px #e8c98366}
+.level-up-dialog h2{margin:0 0 6px;color:#ead39b}.level-up-dialog p{margin:0 0 12px;color:#cbd6cf}
+.level-up-unlocks{list-style:none;margin:0 0 14px;padding:10px 12px;border-radius:12px;background:#0b2c21;display:grid;gap:6px;color:#e8c983;font-weight:600}
+.level-up-dialog .button{width:100%;min-height:52px;border-radius:16px;border:0;background:linear-gradient(180deg,#f0d596,#dcb565);color:#14301f;font:inherit;font-size:17px;font-weight:700}

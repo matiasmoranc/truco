@@ -17,9 +17,8 @@ const HOUSE_MIN=2,HOUSE_MAX=4,HOUSE_TICK_MS=60000,HOUSE_TARGET_MS=30*60000;
 const CODE_ALPHABET='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const randomCode=()=>Array.from(crypto.getRandomValues(new Uint32Array(5)),n=>CODE_ALPHABET[n%CODE_ALPHABET.length]).join('');
 const pick=weights=>{let r=Math.random()*weights.reduce((n,[,w])=>n+w,0);for(const [value,w] of weights){if((r-=w)<0)return value;}return weights[0][0];};
-// Mostly 20-point games, some of 10 and 30; mostly 1 credit, some of 2.
+// Mostly 20-point games, some of 10 and 30; tables are played without credits.
 const housePoints=()=>pick([[20,6],[10,2],[30,2]]);
-const houseStake=()=>pick([[1,3],[2,1]]);
 
 export class Lobby extends DurableObject{
  constructor(ctx,env){
@@ -73,7 +72,7 @@ export class Lobby extends DurableObject{
    const name=free.filter(n=>!house.recent.includes(n))[0]||free[Math.floor(Math.random()*Math.min(free.length,4))];if(!name)break;
    for(let attempt=0;attempt<3;attempt++){
     const code=randomCode();
-    const response=await tableStub(this.env,code).fetch(new Request('https://table/house-create',{method:'POST',headers:{'x-table-code':code,'x-internal-secret':this.env.INTERNAL_SECRET},body:JSON.stringify({uid:houseUid(name),name,stake:houseStake(),targetPoints:housePoints()})}));
+    const response=await tableStub(this.env,code).fetch(new Request('https://table/house-create',{method:'POST',headers:{'x-table-code':code,'x-internal-secret':this.env.INTERNAL_SECRET},body:JSON.stringify({uid:houseUid(name),name,stake:0,targetPoints:housePoints()})}));
     if(response.ok){house.lastAt=now;house.recent=[...house.recent.filter(n=>n!==name),name].slice(-HOUSE_NAMES.length);open.push({players:{player1:{name}}});break;}
     const body=await response.json().catch(()=>({}));if(body.code!=='code-taken'){console.error('house table failed',body.error);break;}
    }

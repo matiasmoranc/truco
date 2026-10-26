@@ -403,6 +403,11 @@ async function refreshMetrics(){
  finally{metricsBusy=false;}
 }
 $('metric-day').addEventListener('change',renderHours);
+$('levels-seed').onclick=async()=>{
+ $('levels-seed').disabled=true;$('levels-seed-status').textContent='Calculando…';
+ try{const r=(await call({action:'levels-backfill'})).data;$('levels-seed-status').textContent=r.seeded+' jugadores recibieron su nivel inicial (de '+r.players+' con partidas ganadas).';}
+ catch(e){$('levels-seed-status').textContent=errorText(e);}finally{$('levels-seed').disabled=false;}
+};
 // Messages to players: a player sees them in the game (never mid-match) and can answer.
 let threads=[];const openThreads=new Set();
 function peopleList(){

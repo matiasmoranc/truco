@@ -182,7 +182,7 @@ const {getAuth}=require('firebase-admin/auth');
 const adminMessages=require('./admin-messages.cjs');
 const alertAdmin=require('./social.cjs').adminAlerter(db);
 const pushToPlayer=require('./social.cjs').pushSender(db);
-const {tableEvents,requireAdmin,adminLedgerChange,validKey,prepareUserDeletion,finishUserDeletion,legacyTableActive,closeLegacyTable,adminTableCurrent}=require('./admin-service.cjs');
+const {pastWins,tableEvents,requireAdmin,adminLedgerChange,validKey,prepareUserDeletion,finishUserDeletion,legacyTableActive,closeLegacyTable,adminTableCurrent}=require('./admin-service.cjs');
 async function adminIdentity(request){
  const uid=request.auth?.uid;
  if(!uid)throw new HttpsError('unauthenticated','Iniciá sesión primero.');
@@ -286,6 +286,12 @@ exports.adminConsole=onCall({...options,secrets:[liveInternalSecret]},async requ
   return {ok:true};
  }
  // Messages to players: send one, list the conversations, mark a player's answers as seen.
+ // Starting levels from the wins already played (only for people without a level yet).
+ if(action==='levels-backfill'){
+  const wins=pastWins(await creditStore.readLedger()),now=Date.now();let seeded=0;
+  for(const [uid,count] of Object.entries(wins)){const r=await db.ref('levels/'+uid).transaction(current=>current?undefined:{points:count*10,wins:count,seededAt:now});if(r.committed)seeded++;}
+  return {players:Object.keys(wins).length,seeded};
+ }
  if(action==='send-message'){
   if(!validKey(data.uid))throw new HttpsError('invalid-argument','Usuario inválido.');
   let text;try{text=adminMessages.cleanText(data.text);}catch(e){throw new HttpsError('invalid-argument',e.message);}

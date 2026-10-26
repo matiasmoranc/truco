@@ -30,7 +30,7 @@ test('Repeated public rematches survive Firebase null omission and preserve byst
 function begin(ledger){assert.equal(ledger.matches.game1.session.room.status,'started');return ledger;}
 const card=(suit,rank)=>({id:suit+'-'+rank,suit,rank,label:String(rank)});
 function fixture(){const session=newSession('ABCDE',{player1:{uid:'a',name:'Mati'},player2:{uid:'b',name:'Ricky'}},10,{id:'game1',stake:1,matchNumber:1},100);Object.assign(session.room,{status:'started',turn:'player1',mano:'player1',muestra:card('♠',6),handNumber:1,deckCount:33});session.hands={player1:[card('♦',1),card('♦',7),card('♣',3)],player2:[card('♥',1),card('♥',7),card('♣',2)]};session.originals=structuredClone(session.hands);session.truth={player1:28,player2:28};return session;}
-test('Creator chooses a whole stake within balance; only that amount is reserved',()=>{const ledger=create();assert.deepEqual(ledger.wallets.a,{balance:7,locked:5,lastGrantAt:1});for(const stake of [0,-1,1.5,13,NaN])assert.throws(()=>create(base(),{stake}));assert.equal(base().wallets.a.balance,12);});
+test('Creator chooses a whole stake within balance; only that amount is reserved',()=>{const ledger=create();assert.deepEqual(ledger.wallets.a,{balance:7,locked:5,lastGrantAt:1});for(const stake of [-1,1.5,13,NaN])assert.throws(()=>create(base(),{stake}));assert.equal(base().wallets.a.balance,12);});
 test('Rival contributes the same stake even with a different total balance; repeat join never debits again',()=>{const ledger=join(create());assert.equal(ledger.wallets.b.balance,2);assert.equal(ledger.wallets.b.locked,5);assert.deepEqual(join(ledger),ledger);assert.throws(()=>join(ledger,{uid:'c'}));});
 test('Insufficient funds, existing reservation and wrong password do not charge the rival',()=>{const ledger=create(base(),{secret:passwordHash('clave')});assert.throws(()=>join(ledger,{password:'incorrecta'}));assert.equal(ledger.wallets.b.balance,7);const low=structuredClone(ledger);low.wallets.b.balance=4;assert.throws(()=>join(low,{password:'clave'}));const busy=structuredClone(ledger);busy.wallets.b.locked=1;assert.throws(()=>join(busy,{password:'clave'}));assert.equal(join(ledger,{password:'clave'}).wallets.b.locked,5);});
 test('Public projection never contains the password, deck, truth or private hands',()=>{const ledger=join(create(base(),{secret:passwordHash('secret-password')}),{password:'secret-password'});const room=publicTable(ledger.matches.game1),json=JSON.stringify(room);assert.equal(room.creditMatch.hasPassword,true);for(const secret of ['secret-password','drawPool','originals','truth','"hands"','"secret"'])assert.ok(!json.includes(secret),secret);});
@@ -147,4 +147,24 @@ test('Early server fold with undeclared flor awards four once and reveals winner
   assert.equal(s.room.scores[winner],4);assert.equal(s.room.status,'revealing');assert.equal(s.room.endReveal.groups[0].player,winner);assert.equal(s.room.endReveal.groups[0].cards.length,3);
   createReferee(s,{now:3201}).advance();assert.equal(s.room.scores[winner],4);
  }
+});
+test('Tables without stake need no wallets and never move credits, in 1 vs 1 and 2 vs 2',()=>{
+ const empty={wallets:{},matches:{},tables:{}};
+ let l=createTable(empty,{code:'FREEA',id:'f1',uid:'n1',name:'Nuevo',stake:0,targetPoints:10,now:100});
+ l=joinTable(l,{code:'FREEA',uid:'n2',name:'Otro',now:200});
+ assert.equal(l.matches.f1.status,'reserved');assert.deepEqual(l.wallets,{});
+ const done=structuredClone(l),room=done.matches.f1.session.room;Object.assign(room,{status:'complete',scores:{...room.scores,player2:10},matchResult:{winner:'player2'},endReveal:{done:true}});
+ const settled=tableOperation(done,{code:'FREEA',uid:'n1',command:{kind:'tick'},now:300});
+ assert.equal(settled.matches.f1.status,'settled');assert.equal(settled.matches.f1.winner,'n2');assert.deepEqual(settled.wallets,{});
+ // A rematch without stake starts without any reservation.
+ let again=tableOperation(settled,{code:'FREEA',uid:'n1',command:{kind:'rematch',value:'request'},requestId:'r1',now:400});
+ again=tableOperation(again,{code:'FREEA',uid:'n2',command:{kind:'rematch',value:'accept'},requestId:'r2',now:500});
+ assert.equal(again.matches[again.tables.FREEA].status,'reserved');assert.deepEqual(again.wallets,{});
+ // Waiting without a rival closes without touching anything.
+ const idle=tableOperation(createTable(empty,{code:'FREEB',id:'f2',uid:'n1',name:'Nuevo',stake:0,targetPoints:20,now:0}),{code:'FREEB',uid:'n1',command:{kind:'tick'},now:700000});
+ assert.equal(idle.matches.f2.status,'refunded');assert.deepEqual(idle.wallets,{});
+ // 2 vs 2 without stake fills with bots and settles without wallets.
+ let t=createTable(empty,{code:'FREEC',id:'f3',uid:'n1',name:'Nuevo',stake:0,targetPoints:10,mode:'2v2',now:0});
+ for(const seat of ['player2','player3','player4'])t=tableOperation(t,{code:'FREEC',uid:'n1',command:{kind:'add-bot',seat},requestId:'b'+seat,now:10});
+ assert.equal(t.matches.f3.status,'reserved');assert.deepEqual(t.wallets,{});
 });

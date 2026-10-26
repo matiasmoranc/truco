@@ -1,6 +1,6 @@
 import './chat-moderation.js?v=20261013-moderation1';
 import { visitPlatform,takeVisit,markTestDevice } from './visit.js?v=20261024-visits5';
-import { installFriends } from './friends.js?v=20261026-msg1';
+import { installFriends } from './friends.js?v=20261027-levels1';
 import { installPlayerPanel } from './player-panel.js?v=20261013-blocklist1';
 import { installScorer,renderCompactTally } from './scorer.js?v=20261026-people1';
 import { installActivity } from './activity.js?v=20261010-adminstats32';
@@ -10,6 +10,7 @@ import { initializeGameAuth } from './auth-init.js?v=20261016-android-google';
 import {installTeamTable,TEAM_SEATS,playerTeam,positionDealerDeck,renderTeamLobbySeats,renderWaitingSeats} from './team-table-ui.js?v=20261026-flor1';
 import {createLiveTables,LiveError} from './live-tables.js?v=20261025-close1';
 import {installMatchPhoto} from './share-photo.js?v=20261026-people1';
+import {installProfiles} from './profile-level.js?v=20261027-levels1';
 const FIREBASE_VERSION = '12.4.0';
 const $ = (id) => document.getElementById(id);
 const views = ['welcome-view', 'invite-view', 'setup-view', 'waiting-view', 'game-view', 'config-view', 'learn-view', 'scorer-view', 'friends-view'];
@@ -650,6 +651,8 @@ async function registerPush(){
   const token=await native.registerPush(data=>{if(data?.type==='friend-request')friends.open();});
   if(token)await creditApi('playerSocial',{action:'register-push',token,platform:native.platform});
 }
+// Levels and profile pictures (profile-level.js); the lobby re-renders when a rival's level arrives.
+const profiles=installProfiles({$,document,services:firebaseServices,getState:()=>state,toast:message=>toast(message,true,2600),onChange:()=>{if(state.lobbyRooms&&$('welcome-view').classList.contains('active'))renderLobby(state.lobbyRooms);}});
 // Friends and table invitations (friends.js).
 const friends=installFriends({$,api:creditApi,services:firebaseServices,getState:()=>state,document,showView,isPlaying:()=>!!state.room&&!state.learning&&$("game-view").classList.contains("active")&&!["waiting","complete"].includes(state.room.status),balance:()=>credits.wallet()?.balance,canClaim:()=>credits.canClaim(),claimCredits:()=>credits.claim(),openLobby:()=>openLobby(),
   toast:(message,error=false,duration=2600)=>toast(message,true,duration),
@@ -675,14 +678,14 @@ setTimeout(()=>{offerAppUpdate().catch(()=>{});},3000);
 const activity=installActivity({send:async data=>{const result=await creditApi('playerActivity',{...data,platform:visitPlatform(),...(data.visible?takeVisit():null)});if(typeof result?.testDevice==='boolean')markTestDevice(result.testDevice);return result;},getUid:()=>state.uid,document});
 const account=installAccount({api:creditApi,services:firebaseServices,getState:()=>state,rememberName:rememberPlayerName,document,onReady:async()=>{
   const initialCredits=credits.start().then(()=>credits.whenReady());
-  loadCreditFunctions().catch(()=>{});activity.start();friends?.start().catch(()=>{});registerPush().catch(()=>{});
+  loadCreditFunctions().catch(()=>{});activity.start();friends?.start().catch(()=>{});profiles.start().catch(()=>{});registerPush().catch(()=>{});
   await Promise.all([openInitialRoom(),initialCredits]);showLobbyOnboarding();
-},onIdentityChange:(...args)=>{friends?.stop();return resetAccountRoom(...args);},onNameChanged:()=>showView('welcome-view'),onRegistered:uid=>{state.lobbyOnboardingUid=uid;requestAnimationFrame(showLobbyOnboarding);},inRoom:()=>!!state.room&&!$('welcome-view').classList.contains('active')});
+},onIdentityChange:(...args)=>{friends?.stop();profiles.stop();return resetAccountRoom(...args);},onNameChanged:()=>showView('welcome-view'),onRegistered:uid=>{state.lobbyOnboardingUid=uid;requestAnimationFrame(showLobbyOnboarding);},inRoom:()=>!!state.room&&!$('welcome-view').classList.contains('active')});
 const credits=installCredits({services:firebaseServices,walletSource:creditWalletSource,api:creditApi,getState:()=>state,document,notify:message=>toast(message,true,2000),onChange:()=>{showLobbyOnboarding();if(state.lobbyRooms)renderLobby(state.lobbyRooms);
   if(state.room)renderMatchEnd();$('table-stake-available').textContent=String(credits.wallet()?.balance??'—');updateStakeControl();}});
 let lobbyWelcomeDialog=null,lobbyWelcomeStep=0,lobbyWelcomeTarget=null;
 const lobbyWelcomeSteps=[
- {target:'credits-open',title:'Tus créditos',text:'Tenés 5 créditos disponibles por día. Los créditos se utilizan para apostar contra otras personas. Podés jugar contra un bot sin créditos.'},
+ {target:'level-open',title:'Tu nivel',text:'Ganá partidas en línea para subir de nivel y desbloquear íconos, insignias y tu foto de perfil. Tocá acá para ver cómo vas.'},
  {target:'open-scorer',title:'Anotador',text:'Si vas a jugar con cartas reales y necesitás un anotador, acá tenés uno. Mientras lo tengas abierto, tu pantalla no se bloqueará.'},
  {target:'learn-game',title:'Aprendé a jugar',text:'¿No sabés jugar al truco? Acá te enseñamos de una manera divertida.'}
 ];
@@ -887,10 +890,9 @@ async function enterRoom() {
   if(state.enteringRoom)return;
   if(!state.joining&&!$('play-bot').checked){
     // The wallet subscription is already live; the server checks the reservation atomically.
-    const wallet=credits.wallet(),stake=Number($('table-stake').value);
-    if(!wallet){toast('Esperá a que carguen tus créditos.',true);return;}
-    if(wallet.locked>0){toast('Ya tenés una apuesta reservada. Volvé a tu mesa.',true);return;}
-    if(!Number.isSafeInteger(stake)||stake<1||stake>wallet.balance){toast('Elegí una apuesta entera dentro de tus créditos disponibles.',true);return;}
+    // Tables no longer use credits; an older reservation must still be finished first.
+    const wallet=credits.wallet();
+    if(wallet?.locked>0){toast('Ya tenés una apuesta reservada. Volvé a tu mesa.',true);return;}
   }
   const entryEpoch=state.navigationEpoch;
   state.enteringRoom=true;$('enter-room').disabled=true;
@@ -944,7 +946,7 @@ async function enterRoom() {
       }
       state.roomCode=code;state.playerId=seat;joinedRoom=room;
     }else{
-      const stake=Number($('table-stake').value),visibility=$('table-visibility').value;
+      const stake=0,visibility=$('table-visibility').value;
       const data={stake,targetPoints:normalizeTargetPoints($('target-points').value),mode:$('table-mode').value,visibility,password:visibility==='password'?$('table-password').value:''};
       // The table appears at once; the server confirms the credit reservation behind it.
       const code=newTableCode();
@@ -1055,7 +1057,8 @@ setInterval(()=>{
 },1000);
 function renderLobby(rooms) {
   Object.entries(rooms).forEach(([code,value])=>{if(roomExpired(value?.public))closeExpiredRoom(code);});
-  const open = Object.entries(rooms).filter(([, value]) => value?.public?.status === 'waiting' && !roomExpired(value.public) && (value.public.mode==='2v2'?Object.keys(value.public.players||{}).length<4:(!value.public.players?.player1 || !value.public.players?.player2))).sort((a,b) => houseTable(a[1].public)-houseTable(b[1].public) || (b[1].public.createdAt || 0) - (a[1].public.createdAt || 0));
+  // Tables with credits come from older app versions: they are no longer listed.
+  const open = Object.entries(rooms).filter(([, value]) => value?.public?.status === 'waiting' && !(Number(value.public.creditMatch?.stake)>0) && !roomExpired(value.public) && (value.public.mode==='2v2'?Object.keys(value.public.players||{}).length<4:(!value.public.players?.player1 || !value.public.players?.player2))).sort((a,b) => houseTable(a[1].public)-houseTable(b[1].public) || (b[1].public.createdAt || 0) - (a[1].public.createdAt || 0));
   if (!open.length) { $('open-room-list').innerHTML = '<div class="empty-lobby"><svg class="empty-table-icon" viewBox="0 0 64 64" aria-hidden="true"><ellipse cx="32" cy="29" rx="18" ry="12"/><path d="M32 41v14M23 55h18M25 15V9c0-7 14-7 14 0v6M9 25v16q0 7 9 7l-2 9M55 25v16q0 7-9 7l2 9"/></svg><strong>No hay mesas abiertas todavía</strong></div>'; setupSuitIcons($('open-room-list')); return; }
   $('open-room-list').innerHTML = open.map(([code, value]) => {
     const room = value.public, players = room.players || {}, seats = [['player1','Jugador 1',players.player1],['player2','Jugador 2',players.player2]];
@@ -1066,9 +1069,10 @@ function renderLobby(rooms) {
     const joinDisabled=!!(room.managedCredits&&!roomSeatForUid(room,state.uid)&&((credits.wallet()?.balance??0)<room.creditMatch.stake||(credits.wallet()?.locked??0)>0));
     const teamSeats=room.mode==='2v2'?renderTeamLobbySeats(code,room,escapeHtml,joinDisabled):`<div class="lobby-team-row"><div class="lobby-team"><span class="lobby-team-name">${escapeHtml(title)}</span></div><span class="lobby-team-versus">vs</span><div class="lobby-team">${actions.map(([key,label])=>`<button class="lobby-team-join" data-room="${code}" data-seat="${key}" ${joinDisabled?'disabled':''}>${label}</button>`).join('')}</div></div>`;
     const privateTable=!!(room.managedCredits&&room.creditMatch.hasPassword);
+    const owner=room.table?.uid||room.players?.player1?.uid,ownerProfile=profiles.profileOf(owner,room.table?.name||room.players?.player1?.name),ownerLevel=ownerProfile?profiles.levelOf(ownerProfile.points).level:'—';
     const coins='<svg class="credit-coin-icon" viewBox="-2 -2 52 54" aria-hidden="true"><g transform="rotate(-9 21 35)"><path d="M6 35v7a15 6 0 0 0 30 0v-7"/><ellipse cx="21" cy="35" rx="15" ry="6"/></g><g transform="rotate(9 27 23)"><path d="M12 23v7a15 6 0 0 0 30 0v-7"/><ellipse cx="27" cy="23" rx="15" ry="6"/></g><g transform="rotate(-12 20 12)"><path d="M5 12v7a15 6 0 0 0 30 0v-7"/><ellipse cx="20" cy="12" rx="15" ry="6"/></g></svg>';
     const lock='<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="'+(privateTable?'M8 10V6a4 4 0 0 1 8 0v4':'M8 10V6a4 4 0 0 1 8 0')+'"/><path d="M12 14v3"/></svg>';
-    return `<article class="lobby-card compact-room has-team-seats"><div class="compact-room-owner"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21v-2a8 8 0 0 1 16 0v2"/></svg><h3>${escapeHtml(title)}</h3></div><div class="compact-room-stat"><strong>${targetPoints(room)}</strong><span>puntos</span></div><div class="compact-room-stat">${coins}<strong>${room.managedCredits?escapeHtml(String(room.creditMatch.stake)):'0'}</strong></div><div class="compact-room-privacy ${privateTable?'is-private':'is-public'}" role="img" aria-label="${privateTable?'Mesa privada':'Mesa pública'}" title="${privateTable?'Mesa privada':'Mesa pública'}">${lock}</div><div class="lobby-join-options">${actions.map(([key,label])=>`<button class="button lobby-player-button" data-room="${code}" data-seat="${key}" ${room.managedCredits&&!roomSeatForUid(room,state.uid)&&((credits.wallet()?.balance??0)<room.creditMatch.stake||(credits.wallet()?.locked??0)>0)?'disabled':''}>${label}</button>`).join('')}</div>${teamSeats}</article>`;
+    return `<article class="lobby-card compact-room has-team-seats"><div class="compact-room-owner">${profiles.avatarHtml(ownerProfile||{},'player-avatar room-avatar')}<h3>${escapeHtml(title)}</h3></div><div class="compact-room-stat"><strong>${targetPoints(room)}</strong><span>puntos</span></div><div class="compact-room-stat level-stat"><strong>${ownerLevel}</strong><span>nivel</span></div><div class="compact-room-privacy ${privateTable?'is-private':'is-public'}" role="img" aria-label="${privateTable?'Mesa privada':'Mesa pública'}" title="${privateTable?'Mesa privada':'Mesa pública'}">${lock}</div><div class="lobby-join-options">${actions.map(([key,label])=>`<button class="button lobby-player-button" data-room="${code}" data-seat="${key}" ${room.managedCredits&&!roomSeatForUid(room,state.uid)&&((credits.wallet()?.balance??0)<room.creditMatch.stake||(credits.wallet()?.locked??0)>0)?'disabled':''}>${label}</button>`).join('')}</div>${teamSeats}</article>`;
   }).join('');
   syncLobbyJoinFeedback();
 }
@@ -4433,7 +4437,7 @@ function openCreditJoin(code,room){
   // What the table is and what entering costs, before any credit moves.
   let cost=$('join-credit-cost');if(!cost){cost=document.createElement('dl');cost.id='join-credit-cost';cost.className='join-summary';$('join-credit-form').insertBefore(cost,$('join-credit-password-row'));}
   const stake=Number(room.creditMatch.stake)||0,balance=credits.wallet()?.balance,plural=n=>n+' crédito'+(n===1?'':'s');
-  const rows=[['Mesa',(room.mode==='2v2'?'2 vs 2':'1 vs 1')+(room.creditMatch.hasPassword?' · privada':' · pública')],['Se juega a',(Number(room.targetPoints)||30)+' puntos'],['Apuesta',plural(stake)+' por jugador'],['Pozo',plural(Number(room.creditMatch.pot)||stake*(room.mode==='2v2'?4:2))],['Tus créditos',Number.isFinite(balance)?plural(balance)+(balance>=stake?' · te quedan '+(balance-stake)+' al entrar':''):'—']];
+  const rows=[['Mesa',(room.mode==='2v2'?'2 vs 2':'1 vs 1')+(room.creditMatch.hasPassword?' · privada':' · pública')],['Se juega a',(Number(room.targetPoints)||30)+' puntos'],...(stake>0?[['Apuesta',plural(stake)+' por jugador'],['Pozo',plural(Number(room.creditMatch.pot)||stake*(room.mode==='2v2'?4:2))],['Tus créditos',Number.isFinite(balance)?plural(balance)+(balance>=stake?' · te quedan '+(balance-stake)+' al entrar':''):'—']]:[])];
   cost.replaceChildren(...rows.flatMap(([k,v])=>{const dt=document.createElement('dt'),dd=document.createElement('dd');dt.textContent=k;dd.textContent=v;return [dt,dd];}));
   let teams=$('join-credit-team-row');
   if(!teams){teams=document.createElement('label');teams.id='join-credit-team-row';teams.textContent='Elegí tu equipo';const select=document.createElement('select');select.id='join-credit-team';select.className='table-mode-select';teams.append(select);$('join-credit-form').insertBefore(teams,$('join-credit-password-row'));}
@@ -4444,8 +4448,8 @@ function openCreditJoin(code,room){
   $('join-credit-password').value='';setPasswordVisible('join-credit-password',false);$('join-credit-error').textContent='';
   // A friend's invitation brings the password of a private table.
   if(state.invitePassword?.code===code){$('join-credit-password').value=state.invitePassword.password;state.invitePassword=null;}
-  const wallet=credits.wallet();$('join-credit-submit').disabled=!wallet||(wallet.balance<room.creditMatch.stake)||wallet.locked>0;
-  if($('join-credit-submit').disabled)$('join-credit-error').textContent='No tenés créditos disponibles para esta apuesta.';
+  const wallet=credits.wallet();$('join-credit-submit').disabled=stake>0&&(!wallet||(wallet.balance<room.creditMatch.stake)||wallet.locked>0);
+  if($('join-credit-submit').disabled&&stake>0)$('join-credit-error').textContent='No tenés créditos disponibles para esta apuesta.';
   $('join-credit-dialog').showModal();
 }
 $('join-credit-form').addEventListener('submit',async event=>{
@@ -4481,7 +4485,8 @@ setInterval(()=>{if(state.firebaseConnected===true&&navigator.onLine!==false&&do
 
 function updateStakeControl(){
   const wallet=credits.wallet(),maximum=Math.max(0,Math.floor(wallet?.balance||0));
-  const value=Math.max(1,Math.min(Math.max(1,maximum),Number($('table-stake').value)||1));
+  // Tables are played without credits: the stake is always 0.
+  const value=0;void maximum;
   $('table-stake').value=String(value);$('table-stake').max=String(maximum);$('table-stake').style.width=Math.max(2,String(value).length)+'ch';
   const unavailable=!wallet||wallet.locked>0;
   $('stake-minus').disabled=unavailable||value<=1;

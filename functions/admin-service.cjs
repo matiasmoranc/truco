@@ -41,7 +41,13 @@ function tableEvents(ledger,now,days=90){
  }
  return {created:created.sort((x,y)=>y.at-x.at),finished:finished.sort((x,y)=>y.at-x.at)};
 }
-module.exports={tableEvents,requireAdmin,adminLedgerChange,validKey};
+// Wins already played, per person, to start the levels: 1 point (10 tenths) each.
+function pastWins(ledger){
+ const wins={},person=uid=>typeof uid==='string'&&!uid.startsWith('bot:')&&!uid.startsWith('house_');
+ for(const m of Object.values(ledger?.matches||{})){if(m?.status!=='settled')continue;for(const uid of Array.isArray(m.winners)?m.winners:[m.winner])if(person(uid))wins[uid]=(wins[uid]||0)+1;}
+ return wins;
+}
+module.exports={pastWins,tableEvents,requireAdmin,adminLedgerChange,validKey};
 
 function legacyTableActive(room,now){
  if(!room||room.managedCredits||room.closedAt||!['waiting','drawing','started','revealing','timed-out'].includes(room.status))return false;

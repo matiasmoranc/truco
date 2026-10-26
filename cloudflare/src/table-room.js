@@ -6,6 +6,7 @@ import {createTableEngine,CodeTakenError} from './table-engine.js';
 import {createDatabase,createDevDatabase,verifyIdToken,playerIdentity,usersBlockEachOther} from './firebase.js';
 import {createFirebaseBank} from './firebase-bank.js';
 import {lobbyStub,bankStub} from './routing.js';
+import {levelAwards} from '../../levels.js';
 
 const {passwordHash}=tableService;
 const CLEANUP_MS=30*60*1000;
@@ -28,7 +29,7 @@ export class TableRoom extends DurableObject{
   ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair('ping','pong'));
   ctx.blockConcurrencyWhile(async()=>{
    const saved=await ctx.storage.get('state');
-   if(saved?.code){this.setCode(saved.code);this.engine.load(saved);this.lastLobby=saved.lastLobby||'null';}
+   if(saved?.code){this.setCode(saved.code);this.engine.load(saved);this.lastLobby=saved.lastLobby||'null';this.awarded=saved.awarded||null;}
   });
  }
  setCode(code){
@@ -159,9 +160,21 @@ export class TableRoom extends DurableObject{
   for(const ws of this.sockets()){const uid=ws.deserializeAttachment()?.uid;if(uid)this.sendState(ws,uid);}
   const entry=JSON.stringify(this.engine.lobbyEntry());
   const lobbyChanged=entry!==this.lastLobby;this.lastLobby=entry;
-  await this.ctx.storage.put('state',{code:this.code,lastLobby:this.lastLobby,...this.engine.snapshot()});
+  const m=this.engine.match,award=m?.status==='settled'&&m.id!==this.awarded?m:null;if(award)this.awarded=m.id;
+  await this.ctx.storage.put('state',{code:this.code,lastLobby:this.lastLobby,awarded:this.awarded||null,...this.engine.snapshot()});
+  if(award)this.ctx.waitUntil(this.awardLevels(award).catch(error=>console.error('level award failed',this.code,error)));
   if(lobbyChanged)this.ctx.waitUntil(lobbyStub(this.env).fetch('https://lobby/update',{method:'POST',body:JSON.stringify({code:this.code,room:JSON.parse(entry)})}).catch(error=>console.error('lobby update failed',error)));
   await this.arm();
+ }
+ // A finished game adds level points to each winning person (once per game, see levelAwards/{id}).
+ async awardLevels(m){
+  const people=Object.values(m.players||{}).map(p=>p?.uid).filter(uid=>typeof uid==='string'&&!uid.startsWith('bot:')&&!uid.startsWith('house_'));
+  if(!people.length)return;
+  const first=await this.db.transaction('levelAwards/'+m.id,current=>current?undefined:{at:Date.now(),code:this.code});
+  if(!first.committed)return;
+  const levels=Object.fromEntries(await Promise.all(people.map(async uid=>[uid,Number((await this.db.get('levels/'+uid+'/points'))||0)])));
+  for(const [uid,points] of Object.entries(levelAwards(m,levels)))
+   await this.db.transaction('levels/'+uid,current=>({...(current||{}),points:(Number(current?.points)||0)+points,wins:(Number(current?.wins)||0)+1,updatedAt:Date.now()}));
  }
  async arm(){
   let at=this.engine.nextDeadline();
