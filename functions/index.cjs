@@ -182,7 +182,7 @@ const {getAuth}=require('firebase-admin/auth');
 const adminMessages=require('./admin-messages.cjs');
 const alertAdmin=require('./social.cjs').adminAlerter(db);
 const pushToPlayer=require('./social.cjs').pushSender(db);
-const {pastWins,tableEvents,requireAdmin,adminLedgerChange,validKey,prepareUserDeletion,finishUserDeletion,legacyTableActive,closeLegacyTable,adminTableCurrent}=require('./admin-service.cjs');
+const {pastWins,finishedTables,tableEvents,requireAdmin,adminLedgerChange,validKey,prepareUserDeletion,finishUserDeletion,legacyTableActive,closeLegacyTable,adminTableCurrent}=require('./admin-service.cjs');
 async function adminIdentity(request){
  const uid=request.auth?.uid;
  if(!uid)throw new HttpsError('unauthenticated','Iniciá sesión primero.');
@@ -327,9 +327,10 @@ exports.adminConsole=onCall({...options,secrets:[liveInternalSecret]},async requ
    const result=batch.length?await getAuth().getUsers(batch.map(uid=>({uid}))):{users:[]};
    page={users:result.users,pageToken:offset+100<ids.length?String(offset+100):null};
   }else page=await getAuth().listUsers(100,data.pageToken||undefined);
+  const finished=finishedTables(await creditStore.readLedger());
   const users=await Promise.all(page.users.filter(u=>!u.providerData.every(p=>!['google.com','apple.com','password'].includes(p.providerId))).map(async u=>{
    const [profile,wallet,points]=await Promise.all([db.ref('profiles/'+u.uid).get(),creditStore.wallet(u.uid).then(value=>({val:()=>value})),db.ref('levels/'+u.uid+'/points').get()]);
-   return {uid:u.uid,email:u.email||'',name:profile.val()?.name||'',disabled:u.disabled,createdAt:u.metadata.creationTime,balance:wallet.val()?.balance??0,locked:wallet.val()?.locked??0,points:Number(points.val())||0};
+   return {uid:u.uid,email:u.email||'',name:profile.val()?.name||'',disabled:u.disabled,createdAt:u.metadata.creationTime,balance:wallet.val()?.balance??0,locked:wallet.val()?.locked??0,points:Number(points.val())||0,finished:finished[u.uid]||0};
   }));
   return {users,pageToken:page.pageToken||null};
  }

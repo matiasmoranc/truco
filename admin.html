@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="es"><head><meta charset="utf-8">
-  <meta name="robots" content="noindex, nofollow"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Administración · Truco Uruguayo</title><link rel="stylesheet" href="admin.css?v=17"></head>
+  <meta name="robots" content="noindex, nofollow"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Administración · Truco Uruguayo</title><link rel="stylesheet" href="admin.css?v=18"></head>
 <body>
 <section id="access" class="access"><div class="access-card"><img src="assets/truco-v3.png" alt=""><small>TRUCO URUGUAYO</small><h1>Administración</h1><p id="identity"></p><p id="access-status">Verificando sesión…</p><button id="login" class="primary" hidden>Continuar con Google</button><button id="switch-account" hidden>Usar otra cuenta</button><a href="./">Volver al juego</a></div></section>
 <div id="console" class="shell" hidden>
@@ -57,7 +57,7 @@
   <section id="users" hidden>
    <div class="toolbar"><label>Mostrar<select id="user-scope"><option value="all">Todos los usuarios</option><option value="active">Jugando ahora</option><option value="today">Jugadores de hoy</option></select></label><label>Nivel<select id="level-filter"><option value="">Todos los niveles</option><option value="1-1">Nivel 1</option><option value="2-4">Niveles 2 a 4</option><option value="5-9">Niveles 5 a 9 (bronce)</option><option value="10-19">Niveles 10 a 19 (plata)</option><option value="20-29">Niveles 20 a 29 (oro)</option><option value="30-9999">Nivel 30 o más (diamante)</option></select></label><label class="grow">Buscar<input id="search" type="search" placeholder="Nombre, correo o UID"></label></div>
    <p class="note">El filtro de nivel se aplica a los usuarios cargados; tocá «Cargar más» para sumar los siguientes.</p>
-   <div class="data-list"><div class="list-head user-row"><span>Usuario</span><span>Correo</span><span class="num">Nivel</span><span class="num">Puntos</span><span>Estado</span><span>Alta</span></div><div id="user-list"></div></div>
+   <div class="data-list"><div class="list-head user-row"><button type="button" data-sort="name">Usuario</button><span>Correo</span><button type="button" class="num" data-sort="level">Nivel</button><button type="button" class="num" data-sort="points">Puntos</button><button type="button" class="num" data-sort="finished">Mesas</button><button type="button" data-sort="state">Estado</button><button type="button" data-sort="joined">Alta</button></div><div id="user-list"></div></div>
    <button id="more" hidden>Cargar más usuarios</button>
    <div class="panel levels-seed"><div class="panel-head"><h2>Niveles iniciales</h2></div><p class="note">Da a cada jugador 1 punto de nivel por cada partida que ya ganó en línea. Solo cambia a quien todavía no tiene nivel, así que se puede tocar más de una vez sin duplicar.</p><button id="levels-seed" type="button" class="primary">Calcular niveles iniciales</button> <span id="levels-seed-status"></span></div>
   </section>
@@ -86,4 +86,4 @@
  </main>
 </div>
 <dialog id="edit"><form id="edit-form"><div class="dialog-head"><h2 id="edit-title"></h2><button type="button" id="close" aria-label="Cerrar">×</button></div><p id="edit-description"></p><label id="value-label">Nuevo valor<input id="value" required></label><label id="delete-label" hidden>Escribí el nombre exacto para confirmar<input id="delete-confirm" autocomplete="off"></label><label>Motivo<input id="reason" required minlength="3" maxlength="200" placeholder="Por qué realizás este cambio"></label><p id="edit-error" role="alert"></p><div class="dialog-actions"><button id="cancel" type="button">Cancelar</button><button id="save" class="primary" type="submit">Confirmar cambio</button></div></form></dialog>
-<script type="module" src="admin.js?v=21"></script></body></html>
+<script type="module" src="admin.js?v=22"></script></body></html>

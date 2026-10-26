@@ -6,6 +6,8 @@ const $=id=>document.getElementById(id);
 const points=tenths=>(tenths/10).toLocaleString('es-UY',{maximumFractionDigits:1});
 // Level filter: "from-to" levels, empty for all.
 function inLevel(u){const [from,to]=($('level-filter').value||'').split('-').map(Number);if(!from)return true;const level=levelFor(u.points||0).level;return level>=from&&level<=to;}
+// Users list order: a column and its direction (1 up, -1 down); newest sign-ups first.
+let sortBy={key:'joined',dir:-1};
 let auth,call,users=[],pageToken=null,selection=null,busy=false,epoch=0,metrics=null,metricsBusy=false,metricsTimer=null,pagesLoaded=1,userScope='all',tableData={tables:[],archivedTables:[]};
 function say(message){$('status').textContent=message;}
 // Test accounts and test devices stay out of every number unless this switch is off.
@@ -37,13 +39,17 @@ function renderUsers(){
  const query=$('search').value.toLocaleLowerCase();$('user-list').replaceChildren();
  const tests=new Set(metrics?.testUids||[]);
  // With test data hidden, test accounts leave the list too (show it to unmark one).
- for(const u of users.filter(u=>(!hideTest()||!tests.has(u.uid))&&inLevel(u)&&[u.name,u.email,u.uid].some(v=>v.toLocaleLowerCase().includes(query)))){
+ const stateRank=u=>u.disabled?0:metrics?.online.includes(u.uid)?2:1;
+ const value={name:u=>(u.name||'').toLocaleLowerCase(),level:u=>levelFor(u.points||0).level,points:u=>u.points||0,finished:u=>u.finished||0,state:stateRank,joined:u=>Date.parse(u.createdAt)||0}[sortBy.key];
+ const byColumn=(a,b)=>{const x=value(a),y=value(b);return (typeof x==='string'?x.localeCompare(y,'es'):x-y)*sortBy.dir;};
+ for(const button of document.querySelectorAll('[data-sort]'))button.dataset.dir=button.dataset.sort===sortBy.key?(sortBy.dir>0?'up':'down'):'';
+ for(const u of users.filter(u=>(!hideTest()||!tests.has(u.uid))&&inLevel(u)&&[u.name,u.email,u.uid].some(v=>v.toLocaleLowerCase().includes(query))).sort(byColumn)){
   const card=node('details','','user-card');card.dataset.uid=u.uid;card.open=expanded.has(u.uid);
   const online=metrics?.online.includes(u.uid);
   const state=node('span','',u.disabled?'state blocked':online?'state online':'state');state.append(node('i'),document.createTextNode(u.disabled?'Bloqueado':online?'Jugando':'Desconectado'));
   const summary=node('summary','','user-row');
   const name=node('span',u.name||'Sin nombre','user-name');if(tests.has(u.uid))name.append(node('em','Prueba','test-badge'));
-  summary.append(name,node('span',u.email||'Sin correo','user-mail'),node('strong',String(levelFor(u.points||0).level),'num'),node('span',points(u.points||0),'num reserved'),state,node('span',new Date(u.createdAt).toLocaleDateString('es-UY'),'joined'));card.append(summary);
+  summary.append(name,node('span',u.email||'Sin correo','user-mail'),node('strong',String(levelFor(u.points||0).level),'num'),node('span',points(u.points||0),'num reserved'),node('span',String(u.finished||0),'num tables'),state,node('span',new Date(u.createdAt).toLocaleDateString('es-UY'),'joined'));card.append(summary);
   const detail=node('div','','user-detail');detail.append(node('small','UID: '+u.uid),node('small','Correo: '+(u.email||'Sin correo')),node('small','Nivel '+levelFor(u.points||0).level+' · '+points(u.points||0)+' puntos · Registro '+new Date(u.createdAt).toLocaleDateString('es-UY')));card.append(detail);
   const actions=node('div','','actions');actions.append(button('Cambiar nombre',()=>openEdit('rename',u)),button(u.disabled?'Desbloquear':'Bloquear',()=>openEdit('block',u)),button('Eliminar usuario',()=>openEdit('delete',u)),button(tests.has(u.uid)?'Quitar de prueba':'Marcar como prueba',()=>setTestUser(u,!tests.has(u.uid))),button('Escribir mensaje',()=>writeTo(u)));detail.append(actions);$('user-list').append(card);
  }
@@ -180,7 +186,9 @@ function renderTables(){
 $('table-search').addEventListener('input',renderTables);
 $('table-order').addEventListener('change',renderTables);
 $('table-state').addEventListener('change',renderTables);
-$('search').addEventListener('input',renderUsers);$('level-filter').onchange=renderUsers;$('more').onclick=()=>refresh(true);
+$('search').addEventListener('input',renderUsers);
+// Tapping a column header orders by it; tapping it again flips the order.
+for(const button of document.querySelectorAll('[data-sort]'))button.onclick=()=>{const key=button.dataset.sort;sortBy=sortBy.key===key?{key,dir:-sortBy.dir}:{key,dir:key==='name'?1:-1};renderUsers();};$('level-filter').onchange=renderUsers;$('more').onclick=()=>refresh(true);
 function showTab(name){for(const section of Object.keys(TAB_TITLES))$(section).hidden=section!==name;for(const tab of document.querySelectorAll('[data-tab]'))tab.classList.toggle('active',tab.dataset.tab===name);$('page-title').textContent=TAB_TITLES[name];}
 $('refresh').onclick=()=>refresh(false,true);
 for(const b of document.querySelectorAll('[data-tab]'))b.onclick=()=>showTab(b.dataset.tab);

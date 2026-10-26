@@ -138,6 +138,7 @@ test('Admin table events list created tables and finished games by Uruguay day, 
  assert.deepEqual(e.finished.map(x=>[x.id,x.house,x.day,x.winner]),[['b',true,'2026-10-26','Caro'],['a',false,'2026-10-25','Ana']]);
 });
 test('Past wins per person, for the starting levels, leave bots and house players out',()=>{
- const {pastWins}=require('../functions/admin-service.cjs');
+ const {pastWins,finishedTables}=require('../functions/admin-service.cjs');
+ assert.deepEqual(finishedTables({matches:{a:{status:'settled',players:{player1:{uid:'u1'},player2:{uid:'u2'}}},b:{status:'refunded',players:{player1:{uid:'u1'},player2:{uid:'u3'}}},c:{status:'settled',players:{player1:{uid:'u1'},player2:{uid:'house_X'}}},d:{status:'settled',players:{player1:{uid:'u2'},player2:{uid:'bot:player2'},player3:{uid:'u3'}}}}}),{u1:2,u2:2,u3:1});
  assert.deepEqual(pastWins({matches:{a:{status:'settled',winner:'u1'},b:{status:'settled',winner:'u1'},c:{status:'refunded',winner:'u2'},d:{status:'settled',winners:['u2','bot:player3']},e:{status:'settled',winner:'house_X'}}}),{u1:2,u2:1});
 });
