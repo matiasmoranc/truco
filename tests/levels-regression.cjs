@@ -29,3 +29,10 @@ test('The own photo opens at level 6, 15 points, in the game and in the database
  const rules=JSON.parse(fs.readFileSync(path.join(__dirname,'../firebase.database.rules.json'),'utf8'));
  assert.match(rules.rules.avatars.$uid.photo['.validate'],/val\(\) >= 150$/);
 });
+test('House players stay between levels 1 and 5, with an icon their level has',async()=>{
+ const L=await load();
+ for(const name of ['Nacho_Pereira','Santi_Fernandez','Vale_Rodriguez','Caro.Suarez','x','']){
+  const level=L.houseLevel(name);assert.ok(level>=1&&level<=5,name+' '+level);
+  assert.ok(L.ICONS.some(i=>i.id===L.houseIcon(name)&&i.level<=level));
+ }
+});

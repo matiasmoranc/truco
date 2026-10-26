@@ -2,7 +2,7 @@
 // were, the level details with what each level unlocks, the icon or photo of every
 // player with its badge on the edge, and the "you went up a level" celebration.
 // Levels are written only by the table server; a player writes only its own avatar.
-import {levelFor,badgeFor,ICONS,PHOTO_LEVEL,unlocks,BADGES,houseLevel,houseIcon,pointsToReach} from './levels.js?v=20261027-icons1';
+import {levelFor,badgeFor,ICONS,PHOTO_LEVEL,unlocks,BADGES,houseLevel,houseIcon,pointsToReach} from './levels.js?v=20261027-house5';
 
 // Profile icons and badges: pictures in assets/profile. The "gaucho" id is kept for
 // players who already chose it; it now shows the coat of arms of Uruguay.
