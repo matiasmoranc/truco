@@ -21,8 +21,10 @@ export function installProfiles({$,document,services,getState,toast,onChange=()=
  const levelOf=points=>levelFor(points||0);
  // An avatar: the chosen icon or the photo, with the badge of the level over its edge.
  const showsPhoto=p=>!!p?.photo&&p.use!=='icon';
+ // The badge shown: the one the player picked if its level has it, none if hidden, else the highest.
+ const shownBadge=p=>{const level=levelOf(p?.points).level;if(p?.badge==='none')return null;const picked=BADGES.find(b=>b.id===p?.badge&&level>=b.level);return picked||badgeFor(level);};
  function avatarHtml(profile={},cls='player-avatar'){
-  const {icon,points}=profile,photo=showsPhoto(profile)?profile.photo:null,{level}=levelOf(points),badge=badgeFor(level);
+  const {icon}=profile,photo=showsPhoto(profile)?profile.photo:null,badge=shownBadge(profile);
   const inner=photo?`<img src="${escapeAttr(photo)}" alt="">`:`<svg viewBox="0 0 24 24" aria-hidden="true">${ICON_SVG[icon]||ICON_SVG.persona}</svg>`;
   return `<span class="${cls}${photo?' has-photo':''}">${inner}${badge?`<span class="level-badge badge-${badge.id}" title="${escapeAttr(badge.name)}">${BADGE_STAR}</span>`:''}</span>`;
  }
@@ -62,7 +64,8 @@ export function installProfiles({$,document,services,getState,toast,onChange=()=
   $('level-detail-avatar').innerHTML=avatarHtml(p,'player-avatar big-avatar');
   $('level-detail-number').textContent=String(info.level);
   $('level-detail-bar').style.width=Math.round(info.progress*100)+'%';
-  $('level-detail-progress').textContent=fmt(info.points)+' de '+fmt(info.need)+' puntos para el nivel '+(info.level+1);
+  $('level-detail-progress').textContent=fmt(info.points)+' puntos / '+fmt(info.need)+' puntos';
+  $('level-detail-progress').setAttribute('aria-label',fmt(info.points)+' de '+fmt(info.need)+' puntos para el nivel '+(info.level+1));
   // Without a photo yet: when it unlocks, or a shortcut to upload it once it has.
   const hint=$('level-photo-hint');
   if(hint){hint.hidden=!!p.photo;hint.replaceChildren();
@@ -70,10 +73,13 @@ export function installProfiles({$,document,services,getState,toast,onChange=()=
   const list=$('level-unlocks');list.replaceChildren();
   for(const u of unlocks()){
    const got=info.level>=u.level,li=document.createElement('li');li.className='level-unlock'+(got?' unlocked':' locked');
-   const chosen=u.kind==='icon'?!showsPhoto(p)&&(p.icon||'persona')===u.id:u.kind==='photo'&&showsPhoto(p);
+   const chosen=u.kind==='icon'?!showsPhoto(p)&&(p.icon||'persona')===u.id:u.kind==='photo'?showsPhoto(p):shownBadge(p)?.id===u.id;
    const preview=u.kind==='icon'?`<span class="player-avatar unlock-avatar"><svg viewBox="0 0 24 24" aria-hidden="true">${ICON_SVG[u.id]}</svg></span>`:u.kind==='badge'?`<span class="unlock-badge level-badge badge-${u.id}">${BADGE_STAR}</span>`:`<span class="player-avatar unlock-avatar"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="6" width="17" height="13" rx="2.5"/><circle cx="12" cy="12.5" r="3.5"/><path d="M8.5 6l1.5-2h4l1.5 2"/></svg></span>`;
-   li.innerHTML=`${preview}<span class="unlock-name">${escapeAttr(u.name)}</span><span class="unlock-level${chosen?' in-use':''}">${got?(chosen?'En uso':u.kind==='badge'?'Nivel '+u.level+' ✓':'Usar'):'Nivel '+u.level}</span>`;
+   li.innerHTML=`${preview}<span class="unlock-name">${escapeAttr(u.name)}</span><span class="unlock-level${chosen?' in-use':''}">${got?(chosen?'En uso':'Usar'):'Nivel '+u.level}</span>`;
    if(got&&u.kind==='icon'&&!chosen){li.classList.add('choosable');li.tabIndex=0;li.setAttribute('role','button');li.title='Usar este ícono';li.onclick=()=>saveAvatar({icon:u.id,use:'icon'});}
+   // Badges: tap one to wear it; the one in use can be taken off.
+   if(got&&u.kind==='badge'&&!chosen){li.classList.add('choosable');li.tabIndex=0;li.setAttribute('role','button');li.title='Usar esta insignia';li.onclick=()=>saveAvatar({badge:u.id});}
+   if(got&&u.kind==='badge'&&chosen){const b=document.createElement('button');b.type='button';b.className='unlock-photo-button secondary';b.textContent='Sacar';b.onclick=event=>{event.stopPropagation();saveAvatar({badge:'none'});};li.querySelector('.unlock-level').after(b);}
    if(got&&u.kind==='photo'){
     // The photo stays saved while an icon is in use, so it can come back with one tap.
     const actions=document.createElement('span');actions.className='unlock-photo-actions';
@@ -82,7 +88,7 @@ export function installProfiles({$,document,services,getState,toast,onChange=()=
     add(p.photo?'Cambiar':'Elegir foto',p.photo?'secondary':'',()=>$('avatar-photo-input').click());
     if(p.photo)add('Quitar','secondary',()=>saveAvatar({photo:null,use:null}));
     const tag=li.querySelector('.unlock-level');if(chosen)tag.after(actions);else tag.replaceWith(actions);
-    if(p.photo)li.querySelector('.unlock-avatar').outerHTML=avatarHtml({photo:p.photo,use:'photo',points:0},'player-avatar unlock-avatar');
+    if(p.photo)li.querySelector('.unlock-avatar').outerHTML=avatarHtml({photo:p.photo,use:'photo',points:0,badge:'none'},'player-avatar unlock-avatar');
    }
    list.append(li);
   }
