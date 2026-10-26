@@ -8,13 +8,13 @@ function reservationAlerts(ledger,now){
   if(!(w.locked>0))continue;
   const matches=Object.values(ledger.matches||{}).filter(m=>participates(m,uid)&&['waiting','reserved'].includes(m.status));
   const current=matches.filter(m=>ledger.tables?.[m.code]===m.id&&!m.closedAt);
-  if(!current.length)alerts.push({uid,locked:w.locked,reason:'Reserva sin una partida activa. Requiere revisión antes de modificar el saldo.',repairable:false});
+  if(!current.length)alerts.push({uid,locked:w.locked,reason:'No tiene una partida activa asociada. Revisalo antes de liberarla.',repairable:false});
   else for(const m of current){
    const expired=m.status==='waiting'&&now-m.createdAt>=600000;
    const complete=['complete','closed'].includes(m.session?.room?.status);
    // The table server owns live matches; the ledger copy has no game to tick.
    if(m.live==='cloudflare'){if(expired)alerts.push({uid,locked:w.locked,code:m.code,id:m.id,reason:'Mesa del servidor de juego sin cerrar. Cerrala desde Mesas.',repairable:false});}
-   else if(expired||complete)alerts.push({uid,locked:w.locked,code:m.code,id:m.id,reason:expired?'Mesa vencida sin rival.':'Partida finalizada pendiente de liquidación.',repairable:true});
+   else if(expired||complete)alerts.push({uid,locked:w.locked,code:m.code,id:m.id,reason:expired?'Mesa vencida sin rival.':'La partida terminó pero quedó sin cerrar.',repairable:true});
    else if(w.locked!==m.stake)alerts.push({uid,locked:w.locked,code:m.code,id:m.id,reason:'La reserva no coincide con la apuesta.',repairable:false});
   }
  }

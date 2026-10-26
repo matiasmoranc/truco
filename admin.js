@@ -21,7 +21,7 @@ async function setTestUser(u,test){
 const number=value=>new Intl.NumberFormat('es-UY').format(Number(value)||0);
 const PLATFORM_LABELS={'app-ios':'App iPhone','app-android':'App Android','web-ios':'Web iPhone','web-android':'Web Android','web-desktop':'Web computadora'};
 const PAGE_LABELS={juego:'Juego',anotador:'Anotador',aprender:'Aprender a jugar',otra:'Reglas y otras'};
-const TAB_TITLES={metrics:'Resumen',visits:'Visitas',users:'Usuarios y créditos',tables:'Mesas y partidas',reports:'Problemas reportados',messages:'Mensajes a jugadores',audit:'Historial de cambios'};
+const TAB_TITLES={metrics:'Resumen',visits:'Visitas',users:'Usuarios',tables:'Mesas y partidas',reports:'Problemas reportados',messages:'Mensajes a jugadores',audit:'Historial de cambios'};
 function errorText(e){return e.code==='functions/not-found'?'Falta publicar las funciones de administración en Firebase.':e.message||'No se pudo completar el cambio.';}
 function node(tag,text,className){const el=document.createElement(tag);el.textContent=text;if(className)el.className=className;return el;}
 function button(text,handler){const el=node('button',text);if(text==='Eliminar usuario')el.classList.add('danger');el.type='button';el.addEventListener('click',handler);return el;}
@@ -30,7 +30,7 @@ function openEdit(action,item){
  const credits=action==='credits',rename=action==='rename';
  $('delete-label').hidden=action!=='delete';$('delete-confirm').required=action==='delete';$('delete-confirm').value='';
  $('edit-title').textContent=action==='delete'?'Eliminar usuario':credits?'Editar créditos':rename?'Cambiar nombre':action==='block'?(item.disabled?'Desbloquear usuario':'Bloquear usuario'):'Cerrar mesa';
- $('edit-description').textContent=action==='delete'?'Se eliminará la cuenta de '+(item.name||item.uid)+'. Si vuelve a registrarse, se creará una cuenta nueva. Sus partidas y registros contables se conservan.':action==='close-table'?'Mesa '+item.code+'. Se cerrará para ambos jugadores y se devolverán las apuestas pendientes.':(item.name||item.email||item.uid);
+ $('edit-description').textContent=action==='delete'?'Se eliminará la cuenta de '+(item.name||item.uid)+'. Si vuelve a registrarse, se creará una cuenta nueva. Sus partidas se conservan.':action==='close-table'?'Mesa '+item.code+'. Se cerrará para todos los jugadores.':(item.name||item.email||item.uid);
  $('value-label').hidden=!credits&&!rename;$('value').required=credits||rename;$('value').type=credits?'number':'text';$('value').min='0';$('value').max='1000000000';$('value').step='1';$('value').maxLength=18;$('value').value=credits?item.balance:rename?item.name:'';
  $('edit').showModal();
 }
@@ -73,7 +73,7 @@ async function refresh(more=false,preservePages=false){
   const data=(await call({action:'tables'})).data;if(generation!==epoch)return;
   tableData=data;renderUsers();renderTables();renderTableStats();
   $('reservation-alerts').replaceChildren();
-  for(const a of data.alerts||[]){const card=node('article','','card');card.append(node('h3','Créditos reservados: '+(users.find(u=>u.uid===a.uid)?.name||a.uid)),node('p',a.locked+' créditos · '+a.reason));if(a.repairable)card.append(button('Resolver reserva',async()=>{try{await call({action:'repair-reservation',uid:a.uid});await refresh();}catch(e){say(errorText(e));}}));$('reservation-alerts').append(card);}
+  for(const a of data.alerts||[]){const card=node('article','','card');card.append(node('h3','Partida anterior sin cerrar: '+(users.find(u=>u.uid===a.uid)?.name||a.uid)),node('p','No puede crear mesas hasta liberarla. '+a.reason));if(a.repairable)card.append(button('Liberar',async()=>{try{await call({action:'repair-reservation',uid:a.uid});await refresh();}catch(e){say(errorText(e));}}));$('reservation-alerts').append(card);}
   $('reports-list').replaceChildren();
   for(const r of data.reports||[]){const card=node('article','','card');card.append(node('h3',r.name),node('small',formatTableTime(r.at)),node('p',r.message),node('small',r.matchId?'Mesa '+r.code+' · ID '+r.matchId:r.localId?'Partida contra el bot · ID '+r.localId:'Reporte general del juego'));card.append(node('small','Usuario: '+r.uid));if(r.matchId)card.append(button('Ver partida',()=>{showTab('tables');$('table-search').value=r.matchId;$('table-state').value='all';renderTables();}));$('reports-list').append(card);}
   if(!data.reports?.length)$('reports-list').append(node('p','No hay problemas reportados.','empty'));
@@ -124,7 +124,7 @@ function openTableDetail(kind,day=null){
  if(!shown.length){body.append(node('p','No hay nada en este período.','empty'));return;}
  const status={waiting:'Esperando rival',reserved:'En juego',settled:'Terminada',refunded:'Sin rival (devuelta)'};
  const reason={abandon:'abandono',disconnect:'desconexión',inactivity:'inactividad',timeout:'inactividad'};
- const rows=shown.map(x=>[formatTableTime(x.at),x.code,x.players.join(' vs ')||'—',(x.targetPoints||'—')+' pts · '+x.stake+' créd.',kind==='created'?status[x.status]||x.status:'Ganó '+(x.winner||'—')+(x.scores?' ('+Object.values(x.scores).join(' a ')+')':'')+(reason[x.reason]?' por '+reason[x.reason]:'')]);
+ const rows=shown.map(x=>[formatTableTime(x.at),x.code,x.players.join(' vs ')||'—',(x.targetPoints||'—')+' pts',kind==='created'?status[x.status]||x.status:'Ganó '+(x.winner||'—')+(x.scores?' ('+Object.values(x.scores).join(' a ')+')':'')+(reason[x.reason]?' por '+reason[x.reason]:'')]);
  body.append(simpleTable(['Fecha y hora','Mesa','Jugadores','Partida',kind==='created'?'Estado':'Resultado'],rows));
 }
 for(const id of ['table-range','table-from','table-to'])$(id).addEventListener('change',renderTableStats);
@@ -142,7 +142,6 @@ function sortedTables(list){
   const dateDifference=tableTime(b)-tableTime(a);
   // Undated old records stay last in either chronological direction.
   if(order==='oldest')return !tableTime(a)?(!tableTime(b)?0:1):!tableTime(b)?-1:-dateDifference;
-  if(order==='stake')return (Number(b.stake)||0)-(Number(a.stake)||0)||dateDifference;
   if(order==='points')return (Number(b.targetPoints)||0)-(Number(a.targetPoints)||0)||dateDifference;
   return dateDifference;
  });
@@ -154,14 +153,13 @@ function renderTables(){
   const card=node('details','','card table-card');card.dataset.match=t.id||t.code;card.open=expanded.has(card.dataset.match);
   const summary=node('summary','','table-summary');
   const players=node('span',t.players[0]||'Sin creador','table-summary-players');players.append(node('small',t.players[1]?'vs. '+t.players[1]:'Esperando rival'));
-  summary.append(players,node('span',t.status,'table-status'),node('span',formatTableTime(t.createdAt),'table-summary-date'),node('span',t.stake+' créditos','table-summary-stake'));card.append(summary);
+  summary.append(players,node('span',t.status,'table-status'),node('span',formatTableTime(t.createdAt),'table-summary-date'));card.append(summary);
   const contents=node('div','','table-expanded');card.append(contents);
   contents.append(node('h3','Mesa '+t.code+' · Partida '+(t.matchNumber||1)),node('small','Partida a '+t.targetPoints+' puntos'),node('small','Creada: '+formatTableTime(t.createdAt)));
   if(t.finishedAt)contents.append(node('small','Finalizada: '+formatTableTime(t.finishedAt)));
   if(t.scores){const score=node('p',t.players.map((name,i)=>name+': '+(t.scores['player'+(i+1)]||0)).join(' · '),'table-result');contents.append(score);}
   if(t.winnerName)contents.append(node('p','Ganó '+t.winnerName,'table-winner'));
-  if(t.rawStatus==='settled')contents.append(node('p','El ganador recibe '+(2*t.stake)+' créditos; cada jugador apostó '+t.stake+'.'));
-  if(t.rawStatus==='refunded')contents.append(node('p','La apuesta fue devuelta a los participantes.'));
+  if(t.rawStatus==='refunded')contents.append(node('p','La mesa se cerró sin terminarse.'));
   if(t.rawStatus==='settled'&&!t.reason)contents.append(node('small','Motivo: alcanzó los puntos de la partida.'));
   if(t.id)contents.append(node('small','ID: '+t.id));
   if(t.reason)contents.append(node('small','Motivo: '+({abandon:'Abandono',disconnect:'Desconexión','waiting-canceled':'Cancelada sin rival','draw-left':'Abandono antes de empezar','draw-cancel':'Cancelación antes de empezar',points:'Puntos',timeout:'Inactividad',inactivity:'Inactividad',admin:'Cierre del administrador'}[t.reason]||t.reason)));
