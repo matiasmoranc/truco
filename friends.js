@@ -75,14 +75,16 @@ export function installFriends({$,api,services,getState,toast,tableToInvite,join
  function friendButtons(f,{remove=false}={}){
   const state=stateOf(f.uid),b=[];
   if(state==='playing')b.push(tag('Jugando'));
-  else{const invite=button(invited.get(f.uid)==='sent'?'Invitado':'Invitar',()=>inviteFriend(f),state==='lobby');b.push(invite);}
+  else b.push(button(invited.get(f.uid)==='sent'?'Invitado':'Invitar',()=>inviteFriend(f),true));
   if(remove){const x=button('×',async()=>{if(!confirm('¿Quitar a '+f.name+' de tus amigos?'))return;await call('remove',{uid:f.uid});});x.classList.add('icon-only');x.setAttribute('aria-label','Quitar a '+f.name);b.push(x);}
   return b;
  }
  function renderOnline(){
   const people=online().sort(byPresence),n=people.length;
   $('friends-online-text').textContent=n+' en línea';$('friends-online').classList.toggle('has-online',n>0);
-  if($('friends-online-dialog').open)list($('friends-online-list'),people.map(f=>personRow(f,null,friendButtons(f),{live:true})),'Ninguno de tus amigos está conectado ahora.');
+  if(!$('friends-online-dialog').open)return;
+  if(n)list($('friends-online-list'),people.map(f=>personRow(f,null,friendButtons(f),{live:true})),null);
+  else{const empty=el('li','friends-sheet-empty');empty.append(el('span','friends-sheet-empty-icon','😴'),el('strong','','Ninguno de tus amigos está conectado'),el('small','',overview.friends.length?'Igual podés invitarlos desde Amigos: les llega una notificación.':'Sumá amigos desde el buscador o desde "Jugaste con".'));list($('friends-online-list'),[empty],null);}
  }
  function fold(name,toggle,panel){$(toggle).setAttribute('aria-expanded',String(open$[name]));$(toggle).classList.toggle('open',open$[name]);$(panel).hidden=!open$[name];}
  function render(){
@@ -114,6 +116,7 @@ export function installFriends({$,api,services,getState,toast,tableToInvite,join
     const card=el('div','recent-person'),av=el('span','friend-avatar');
     if(profiles)av.innerHTML=profiles.avatarHtml(profiles.profileOf(p.uid,p.name)||{},'player-avatar');
     const [action]=personButtons(p);action.classList.add('recent-action');
+    if(action.textContent==='Solicitud enviada')action.textContent='Enviada';
     if(action.tagName==='BUTTON'&&action.textContent==='Agregar')action.textContent='+ Sumar';
     card.append(av,el('b','',p.name),action);strip.append(card);
    }

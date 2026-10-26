@@ -2358,3 +2358,19 @@ input,textarea,[contenteditable=""],[contenteditable="true"]{-webkit-user-select
 .friend-row.with-avatar .friend-actions{align-items:center}
 .friend-row.with-avatar .friend-button.icon-only{min-width:34px;min-height:34px;border-color:#ffffff22;color:#a9b8ad;font-size:16px}
 .friend-row.with-avatar .friend-who small{display:flex;align-items:center;gap:6px;white-space:nowrap;overflow:hidden}.friend-row.with-avatar .friend-who small .friend-level{margin-left:0;flex:none;padding:1px 6px}
+/* Offline friends look the same (they can be invited too); only their status line is muted. */
+.friend-row.is-off{opacity:1}
+/* Played with: four and a half faces on a phone, so it is clear the row scrolls. */
+.friends-recent{gap:12px;scroll-snap-type:x proximity}
+.recent-person{flex:0 0 calc((100% - 48px) / 4.5);width:auto;min-width:0;scroll-snap-align:start}
+.recent-person b{max-width:100%}
+.recent-person .recent-action,.recent-person .friend-tag{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* Online sheet: content-sized, stuck to the bottom, rows packed at the top. */
+.friends-online-sheet{top:auto;bottom:0;height:auto;max-height:80dvh;padding-bottom:calc(20px + env(safe-area-inset-bottom))}
+.friends-online-sheet[open]{display:flex;flex-direction:column;gap:12px}
+.friends-online-sheet .friend-list{display:flex;flex-direction:column;gap:8px}
+.friends-sheet-head .icon-button{width:38px;height:38px;min-height:0;padding:0;border-radius:50%;border:1px solid #ffffff2e;background:#ffffff12;color:#f7f3e9;font-size:22px;line-height:1;display:flex;align-items:center;justify-content:center}
+.friends-sheet-empty{display:flex;flex-direction:column;align-items:center;gap:6px;padding:22px 16px;border-radius:16px;border:1px dashed #ffffff26;background:#ffffff08;text-align:center}
+.friends-sheet-empty-icon{font-size:30px}
+.friends-sheet-empty strong{font-size:16px}
+.friends-sheet-empty small{font-size:13px;color:#a9b8ad;line-height:1.4}
