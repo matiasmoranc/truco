@@ -1,6 +1,6 @@
 # Truco Uruguayo — primera versión sin anuncios
 
-Juego gratuito de truco uruguayo con muestra, partidas entre dos personas o cuatro en equipos, práctica contra el bot, chat, estadísticas y créditos virtuales gratuitos. No hay publicidad, compras, suscripciones ni premios con valor monetario.
+Juego gratuito de truco uruguayo con muestra, partidas entre dos personas o cuatro en equipos, práctica contra el bot, chat, estadísticas y niveles que se suben ganando partidas en línea. No hay publicidad, compras, suscripciones ni premios con valor monetario.
 
 Web: https://trucouruguayo.uy/
 
@@ -26,4 +26,4 @@ Ver [REGLAS.md](REGLAS.md) para reparto sin sorteo, mano y pie, flor opcional, v
 - En cuatro, irse al mazo retira a ese jugador de la mano; su compañero puede continuar. Si se van ambos, gana el rival. Abandonar la partida hace perder al equipo. La revancha requiere la confirmación y saldo suficiente de los cuatro.
 - El mazo queda entre jugadores, a la derecha de quien reparte; la muestra queda debajo, perpendicular, con su parte superior hacia el centro. Se puede mover la muestra hasta 10 píxeles en cualquier dirección, también en 1 vs 1 y práctica. En 1 vs 1 las cartas jugadas quedan del lado opuesto al mazo.
 - Los avisos de cantos e indicaciones duran hasta cinco segundos y se limpian al cambiar de ronda o reparto. El anotador conserva el marcador y permite consultar las manos anteriores.
-- Todos aportan la misma cantidad de créditos virtuales. En 1 vs 1 el ganador recibe el pozo de dos aportes; en 2 vs 2 cada ganador recibe la mitad del pozo de cuatro aportes. La práctica no usa créditos. Sin compras, retiros ni premios canjeables.
+- Las mesas son libres: no se apuesta nada. Cada victoria en línea suma puntos de nivel (1 contra un rival de tu nivel o menor, 1,2 contra uno de nivel mayor) y los niveles desbloquean íconos, insignias y la foto de perfil. La práctica contra el bot no suma. Sin compras, retiros ni premios canjeables.

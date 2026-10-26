@@ -892,7 +892,7 @@ async function enterRoom() {
     // The wallet subscription is already live; the server checks the reservation atomically.
     // Tables no longer use credits; an older reservation must still be finished first.
     const wallet=credits.wallet();
-    if(wallet?.locked>0){toast('Ya tenés una apuesta reservada. Volvé a tu mesa.',true);return;}
+    if(wallet?.locked>0){toast('Tenés una partida anterior sin terminar. Volvé a tu mesa.',true);return;}
   }
   const entryEpoch=state.navigationEpoch;
   state.enteringRoom=true;$('enter-room').disabled=true;
@@ -1066,13 +1066,13 @@ function renderLobby(rooms) {
     const available = seats.filter(([, , person]) => !person);
     const actions=[];
     if(room.mode!=='2v2'&&roomSeats(room).some(p=>!players[p]))actions.push(['player','Entrar']);
-    const joinDisabled=!!(room.managedCredits&&!roomSeatForUid(room,state.uid)&&((credits.wallet()?.balance??0)<room.creditMatch.stake||(credits.wallet()?.locked??0)>0));
+    const joinDisabled=!!(room.managedCredits&&Number(room.creditMatch?.stake)>0&&!roomSeatForUid(room,state.uid)&&((credits.wallet()?.balance??0)<room.creditMatch.stake||(credits.wallet()?.locked??0)>0));
     const teamSeats=room.mode==='2v2'?renderTeamLobbySeats(code,room,escapeHtml,joinDisabled):`<div class="lobby-team-row lobby-solo-row"><div class="lobby-team"><span class="lobby-team-name">${escapeHtml(title)}</span></div><span class="lobby-team-versus">vs</span><div class="lobby-team">${actions.map(([key,label])=>`<button class="lobby-team-join" data-room="${code}" data-seat="${key}" ${joinDisabled?'disabled':''}>${label}</button>`).join('')}</div></div>`;
     const privateTable=!!(room.managedCredits&&room.creditMatch.hasPassword);
     const owner=room.table?.uid||room.players?.player1?.uid,ownerProfile=profiles.profileOf(owner,room.table?.name||room.players?.player1?.name),ownerLevel=ownerProfile?profiles.levelOf(ownerProfile.points).level:'—';
     const coins='<svg class="credit-coin-icon" viewBox="-2 -2 52 54" aria-hidden="true"><g transform="rotate(-9 21 35)"><path d="M6 35v7a15 6 0 0 0 30 0v-7"/><ellipse cx="21" cy="35" rx="15" ry="6"/></g><g transform="rotate(9 27 23)"><path d="M12 23v7a15 6 0 0 0 30 0v-7"/><ellipse cx="27" cy="23" rx="15" ry="6"/></g><g transform="rotate(-12 20 12)"><path d="M5 12v7a15 6 0 0 0 30 0v-7"/><ellipse cx="20" cy="12" rx="15" ry="6"/></g></svg>';
     const lock='<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="'+(privateTable?'M8 10V6a4 4 0 0 1 8 0v4':'M8 10V6a4 4 0 0 1 8 0')+'"/><path d="M12 14v3"/></svg>';
-    return `<article class="lobby-card compact-room has-team-seats"><div class="compact-room-owner">${profiles.avatarHtml(ownerProfile||{},'player-avatar room-avatar')}<h3>${escapeHtml(title)}</h3></div><div class="compact-room-stat"><strong>${targetPoints(room)}</strong><span>puntos</span></div><div class="compact-room-stat level-stat"><span>nivel</span><strong>${ownerLevel}</strong></div><div class="compact-room-privacy ${privateTable?'is-private':'is-public'}" role="img" aria-label="${privateTable?'Mesa privada':'Mesa pública'}" title="${privateTable?'Mesa privada':'Mesa pública'}">${lock}</div><div class="lobby-join-options">${actions.map(([key,label])=>`<button class="button lobby-player-button" data-room="${code}" data-seat="${key}" ${room.managedCredits&&!roomSeatForUid(room,state.uid)&&((credits.wallet()?.balance??0)<room.creditMatch.stake||(credits.wallet()?.locked??0)>0)?'disabled':''}>${label}</button>`).join('')}</div>${teamSeats}</article>`;
+    return `<article class="lobby-card compact-room has-team-seats"><div class="compact-room-owner">${profiles.avatarHtml(ownerProfile||{},'player-avatar room-avatar')}<h3>${escapeHtml(title)}</h3></div><div class="compact-room-stat"><strong>${targetPoints(room)}</strong><span>puntos</span></div><div class="compact-room-stat level-stat"><span>nivel</span><strong>${ownerLevel}</strong></div><div class="compact-room-privacy ${privateTable?'is-private':'is-public'}" role="img" aria-label="${privateTable?'Mesa privada':'Mesa pública'}" title="${privateTable?'Mesa privada':'Mesa pública'}">${lock}</div><div class="lobby-join-options">${actions.map(([key,label])=>`<button class="button lobby-player-button" data-room="${code}" data-seat="${key}" ${room.managedCredits&&Number(room.creditMatch?.stake)>0&&!roomSeatForUid(room,state.uid)&&((credits.wallet()?.balance??0)<room.creditMatch.stake||(credits.wallet()?.locked??0)>0)?'disabled':''}>${label}</button>`).join('')}</div>${teamSeats}</article>`;
   }).join('');
   syncLobbyJoinFeedback();
 }
@@ -1110,7 +1110,7 @@ function firebaseError(error) {
   if (error?.code === 'auth/operation-not-allowed') return 'Activá el inicio de sesión anónimo en Firebase y volvé a intentar.';
   if (error?.code?.includes('permission-denied')) return 'Firebase rechazó el acceso. Revisá las reglas de la base.';
   if (error?.message?.includes('Failed to fetch')) return 'No se pudo conectar con Firebase. Revisá la configuración y la conexión.';
-  if(error?.code?.startsWith('functions/'))return error.code==='functions/not-found'?'Falta habilitar el servidor de las mesas con créditos.':error.message||'No pudimos conectar con el servidor.';
+  if(error?.code?.startsWith('functions/'))return error.code==='functions/not-found'?'Falta habilitar el servidor de las mesas.':error.message||'No pudimos conectar con el servidor.';
   return 'No pudimos conectar la mesa. Revisá la configuración de Firebase.';
 }
 function watchRoom() {
@@ -2602,7 +2602,7 @@ async function respondRematch(action){
   finally{rematchInFlight=false;renderGame();}
 }
 function syncRematchCreditControls(){
-  const insufficient=!!state.room?.managedCredits&&((credits.wallet()?.balance??0)<state.room.creditMatch.stake||(credits.wallet()?.locked??0)>0);
+  const insufficient=!!state.room?.managedCredits&&Number(state.room.creditMatch?.stake)>0&&((credits.wallet()?.balance??0)<state.room.creditMatch.stake||(credits.wallet()?.locked??0)>0);
   for(const [id,label] of [['request-rematch','Revancha'],['accept-rematch','Aceptar']]){
     $(id).textContent=insufficient?'Créditos insuficientes':label;
     if(insufficient)$(id).disabled=true;
