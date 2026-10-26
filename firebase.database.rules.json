@@ -60,6 +60,16 @@
       ".read": "(auth != null && root.child('userAccess').child(auth.uid).child('blocked').val() != true)",
       ".write": false
     },
+    "presence": {
+      "$uid": {
+        ".read": "auth != null && (auth.uid == $uid || root.child('friends').child($uid).child(auth.uid).exists())",
+        ".write": "auth != null && auth.uid == $uid",
+        ".validate": "newData.hasChildren(['state','at'])",
+        "state": {".validate": "newData.isString() && (newData.val() == 'lobby' || newData.val() == 'playing' || newData.val() == 'off')"},
+        "at": {".validate": "newData.isNumber() && newData.val() <= now + 60000"},
+        "$other": {".validate": false}
+      }
+    },
     "friends": {
       "$uid": {
         ".read": "auth != null && auth.uid == $uid && root.child('userAccess').child(auth.uid).child('blocked').val() != true",

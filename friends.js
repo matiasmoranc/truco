@@ -4,8 +4,11 @@
 // friend, who gets the invitation live in the game (and as a phone notification)
 // with Entrar / Rechazar.
 const coinIcon='<svg class="credit-coin-icon" viewBox="-2 -2 52 54" aria-hidden="true"><g transform="rotate(-9 21 35)"><path d="M6 35v7a15 6 0 0 0 30 0v-7"/><ellipse cx="21" cy="35" rx="15" ry="6"/></g><g transform="rotate(9 27 23)"><path d="M12 23v7a15 6 0 0 0 30 0v-7"/><ellipse cx="27" cy="23" rx="15" ry="6"/></g><g transform="rotate(-12 20 12)"><path d="M5 12v7a15 6 0 0 0 30 0v-7"/><ellipse cx="20" cy="12" rx="15" ry="6"/></g></svg>';
-export function installFriends({$,api,services,getState,toast,tableToInvite,joinInvite,showView,openLobby,isPlaying=()=>false,balance=()=>undefined,canClaim=()=>false,claimCredits=async()=>{},document}){
+export function installFriends({$,api,services,getState,toast,tableToInvite,joinInvite,showView,openLobby,profiles=null,createTable=()=>{},isPlaying=()=>false,balance=()=>undefined,canClaim=()=>false,claimCredits=async()=>{},document}){
  let overview={friends:[],incoming:[],outgoing:[]},recent=null,unsubscribers=[],listening=null,statusTimer=null;
+ // Friends' presence (presence/{uid}: lobby, playing or off, and since when), one listener each.
+ let presence={},presenceSubs=new Map(),presenceFb=null,pendingInvite=null;
+ const open$={requests:false,list:false};
  const shownInvites=new Set(),shownReplies=new Set(),invited=new Map();
  const el=(tag,cls,text)=>{const node=document.createElement(tag);if(cls)node.className=cls;if(text!=null)node.textContent=text;return node;};
  const call=(action,data={})=>api('playerSocial',{action,...data});
@@ -35,19 +38,86 @@ export function installFriends({$,api,services,getState,toast,tableToInvite,join
  function list(target,items,empty){target.replaceChildren();if(!items.length){if(empty)target.append(el('p','friend-empty',empty));return;}for(const i of items)target.append(i);}
  function badge(){const n=overview.incoming.length;const b=$('friends-badge');if(b){b.hidden=!n;b.textContent=String(n);}}
  let searchResults=null,searchTimer=null,searchSeq=0;
+ const stateOf=uid=>{const p=presence[uid];return p?.state==='lobby'||p?.state==='playing'?p.state:'off';};
+ const online=()=>overview.friends.filter(f=>stateOf(f.uid)!=='off');
+ const rank={lobby:0,playing:1,off:2};
+ const byPresence=(a,b)=>rank[stateOf(a.uid)]-rank[stateOf(b.uid)]||(stateOf(a.uid)==='off'?(presence[b.uid]?.at||0)-(presence[a.uid]?.at||0):0)||byName(a,b);
+ function ago(at){
+  if(!at)return 'Desconectado';const m=Math.max(1,Math.round((Date.now()-at)/60000));
+  if(m<60)return 'Hace '+m+(m===1?' minuto':' minutos');const h=Math.round(m/60);if(h<24)return 'Hace '+h+(h===1?' hora':' horas');
+  const d=Math.round(h/24);return d===1?'Ayer':'Hace '+d+' días';
+ }
+ // A person with their picture, level and what they are doing.
+ function personRow(person,detail,buttons,{live=false}={}){
+  const item=row(person.name,null,buttons);item.classList.add('with-avatar');
+  const state=live?stateOf(person.uid):null;if(state==='off')item.classList.add('is-off');
+  const profile=profiles?.profileOf(person.uid,person.name);
+  if(profiles){const av=el('span','friend-avatar');av.innerHTML=profiles.avatarHtml(profile||{},'player-avatar');if(state&&state!=='off')av.append(el('i','live-dot'+(state==='playing'?' busy':'')));item.prepend(av);}
+  const who=item.querySelector('.friend-who');
+  const text=detail??(state==='lobby'?'En línea':state==='playing'?'Jugando una partida':state==='off'?ago(presence[person.uid]?.at):null);
+  // The level goes on the second line, so the whole name fits on the first.
+  if(text||profile){const small=el('small',state==='lobby'?'is-online':state==='playing'?'is-playing':'',text||'');if(profile)small.prepend(el('span','friend-level','Nv '+profiles.levelOf(profile.points).level));who.append(small);}
+  return item;
+ }
+ // Invite a friend: to the table I am waiting at, or to the one I am about to create.
+ async function inviteFriend(f){
+  const table=tableToInvite();
+  if(table){await call('invite',{uid:f.uid,table});invited.set(f.uid,'sent');toast('Invitación enviada a '+f.name+'.');return;}
+  pendingInvite={uid:f.uid,name:f.name,until:Date.now()+10*60000};
+  toast('Creá tu mesa y le mandamos la invitación a '+f.name+'.',false,3500);createTable();
+ }
+ async function sendPendingInvite(){
+  if(!pendingInvite)return;if(Date.now()>pendingInvite.until){pendingInvite=null;return;}
+  const table=tableToInvite();if(!table)return;const p=pendingInvite;pendingInvite=null;
+  try{await call('invite',{uid:p.uid,table});invited.set(p.uid,'sent');toast('Invitación enviada a '+p.name+'.');}
+  catch(error){toast(error?.message||'No se pudo enviar la invitación.',true);}
+ }
+ function friendButtons(f,{remove=false}={}){
+  const state=stateOf(f.uid),b=[];
+  if(state==='playing')b.push(tag('Jugando'));
+  else{const invite=button(invited.get(f.uid)==='sent'?'Invitado':'Invitar',()=>inviteFriend(f),state==='lobby');b.push(invite);}
+  if(remove){const x=button('×',async()=>{if(!confirm('¿Quitar a '+f.name+' de tus amigos?'))return;await call('remove',{uid:f.uid});});x.classList.add('icon-only');x.setAttribute('aria-label','Quitar a '+f.name);b.push(x);}
+  return b;
+ }
+ function renderOnline(){
+  const people=online().sort(byPresence),n=people.length;
+  $('friends-online-text').textContent=n+' en línea';$('friends-online').classList.toggle('has-online',n>0);
+  if($('friends-online-dialog').open)list($('friends-online-list'),people.map(f=>personRow(f,null,friendButtons(f),{live:true})),'Ninguno de tus amigos está conectado ahora.');
+ }
+ function fold(name,toggle,panel){$(toggle).setAttribute('aria-expanded',String(open$[name]));$(toggle).classList.toggle('open',open$[name]);$(panel).hidden=!open$[name];}
  function render(){
-  badge();
+  badge();renderOnline();
   if(!$('friends-view').classList.contains('active'))return;
-  const requests=overview.incoming.length+overview.outgoing.length;
-  $('friends-requests-section').hidden=!requests;
-  list($('friends-incoming'),overview.incoming.map(r=>row(r.name,'Quiere ser tu amigo',[button('Aceptar',async()=>{await call('respond',{uid:r.uid,accept:true});toast('Ahora son amigos.');},true),button('Rechazar',()=>call('respond',{uid:r.uid,accept:false}))])),null);
-  list($('friends-outgoing'),overview.outgoing.map(r=>row(r.name,'Esperando respuesta',[button('Cancelar',()=>call('cancel-request',{uid:r.uid}))])),null);
-  list($('friends-list'),overview.friends.map(f=>row(f.name,null,[button('Quitar',async()=>{if(!confirm('¿Quitar a '+f.name+' de tus amigos?'))return;await call('remove',{uid:f.uid});})])),'Todavía no tenés amigos. Buscalos por nombre o agregá a los que jugaron con vos.');
-  // While searching, the results take the place of the recent players.
+  const incoming=overview.incoming.length,count=$('friends-requests-count');count.hidden=!incoming;count.textContent=String(incoming);
+  $('friends-count').textContent=String(overview.friends.length);
+  fold('requests','friends-requests-toggle','friends-requests-panel');fold('list','friends-list-toggle','friends-list-panel');
+  if(open$.requests){
+   list($('friends-incoming'),overview.incoming.map(r=>personRow(r,'Te pidió amistad',[button('Aceptar',async()=>{await call('respond',{uid:r.uid,accept:true});toast('Ahora son amigos.');},true),Object.assign(button('×',()=>call('respond',{uid:r.uid,accept:false})),{className:'friend-button icon-only',ariaLabel:'Rechazar a '+r.name})])),overview.outgoing.length?null:'No tenés solicitudes nuevas.');
+   $('friends-sent-title').hidden=!overview.outgoing.length;
+   list($('friends-outgoing'),overview.outgoing.map(r=>personRow(r,'Esperando',[button('Cancelar',()=>call('cancel-request',{uid:r.uid}))])),null);
+  }
+  if(open$.list){
+   const query=$('friends-filter').value.trim().toLocaleLowerCase('es');
+   const shown=overview.friends.filter(f=>f.name.toLocaleLowerCase('es').includes(query)).sort(byPresence);
+   list($('friends-list'),shown.map(f=>personRow(f,null,friendButtons(f,{remove:true}),{live:true})),overview.friends.length?'Ningún amigo con ese nombre.':'Todavía no tenés amigos. Buscalos por nombre o sumá a los que jugaron con vos.');
+  }
+  // While searching, the results take the place of the folded lists and the recent players.
   const searching=searchResults!==null;
-  $('friends-search-section').hidden=!searching;$('friends-recent-section').hidden=searching;
-  if(searching)list($('friends-search-results'),searchResults.map(p=>row(p.name,null,personButtons(p))),'No encontramos jugadores con ese nombre.');
-  else list($('friends-recent'),recent===null?[el('p','friend-empty','Cargando…')]:recent.filter(p=>relationOf(p.uid)!=='friend').map(p=>row(p.name,'Jugaron juntos',personButtons(p))),'Cuando juegues con otras personas, aparecen acá las últimas 10.');
+  $('friends-search-section').hidden=!searching;$('friends-recent-section').hidden=searching;document.querySelector('.friends-folds').hidden=searching;
+  if(searching)list($('friends-search-results'),searchResults.map(p=>personRow(p,null,personButtons(p))),'No encontramos jugadores con ese nombre.');
+  else{
+   const strip=$('friends-recent');strip.replaceChildren();
+   const people=recent===null?null:recent.filter(p=>relationOf(p.uid)!=='friend');
+   if(people===null)strip.append(el('p','friend-empty','Cargando…'));
+   else if(!people.length)strip.append(el('p','friend-empty','Cuando juegues con otras personas, aparecen acá.'));
+   else for(const p of people){
+    const card=el('div','recent-person'),av=el('span','friend-avatar');
+    if(profiles)av.innerHTML=profiles.avatarHtml(profiles.profileOf(p.uid,p.name)||{},'player-avatar');
+    const [action]=personButtons(p);action.classList.add('recent-action');
+    if(action.tagName==='BUTTON'&&action.textContent==='Agregar')action.textContent='+ Sumar';
+    card.append(av,el('b','',p.name),action);strip.append(card);
+   }
+  }
  }
  async function search(){
   const query=$('friends-search').value.trim(),seq=++searchSeq;
@@ -56,13 +126,18 @@ export function installFriends({$,api,services,getState,toast,tableToInvite,join
   searchResults=results;render();
  }
  async function open(){
-  showView('friends-view');$('friends-search').value='';searchResults=null;recent=null;render();
+  showView('friends-view');$('friends-search').value='';$('friends-filter').value='';searchResults=null;recent=null;open$.requests=overview.incoming.length>0;open$.list=false;render();
   try{recent=(await call('recent'))?.results||[];}catch(e){recent=[];toast(e?.message||'No se pudieron cargar los últimos jugadores.',true);}
   render();
  }
  $('open-friends').onclick=()=>open();
  $('friends-back').onclick=()=>openLobby();
  $('friends-search').oninput=()=>{clearTimeout(searchTimer);searchTimer=setTimeout(search,300);};
+ $('friends-filter').oninput=()=>render();
+ for(const [name,toggle] of [['requests','friends-requests-toggle'],['list','friends-list-toggle']])$(toggle).onclick=()=>{open$[name]=!open$[name];render();};
+ $('friends-online').onclick=()=>{list($('friends-online-list'),[],null);$('friends-online-dialog').showModal();renderOnline();};
+ $('friends-online-close').onclick=()=>$('friends-online-dialog').close();
+ $('friends-online-dialog').addEventListener('click',event=>{if(event.target===$('friends-online-dialog'))$('friends-online-dialog').close();});
 
  // Inviting a friend to the table I am waiting at.
  function renderInviteList(){
@@ -163,7 +238,7 @@ export function installFriends({$,api,services,getState,toast,tableToInvite,join
   const follow=(path,onValue)=>unsubscribers.push(fb.onValue(fb.ref(fb.db,path+'/'+uid),snap=>onValue(snap.val()),()=>onValue(null)));
   // A new request, an acceptance or a removal reaches both players right away.
   let incomingSeen=null;
-  follow('friends',value=>{overview.friends=asList(value);render();if($('invite-friend-dialog').open)renderInviteList();});
+  follow('friends',value=>{overview.friends=asList(value);followPresence();render();if($('invite-friend-dialog').open)renderInviteList();});
   follow('friendRequests',value=>{
    overview.incoming=asList(value);
    const ids=new Set(overview.incoming.map(r=>r.uid));
@@ -184,9 +259,21 @@ export function installFriends({$,api,services,getState,toast,tableToInvite,join
    reported=playing;reportedAt=Date.now();
    fb.set(statusRef,playing?{playing:true,at:fb.serverTimestamp()}:null).catch(()=>{reported=!playing;});
   };
-  report();statusTimer=setInterval(()=>{report();showAdminMessage();},4000);
+  // My presence: lobby or playing while connected; the server writes "off" when I drop.
+  const presenceRef=fb.ref(fb.db,'presence/'+uid);let shownState=null;
+  const announce=force=>{const state=isPlaying()?'playing':'lobby';if(!force&&state===shownState)return;shownState=state;fb.set(presenceRef,{state,at:fb.serverTimestamp()}).catch(()=>{shownState=null;});};
+  unsubscribers.push(fb.onValue(fb.ref(fb.db,'.info/connected'),snap=>{if(snap.val()!==true||listening!==uid)return;fb.onDisconnect(presenceRef).set({state:'off',at:fb.serverTimestamp()}).then(()=>announce(true)).catch(()=>{});},()=>{}));
+  unsubscribers.push(()=>{fb.set(presenceRef,{state:'off',at:fb.serverTimestamp()}).catch(()=>{});});
+  presenceFb=fb;followPresence();
+  report();statusTimer=setInterval(()=>{report();announce(false);sendPendingInvite();showAdminMessage();},4000);
   unsubscribers.push(()=>{if(reported)fb.set(statusRef,null).catch(()=>{});});
  }
- function stop(){clearInterval(statusTimer);adminInbox=[];if(adminShowing){adminShowing=null;$('admin-message-dialog').close();}statusTimer=null;for(const off of unsubscribers)off?.();unsubscribers=[];listening=null;overview={friends:[],incoming:[],outgoing:[]};badge();}
- return {start,stop,open,friendNames:()=>overview.friends.map(f=>f.name)};
+ // One presence listener per friend, added and dropped as the friend list changes.
+ function followPresence(){
+  const fb=presenceFb;if(!fb)return;const ids=new Set(overview.friends.map(f=>f.uid));
+  for(const [uid,off] of presenceSubs)if(!ids.has(uid)){off?.();presenceSubs.delete(uid);delete presence[uid];}
+  for(const uid of ids)if(!presenceSubs.has(uid))presenceSubs.set(uid,fb.onValue(fb.ref(fb.db,'presence/'+uid),snap=>{presence[uid]=snap.val()||null;render();},()=>{presence[uid]=null;}));
+ }
+ function stop(){for(const off of presenceSubs.values())off?.();presenceSubs=new Map();presence={};presenceFb=null;pendingInvite=null;clearInterval(statusTimer);adminInbox=[];if(adminShowing){adminShowing=null;$('admin-message-dialog').close();}statusTimer=null;for(const off of unsubscribers)off?.();unsubscribers=[];listening=null;overview={friends:[],incoming:[],outgoing:[]};badge();}
+ return {start,stop,open,render,friendNames:()=>overview.friends.map(f=>f.name)};
 }

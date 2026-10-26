@@ -1,6 +1,6 @@
 import './chat-moderation.js?v=20261013-moderation1';
 import { visitPlatform,takeVisit,markTestDevice } from './visit.js?v=20261024-visits5';
-import { installFriends } from './friends.js?v=20261027-levels1';
+import { installFriends } from './friends.js?v=20261027-friends1';
 import { installPlayerPanel } from './player-panel.js?v=20261013-blocklist1';
 import { installScorer,renderCompactTally } from './scorer.js?v=20261026-people1';
 import { installActivity } from './activity.js?v=20261010-adminstats32';
@@ -652,9 +652,11 @@ async function registerPush(){
   if(token)await creditApi('playerSocial',{action:'register-push',token,platform:native.platform});
 }
 // Levels and profile pictures (profile-level.js); the lobby re-renders when a rival's level arrives.
-const profiles=installProfiles({$,document,services:firebaseServices,getState:()=>state,toast:message=>toast(message,true,2600),onChange:()=>{if(state.lobbyRooms&&$('welcome-view').classList.contains('active'))renderLobby(state.lobbyRooms);}});
+const profiles=installProfiles({$,document,services:firebaseServices,getState:()=>state,toast:message=>toast(message,true,2600),onChange:()=>{if(state.lobbyRooms&&$('welcome-view').classList.contains('active'))renderLobby(state.lobbyRooms);refreshFriends();}});
+// Friends' avatars arrive after the list: redraw it then (friends is installed just below).
+function refreshFriends(){try{if($('friends-view').classList.contains('active'))friends.render();}catch{}}
 // Friends and table invitations (friends.js).
-const friends=installFriends({$,api:creditApi,services:firebaseServices,getState:()=>state,document,showView,isPlaying:()=>!!state.room&&!state.learning&&$("game-view").classList.contains("active")&&!["waiting","complete"].includes(state.room.status),balance:()=>credits.wallet()?.balance,canClaim:()=>credits.canClaim(),claimCredits:()=>credits.claim(),openLobby:()=>openLobby(),
+const friends=installFriends({$,api:creditApi,services:firebaseServices,getState:()=>state,document,showView,profiles,createTable:()=>{warmGameConnection();configureSetup();},isPlaying:()=>!!state.room&&!state.learning&&$("game-view").classList.contains("active")&&!["waiting","complete"].includes(state.room.status),balance:()=>credits.wallet()?.balance,canClaim:()=>credits.canClaim(),claimCredits:()=>credits.claim(),openLobby:()=>openLobby(),
   toast:(message,error=false,duration=2600)=>toast(message,true,duration),
   tableToInvite:()=>{const room=state.room;if(!state.roomCode||state.localGame||room?.status!=='waiting')return null;
     return {code:state.roomCode,mode:room.mode==='2v2'?'2v2':'1v1',targetPoints:Number(room.targetPoints)||null,stake:Number(room.creditMatch?.stake)||null,password:state.hostTablePassword?.code===state.roomCode?state.hostTablePassword.password:''};},

@@ -2312,3 +2312,49 @@ input,textarea,[contenteditable=""],[contenteditable="true"]{-webkit-user-select
 .level-badge{background:none!important;border:0!important;border-radius:0;width:50%;height:50%;right:-7px;bottom:-6px;filter:drop-shadow(0 2px 3px #0009)}
 .level-badge img{width:100%;height:100%;object-fit:contain}
 .unlock-badge{width:30px;height:30px}
+
+/* Amigos: who is online at the top right, folded requests and friends, the people you played with. */
+.friends-title{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.friends-online{display:inline-flex;align-items:center;gap:7px;padding:8px 13px;border-radius:99px;border:1px solid #ffffff2a;background:#ffffff0d;color:#b9c8bd;font:inherit;font-weight:800;font-size:14px;cursor:pointer}
+.friends-online.has-online{background:#4dd99b1f;border-color:#4dd99b77;color:#9ff0c8}
+.friends-online-chev{font-size:11px;opacity:.8}
+.online-dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:#7d8f84}
+.has-online .online-dot,.friends-online-sheet .online-dot{background:#4dd99b;box-shadow:0 0 0 3px #4dd99b33}
+.friends-folds{display:grid;gap:10px}.friends-folds[hidden]{display:none}
+.friends-fold{display:flex;align-items:center;gap:12px;width:100%;padding:14px;border-radius:16px;border:1px solid #d9bd7933;background:#0f3529;color:#f7f3e9;font:inherit;font-weight:800;font-size:16px;text-align:left;cursor:pointer}
+.friends-fold svg{width:22px;height:22px;flex:none;fill:none;stroke:#e8c983;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.friends-fold-label{flex:1}
+.friends-fold-num{min-width:24px;height:24px;padding:0 7px;border-radius:99px;display:inline-flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;background:#e8c98330;color:#e8c983}
+.friends-fold-num.alert{background:#ef5350;color:#fff;box-shadow:0 0 0 3px #ef535033}.friends-fold-num[hidden]{display:none}
+.friends-fold-chev{color:#e8c983;font-size:16px;transition:transform .15s}
+.friends-fold.open{border-color:#e8c98388;border-bottom-left-radius:6px;border-bottom-right-radius:6px}.friends-fold.open .friends-fold-chev{transform:rotate(90deg)}
+.friends-fold-panel{margin-top:-10px;padding:8px;border-radius:0 0 16px 16px;background:#0b2a20;border:1px solid #e8c98355;border-top:0;display:grid;gap:8px}.friends-fold-panel[hidden]{display:none}
+.friends-fold-sub{margin:4px 4px 0;font-size:12px;font-weight:900;letter-spacing:1px;color:#a9b8ad}
+.friends-search.small{min-height:42px;padding:9px 13px;font-size:15px}
+.friend-row.with-avatar{justify-content:flex-start;gap:11px}
+.friend-row.with-avatar .friend-who{flex:1}
+.friend-row.is-off{opacity:.65}
+.friend-avatar{position:relative;flex:none;display:inline-flex}
+.friend-avatar .player-avatar{width:42px;height:42px}
+.live-dot{position:absolute;left:-2px;bottom:-1px;width:13px;height:13px;border-radius:50%;background:#4dd99b;border:2.5px solid #0f3529;z-index:2}
+.live-dot.busy{background:#f2b552}
+.friend-level{margin-left:6px;padding:2px 7px;border-radius:99px;background:#e8c98322;color:#e8c983;font-size:11px;font-weight:900}
+.friend-who small.is-online{color:#9ff0c8}.friend-who small.is-playing{color:#f6d08e}
+.friend-button.icon-only{min-width:40px;padding:8px 0;font-size:18px;line-height:1}
+.friends-recent{display:flex;gap:14px;overflow-x:auto;padding:4px 2px 6px;scrollbar-width:none}
+.recent-person{display:flex;flex-direction:column;align-items:center;gap:6px;width:76px;flex:none;text-align:center}
+.recent-person .player-avatar{width:48px;height:48px}
+.recent-person b{max-width:76px;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.recent-person .recent-action{min-height:0;padding:4px 10px;border-radius:99px;font-size:11.5px;font-weight:900}
+.recent-person .friend-tag{font-size:11px}
+.friends-online-sheet{position:fixed;inset:auto 0 0 0;margin:0 auto;width:min(560px,100%);max-height:80dvh;padding:10px 14px 20px;border:0;border-top:1px solid #4dd99b88;border-radius:24px 24px 0 0;background:#123d2e;color:#f7f3e9;box-shadow:0 -14px 40px #000b;overflow:auto}
+.friends-online-sheet::backdrop{background:#000a}
+.friends-online-sheet[open]{display:grid;gap:10px}
+.friends-sheet-grab{width:44px;height:5px;border-radius:9px;background:#ffffff33;margin:0 auto 2px}
+.friends-sheet-head{display:flex;align-items:center;justify-content:space-between}
+.friends-sheet-head h2{display:flex;align-items:center;gap:9px;margin:0;font-size:19px}
+.friends-sheet-hint{margin:0;text-align:center;font-size:12px;color:#a9b8ad}
+.friend-name-line{display:flex;align-items:center;gap:6px;min-width:0}.friend-name-line strong{min-width:0}.friend-name-line .friend-level{margin-left:0;flex:none}
+.friend-row.with-avatar .friend-actions{align-items:center}
+.friend-row.with-avatar .friend-button.icon-only{min-width:34px;min-height:34px;border-color:#ffffff22;color:#a9b8ad;font-size:16px}
+.friend-row.with-avatar .friend-who small{display:flex;align-items:center;gap:6px;white-space:nowrap;overflow:hidden}.friend-row.with-avatar .friend-who small .friend-level{margin-left:0;flex:none;padding:1px 6px}
