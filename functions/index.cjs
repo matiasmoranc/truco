@@ -180,6 +180,7 @@ exports.creditExpireTables=onSchedule({schedule:'every 1 minutes',region:'us-cen
 // Admin permissions are server-only. Clients cannot write administrators.
 const {getAuth}=require('firebase-admin/auth');
 const adminMessages=require('./admin-messages.cjs');
+const alertAdmin=require('./social.cjs').adminAlerter(db);
 const pushToPlayer=require('./social.cjs').pushSender(db);
 const {tableEvents,requireAdmin,adminLedgerChange,validKey,prepareUserDeletion,finishUserDeletion,legacyTableActive,closeLegacyTable,adminTableCurrent}=require('./admin-service.cjs');
 async function adminIdentity(request){
@@ -490,11 +491,17 @@ exports.playerConsole=onCall(options,async request=>{
   if(data.localId&&!validKey(data.localId))throw new HttpsError('invalid-argument','Identificador inválido.');
   const report={uid:user.uid,name:user.name,message:data.message.trim(),matchId:match?.id||null,code:match?.code||null,localId:!match&&data.localId?data.localId:null,mode:match?'online':data.mode==='bot'?'bot':'general',at:Date.now()};
   const r=await db.ref('problemReports/'+user.uid+'_'+data.requestId).transaction(old=>old||report);
+  if(r.committed&&r.snapshot.val()?.at===report.at)await alertAdmin('Reporte de '+(user.name||'un jugador'),report.message,{kind:'report'});
   return {ok:!!r.snapshot.val()};
  }
  throw new HttpsError('invalid-argument','Acción inválida.');
 });
-const {onValueWritten}=require('firebase-functions/v2/database');
+const {onValueWritten,onValueCreated}=require('firebase-functions/v2/database');
+// A new player: the first time an account saves its username.
+exports.newPlayerAlert=onValueCreated({ref:'/profiles/{uid}/name',region:'us-central1',maxInstances:2},async event=>{
+ const name=event.data.val();if(typeof name!=='string'||!name)return;
+ await alertAdmin('Nuevo jugador registrado',name+' se registró en Truco Uruguayo.',{kind:'signup'});
+});
 // Independent of creditEconomy: a deletion cannot erase its own evidence.
 exports.creditAccountingAudit=onValueWritten({ref:'/creditEconomy',region:'us-central1',maxInstances:2},async event=>{
  const before=event.data.before.val()||{},after=event.data.after.val()||{};

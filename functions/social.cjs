@@ -22,6 +22,19 @@ function pushSender(db){
  }
 }
 
+// Alerts for the administrator's phone: the game account Mati93 receives them on every
+// device where it allowed notifications. A failure never blocks what triggered it.
+const ADMIN_ALERT_USERNAME='mati93';
+function adminAlerter(db){
+ const push=pushSender(db);
+ return async function alert(title,body,data={}){
+  try{
+   const uid=(await db.ref('usernames/'+S.nameKey(ADMIN_ALERT_USERNAME)).get()).val();
+   if(typeof uid!=='string')return 0;
+   return await push(uid,{title,body:String(body).slice(0,180),data:{type:'admin-alert',...data}});
+  }catch(error){console.error('admin alert',error);return 0;}
+ };
+}
 function createSocialFunctions({db,identity,rateLimit,options,readLedger,usersBlockEachOther}){
  const val=async path=>(await db.ref(path).get()).val();
  const names=async uids=>{const list=await Promise.all(uids.map(uid=>val('profiles/'+uid+'/name')));return Object.fromEntries(uids.map((uid,i)=>[uid,list[i]||'']));};
@@ -34,7 +47,7 @@ function createSocialFunctions({db,identity,rateLimit,options,readLedger,usersBl
   return name;
  }
  // Every phone the player registered; tokens Google says are gone are removed.
- const push=pushSender(db);
+ const push=pushSender(db),alertAdmin=adminAlerter(db);
  const playerSocial=onCall(options,async request=>{
   const user=await identity(request),data=request.data||{},now=Date.now();
   await rateLimit(user.uid,40,'social');
@@ -111,6 +124,7 @@ function createSocialFunctions({db,identity,rateLimit,options,readLedger,usersBl
     if(!(await val('adminMessages/'+user.uid+'/'+data.messageId)))return {ok:true};
     let text='';if(data.text!=null&&String(data.text).trim()){try{text=M.cleanText(data.text);}catch(e){throw new HttpsError('invalid-argument',e.message);}await rateLimit(user.uid,10,'admin-answer');}
     await db.ref().update(M.answerUpdates({uid:user.uid,messageId:data.messageId,replyId:crypto.randomUUID(),text,now}));
+    if(text)await alertAdmin('Respuesta de '+user.name,text,{kind:'reply'});
     return {ok:true,answered:!!text};
    }
    case 'register-push':{
@@ -124,4 +138,4 @@ function createSocialFunctions({db,identity,rateLimit,options,readLedger,usersBl
  });
  return {playerSocial};
 }
-module.exports={createSocialFunctions,pushSender};
+module.exports={createSocialFunctions,pushSender,adminAlerter};
