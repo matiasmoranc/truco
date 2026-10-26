@@ -138,7 +138,14 @@ export function installFriends({$,api,services,getState,toast,tableToInvite,join
  $('friends-search').oninput=()=>{clearTimeout(searchTimer);searchTimer=setTimeout(search,300);};
  $('friends-filter').oninput=()=>render();
  for(const [name,toggle] of [['requests','friends-requests-toggle'],['list','friends-list-toggle']])$(toggle).onclick=()=>{open$[name]=!open$[name];render();};
- $('friends-online').onclick=()=>{list($('friends-online-list'),[],null);$('friends-online-dialog').showModal();renderOnline();};
+ // The online list drops down from the green counter, pointing at it.
+ function placeOnline(){
+  const box=$('friends-online').getBoundingClientRect(),sheet=$('friends-online-dialog');
+  sheet.style.top=Math.round(box.bottom+10)+'px';
+  const panel=sheet.getBoundingClientRect();sheet.style.setProperty('--arrow-right',Math.max(16,Math.round(panel.right-(box.left+box.width/2)-7))+'px');
+ }
+ $('friends-online').onclick=()=>{list($('friends-online-list'),[],null);$('friends-online-dialog').showModal();renderOnline();placeOnline();};
+ window.addEventListener('resize',()=>{if($('friends-online-dialog').open)placeOnline();});
  $('friends-online-close').onclick=()=>$('friends-online-dialog').close();
  $('friends-online-dialog').addEventListener('click',event=>{if(event.target===$('friends-online-dialog'))$('friends-online-dialog').close();});
 
