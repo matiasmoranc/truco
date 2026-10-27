@@ -710,10 +710,16 @@ async function offerAppUpdate(){
 }
 setTimeout(()=>{offerAppUpdate().catch(()=>{});},3000);
 const activity=installActivity({send:async data=>{const result=await creditApi('playerActivity',{...data,platform:visitPlatform(),...(data.visible?takeVisit():null)});if(typeof result?.testDevice==='boolean')markTestDevice(result.testDevice);return result;},getUid:()=>state.uid,document});
+// Coming from the scorer page (?anotador): sign in or create the account first, then the
+// scorer opens by itself, full screen.
+let scorerAfterSignIn=new URLSearchParams(location.search).has('anotador');
+if(scorerAfterSignIn)$('auth-title').textContent='Iniciá sesión o creá tu cuenta para usar el anotador';
 const account=installAccount({api:creditApi,services:firebaseServices,getState:()=>state,rememberName:rememberPlayerName,document,onReady:async()=>{
   const initialCredits=credits.start().then(()=>credits.whenReady());
   loadCreditFunctions().catch(()=>{});activity.start();friends?.start().catch(()=>{});profiles.start().catch(()=>{});registerPush().catch(()=>{});
-  await Promise.all([openInitialRoom(),initialCredits]);showLobbyOnboarding();
+  await Promise.all([openInitialRoom(),initialCredits]);
+  if(scorerAfterSignIn&&!state.room){scorerAfterSignIn=false;history.replaceState(null,'',location.pathname);$('open-scorer').click();}
+  else showLobbyOnboarding();
 },onIdentityChange:(...args)=>{friends?.stop();profiles.stop();return resetAccountRoom(...args);},onNameChanged:()=>showView('welcome-view'),onRegistered:uid=>{state.lobbyOnboardingUid=uid;requestAnimationFrame(showLobbyOnboarding);},inRoom:()=>!!state.room&&!$('welcome-view').classList.contains('active')});
 const credits=installCredits({services:firebaseServices,walletSource:creditWalletSource,api:creditApi,getState:()=>state,document,notify:message=>toast(message,true,2000),onChange:()=>{showLobbyOnboarding();if(state.lobbyRooms)renderLobby(state.lobbyRooms);
   if(state.room)renderMatchEnd();$('table-stake-available').textContent=String(credits.wallet()?.balance??'—');updateStakeControl();}});
@@ -4575,12 +4581,6 @@ for(const button of document.querySelectorAll('[data-password-toggle]')){
 installScorer({document,showView,renderTally:renderCompactTally,
   people:()=>[$('account-username').textContent,...friends.friendNames()],
   onShare:score=>matchPhoto.start(()=>score)});
-// Coming from the scorer page (?anotador): the scorer opens at once, full screen, even
-// over the sign-in screen; going back leaves it (and the address) as usual.
-if(new URLSearchParams(location.search).has('anotador')){
-  $('open-scorer')?.click();$('scorer-view').classList.add('over-login');
-  $('scorer-back')?.addEventListener('click',()=>{$('scorer-view').classList.remove('over-login');history.replaceState(null,'',location.pathname);});
-}
 
 installPlayerPanel({document,api:creditApi,getState:()=>state});
 
