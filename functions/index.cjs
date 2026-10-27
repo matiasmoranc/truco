@@ -394,10 +394,21 @@ exports.adminConsole=onCall({...options,secrets:[liveInternalSecret]},async requ
  }
  if(action==='level'){
   if(!validKey(data.uid)||!validKey(data.requestId))throw new HttpsError('invalid-argument','Usuario inválido.');
-  await getAuth().getUser(data.uid);let failure;
-  await db.ref().get();
-  const r=await db.ref().transaction(root=>{failure=null;if(!root)return undefined;try{return adminSetPoints(root,{...data,actor,now:Date.now()});}catch(error){failure=error.message;return undefined;}});
-  if(!r.committed)throw new HttpsError('failed-precondition',failure||'No se pudo cambiar el nivel.');return {ok:true};
+  await getAuth().getUser(data.uid);
+  const access=(await db.ref('userAccess/'+data.uid).get()).val();
+  if(access?.deleting||access?.deletedAt)throw new HttpsError('failed-precondition','La cuenta está siendo eliminada.');
+  const receipt=(await db.ref('adminUserAudit/'+data.requestId).get()).val();
+  if(receipt){if(receipt.actor!==actor||receipt.uid!==data.uid||receipt.action!=='level'||receipt.points!==data.points)throw new HttpsError('failed-precondition','Solicitud reutilizada.');return {ok:true};}
+  // Only this player's level is locked; the first pass may not know the stored value yet,
+  // so the "points changed meanwhile" check waits for the real one.
+  let failure,record;
+  const r=await db.ref('levels/'+data.uid).transaction(current=>{
+   failure=null;
+   try{const next=adminSetPoints({levels:{[data.uid]:current}},{...data,expected:current===null?undefined:data.expected,actor,now:Date.now()});record=next.adminUserAudit[data.requestId];return next.levels[data.uid];}
+   catch(error){failure=error.message;return undefined;}
+  });
+  if(!r.committed)throw new HttpsError('failed-precondition',failure||'No se pudo cambiar el nivel.');
+  await db.ref('adminUserAudit/'+data.requestId).set(record);return {ok:true};
  }
  if(action==='block'){
   if(!validKey(data.uid)||typeof data.disabled!=='boolean'||typeof data.reason!=='string'||data.reason.trim().length<3||data.reason.length>200||!validKey(data.requestId))throw new HttpsError('invalid-argument','Usuario o motivo inválido.');
