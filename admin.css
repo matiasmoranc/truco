@@ -214,3 +214,13 @@ textarea:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 
 /* Level and points editor. */
 .level-fields{display:grid;grid-template-columns:1fr 1fr;gap:10px}.level-fields[hidden]{display:none}.level-fields small{grid-column:1/-1;color:var(--muted,#9fb3a8)}
+
+/* Audiences: one button per group with how many players it has. */
+.audiences .panel-head{display:flex;flex-wrap:wrap;gap:12px;align-items:end;justify-content:space-between}
+.audience-settings{display:flex;gap:10px}.audience-settings label{min-width:120px}.audience-settings input{width:110px}
+.audience-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px;margin-top:12px}
+.audience{display:grid;grid-template-columns:1fr auto;grid-template-rows:auto auto;align-items:center;gap:2px 10px;padding:10px 12px;border-radius:12px;text-align:left;cursor:pointer}
+.audience .audience-name{grid-row:1/3;font-weight:600;line-height:1.25}
+.audience .audience-count{font-size:22px;line-height:1;text-align:right}
+.audience .audience-share{text-align:right;opacity:.75}
+.audience.active{outline:2px solid #e8c983;background:#e8c98322}

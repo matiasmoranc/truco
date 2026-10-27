@@ -41,6 +41,35 @@ function openEdit(action,item){
 function showLevelPreview(){const tenths=Math.round(Number($('points-value').value||0)*10),info=levelFor(tenths);$('level-preview').textContent='Quedará en nivel '+info.level+' con '+points(info.points)+' de '+points(info.need)+' puntos para el siguiente.';}
 $('level-value').oninput=()=>{const level=Math.max(1,Math.floor(Number($('level-value').value)||1));$('points-value').value=pointsToReach(level)/10;showLevelPreview();};
 $('points-value').oninput=()=>{$('level-value').value=levelFor(Math.round(Number($('points-value').value||0)*10)).level;showLevelPreview();};
+// Audiences: groups of players by how they play, counted over the loaded users.
+let audience='';
+const audienceGames=()=>Math.max(1,Math.floor(Number($('audience-games').value)||1));
+const audienceDays=()=>Math.max(1,Math.floor(Number($('audience-days').value)||1));
+const audienceSince=()=>Date.now()-audienceDays()*86400000;
+const AUDIENCES=[
+ {id:'',name:()=>'Todos',test:()=>true},
+ {id:'never',name:()=>'Se registraron y nunca jugaron',test:u=>!u.finished},
+ {id:'one',name:()=>'Jugaron 1 sola partida',test:u=>u.finished===1},
+ {id:'many',name:()=>'Jugaron '+audienceGames()+' partidas o más',test:u=>u.finished>=audienceGames()},
+ {id:'nowin',name:()=>'Jugaron pero nunca ganaron',test:u=>u.finished>0&&!u.wins},
+ {id:'new',name:()=>'Nuevos: se registraron en los últimos '+audienceDays()+' días',test:u=>(Date.parse(u.createdAt)||0)>=audienceSince()},
+ {id:'active',name:()=>'Activos: jugaron en los últimos '+audienceDays()+' días',test:u=>(u.lastPlayedAt||0)>=audienceSince()},
+ {id:'gone',name:()=>'Se alejaron: jugaron, pero no en los últimos '+audienceDays()+' días',test:u=>u.finished>0&&(u.lastPlayedAt||0)<audienceSince()},
+ {id:'registered-only',name:()=>'Entraron en los últimos '+audienceDays()+' días sin jugar nunca',test:u=>!u.finished&&(Date.parse(u.lastSeenAt)||0)>=audienceSince()}
+];
+const inAudience=u=>(AUDIENCES.find(a=>a.id===audience)||AUDIENCES[0]).test(u);
+function renderAudiences(base){
+ const list=$('audience-list');list.replaceChildren();
+ for(const a of AUDIENCES){
+  const count=base.filter(a.test).length,share=base.length?Math.round(count*100/base.length):0;
+  const b=node('button','','audience'+(a.id===audience?' active':''));b.type='button';b.setAttribute('aria-pressed',String(a.id===audience));
+  b.append(node('span',a.name(),'audience-name'),node('strong',String(count),'audience-count'),node('small',a.id?share+'%':'usuarios','audience-share'));
+  b.onclick=()=>{audience=a.id;renderUsers();};list.append(b);
+ }
+ $('audience-note').textContent='Calculado sobre '+base.length+' usuarios cargados'+(pageToken?'. Tocá «Cargar más usuarios» para incluir al resto.':'.');
+}
+$('audience-games').oninput=$('audience-days').oninput=()=>renderUsers();
+const shortDate=value=>value?new Date(value).toLocaleDateString('es-UY'):'nunca';
 function renderUsers(){
  const expanded=new Set([...$('user-list').querySelectorAll('details[open]')].map(el=>el.dataset.uid));
  const query=$('search').value.toLocaleLowerCase();$('user-list').replaceChildren();
@@ -50,14 +79,15 @@ function renderUsers(){
  const value={name:u=>(u.name||'').toLocaleLowerCase(),level:u=>levelFor(u.points||0).level,points:u=>u.points||0,finished:u=>u.finished||0,state:stateRank,joined:u=>Date.parse(u.createdAt)||0}[sortBy.key];
  const byColumn=(a,b)=>{const x=value(a),y=value(b);return (typeof x==='string'?x.localeCompare(y,'es'):x-y)*sortBy.dir;};
  for(const button of document.querySelectorAll('[data-sort]'))button.dataset.dir=button.dataset.sort===sortBy.key?(sortBy.dir>0?'up':'down'):'';
- for(const u of users.filter(u=>(!hideTest()||!tests.has(u.uid))&&inLevel(u)&&[u.name,u.email,u.uid].some(v=>v.toLocaleLowerCase().includes(query))).sort(byColumn)){
+ const base=users.filter(u=>!hideTest()||!tests.has(u.uid));renderAudiences(base);
+ for(const u of base.filter(u=>inLevel(u)&&inAudience(u)&&[u.name,u.email,u.uid].some(v=>v.toLocaleLowerCase().includes(query))).sort(byColumn)){
   const card=node('details','','user-card');card.dataset.uid=u.uid;card.open=expanded.has(u.uid);
   const online=metrics?.online.includes(u.uid);
   const state=node('span','',u.disabled?'state blocked':online?'state online':'state');state.append(node('i'),document.createTextNode(u.disabled?'Bloqueado':online?'Jugando':'Desconectado'));
   const summary=node('summary','','user-row');
   const name=node('span',u.name||'Sin nombre','user-name');if(tests.has(u.uid))name.append(node('em','Prueba','test-badge'));
   summary.append(name,node('span',u.email||'Sin correo','user-mail'),node('strong',String(levelFor(u.points||0).level),'num'),node('span',points(u.points||0),'num reserved'),node('span',String(u.finished||0),'num tables'),state,node('span',new Date(u.createdAt).toLocaleDateString('es-UY'),'joined'));card.append(summary);
-  const detail=node('div','','user-detail');detail.append(node('small','UID: '+u.uid),node('small','Correo: '+(u.email||'Sin correo')),node('small','Nivel '+levelFor(u.points||0).level+' · '+points(u.points||0)+' puntos · Registro '+new Date(u.createdAt).toLocaleDateString('es-UY')));card.append(detail);
+  const detail=node('div','','user-detail');detail.append(node('small','UID: '+u.uid),node('small','Correo: '+(u.email||'Sin correo')),node('small','Nivel '+levelFor(u.points||0).level+' · '+points(u.points||0)+' puntos · Registro '+new Date(u.createdAt).toLocaleDateString('es-UY')),node('small','Partidas: '+(u.finished||0)+' · Ganadas: '+(u.wins||0)+' · Última partida: '+shortDate(u.lastPlayedAt)+' · Última conexión: '+shortDate(u.lastSeenAt)));card.append(detail);
   const actions=node('div','','actions');actions.append(button('Cambiar nombre',()=>openEdit('rename',u)),button('Cambiar nivel y puntos',()=>openEdit('level',u)),button(u.disabled?'Desbloquear':'Bloquear',()=>openEdit('block',u)),button('Eliminar usuario',()=>openEdit('delete',u)),button(tests.has(u.uid)?'Quitar de prueba':'Marcar como prueba',()=>setTestUser(u,!tests.has(u.uid))),button('Escribir mensaje',()=>writeTo(u)));detail.append(actions);$('user-list').append(card);
  }
  if(!$('user-list').children.length)$('user-list').append(node('p','No hay usuarios para mostrar.','empty'));

@@ -156,3 +156,8 @@ test('An administrator sets level points with the reason on record, never over a
  assert.equal(adminSetPoints({},{...change,expected:0,requestId:'lv2'}).levels.a.points,150);
  assert.deepEqual([0,29,30,120,150,350].map(levelOfPoints),[1,1,2,5,6,10]);
 });
+test('The last finished game of each person, for the admin audiences',()=>{
+ const {lastPlayed}=require('../functions/admin-service.cjs');
+ const ledger={matches:{m1:{status:'settled',settledAt:100,players:{player1:{uid:'a'},player2:{uid:'b'}}},m2:{status:'settled',settledAt:300,players:{player1:{uid:'a'},player2:{uid:'house_x'}}},m3:{status:'waiting',players:{player1:{uid:'c'}}}}};
+ assert.deepEqual(lastPlayed(ledger),{a:300,b:100});
+});

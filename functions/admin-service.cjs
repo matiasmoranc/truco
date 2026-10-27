@@ -53,7 +53,13 @@ function finishedTables(ledger){
  for(const m of Object.values(ledger?.matches||{})){if(m?.status!=='settled')continue;for(const uid of new Set(Object.values(m.players||{}).map(p=>p?.uid)))if(person(uid))count[uid]=(count[uid]||0)+1;}
  return count;
 }
-module.exports={pastWins,finishedTables,tableEvents,requireAdmin,adminLedgerChange,validKey};
+// When each person last finished a game (the newest settled match they played).
+function lastPlayed(ledger){
+ const last={},person=uid=>typeof uid==='string'&&!uid.startsWith('bot:')&&!uid.startsWith('house_');
+ for(const m of Object.values(ledger?.matches||{})){if(m?.status!=='settled')continue;const at=Number(m.settledAt)||0;for(const p of Object.values(m.players||{}))if(person(p?.uid)&&at>(last[p.uid]||0))last[p.uid]=at;}
+ return last;
+}
+module.exports={pastWins,finishedTables,lastPlayed,tableEvents,requireAdmin,adminLedgerChange,validKey};
 
 function legacyTableActive(room,now){
  if(!room||room.managedCredits||room.closedAt||!['waiting','drawing','started','revealing','timed-out'].includes(room.status))return false;
