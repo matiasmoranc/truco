@@ -19,19 +19,27 @@ function drawTally(ctx,x,y,points,target,size,gap){
   return half*2+gap;
 }
 
-// The photo, cropped to 9:16, with the scoreboard card on top, kept
-// well inside the lower-right corner.
-export async function composeMatchPhoto(photo,{sides,target=30},logo){
-  // Always a vertical 9:16 picture (stories size), cropped from the middle of the photo.
-  const pw=photo.naturalWidth||photo.width,ph=photo.naturalHeight||photo.height,W=1080,H=1920;
+// Every shared picture is vertical 9:16 (stories size).
+const W=1080,H=1920,U=Math.min(W,H)/100,CARD_MARGIN=6*U;
+
+// The photo cropped from its middle to fill the 9:16 picture.
+export function drawPhoto(photo){
+  const pw=photo.naturalWidth||photo.width,ph=photo.naturalHeight||photo.height;
   const cover=Math.max(W/pw,H/ph),sw=W/cover,sh=H/cover;
   const canvas=document.createElement('canvas');canvas.width=W;canvas.height=H;
-  const ctx=canvas.getContext('2d');ctx.drawImage(photo,(pw-sw)/2,(ph-sh)/2,sw,sh,0,0,W,H);
+  canvas.getContext('2d').drawImage(photo,(pw-sw)/2,(ph-sh)/2,sw,sh,0,0,W,H);
+  return canvas;
+}
+
+// The scoreboard card alone, on a transparent canvas with room around it for its shadow.
+export async function drawScoreCard({sides,target=30},logo){
   await document.fonts?.ready;
   target=[10,20,30,40,50,60].includes(Number(target))?Number(target):30;
-  const u=Math.min(W,H)/100,pad=3.6*u,colW=16.8*u,cardW=pad*2+colW*sides.length,logoH=logo?8*u:0;
+  const u=U,pad=3.6*u,colW=16.8*u,cardW=pad*2+colW*sides.length,logoH=logo?8*u:0;
   const size=Math.min(3.6*u,30*u/(target/5)),gap=size*.45,tallyH=(target/10)*(size+gap)*2+gap,nameH=7*u,footH=7*u;
-  const cardH=pad+(logo?logoH+2.5*u:0)+nameH+tallyH+2*u+footH+pad*.6,margin=7*u,x=W-cardW-margin,y=H-cardH-margin;
+  const cardH=pad+(logo?logoH+2.5*u:0)+nameH+tallyH+2*u+footH+pad*.6,x=CARD_MARGIN,y=CARD_MARGIN;
+  const canvas=document.createElement('canvas');canvas.width=Math.ceil(cardW+2*CARD_MARGIN);canvas.height=Math.ceil(cardH+2*CARD_MARGIN);
+  const ctx=canvas.getContext('2d');
   ctx.save();ctx.shadowColor='rgba(0,0,0,.55)';ctx.shadowBlur=5*u;ctx.shadowOffsetY=1.5*u;
   roundRect(ctx,x,y,cardW,cardH,3.5*u);ctx.fillStyle='rgba(9,38,28,.82)';ctx.fill();ctx.restore();
   roundRect(ctx,x,y,cardW,cardH,3.5*u);ctx.lineWidth=Math.max(1,.35*u);ctx.strokeStyle='rgba(232,201,131,.75)';ctx.stroke();
@@ -55,29 +63,95 @@ export async function composeMatchPhoto(photo,{sides,target=30},logo){
   return canvas;
 }
 
+// Where the card starts: well inside the lower-right corner, slightly tilted.
+// x and y are the card's middle on the 1080x1920 picture; rotation is in radians.
+export function cardPlacement(card,{rotation=-3*Math.PI/180}={}){
+  const w=card.width-2*CARD_MARGIN,h=card.height-2*CARD_MARGIN,margin=7*U+1.5*U;
+  return {x:W-margin-w/2,y:H-margin-h/2,scale:1,rotation};
+}
+
+// The final picture: the photo with the card where the player left it.
+export function placeCard(background,card,place){
+  const canvas=document.createElement('canvas');canvas.width=W;canvas.height=H;
+  const ctx=canvas.getContext('2d');ctx.drawImage(background,0,0,W,H);
+  ctx.save();ctx.translate(place.x,place.y);ctx.rotate(place.rotation);ctx.scale(place.scale,place.scale);ctx.drawImage(card,-card.width/2,-card.height/2);ctx.restore();
+  return canvas;
+}
+
+// The photo with the card in its starting place (also used by the ad videos).
+export async function composeMatchPhoto(photo,score,logo,place){
+  const card=await drawScoreCard(score,logo);
+  return placeCard(drawPhoto(photo),card,place||cardPlacement(card,{rotation:0}));
+}
+
 export function installMatchPhoto({$,document,toast,score}){
-  const input=$('match-photo-input'),dialog=$('match-photo-dialog'),preview=$('match-photo-preview');
-  let blob=null,logo=null,currentScore=score;
+  const input=$('match-photo-input'),dialog=$('match-photo-dialog'),stage=$('match-photo-stage'),bgCanvas=$('match-photo-bg'),cardImg=$('match-photo-card');
+  let background=null,card=null,place=null,logo=null,currentScore=score;
   // Opens the camera; the score comes from the match panel unless another screen passes its own.
   const start=(provider=score)=>{currentScore=provider;input.value='';input.click();};
   $('share-match').onclick=()=>start();
+  // The card over the photo, at the stage's size (the picture is 1080 wide).
+  function show(){
+    const k=stage.clientWidth/W;if(!card||!k)return;
+    cardImg.style.width=card.width*k+'px';cardImg.style.height=card.height*k+'px';
+    cardImg.style.transform=`translate(${place.x*k-card.width*k/2}px,${place.y*k-card.height*k/2}px) rotate(${place.rotation}rad) scale(${place.scale})`;
+  }
+  const keepInside=()=>{place.scale=Math.min(2.5,Math.max(.4,place.scale));place.x=Math.min(W,Math.max(0,place.x));place.y=Math.min(H,Math.max(0,place.y));};
   input.onchange=async()=>{
     const file=input.files?.[0];if(!file)return;
     const url=URL.createObjectURL(file);
     try{
       logo??=await loadImage('assets/truco-v3.png').catch(()=>null);
-      const canvas=await composeMatchPhoto(await loadImage(url),currentScore(),logo);
-      blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/jpeg',.9));
-      preview.src=canvas.toDataURL('image/jpeg',.85);
-      if(!dialog.open)dialog.showModal();
+      background=drawPhoto(await loadImage(url));
+      card=await drawScoreCard(currentScore(),logo);place=cardPlacement(card);
+      bgCanvas.getContext('2d').drawImage(background,0,0);cardImg.src=card.toDataURL('image/png');
+      if(!dialog.open)dialog.showModal();show();
+      requestAnimationFrame(show);
     }catch(error){console.error('[truco:photo]',error);toast('No pudimos preparar la foto.',true);}
     finally{URL.revokeObjectURL(url);}
   };
+  // Moving the card: one finger drags it (starting on the card); two fingers pinch to
+  // resize and turn to rotate it. With a mouse, the wheel resizes and Shift+wheel rotates.
+  const pointers=new Map();let gesture=null;
+  const local=event=>{const r=stage.getBoundingClientRect(),k=W/r.width;return {x:(event.clientX-r.left)*k,y:(event.clientY-r.top)*k};};
+  const onCard=p=>{const dx=p.x-place.x,dy=p.y-place.y,c=Math.cos(-place.rotation),s=Math.sin(-place.rotation);const lx=(dx*c-dy*s)/place.scale,ly=(dx*s+dy*c)/place.scale;return Math.abs(lx)<=card.width/2-CARD_MARGIN+2*U&&Math.abs(ly)<=card.height/2-CARD_MARGIN+2*U;};
+  const begin=()=>{
+    const list=[...pointers.values()];
+    if(list.length===1)gesture={from:list[0],place:{...place}};
+    else if(list.length>=2){const [a,b]=list;gesture={a,b,place:{...place},mid:{x:(a.x+b.x)/2,y:(a.y+b.y)/2},dist:Math.hypot(b.x-a.x,b.y-a.y)||1,angle:Math.atan2(b.y-a.y,b.x-a.x)};}
+    else gesture=null;
+  };
+  stage.addEventListener('pointerdown',event=>{
+    if(!card)return;const p=local(event);
+    if(!pointers.size&&!onCard(p))return;
+    try{stage.setPointerCapture(event.pointerId);}catch{}pointers.set(event.pointerId,p);begin();stage.classList.add('moving');
+  });
+  stage.addEventListener('pointermove',event=>{
+    if(!pointers.has(event.pointerId)||!gesture)return;
+    pointers.set(event.pointerId,local(event));const list=[...pointers.values()];
+    if(list.length===1&&gesture.from){place.x=gesture.place.x+list[0].x-gesture.from.x;place.y=gesture.place.y+list[0].y-gesture.from.y;}
+    else if(list.length>=2&&gesture.a){
+      const [a,b]=list,mid={x:(a.x+b.x)/2,y:(a.y+b.y)/2};
+      place.scale=gesture.place.scale*Math.hypot(b.x-a.x,b.y-a.y)/gesture.dist;
+      place.rotation=gesture.place.rotation+Math.atan2(b.y-a.y,b.x-a.x)-gesture.angle;
+      place.x=gesture.place.x+mid.x-gesture.mid.x;place.y=gesture.place.y+mid.y-gesture.mid.y;
+    }
+    keepInside();show();
+  });
+  const end=event=>{if(!pointers.delete(event.pointerId))return;begin();if(!pointers.size)stage.classList.remove('moving');};
+  stage.addEventListener('pointerup',end);stage.addEventListener('pointercancel',end);
+  stage.addEventListener('wheel',event=>{
+    if(!card)return;event.preventDefault();
+    if(event.shiftKey)place.rotation+=(event.deltaY>0?1:-1)*3*Math.PI/180;else place.scale*=event.deltaY>0?1/1.06:1.06;
+    keepInside();show();
+  },{passive:false});
+  addEventListener('resize',()=>{if(dialog.open)show();});
   $('match-photo-retake').onclick=()=>start(currentScore);
   $('match-photo-close').onclick=()=>dialog.close();
   $('match-photo-share').onclick=async()=>{
-    if(!blob)return;
+    if(!background||!card)return;
     // Only the photo travels: no text is attached to the message.
+    const blob=await new Promise(resolve=>placeCard(background,card,place).toBlob(resolve,'image/jpeg',.9));
     const name='truco-uruguayo-'+Date.now()+'.jpg';
     try{
       if(globalThis.trucoNative?.shareImage){

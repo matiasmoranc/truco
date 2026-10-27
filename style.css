@@ -2429,3 +2429,10 @@ input,textarea,[contenteditable=""],[contenteditable="true"]{-webkit-user-select
 .level-up-dialog p strong{color:#ead39b}
 .level-up-dialog #level-up-open{display:flex;align-items:center;justify-content:center;text-align:center}
 .level-up-dialog .level-up-x{border-radius:12px}
+
+/* Photo editor: the photo with the score card on top, moved, resized and rotated by hand. */
+.match-photo-stage{position:relative;width:min(100%,calc(58dvh * 9 / 16));aspect-ratio:9/16;margin:4px auto 8px;border-radius:14px;overflow:hidden;background:#0b2c21;touch-action:none;-webkit-user-select:none;user-select:none}
+.match-photo-stage canvas{position:absolute;inset:0;width:100%;height:100%}
+.match-photo-dialog .match-photo-stage img{position:absolute;left:0;top:0;margin:0;max-height:none;border-radius:0;background:none;object-fit:fill;transform-origin:50% 50%;pointer-events:none;-webkit-user-drag:none}
+.match-photo-stage.moving img{filter:drop-shadow(0 0 6px #e8c983aa)}
+.match-photo-hint{margin:0 0 14px;text-align:center;font-size:13px;color:#cbd6cf}
