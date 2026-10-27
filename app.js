@@ -4575,6 +4575,12 @@ for(const button of document.querySelectorAll('[data-password-toggle]')){
 installScorer({document,showView,renderTally:renderCompactTally,
   people:()=>[$('account-username').textContent,...friends.friendNames()],
   onShare:score=>matchPhoto.start(()=>score)});
+// Coming from the scorer page (?anotador): the scorer opens at once, full screen, even
+// over the sign-in screen; going back leaves it (and the address) as usual.
+if(new URLSearchParams(location.search).has('anotador')){
+  $('open-scorer')?.click();$('scorer-view').classList.add('over-login');
+  $('scorer-back')?.addEventListener('click',()=>{$('scorer-view').classList.remove('over-login');history.replaceState(null,'',location.pathname);});
+}
 
 installPlayerPanel({document,api:creditApi,getState:()=>state});
 
