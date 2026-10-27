@@ -460,7 +460,16 @@ exports.playerActivity=onCall({...options,maxInstances:3},async request=>{
 });
 // Anonymous visit counters for the admin panel. No login and no stored
 // identifiers; a per-instance limit keeps one address from inflating them.
-const {visitUpdates,visitSummary,visitRecord,visitRange,visitorsInRange,visitClaimPath,deviceFacts,dedupeVisit,rememberDevice,VISIT_DAYS}=require('./visit-service.cjs');
+const {visitUpdates,visitSummary,visitRecord,visitRange,visitorsInRange,visitClaimPath,deviceFacts,dedupeVisit,rememberDevice,VISIT_DAYS,robotDevice,inRanges}=require('./visit-service.cjs');
+// Google's address list, read at most once a day per server; without it only the known robot devices are caught.
+let googleRanges={at:0,prefixes:[]};
+async function googleAddresses(now){
+ if(now-googleRanges.at<86400000)return googleRanges.prefixes;
+ googleRanges.at=now;
+ try{const r=await fetch('https://www.gstatic.com/ipranges/goog.json',{signal:AbortSignal.timeout(3000)});const j=await r.json();googleRanges.prefixes=(j.prefixes||[]).map(p=>p.ipv4Prefix||p.ipv6Prefix).filter(Boolean);}
+ catch(error){console.error('google ranges',error.message);googleRanges.at=now-86400000+600000;}
+ return googleRanges.prefixes;
+}
 const {moveVisitUpdates,moveVisitsUpdates,mergeVisitCounters,withoutTestActivity}=require('./test-data.cjs');
 const visitLimits=new Map(),visitDevices=new Map();
 exports.siteVisit=onCall({region:'us-central1',maxInstances:3,timeoutSeconds:10,cors:true},async request=>{
@@ -477,6 +486,8 @@ exports.siteVisit=onCall({region:'us-central1',maxInstances:3,timeoutSeconds:10,
  let updates;
  try{updates=visitUpdates({...data,now,increment:ServerValue.increment});}catch(e){throw new HttpsError('invalid-argument',e.message);}
  const record=visitRecord({...data,now,userAgent:agent});
+ // Google's test robots count with the test visits, never as real people.
+ if(!record.test&&(robotDevice(record)||inRanges(ip,await googleAddresses(now)))){record.test=true;record.robot=true;}
  const entry=db.ref('adminMetrics/visitLog/'+day).push();
  rememberDevice({seen:visitDevices,key,day,page:data.page,now,id:entry.key});
  // Devices flagged as test devices count apart from the real visits.
@@ -490,6 +501,10 @@ exports.activityCleanup=onSchedule({schedule:'every day 04:00',timeZone:'America
  for(const root of ['tableInvites','tableInviteReplies']){const all=(await db.ref(root).get()).val()||{},gone={};for(const [uid,list] of Object.entries(all))for(const [id,v] of Object.entries(list||{}))if(!(now-(v?.at||0)<86400000))gone[root+'/'+uid+'/'+id]=null;if(Object.keys(gone).length)await db.ref().update(gone);}
  await db.ref('adminMetrics').transaction(metrics=>{
   if(!metrics)return undefined;
+  // Visits already logged from Google's test robots move to the test counters.
+  const robots=[];
+  for(const [day,list] of Object.entries(metrics.visitLog||{}))for(const r of Object.values(list||{}))if(r&&!r.test&&Number.isFinite(r.at)&&robotDevice(r)){robots.push({...r});r.test=true;r.robot=true;}
+  if(robots.length){const moves=moveVisitsUpdates(robots,true,n=>n);for(const [path,n] of Object.entries(moves)){const keys=path.split('/');let node=metrics;for(const k of keys.slice(0,-1))node=node[k]??={};const last=keys.at(-1);node[last]=Math.max(0,(Number(node[last])||0)+n);}}
   // Daily activity, counters and visit details are kept for VISIT_DAYS.
   const visitCutoff=uruguayDate(now-(VISIT_DAYS-1)*86400000).day;
   for(const key of ['days','visits','visitsTest','visitLog'])for(const day of Object.keys(metrics[key]||{}))if(day<visitCutoff)delete metrics[key][day];

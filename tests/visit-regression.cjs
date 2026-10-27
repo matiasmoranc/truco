@@ -108,3 +108,15 @@ test('The most players online at once only goes up, and counts each player once'
  assert.deepEqual(higherPeak(null,2,now),{count:2,at:now});
  assert.equal(higherPeak({count:3,at:1},2,now),undefined);assert.equal(higherPeak(null,0,now),undefined);
 });
+test("Google's test robots are recognized by their device or by Google's addresses",()=>{
+ const {robotDevice,inRanges}=require('../functions/visit-service.cjs');
+ assert.equal(robotDevice({model:'OnePlus8Pro Build/QKR1.191246.002'}),true);
+ assert.equal(robotDevice({model:'2201117TL Build/SKQ1.211103.001'}),false);
+ const google=['108.177.0.0/17','2001:4860::/32'];
+ assert.equal(inRanges('108.177.6.20',google),true);
+ assert.equal(inRanges('::ffff:108.177.7.1',google),true);
+ assert.equal(inRanges('2001:4860:1234::1',google),true);
+ assert.equal(inRanges('190.64.12.5',google),false);
+ assert.equal(inRanges('2800:a4::1',google),false);
+ assert.equal(inRanges('',google),false);
+});

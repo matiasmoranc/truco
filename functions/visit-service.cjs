@@ -119,4 +119,30 @@ function visitorsInRange({log,activity,platform,page=null,hour=null,exclude=null
  return {visits:visits.slice(0,limit),totalVisits:visits.length,signedVisits:visits.length-anonymous.length,anonymousVisits:anonymous.length,anonymousDevices:anonymous.filter(v=>v.first).length,
   players:[...players.values()].sort((a,b)=>b.visits-a.visits||b.lastDay.localeCompare(a.lastDay)||b.days-a.days)};
 }
-module.exports={dedupeVisit,rememberDevice,PLATFORMS,PAGES,VISIT_DAYS,visitUpdates,visitSummary,deviceFacts,visitOrigin,visitRecord,visitRange,visitorsInRange,visitClaimPath};
+// Google's own test robots (the Play Console pre-launch report, Firebase Test Lab) open
+// the app on Google's devices right after each upload. They come from Google's addresses
+// (gstatic.com/ipranges/goog.json) and use a few known devices; their visits count as tests.
+const ROBOT_DEVICES=[/OnePlus8Pro Build\/QKR1\.191246\.002/];
+const robotDevice=record=>ROBOT_DEVICES.some(re=>re.test(String(record?.model||'')));
+function ipToBig(ip){
+ ip=String(ip||'').trim().replace(/^::ffff:(?=\d+\.)/,'');
+ if(/^\d+\.\d+\.\d+\.\d+$/.test(ip))return {v:4,n:ip.split('.').reduce((a,p)=>(a<<8n)+BigInt(Number(p)&255),0n)};
+ if(!ip.includes(':'))return null;
+ const [head,tail='']=ip.split('::'),h=head?head.split(':'):[],t=tail?tail.split(':'):[];
+ if(!ip.includes('::')&&h.length!==8)return null;
+ const parts=[...h,...Array(8-h.length-t.length).fill('0'),...t];
+ if(parts.length!==8||parts.some(p=>!/^[0-9a-f]{1,4}$/i.test(p)))return null;
+ return {v:6,n:parts.reduce((a,p)=>(a<<16n)+BigInt(parseInt(p,16)),0n)};
+}
+function inRanges(ip,prefixes){
+ const addr=ipToBig(ip);if(!addr)return false;
+ for(const prefix of prefixes||[]){
+  const [base,bits]=String(prefix).split('/'),net=ipToBig(base),len=Number(bits);
+  if(!net||net.v!==addr.v||!Number.isInteger(len))continue;
+  const size=addr.v===4?32:128,shift=BigInt(size-len);
+  if((addr.n>>shift)===(net.n>>shift))return true;
+ }
+ return false;
+}
+module.exports.robotDevice=robotDevice;module.exports.inRanges=inRanges;
+module.exports={...module.exports,dedupeVisit,rememberDevice,PLATFORMS,PAGES,VISIT_DAYS,visitUpdates,visitSummary,deviceFacts,visitOrigin,visitRecord,visitRange,visitorsInRange,visitClaimPath};
