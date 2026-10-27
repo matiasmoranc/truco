@@ -31,35 +31,61 @@ export function drawPhoto(photo){
   return canvas;
 }
 
+// Looks for the card: the same layout with other colors and small details.
+// winner/other: names and tallies; lines: malas/buenas and middle lines; site: the address.
+export const CARD_THEMES={
+  clasico:{name:'Clásico',swatch:'#0e3a2b',fill:'rgba(9,38,28,.82)',border:'rgba(232,201,131,.75)',winner:'#f0d596',other:'#dfe6e1',tally:'#f0eee2',lines:'rgba(239,235,215,.4)',footLine:'rgba(232,201,131,.35)',site:'#e8c983'},
+  claro:{name:'Claro',swatch:'#f7f1e2',logoTint:'#1f6b4c',fill:'rgba(250,246,236,.94)',border:'rgba(176,138,62,.9)',winner:'#1f6b4c',other:'#4b5a52',tally:'#4b5a52',winnerTally:'#1f6b4c',lines:'rgba(31,61,46,.25)',footLine:'rgba(176,138,62,.5)',site:'#1f6b4c',shadow:.35},
+  madera:{name:'Madera',swatch:'#7a4b27',wood:true,border:'rgba(58,32,14,.9)',winner:'#ffe2a3',other:'#f3e6cf',tally:'#f6ecd9',winnerTally:'#ffe2a3',lines:'rgba(246,236,217,.35)',footLine:'rgba(255,226,163,.4)',site:'#ffe2a3'},
+  pizarra:{name:'Pizarra',swatch:'#26332e',fill:'#26332e',frame:'#7a4f2a',border:'rgba(0,0,0,0)',winner:'#f8e7b0',other:'#eef0ea',tally:'#f4f4ee',winnerTally:'#f8e7b0',lines:'rgba(244,244,238,.45)',footLine:'rgba(244,244,238,.3)',site:'#f8e7b0',chalk:true}
+};
+
 // The scoreboard card alone, on a transparent canvas with room around it for its shadow.
-export async function drawScoreCard({sides,target=30},logo){
+export async function drawScoreCard({sides,target=30},logo,theme='clasico'){
   await document.fonts?.ready;
+  const t=CARD_THEMES[theme]||CARD_THEMES.clasico;
   target=[10,20,30,40,50,60].includes(Number(target))?Number(target):30;
   const u=U,pad=3.6*u,colW=16.8*u,cardW=pad*2+colW*sides.length,logoH=logo?8*u:0;
   const size=Math.min(3.6*u,30*u/(target/5)),gap=size*.45,tallyH=(target/10)*(size+gap)*2+gap,nameH=7*u,footH=7*u;
-  const cardH=pad+(logo?logoH+2.5*u:0)+nameH+tallyH+2*u+footH+pad*.6,x=CARD_MARGIN,y=CARD_MARGIN;
+  const cardH=pad+(logo?logoH+2.5*u:0)+nameH+tallyH+2*u+footH+pad*.6,x=CARD_MARGIN,y=CARD_MARGIN,r=3.5*u;
   const canvas=document.createElement('canvas');canvas.width=Math.ceil(cardW+2*CARD_MARGIN);canvas.height=Math.ceil(cardH+2*CARD_MARGIN);
   const ctx=canvas.getContext('2d');
-  ctx.save();ctx.shadowColor='rgba(0,0,0,.55)';ctx.shadowBlur=5*u;ctx.shadowOffsetY=1.5*u;
-  roundRect(ctx,x,y,cardW,cardH,3.5*u);ctx.fillStyle='rgba(9,38,28,.82)';ctx.fill();ctx.restore();
-  roundRect(ctx,x,y,cardW,cardH,3.5*u);ctx.lineWidth=Math.max(1,.35*u);ctx.strokeStyle='rgba(232,201,131,.75)';ctx.stroke();
+  ctx.save();ctx.shadowColor=`rgba(0,0,0,${t.shadow??.55})`;ctx.shadowBlur=5*u;ctx.shadowOffsetY=1.5*u;
+  roundRect(ctx,x,y,cardW,cardH,r);
+  if(t.wood){const g=ctx.createLinearGradient(x,y,x+cardW,y+cardH);g.addColorStop(0,'#8a5a32');g.addColorStop(.5,'#6e4423');g.addColorStop(1,'#5a3519');ctx.fillStyle=g;}
+  else ctx.fillStyle=t.frame||t.fill;
+  ctx.fill();ctx.restore();
+  ctx.save();roundRect(ctx,x,y,cardW,cardH,r);ctx.clip();
+  // Wood grain, a chalkboard inside a wooden frame, or a sky-blue band at the top.
+  if(t.wood){ctx.strokeStyle='rgba(40,20,6,.22)';ctx.lineWidth=.3*u;for(let i=0;i<26;i++){const yy=y+i*cardH/26+Math.sin(i*1.7)*u;ctx.beginPath();ctx.moveTo(x,yy);ctx.bezierCurveTo(x+cardW*.3,yy+u*Math.sin(i),x+cardW*.7,yy-u*Math.cos(i),x+cardW,yy+.5*u);ctx.stroke();}}
+  if(t.frame){const f=1.6*u;roundRect(ctx,x+f,y+f,cardW-2*f,cardH-2*f,r*.6);ctx.fillStyle=t.fill;ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,.035)';for(let i=0;i<180;i++)ctx.fillRect(x+f+((i*97)%1000)/1000*(cardW-2*f),y+f+((i*61)%1000)/1000*(cardH-2*f),((i*13)%10)/10*1.2*u,.4*u);}
+  if(t.band){ctx.fillStyle=t.band;ctx.fillRect(x,y,cardW,pad+logoH+1.2*u);}
+  ctx.restore();
+  roundRect(ctx,x,y,cardW,cardH,r);ctx.lineWidth=Math.max(1,.35*u);ctx.strokeStyle=t.border;ctx.stroke();
+  if(t.doubleBorder){roundRect(ctx,x+1.1*u,y+1.1*u,cardW-2.2*u,cardH-2.2*u,r*.7);ctx.lineWidth=Math.max(1,.18*u);ctx.stroke();}
   let cy=y+pad;
-  if(logo){const lw=logoH*(logo.naturalWidth/logo.naturalHeight);ctx.drawImage(logo,x+(cardW-lw)/2,cy,lw,logoH);cy+=logoH+2.5*u;}
+  if(logo){const lw=logoH*(logo.naturalWidth/logo.naturalHeight);
+    // Light cards tint the logo (white on the sky-blue band); Celeste adds a sun of Uruguay on each side.
+    if(t.logoTint){const tint=document.createElement('canvas');tint.width=logo.naturalWidth;tint.height=logo.naturalHeight;const tc=tint.getContext('2d');tc.drawImage(logo,0,0);tc.globalCompositeOperation='source-in';tc.fillStyle=t.logoTint;tc.fillRect(0,0,tint.width,tint.height);ctx.drawImage(tint,x+(cardW-lw)/2,cy,lw,logoH);}
+    else ctx.drawImage(logo,x+(cardW-lw)/2,cy,lw,logoH);
+    if(t.sun)for(const sx of [x+pad+2.6*u,x+cardW-pad-2.6*u]){const sy=cy+logoH/2;ctx.save();ctx.translate(sx,sy);ctx.fillStyle='#f7c948';ctx.strokeStyle='#f7c948';ctx.lineWidth=.3*u;for(let k=0;k<16;k++){ctx.rotate(Math.PI/8);ctx.beginPath();ctx.moveTo(0,1.4*u);ctx.lineTo(0,2.3*u);ctx.stroke();}ctx.beginPath();ctx.arc(0,0,1.15*u,0,Math.PI*2);ctx.fill();ctx.restore();}
+    cy+=logoH+2.5*u;}
   ctx.textBaseline='middle';ctx.textAlign='center';
   sides.forEach((side,i)=>{
     const cx=x+pad+colW*i+colW/2;
-    ctx.font=`${side.winner?700:500} ${3*u}px 'DM Sans',sans-serif`;ctx.fillStyle=side.winner?'#f0d596':'#dfe6e1';
+    ctx.font=`${side.winner?700:500} ${(t.chalk?4.2:3)*u}px ${t.chalk?"'Caveat','DM Sans'":"'DM Sans'"},sans-serif`;ctx.fillStyle=side.winner?t.winner:t.other;
     ctx.fillText(fitText(ctx,side.name,colW-2*u),cx,cy+nameH/2-u);
-    ctx.lineWidth=Math.max(1.5,.55*u);ctx.lineCap='round';ctx.strokeStyle=side.winner?'#f0d596':'#f0eee2';
+    ctx.lineWidth=Math.max(1.5,.55*u);ctx.lineCap='round';ctx.strokeStyle=side.winner?(t.winnerTally||t.winner):t.tally;
     drawTally(ctx,cx-size/2,cy+nameH,side.points,target,size,gap);
   });
   // The line between malas and buenas, and the one between both players.
   const mid=cy+nameH+(target/10)*(size+gap)+gap/2;
-  ctx.fillStyle='rgba(239,235,215,.4)';ctx.fillRect(x+pad,mid-.15*u,cardW-2*pad,Math.max(1,.3*u));
+  ctx.fillStyle=t.lines;ctx.fillRect(x+pad,mid-.15*u,cardW-2*pad,Math.max(1,.3*u));
   if(sides.length===2)ctx.fillRect(x+pad+colW-.15*u,cy,Math.max(1,.3*u),nameH+tallyH);
   cy+=nameH+tallyH+2*u;
-  ctx.fillStyle='rgba(232,201,131,.35)';ctx.fillRect(x+pad,cy,cardW-2*pad,Math.max(1,.25*u));
-  ctx.font=`700 ${3.6*u}px 'DM Sans',sans-serif`;ctx.fillStyle='#e8c983';ctx.fillText(SITE,x+cardW/2,cy+footH/2+.5*u);
+  ctx.fillStyle=t.footLine;ctx.fillRect(x+pad,cy,cardW-2*pad,Math.max(1,.25*u));
+  ctx.font=`700 ${3.6*u}px 'DM Sans',sans-serif`;ctx.fillStyle=t.site;ctx.fillText(SITE,x+cardW/2,cy+footH/2+.5*u);
   return canvas;
 }
 
@@ -86,7 +112,18 @@ export async function composeMatchPhoto(photo,score,logo,place){
 
 export function installMatchPhoto({$,document,toast,score}){
   const input=$('match-photo-input'),dialog=$('match-photo-dialog'),stage=$('match-photo-stage'),bgCanvas=$('match-photo-bg'),cardImg=$('match-photo-card');
-  let background=null,card=null,place=null,logo=null,currentScore=score;
+  let background=null,card=null,place=null,logo=null,currentScore=score,theme='clasico',score$=null;
+  try{const saved=localStorage.getItem('truco-card-theme');if(CARD_THEMES[saved])theme=saved;}catch{}
+  // The circles under the photo: one per look; the chosen one is remembered on this device.
+  const themes=$('match-photo-themes');
+  function renderThemes(){
+    themes.replaceChildren(...Object.entries(CARD_THEMES).map(([id,t])=>{
+      const b=document.createElement('button');b.type='button';b.className='match-photo-theme'+(id===theme?' active':'');b.style.setProperty('--swatch',t.swatch);b.style.setProperty('--edge',t.frame||t.border);
+      b.setAttribute('aria-label','Marcador '+t.name);b.setAttribute('aria-pressed',String(id===theme));b.title=t.name;
+      b.onclick=async()=>{if(id===theme||!score$)return;theme=id;try{localStorage.setItem('truco-card-theme',id);}catch{}renderThemes();card=await drawScoreCard(score$,logo,theme);cardImg.src=card.toDataURL('image/png');show();};
+      return b;
+    }));
+  }
   // Opens the camera; the score comes from the match panel unless another screen passes its own.
   const start=(provider=score)=>{currentScore=provider;input.value='';input.click();};
   $('share-match').onclick=()=>start();
@@ -103,7 +140,7 @@ export function installMatchPhoto({$,document,toast,score}){
     try{
       logo??=await loadImage('assets/truco-v3.png').catch(()=>null);
       background=drawPhoto(await loadImage(url));
-      card=await drawScoreCard(currentScore(),logo);place=cardPlacement(card);
+      score$=currentScore();card=await drawScoreCard(score$,logo,theme);place=cardPlacement(card);renderThemes();
       bgCanvas.getContext('2d').drawImage(background,0,0);cardImg.src=card.toDataURL('image/png');
       if(!dialog.open)dialog.showModal();show();
       requestAnimationFrame(show);

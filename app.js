@@ -9,7 +9,7 @@ import { installAccount } from './account.js?v=20261022-ios-redirect';
 import { initializeGameAuth } from './auth-init.js?v=20261016-android-google';
 import {installTeamTable,TEAM_SEATS,playerTeam,positionDealerDeck,renderTeamLobbySeats,renderWaitingSeats} from './team-table-ui.js?v=20261026-flor1';
 import {createLiveTables,LiveError} from './live-tables.js?v=20261025-close1';
-import {installMatchPhoto} from './share-photo.js?v=20261027-photo1';
+import {installMatchPhoto} from './share-photo.js?v=20261027-photo2';
 import {installProfiles,SOUND_MESSAGES} from './profile-level.js?v=20261027-levelup1';
 const FIREBASE_VERSION = '12.4.0';
 const $ = (id) => document.getElementById(id);
