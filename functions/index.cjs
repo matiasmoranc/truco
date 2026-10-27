@@ -486,8 +486,8 @@ exports.siteVisit=onCall({region:'us-central1',maxInstances:3,timeoutSeconds:10,
  let updates;
  try{updates=visitUpdates({...data,now,increment:ServerValue.increment});}catch(e){throw new HttpsError('invalid-argument',e.message);}
  const record=visitRecord({...data,now,userAgent:agent});
- // Google's test robots count with the test visits, never as real people.
- if(!record.test&&(robotDevice(record)||inRanges(ip,await googleAddresses(now)))){record.test=true;record.robot=true;}
+ // Visits from Google's own addresses (its test robots) count with the test visits.
+ if(!record.test&&inRanges(ip,await googleAddresses(now))){record.test=true;record.robot=true;}
  const entry=db.ref('adminMetrics/visitLog/'+day).push();
  rememberDevice({seen:visitDevices,key,day,page:data.page,now,id:entry.key});
  // Devices flagged as test devices count apart from the real visits.
@@ -501,9 +501,9 @@ exports.activityCleanup=onSchedule({schedule:'every day 04:00',timeZone:'America
  for(const root of ['tableInvites','tableInviteReplies']){const all=(await db.ref(root).get()).val()||{},gone={};for(const [uid,list] of Object.entries(all))for(const [id,v] of Object.entries(list||{}))if(!(now-(v?.at||0)<86400000))gone[root+'/'+uid+'/'+id]=null;if(Object.keys(gone).length)await db.ref().update(gone);}
  await db.ref('adminMetrics').transaction(metrics=>{
   if(!metrics)return undefined;
-  // Visits already logged from Google's test robots move to the test counters.
+  // Visits from the robots' known device that never signed in move to the test counters.
   const robots=[];
-  for(const [day,list] of Object.entries(metrics.visitLog||{}))for(const r of Object.values(list||{}))if(r&&!r.test&&Number.isFinite(r.at)&&robotDevice(r)){robots.push({...r});r.test=true;r.robot=true;}
+  for(const [day,list] of Object.entries(metrics.visitLog||{}))for(const r of Object.values(list||{}))if(r&&!r.test&&!r.uid&&Number.isFinite(r.at)&&robotDevice(r)){robots.push({...r});r.test=true;r.robot=true;}
   if(robots.length){const moves=moveVisitsUpdates(robots,true,n=>n);for(const [path,n] of Object.entries(moves)){const keys=path.split('/');let node=metrics;for(const k of keys.slice(0,-1))node=node[k]??={};const last=keys.at(-1);node[last]=Math.max(0,(Number(node[last])||0)+n);}}
   // Daily activity, counters and visit details are kept for VISIT_DAYS.
   const visitCutoff=uruguayDate(now-(VISIT_DAYS-1)*86400000).day;
