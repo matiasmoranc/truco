@@ -230,6 +230,7 @@ function syncMatchChat(){
       if(!chatMuted&&!matchChat.open&&$('game-view').classList.contains('active'))showChatNotice(message);
       continue;
     }
+    playChatSound(message.text);
     if(!matchChat.open&&!chatMuted)matchChat.unread++;
     if(!chatMuted&&!matchChat.open&&$('game-view').classList.contains('active'))showChatNotice(message);
   }
@@ -256,7 +257,7 @@ async function sendMatchChat(event,preset){
   matchChat.sending=true;$('chat-send').disabled=true;$('chat-error').classList.add('hidden');
   // Close at once and show the message the way the rival sees it; the server copy is then skipped.
   const own={id:`local-${Date.now()}`,sender,text};matchChat.pendingOwn.push(own);
-  closeMatchChat();const dismissOwn=showChatNotice(own);
+  closeMatchChat();const dismissOwn=showChatNotice(own);playChatSound(text);
   if(preset==null){input.value='';$('chat-count').textContent='0/40';}
   try{
     if(state.room?.managedCredits){await creditCommand({kind:'chat',text});return;}
@@ -452,6 +453,7 @@ let soundEnabled=localStorage.getItem('truco-call-sound')==='on';
 let voiceUnlocked=false;
 let activeVoiceUtterance=null;
 function unlockVoice(){
+  if(soundEnabled)unlockChatSounds();
   if(voiceUnlocked||!soundEnabled||!('speechSynthesis' in window))return;
   // Start a silent synthesis session directly inside the user's gesture on iOS.
   try{
@@ -463,6 +465,18 @@ function unlockVoice(){
     synth.resume();
     voiceUnlocked=true;
   }catch(error){console.warn('[truco:voice] unlock failed',error);}
+}
+// Quick messages with their own audio clip, heard by the whole table when the voice is on.
+const CHAT_SOUNDS={'andate fernando':'assets/sounds/andate-fernando.mp3','falta envido y truco':'assets/sounds/falta-envido-y-truco.mp3'};
+const chatSoundKey=text=>String(text||'').toLocaleLowerCase('es').replace(/[^a-záéíóúñ ]/g,'').trim();
+const chatAudio=new Map();
+function chatSound(src){if(!chatAudio.has(src)){const audio=new Audio(src);audio.preload='auto';chatAudio.set(src,audio);}return chatAudio.get(src);}
+// iOS only lets audio start from a gesture: play each clip silently once while unlocking.
+let chatSoundsUnlocked=false;
+function unlockChatSounds(){if(chatSoundsUnlocked)return;chatSoundsUnlocked=true;for(const src of Object.values(CHAT_SOUNDS)){const audio=chatSound(src);audio.muted=true;audio.play().then(()=>{audio.pause();audio.currentTime=0;audio.muted=false;}).catch(()=>{audio.muted=false;});}}
+function playChatSound(text){
+  const src=CHAT_SOUNDS[chatSoundKey(text)];if(!src||!soundEnabled||chatMuted)return;
+  const audio=chatSound(src);audio.muted=false;audio.currentTime=0;audio.play().catch(()=>{});
 }
 let callNoticeTimer=null;
 const CALL_NOTICE_DURATION=4000;
@@ -3664,6 +3678,8 @@ function openChatHoldMenu(){
   if(!chatAvailable()||chatMuted||peerChatMuted()||liveActionsBlocked()||matchChat.sending)return;
   const rect=$('chat-toggle').getBoundingClientRect(),menu=$('chat-hold-menu');
   menu.style.top=`${rect.bottom+8}px`;menu.style.right=`${Math.max(8,innerWidth-rect.right)}px`;
+  // Some messages only make sense later in the hand (data-from-round: the round, trickNo, they appear from).
+  const round=Number(state.room?.trickNo)||1;for(const button of menu.querySelectorAll('[data-from-round]'))button.hidden=round<Number(button.dataset.fromRound);
   closeMatchChat();menu.classList.remove('hidden');chatHold.open=true;chatHold.suppressClick=true;navigator.vibrate?.(12);
 }
 function closeChatHoldMenu(){
