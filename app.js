@@ -469,14 +469,28 @@ function unlockVoice(){
 // Quick messages with their own audio clip, heard by the whole table when the voice is on.
 const CHAT_SOUNDS={'andate fernando':'assets/sounds/andate-fernando.mp3','falta envido y truco':'assets/sounds/falta-envido-y-truco.mp3'};
 const chatSoundKey=text=>String(text||'').toLocaleLowerCase('es').replace(/[^a-záéíóúñ ]/g,'').trim();
-const chatAudio=new Map();
-function chatSound(src){if(!chatAudio.has(src)){const audio=new Audio(src);audio.preload='auto';chatAudio.set(src,audio);}return chatAudio.get(src);}
-// iOS only lets audio start from a gesture: play each clip silently once while unlocking.
-let chatSoundsUnlocked=false;
-function unlockChatSounds(){if(chatSoundsUnlocked)return;chatSoundsUnlocked=true;for(const src of Object.values(CHAT_SOUNDS)){const audio=chatSound(src);audio.muted=true;audio.play().then(()=>{audio.pause();audio.currentTime=0;audio.muted=false;}).catch(()=>{audio.muted=false;});}}
+// The clips play through Web Audio: iOS only lets sound start from a gesture, so every tap
+// resumes the context (iOS also suspends it in the background) and the clips are decoded ahead.
+let chatAudioContext=null;const chatBuffers=new Map();
+function chatContext(){const Context=window.AudioContext||window.webkitAudioContext;if(!Context)return null;chatAudioContext??=new Context();return chatAudioContext;}
+function loadChatSound(src){
+  const ctx=chatContext();if(!ctx)return Promise.reject(new Error('no audio'));
+  if(!chatBuffers.has(src))chatBuffers.set(src,fetch(src).then(r=>r.arrayBuffer()).then(data=>new Promise((resolve,reject)=>ctx.decodeAudioData(data,resolve,reject))).catch(error=>{chatBuffers.delete(src);throw error;}));
+  return chatBuffers.get(src);
+}
+function unlockChatSounds(){
+  const ctx=chatContext();if(!ctx)return;
+  if(ctx.state!=='running'){ctx.resume().catch(()=>{});const silent=ctx.createBufferSource();silent.buffer=ctx.createBuffer(1,1,22050);silent.connect(ctx.destination);silent.start(0);}
+  for(const src of Object.values(CHAT_SOUNDS))loadChatSound(src).catch(()=>{});
+}
+function startChatSound(src){
+  const ctx=chatContext();
+  if(!ctx){new Audio(src).play().catch(()=>{});return;}
+  loadChatSound(src).then(buffer=>{if(ctx.state!=='running')ctx.resume().catch(()=>{});const source=ctx.createBufferSource();source.buffer=buffer;source.connect(ctx.destination);source.start(0);}).catch(()=>{});
+}
 function playChatSound(text){
   const src=CHAT_SOUNDS[chatSoundKey(text)];if(!src||!soundEnabled||chatMuted)return;
-  const audio=chatSound(src);audio.muted=false;audio.currentTime=0;audio.play().catch(()=>{});
+  startChatSound(src);
 }
 let callNoticeTimer=null;
 const CALL_NOTICE_DURATION=4000;
@@ -3678,8 +3692,8 @@ function openChatHoldMenu(){
   if(!chatAvailable()||chatMuted||peerChatMuted()||liveActionsBlocked()||matchChat.sending)return;
   const rect=$('chat-toggle').getBoundingClientRect(),menu=$('chat-hold-menu');
   menu.style.top=`${rect.bottom+8}px`;menu.style.right=`${Math.max(8,innerWidth-rect.right)}px`;
-  // Some messages only make sense later in the hand (data-from-round: the round, trickNo, they appear from).
-  const round=Number(state.room?.trickNo)||1;for(const button of menu.querySelectorAll('[data-from-round]'))button.hidden=round<Number(button.dataset.fromRound);
+  // Some messages only make sense later in the match (data-from-hand: the hand they appear from).
+  const hand=Number(state.room?.handNumber)||1;for(const button of menu.querySelectorAll('[data-from-hand]'))button.hidden=hand<Number(button.dataset.fromHand);
   closeMatchChat();menu.classList.remove('hidden');chatHold.open=true;chatHold.suppressClick=true;navigator.vibrate?.(12);
 }
 function closeChatHoldMenu(){

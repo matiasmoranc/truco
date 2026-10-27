@@ -363,14 +363,14 @@ test('Knowing the rival declared 37 and threw a common 4 lowers the hard bot win
  const hard=c.assessBotHand(room,hand,'hard',{},seeded()).chance,blind=c.assessBotHand(room,hand,'normal',{},seeded()).chance;
  assert.ok(hard<blind-0.1,'hard '+hard+' vs blind '+blind);
 });
-test('"Falta envido y truco!" shows in the quick messages only from the second round, and quick messages with a clip play it',()=>{
- const buttons=[{dataset:{fromRound:'2'},hidden:true}],menu={style:{},classList:{remove(){}},querySelectorAll:()=>buttons};
- const c={$:id=>id==='chat-hold-menu'?menu:{getBoundingClientRect:()=>({bottom:0,right:0})},innerWidth:400,navigator:{},chatHold:{},matchChat:{},chatMuted:false,state:{room:{trickNo:1}},
+test('"Falta envido y truco!" shows in the quick messages only from the second hand, and quick messages with a clip play it',()=>{
+ const buttons=[{dataset:{fromHand:'2'},hidden:true}],menu={style:{},classList:{remove(){}},querySelectorAll:()=>buttons};
+ const c={$:id=>id==='chat-hold-menu'?menu:{getBoundingClientRect:()=>({bottom:0,right:0})},innerWidth:400,navigator:{},chatHold:{},matchChat:{},chatMuted:false,state:{room:{handNumber:1,trickNo:3}},
   chatAvailable:()=>true,peerChatMuted:()=>false,liveActionsBlocked:()=>false,closeMatchChat(){}};
  vm.createContext(c);vm.runInContext(extract('openChatHoldMenu'),c);
  c.openChatHoldMenu();assert.equal(buttons[0].hidden,true);
- c.state.room.trickNo=2;c.openChatHoldMenu();assert.equal(buttons[0].hidden,false);
- const played=[],s={CHAT_SOUNDS:null,soundEnabled:true,chatMuted:false,chatSound:src=>({play:()=>{played.push(src);return Promise.resolve();}})};
+ c.state.room.handNumber=2;c.state.room.trickNo=1;c.openChatHoldMenu();assert.equal(buttons[0].hidden,false);
+ const played=[],s={CHAT_SOUNDS:null,soundEnabled:true,chatMuted:false,startChatSound:src=>played.push(src)};
  vm.createContext(s);vm.runInContext(require('fs').readFileSync(require('path').join(__dirname,'..','app.js'),'utf8').match(/const CHAT_SOUNDS=[^\n]+\nconst chatSoundKey=[^\n]+/)[0].replace(/^const /gm,'var ')+'\n'+extract('playChatSound'),s);
  s.playChatSound('Andate Fernando!');s.playChatSound('Falta envido y truco!');s.playChatSound('Jajaja');
  assert.deepEqual(played,['assets/sounds/andate-fernando.mp3','assets/sounds/falta-envido-y-truco.mp3']);
