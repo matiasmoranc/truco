@@ -363,16 +363,18 @@ test('Knowing the rival declared 37 and threw a common 4 lowers the hard bot win
  const hard=c.assessBotHand(room,hand,'hard',{},seeded()).chance,blind=c.assessBotHand(room,hand,'normal',{},seeded()).chance;
  assert.ok(hard<blind-0.1,'hard '+hard+' vs blind '+blind);
 });
-test('"Falta envido y truco!" shows in the quick messages only from the second hand, and quick messages with a clip play it',()=>{
- const buttons=[{dataset:{fromHand:'2'},hidden:true}],menu={style:{},classList:{remove(){}},querySelectorAll:()=>buttons};
- const c={$:id=>id==='chat-hold-menu'?menu:{getBoundingClientRect:()=>({bottom:0,right:0})},innerWidth:400,navigator:{},chatHold:{},matchChat:{},chatMuted:false,state:{room:{handNumber:1,trickNo:3}},
-  chatAvailable:()=>true,peerChatMuted:()=>false,liveActionsBlocked:()=>false,closeMatchChat(){}};
- vm.createContext(c);vm.runInContext(extract('openChatHoldMenu'),c);
- c.openChatHoldMenu();assert.equal(buttons[0].hidden,true);
- c.state.room.handNumber=2;c.state.room.trickNo=1;c.openChatHoldMenu();assert.equal(buttons[0].hidden,false);
- const played=[],s={CHAT_SOUNDS:null,soundEnabled:true,chatMuted:false,startChatSound:src=>played.push(src)};
- vm.createContext(s);vm.runInContext(require('fs').readFileSync(require('path').join(__dirname,'..','app.js'),'utf8').match(/const CHAT_SOUNDS=[^\n]+\nconst chatSoundKey=[^\n]+/)[0].replace(/^const /gm,'var ')+'\n'+extract('playChatSound'),s);
- s.playChatSound('Andate Fernando!');s.playChatSound('Falta envido y truco!');s.playChatSound('Jajaja');
- assert.deepEqual(played,['assets/sounds/andate-fernando.mp3','assets/sounds/falta-envido-y-truco.mp3']);
- s.soundEnabled=false;s.playChatSound('Andate Fernando!');assert.equal(played.length,2);
+test('Sound messages show only when unlocked and switched on and nobody muted the chat; they play only for a sender with the level',()=>{
+ const buttons=[{dataset:{sound:'fernando'},hidden:true},{dataset:{sound:'falta'},hidden:true}],menu={style:{},classList:{remove(){}},querySelectorAll:()=>buttons};
+ const active=new Set(['fernando']),room={players:{player1:{uid:'a'},player2:{uid:'b'}},chatPreferences:{}};
+ const c={$:id=>id==='chat-hold-menu'?menu:{getBoundingClientRect:()=>({bottom:0,right:0})},innerWidth:400,navigator:{},chatHold:{},matchChat:{},chatMuted:false,state:{playerId:'player1',room},
+  roomSeats:()=>['player1','player2'],profiles:{soundActive:id=>active.has(id)},chatAvailable:()=>true,peerChatMuted:()=>false,liveActionsBlocked:()=>false,closeMatchChat(){}};
+ vm.createContext(c);vm.runInContext(extract('someoneMutedChat')+'\n'+extract('openChatHoldMenu'),c);
+ c.openChatHoldMenu();assert.deepEqual(buttons.map(b=>b.hidden),[false,true]);
+ active.add('falta');c.openChatHoldMenu();assert.deepEqual(buttons.map(b=>b.hidden),[false,false]);
+ room.chatPreferences.player2={muted:true,uid:'b'};c.openChatHoldMenu();assert.deepEqual(buttons.map(b=>b.hidden),[true,true]);
+ const played=[],levels={a:1,b:3},s={SOUND_MESSAGES:[{text:'Andate Fernando!',level:2,src:'f.mp3'},{text:'Falta envido y truco!',level:3,src:'t.mp3'}],soundEnabled:true,chatMuted:false,profiles:{levelNumber:uid=>levels[uid]??null},startChatSound:src=>played.push(src)};
+ vm.createContext(s);vm.runInContext(source.match(/const chatSoundKey=[^\n]+\r?\nconst CHAT_SOUNDS=[^\n]+/)[0].replace(/^const /gm,'var ')+'\n'+extract('playChatSound'),s);
+ s.playChatSound('Andate Fernando!','b');s.playChatSound('Falta envido y truco!','b');s.playChatSound('Andate Fernando!','a');s.playChatSound('Jajaja','b');
+ assert.deepEqual(played,['f.mp3','t.mp3']);
+ s.chatMuted=true;s.playChatSound('Andate Fernando!','b');assert.equal(played.length,2);
 });

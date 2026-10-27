@@ -124,3 +124,26 @@ function finishUserDeletion(root,{uid,requestId,now}){
 }
 module.exports.prepareUserDeletion=prepareUserDeletion;
 module.exports.finishUserDeletion=finishUserDeletion;
+
+// Levels as the game counts them (points in tenths): 3 points a level up to 5, 5 up to 10,
+// 8 up to 20 and 12 from 21 on; kept in step with levels.js.
+const pointsForLevel=level=>level<=5?30:level<=10?50:level<=20?80:120;
+function levelOfPoints(tenths){let level=1,left=tenths;while(left>=pointsForLevel(level)){left-=pointsForLevel(level);level++;}return level;}
+const describePoints=tenths=>'Nivel '+levelOfPoints(tenths)+' · '+(tenths/10).toLocaleString('es-UY',{maximumFractionDigits:1})+' puntos';
+// An administrator sets a player's total points (and so the level), with the reason on record.
+// expected: the points the administrator saw, so a game finished meanwhile is not overwritten.
+function adminSetPoints(root,{actor,uid,points,expected,requestId,reason,now}){
+ if(!validKey(actor)||!validKey(uid)||!validKey(requestId))throw new Error('Usuario inválido.');
+ if(typeof reason!=='string'||reason.trim().length<3||reason.length>200)throw new Error('Completá el motivo del cambio.');
+ if(!Number.isSafeInteger(points)||points<0||points>10000000)throw new Error('Puntos inválidos.');
+ const next=structuredClone(root||{}),receipt=next.adminUserAudit?.[requestId];
+ if(receipt){if(receipt.actor!==actor||receipt.uid!==uid||receipt.action!=='level'||receipt.points!==points)throw new Error('Solicitud reutilizada.');return next;}
+ if(next.userAccess?.[uid]?.deleting||next.userAccess?.[uid]?.deletedAt)throw new Error('La cuenta está siendo eliminada.');
+ const current=Number(next.levels?.[uid]?.points)||0;
+ if(expected!==undefined&&expected!==current)throw new Error('Los puntos cambiaron mientras editabas. Actualizá la lista y volvé a intentar.');
+ next.levels??={};next.levels[uid]={...(next.levels[uid]||{}),points};
+ next.adminUserAudit??={};next.adminUserAudit[requestId]={actor,uid,action:'level',before:describePoints(current),after:describePoints(points),points,reason:reason.trim(),at:now};
+ return next;
+}
+module.exports.adminSetPoints=adminSetPoints;
+module.exports.levelOfPoints=levelOfPoints;

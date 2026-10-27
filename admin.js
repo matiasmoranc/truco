@@ -1,7 +1,7 @@
 import {initializeApp} from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js';
 import {getAuth,onAuthStateChanged,GoogleAuthProvider,signInWithPopup,signOut,browserLocalPersistence,setPersistence} from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js';
 import {getFunctions,httpsCallable} from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-functions.js';
-import {levelFor} from './levels.js?v=20261027-house5';
+import {levelFor,pointsToReach} from './levels.js?v=20261027-sounds1';
 const $=id=>document.getElementById(id);
 const points=tenths=>(tenths/10).toLocaleString('es-UY',{maximumFractionDigits:1});
 // Level filter: "from-to" levels, empty for all.
@@ -23,17 +23,24 @@ const PLATFORM_LABELS={'app-ios':'App iPhone','app-android':'App Android','web-i
 const PAGE_LABELS={juego:'Juego',anotador:'Anotador',aprender:'Aprender a jugar',otra:'Reglas y otras'};
 const TAB_TITLES={metrics:'Resumen',visits:'Visitas',users:'Usuarios',tables:'Mesas y partidas',reports:'Problemas reportados',messages:'Mensajes a jugadores',audit:'Historial de cambios'};
 function errorText(e){return e.code==='functions/not-found'?'Falta publicar las funciones de administración en Firebase.':e.message||'No se pudo completar el cambio.';}
+const AUDIT_LABELS={level:'Cambio de nivel y puntos',rename:'Cambio de nombre',block:'Bloqueo',delete:'Eliminación de cuenta',credits:'Créditos','close-table':'Cierre de mesa','close-legacy-table':'Cierre de mesa','repair-reservation':'Reparación de reserva'};
 function node(tag,text,className){const el=document.createElement(tag);el.textContent=text;if(className)el.className=className;return el;}
 function button(text,handler){const el=node('button',text);if(text==='Eliminar usuario')el.classList.add('danger');el.type='button';el.addEventListener('click',handler);return el;}
 function openEdit(action,item){
  selection={action,item,requestId:crypto.randomUUID()};$('edit-error').textContent='';$('reason').value='';
- const credits=action==='credits',rename=action==='rename';
+ const credits=action==='credits',rename=action==='rename',level=action==='level';
+ $('level-fields').hidden=!level;$('level-value').required=$('points-value').required=level;
+ if(level){$('level-value').value=levelFor(item.points||0).level;$('points-value').value=(item.points||0)/10;showLevelPreview();}
  $('delete-label').hidden=action!=='delete';$('delete-confirm').required=action==='delete';$('delete-confirm').value='';
- $('edit-title').textContent=action==='delete'?'Eliminar usuario':credits?'Editar créditos':rename?'Cambiar nombre':action==='block'?(item.disabled?'Desbloquear usuario':'Bloquear usuario'):'Cerrar mesa';
+ $('edit-title').textContent=action==='delete'?'Eliminar usuario':credits?'Editar créditos':rename?'Cambiar nombre':action==='block'?(item.disabled?'Desbloquear usuario':'Bloquear usuario'):level?'Cambiar nivel y puntos':'Cerrar mesa';
  $('edit-description').textContent=action==='delete'?'Se eliminará la cuenta de '+(item.name||item.uid)+'. Si vuelve a registrarse, se creará una cuenta nueva. Sus partidas se conservan.':action==='close-table'?'Mesa '+item.code+'. Se cerrará para todos los jugadores.':(item.name||item.email||item.uid);
  $('value-label').hidden=!credits&&!rename;$('value').required=credits||rename;$('value').type=credits?'number':'text';$('value').min='0';$('value').max='1000000000';$('value').step='1';$('value').maxLength=18;$('value').value=credits?item.balance:rename?item.name:'';
  $('edit').showModal();
 }
+// Level and points move together: a level starts at its first point, the points show their level.
+function showLevelPreview(){const tenths=Math.round(Number($('points-value').value||0)*10),info=levelFor(tenths);$('level-preview').textContent='Quedará en nivel '+info.level+' con '+points(info.points)+' de '+points(info.need)+' puntos para el siguiente.';}
+$('level-value').oninput=()=>{const level=Math.max(1,Math.floor(Number($('level-value').value)||1));$('points-value').value=pointsToReach(level)/10;showLevelPreview();};
+$('points-value').oninput=()=>{$('level-value').value=levelFor(Math.round(Number($('points-value').value||0)*10)).level;showLevelPreview();};
 function renderUsers(){
  const expanded=new Set([...$('user-list').querySelectorAll('details[open]')].map(el=>el.dataset.uid));
  const query=$('search').value.toLocaleLowerCase();$('user-list').replaceChildren();
@@ -51,7 +58,7 @@ function renderUsers(){
   const name=node('span',u.name||'Sin nombre','user-name');if(tests.has(u.uid))name.append(node('em','Prueba','test-badge'));
   summary.append(name,node('span',u.email||'Sin correo','user-mail'),node('strong',String(levelFor(u.points||0).level),'num'),node('span',points(u.points||0),'num reserved'),node('span',String(u.finished||0),'num tables'),state,node('span',new Date(u.createdAt).toLocaleDateString('es-UY'),'joined'));card.append(summary);
   const detail=node('div','','user-detail');detail.append(node('small','UID: '+u.uid),node('small','Correo: '+(u.email||'Sin correo')),node('small','Nivel '+levelFor(u.points||0).level+' · '+points(u.points||0)+' puntos · Registro '+new Date(u.createdAt).toLocaleDateString('es-UY')));card.append(detail);
-  const actions=node('div','','actions');actions.append(button('Cambiar nombre',()=>openEdit('rename',u)),button(u.disabled?'Desbloquear':'Bloquear',()=>openEdit('block',u)),button('Eliminar usuario',()=>openEdit('delete',u)),button(tests.has(u.uid)?'Quitar de prueba':'Marcar como prueba',()=>setTestUser(u,!tests.has(u.uid))),button('Escribir mensaje',()=>writeTo(u)));detail.append(actions);$('user-list').append(card);
+  const actions=node('div','','actions');actions.append(button('Cambiar nombre',()=>openEdit('rename',u)),button('Cambiar nivel y puntos',()=>openEdit('level',u)),button(u.disabled?'Desbloquear':'Bloquear',()=>openEdit('block',u)),button('Eliminar usuario',()=>openEdit('delete',u)),button(tests.has(u.uid)?'Quitar de prueba':'Marcar como prueba',()=>setTestUser(u,!tests.has(u.uid))),button('Escribir mensaje',()=>writeTo(u)));detail.append(actions);$('user-list').append(card);
  }
  if(!$('user-list').children.length)$('user-list').append(node('p','No hay usuarios para mostrar.','empty'));
  $('more').hidden=!pageToken;
@@ -80,7 +87,7 @@ async function refresh(more=false,preservePages=false){
   $('reports-count').hidden=!data.reports?.length;$('reports-count').textContent=data.reports?.length||'';
   $('kpi-tables').textContent=number(data.tables?.length||0);$('kpi-tables-note').textContent=(data.alerts?.length?data.alerts.length+' reservas por revisar':'En curso o esperando rival');
   $('audit-list').replaceChildren();for(const a of data.audit){
-   const card=node('article','','card');card.append(node('h3',a.action),node('p',a.reason),node('p',a.uid||a.code||''),node('small',new Date(a.at).toLocaleString('es-UY')),node('small','Administrador: '+a.actor));
+   const card=node('article','','card');card.append(node('h3',AUDIT_LABELS[a.action]||a.action),node('p',a.reason),node('p',a.uid||a.code||''),node('small',new Date(a.at).toLocaleString('es-UY')),node('small','Administrador: '+a.actor));
    if(a.before!==undefined)card.append(node('p',String(a.before)+' → '+String(a.after)));$('audit-list').append(card);
   }await refreshMetrics();await loadMessages();say('');
   $('updated').textContent='Actualizado '+new Intl.DateTimeFormat('es-UY',{timeZone:'America/Montevideo',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date());
@@ -199,7 +206,7 @@ $('edit-form').onsubmit=async event=>{
  event.preventDefault();if(!selection||$('save').disabled)return;
  const {action,item,requestId}=selection;const data={action,requestId,reason:$('reason').value.trim()};
  if(action==='close-table')data.code=item.code;
- else{data.uid=item.uid;if(action==='credits'){data.balance=Number($('value').value);data.expectedBalance=item.balance;}if(action==='rename')data.name=$('value').value.trim();if(action==='block')data.disabled=!item.disabled;if(action==='delete')data.confirmName=$('delete-confirm').value;}
+ else{data.uid=item.uid;if(action==='credits'){data.balance=Number($('value').value);data.expectedBalance=item.balance;}if(action==='rename')data.name=$('value').value.trim();if(action==='block')data.disabled=!item.disabled;if(action==='level'){data.points=Math.round(Number($('points-value').value)*10);data.expected=item.points||0;}if(action==='delete')data.confirmName=$('delete-confirm').value;}
  $('save').disabled=true;$('edit-error').textContent='';
  try{await call(data);$('edit').close();say('Cambio guardado.');await refresh();}catch(e){$('edit-error').textContent=errorText(e);}finally{$('save').disabled=false;}
 };

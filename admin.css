@@ -211,3 +211,6 @@ textarea:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 .bubble.mine{justify-self:end;background:#e8c9831a;border-color:#e8c98344}
 .bubble.theirs{justify-self:start;background:var(--surface-2)}
 .thread-reply{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:end}.thread-reply textarea{margin:0}.thread-reply .thread-error{grid-column:1/-1}
+
+/* Level and points editor. */
+.level-fields{display:grid;grid-template-columns:1fr 1fr;gap:10px}.level-fields[hidden]{display:none}.level-fields small{grid-column:1/-1;color:var(--muted,#9fb3a8)}

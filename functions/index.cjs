@@ -182,7 +182,7 @@ const {getAuth}=require('firebase-admin/auth');
 const adminMessages=require('./admin-messages.cjs');
 const alertAdmin=require('./social.cjs').adminAlerter(db);
 const pushToPlayer=require('./social.cjs').pushSender(db);
-const {pastWins,finishedTables,tableEvents,requireAdmin,adminLedgerChange,validKey,prepareUserDeletion,finishUserDeletion,legacyTableActive,closeLegacyTable,adminTableCurrent}=require('./admin-service.cjs');
+const {pastWins,finishedTables,tableEvents,requireAdmin,adminLedgerChange,validKey,prepareUserDeletion,finishUserDeletion,legacyTableActive,closeLegacyTable,adminTableCurrent,adminSetPoints}=require('./admin-service.cjs');
 async function adminIdentity(request){
  const uid=request.auth?.uid;
  if(!uid)throw new HttpsError('unauthenticated','Iniciá sesión primero.');
@@ -391,6 +391,13 @@ exports.adminConsole=onCall({...options,secrets:[liveInternalSecret]},async requ
    root.adminUserAudit??={};root.adminUserAudit[data.requestId]={actor,uid:data.uid,action:'rename',before:old||null,after:data.name,reason:data.reason,at:Date.now()};return root;
   });
   if(!r.committed)throw new HttpsError('failed-precondition',failure||'No se pudo cambiar el nombre.');return {ok:true};
+ }
+ if(action==='level'){
+  if(!validKey(data.uid)||!validKey(data.requestId))throw new HttpsError('invalid-argument','Usuario inválido.');
+  await getAuth().getUser(data.uid);let failure;
+  await db.ref().get();
+  const r=await db.ref().transaction(root=>{failure=null;if(!root)return undefined;try{return adminSetPoints(root,{...data,actor,now:Date.now()});}catch(error){failure=error.message;return undefined;}});
+  if(!r.committed)throw new HttpsError('failed-precondition',failure||'No se pudo cambiar el nivel.');return {ok:true};
  }
  if(action==='block'){
   if(!validKey(data.uid)||typeof data.disabled!=='boolean'||typeof data.reason!=='string'||data.reason.trim().length<3||data.reason.length>200||!validKey(data.requestId))throw new HttpsError('invalid-argument','Usuario o motivo inválido.');

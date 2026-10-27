@@ -10,7 +10,7 @@ import { initializeGameAuth } from './auth-init.js?v=20261016-android-google';
 import {installTeamTable,TEAM_SEATS,playerTeam,positionDealerDeck,renderTeamLobbySeats,renderWaitingSeats} from './team-table-ui.js?v=20261026-flor1';
 import {createLiveTables,LiveError} from './live-tables.js?v=20261025-close1';
 import {installMatchPhoto} from './share-photo.js?v=20261026-people1';
-import {installProfiles} from './profile-level.js?v=20261027-house5';
+import {installProfiles,SOUND_MESSAGES} from './profile-level.js?v=20261027-sounds1';
 const FIREBASE_VERSION = '12.4.0';
 const $ = (id) => document.getElementById(id);
 const views = ['welcome-view', 'invite-view', 'setup-view', 'waiting-view', 'game-view', 'config-view', 'learn-view', 'scorer-view', 'friends-view'];
@@ -230,7 +230,7 @@ function syncMatchChat(){
       if(!chatMuted&&!matchChat.open&&$('game-view').classList.contains('active'))showChatNotice(message);
       continue;
     }
-    playChatSound(message.text);
+    playChatSound(message.text,state.room.players?.[message.sender]?.uid);
     if(!matchChat.open&&!chatMuted)matchChat.unread++;
     if(!chatMuted&&!matchChat.open&&$('game-view').classList.contains('active'))showChatNotice(message);
   }
@@ -257,7 +257,7 @@ async function sendMatchChat(event,preset){
   matchChat.sending=true;$('chat-send').disabled=true;$('chat-error').classList.add('hidden');
   // Close at once and show the message the way the rival sees it; the server copy is then skipped.
   const own={id:`local-${Date.now()}`,sender,text};matchChat.pendingOwn.push(own);
-  closeMatchChat();const dismissOwn=showChatNotice(own);playChatSound(text);
+  closeMatchChat();const dismissOwn=showChatNotice(own);playChatSound(text,state.uid);
   if(preset==null){input.value='';$('chat-count').textContent='0/40';}
   try{
     if(state.room?.managedCredits){await creditCommand({kind:'chat',text});return;}
@@ -467,8 +467,8 @@ function unlockVoice(){
   }catch(error){console.warn('[truco:voice] unlock failed',error);}
 }
 // Quick messages with their own audio clip, heard by the whole table when the voice is on.
-const CHAT_SOUNDS={'andate fernando':'assets/sounds/andate-fernando.mp3','falta envido y truco':'assets/sounds/falta-envido-y-truco.mp3'};
 const chatSoundKey=text=>String(text||'').toLocaleLowerCase('es').replace(/[^a-záéíóúñ ]/g,'').trim();
+const CHAT_SOUNDS=Object.fromEntries(SOUND_MESSAGES.map(sound=>[chatSoundKey(sound.text),sound]));
 // The clips play through Web Audio: iOS only lets sound start from a gesture, so every tap
 // resumes the context (iOS also suspends it in the background) and the clips are decoded ahead.
 let chatAudioContext=null;const chatBuffers=new Map();
@@ -481,17 +481,21 @@ function loadChatSound(src){
 function unlockChatSounds(){
   const ctx=chatContext();if(!ctx)return;
   if(ctx.state!=='running'){ctx.resume().catch(()=>{});const silent=ctx.createBufferSource();silent.buffer=ctx.createBuffer(1,1,22050);silent.connect(ctx.destination);silent.start(0);}
-  for(const src of Object.values(CHAT_SOUNDS))loadChatSound(src).catch(()=>{});
+  for(const sound of Object.values(CHAT_SOUNDS))loadChatSound(sound.src).catch(()=>{});
 }
 function startChatSound(src){
   const ctx=chatContext();
   if(!ctx){new Audio(src).play().catch(()=>{});return;}
   loadChatSound(src).then(buffer=>{if(ctx.state!=='running')ctx.resume().catch(()=>{});const source=ctx.createBufferSource();source.buffer=buffer;source.connect(ctx.destination);source.start(0);}).catch(()=>{});
 }
-function playChatSound(text){
-  const src=CHAT_SOUNDS[chatSoundKey(text)];if(!src||!soundEnabled||chatMuted)return;
-  startChatSound(src);
+// Anyone hears it (voice on, chat not muted); it plays only if the sender's level has it.
+function playChatSound(text,senderUid){
+  const sound=CHAT_SOUNDS[chatSoundKey(text)];if(!sound||!soundEnabled||chatMuted)return;
+  const level=senderUid?profiles.levelNumber(senderUid):null;if(level!=null&&level<sound.level)return;
+  startChatSound(sound.src);
 }
+// A rival (anyone else at the table) who muted the chat gets no sound messages.
+function someoneMutedChat(room=state.room){return roomSeats().some(p=>{if(p===state.playerId)return false;const preference=room?.chatPreferences?.[p];return !!(preference?.muted&&preference.uid===room?.players?.[p]?.uid);});}
 let callNoticeTimer=null;
 const CALL_NOTICE_DURATION=4000;
 function spokenCall(text=''){
@@ -3692,8 +3696,8 @@ function openChatHoldMenu(){
   if(!chatAvailable()||chatMuted||peerChatMuted()||liveActionsBlocked()||matchChat.sending)return;
   const rect=$('chat-toggle').getBoundingClientRect(),menu=$('chat-hold-menu');
   menu.style.top=`${rect.bottom+8}px`;menu.style.right=`${Math.max(8,innerWidth-rect.right)}px`;
-  // Some messages only make sense later in the match (data-from-hand: the hand they appear from).
-  const hand=Number(state.room?.handNumber)||1;for(const button of menu.querySelectorAll('[data-from-hand]'))button.hidden=hand<Number(button.dataset.fromHand);
+  // Sound messages: only once unlocked and switched on, and never to someone who muted the chat.
+  const muted=someoneMutedChat();for(const button of menu.querySelectorAll('[data-sound]'))button.hidden=muted||!profiles.soundActive(button.dataset.sound);
   closeMatchChat();menu.classList.remove('hidden');chatHold.open=true;chatHold.suppressClick=true;navigator.vibrate?.(12);
 }
 function closeChatHoldMenu(){

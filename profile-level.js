@@ -2,7 +2,7 @@
 // were, the level details with what each level unlocks, the icon or photo of every
 // player with its badge on the edge, and the "you went up a level" celebration.
 // Levels are written only by the table server; a player writes only its own avatar.
-import {levelFor,badgeFor,ICONS,PHOTO_LEVEL,unlocks,BADGES,houseLevel,houseIcon,pointsToReach} from './levels.js?v=20261027-house5';
+import {levelFor,badgeFor,ICONS,PHOTO_LEVEL,unlocks,BADGES,houseLevel,houseIcon,pointsToReach,SOUND_MESSAGES} from './levels.js?v=20261027-sounds1';
 
 // Profile icons and badges: pictures in assets/profile. The "gaucho" id is kept for
 // players who already chose it; it now shows the coat of arms of Uruguay.
@@ -41,6 +41,27 @@ export function installProfiles({$,document,services,getState,toast,onChange=()=
   return entry?.value||null;
  }
  const levelNumber=uid=>{const p=profileOf(uid);return p?levelOf(p.points).level:null;};
+ // Sound messages: unlocked by level, switched on by the player on this device.
+ const soundKey=id=>'truco-sound-'+getState().uid+'-'+id;
+ const soundSwitchedOn=id=>{try{return localStorage.getItem(soundKey(id))==='on';}catch{return false;}};
+ const switchSound=(id,on)=>{try{localStorage.setItem(soundKey(id),on?'on':'off');}catch{}};
+ const soundActive=id=>{const sound=SOUND_MESSAGES.find(s=>s.id===id);return !!sound&&!!getState().uid&&levelOf(mine?.points).level>=sound.level&&soundSwitchedOn(id);};
+ // How to send one: hold the messages button during a game and let go on the message.
+ function showSoundHowTo(sound){
+  const dialog=document.createElement('dialog');dialog.className='credit-join-dialog sound-howto-dialog';
+  const items=[...SOUND_MESSAGES.filter(s=>s.id===sound.id||soundActive(s.id)).map(s=>s.text),'Buena jugada!','Jajaja','Que suerte'],target=items.indexOf(sound.text);
+  dialog.innerHTML=`<h2>¡Activaste un audio!</h2><p class="level-dialog-note">Así se lo mandás a tu rival durante la partida:</p>
+   <div class="sound-howto-demo" style="--item:${target}"><div class="demo-bar"><span>Mesa</span><i class="demo-chat"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v12H9l-5 4V4Z"/><path d="M8 8h8M8 12h5"/></svg></i></div>
+   <div class="demo-menu">${items.map((t,i)=>`<b class="${i===target?'demo-target':''}">${escapeAttr(t)}</b>`).join('')}</div>
+   <div class="demo-sent">🔊 ${escapeAttr(sound.text)}</div><span class="demo-finger" aria-hidden="true">👆</span></div>
+   <ol class="sound-howto-steps"><li>Dejá el dedo apretado en el botón de mensajes.</li><li>Sin soltar, deslizalo hasta <b>${escapeAttr(sound.text)}</b>.</li><li>Soltá: tu rival ve el mensaje y escucha el audio.</li></ol>
+   <p class="level-dialog-note">Si tu rival silenció los mensajes, no le llega y la opción no aparece.</p>
+   <button type="button" class="button primary">Entendido</button>`;
+  dialog.querySelector('.button').onclick=()=>dialog.close();dialog.onclose=()=>dialog.remove();
+  document.body.append(dialog);dialog.showModal();
+  // The finger goes to the real spots of this demo, whatever the dialog width.
+  const demo=dialog.querySelector('.sound-howto-demo'),w=demo.clientWidth;demo.style.setProperty('--chat-x',(w-12-19-17)+'px');demo.style.setProperty('--item-x',(w-10-95-17)+'px');
+ }
 
  // Header: the level number and its bar; the account button shows the avatar.
  function renderHeader(){
@@ -68,6 +89,14 @@ export function installProfiles({$,document,services,getState,toast,onChange=()=
   const list=$('level-unlocks');list.replaceChildren();
   for(const u of unlocks()){
    const got=info.level>=u.level,li=document.createElement('li');li.className='level-unlock'+(got?' unlocked':' locked');
+   if(u.kind==='sound'){
+    const sound=SOUND_MESSAGES.find(s=>s.id===u.id),on=got&&soundSwitchedOn(u.id);
+    li.innerHTML=`<span class="player-avatar unlock-avatar unlock-sound"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4Z"/><path d="M16 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14"/></svg></span><span class="unlock-name">${escapeAttr(u.name)}</span><span class="unlock-level${on?' in-use':''}">${got?(on?'Activo':''):'Nivel '+u.level}</span>`;
+    if(got){const b=document.createElement('button');b.type='button';b.className='unlock-photo-button'+(on?' secondary':'');b.textContent=on?'Desactivar':'Activar';
+     b.onclick=event=>{event.stopPropagation();switchSound(u.id,!on);renderDetails();if(!on)showSoundHowTo(sound);};
+     const tag=li.querySelector('.unlock-level');if(on)tag.after(b);else tag.replaceWith(b);}
+    list.append(li);continue;
+   }
    const chosen=u.kind==='icon'?!showsPhoto(p)&&(p.icon||'persona')===u.id:u.kind==='photo'?showsPhoto(p):shownBadge(p)?.id===u.id;
    const preview=u.kind==='icon'?`<span class="player-avatar unlock-avatar has-icon">${iconImg(u.id)}</span>`:u.kind==='badge'?`<span class="unlock-badge level-badge badge-${u.id}">${badgeImg(u.id)}</span>`:`<span class="player-avatar unlock-avatar"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="6" width="17" height="13" rx="2.5"/><circle cx="12" cy="12.5" r="3.5"/><path d="M8.5 6l1.5-2h4l1.5 2"/></svg></span>`;
    li.innerHTML=`${preview}<span class="unlock-name">${escapeAttr(u.name)}</span><span class="unlock-level${chosen?' in-use':''}">${got?(chosen?'En uso':'Usar'):'Nivel '+u.level}</span>`;
@@ -186,6 +215,6 @@ export function installProfiles({$,document,services,getState,toast,onChange=()=
  }
  function stop(){for(const off of unsubscribers)off?.();unsubscribers=[];listening=null;mine=null;renderHeader();}
  renderHeader();
- return {start,stop,avatarHtml,profileOf,levelNumber,mine:()=>mine,levelOf};
+ return {start,stop,avatarHtml,profileOf,levelNumber,mine:()=>mine,levelOf,soundActive};
 }
-export {ICONS,BADGES,PHOTO_LEVEL};
+export {ICONS,BADGES,PHOTO_LEVEL,SOUND_MESSAGES};

@@ -142,3 +142,17 @@ test('Past wins per person, for the starting levels, leave bots and house player
  assert.deepEqual(finishedTables({matches:{a:{status:'settled',players:{player1:{uid:'u1'},player2:{uid:'u2'}}},b:{status:'refunded',players:{player1:{uid:'u1'},player2:{uid:'u3'}}},c:{status:'settled',players:{player1:{uid:'u1'},player2:{uid:'house_X'}}},d:{status:'settled',players:{player1:{uid:'u2'},player2:{uid:'bot:player2'},player3:{uid:'u3'}}}}}),{u1:2,u2:2,u3:1});
  assert.deepEqual(pastWins({matches:{a:{status:'settled',winner:'u1'},b:{status:'settled',winner:'u1'},c:{status:'refunded',winner:'u2'},d:{status:'settled',winners:['u2','bot:player3']},e:{status:'settled',winner:'house_X'}}}),{u1:2,u2:1});
 });
+test('An administrator sets level points with the reason on record, never over a change made meanwhile',()=>{
+ const {adminSetPoints,levelOfPoints}=require('../functions/admin-service.cjs');
+ const root={levels:{a:{points:70,wins:7}}},change={actor:'owner',uid:'a',points:150,expected:70,requestId:'lv1',reason:'Compensación por un corte',now:5};
+ const next=adminSetPoints(root,change);
+ assert.equal(next.levels.a.points,150);assert.equal(next.levels.a.wins,7);assert.equal(root.levels.a.points,70);
+ assert.deepEqual(next.adminUserAudit.lv1,{actor:'owner',uid:'a',action:'level',before:'Nivel 3 · 7 puntos',after:'Nivel 6 · 15 puntos',points:150,reason:'Compensación por un corte',at:5});
+ assert.equal(adminSetPoints(next,change).levels.a.points,150);
+ assert.throws(()=>adminSetPoints(root,{...change,expected:60}),/cambiaron/);
+ assert.throws(()=>adminSetPoints(root,{...change,reason:'x'}),/motivo/);
+ assert.throws(()=>adminSetPoints(root,{...change,points:-1}),/inválidos/);
+ assert.throws(()=>adminSetPoints(next,{...change,points:200}),/reutilizada/);
+ assert.equal(adminSetPoints({},{...change,expected:0,requestId:'lv2'}).levels.a.points,150);
+ assert.deepEqual([0,29,30,120,150,350].map(levelOfPoints),[1,1,2,5,6,10]);
+});
