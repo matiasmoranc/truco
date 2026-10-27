@@ -2422,3 +2422,10 @@ input,textarea,[contenteditable=""],[contenteditable="true"]{-webkit-user-select
 @keyframes demo-pick{0%,60%{background:transparent;color:#f1f5ee}62%,76%{background:#e8c983;color:#15251b}78%,100%{background:transparent;color:#f1f5ee}}
 @keyframes demo-sent{0%,77%{opacity:0;transform:translateY(-8px) scale(.9)}81%,96%{opacity:1;transform:none}100%{opacity:0}}
 @media(prefers-reduced-motion:reduce){.sound-howto-demo{--loop:6s}}
+
+/* Level up: congratulations, the X in the corner and the way to the unlocks. */
+.level-up-dialog{position:relative;padding-top:28px}
+.level-up-dialog .level-up-x{position:absolute;top:12px;right:12px}
+.level-up-dialog p strong{color:#ead39b}
+.level-up-dialog #level-up-open{display:flex;align-items:center;justify-content:center;text-align:center}
+.level-up-dialog .level-up-x{border-radius:12px}

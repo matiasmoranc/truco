@@ -193,13 +193,11 @@ export function installProfiles({$,document,services,getState,toast,onChange=()=
  $('level-open').onclick=openDetails;
  $('level-close').onclick=()=>$('level-dialog').close();
  $('level-up-close').onclick=()=>$('level-up-dialog').close();
+ $('level-up-open').onclick=()=>{$('level-up-dialog').close();openDetails();};
 
- // Going up a level: a celebration with what it unlocked (once per level and device).
+ // Going up a level: congratulations and a way to the level details (once per level and device).
  function celebrate(previous,level){
-  const got=unlocks().filter(u=>u.level>previous&&u.level<=level);
   $('level-up-number').textContent=String(level);
-  $('level-up-unlocks').replaceChildren(...got.map(u=>{const li=document.createElement('li');li.textContent=u.name;return li;}));
-  $('level-up-unlocks').hidden=!got.length;
   if(!document.querySelector('dialog[open]'))$('level-up-dialog').showModal();
  }
  function seenLevel(uid,level){
