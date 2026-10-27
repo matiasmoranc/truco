@@ -2382,28 +2382,43 @@ input,textarea,[contenteditable=""],[contenteditable="true"]{-webkit-user-select
 
 /* Sound messages: the speaker in the level list and the "how to send it" demo. */
 .unlock-sound svg{width:22px;height:22px;fill:none;stroke:#e8c983;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
-.sound-howto-dialog{max-width:340px}
-.sound-howto-demo{position:relative;height:262px;margin:12px 0;border-radius:16px;background:radial-gradient(120% 90% at 50% 0%,#1b4a38,#0d2f23);overflow:hidden;--loop:5s}
-.sound-howto-demo .demo-bar{position:absolute;left:0;right:0;top:0;height:52px;display:flex;align-items:center;justify-content:space-between;padding:0 12px;border-bottom:1px solid #e8c98322;font-weight:700;color:#e8c983}
-.sound-howto-demo .demo-chat{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;border:1px solid #efebd766;background:#193b2b;animation:demo-press var(--loop) infinite}
+.sound-howto-dialog{width:min(92vw,340px)}
+.sound-howto-dialog .friends-head h2{margin:0;font-size:22px}
+.sound-howto-label{margin:6px 0 10px;color:#cbbf9f;font-weight:600}
+/* The demo: --loop is one round; it runs twice (finger, menu and all) and the window closes. */
+.sound-howto-demo{position:relative;height:300px;border-radius:16px;background:radial-gradient(120% 80% at 50% 40%,#1f5541,#123a2b 60%,#0b271d);overflow:hidden;--loop:4.6s;--runs:2}
+.sound-howto-demo *{animation-duration:var(--loop);animation-iteration-count:var(--runs);animation-fill-mode:both;animation-timing-function:ease-in-out}
+.sound-howto-demo .demo-bar{position:absolute;left:0;right:0;top:0;height:52px;display:flex;align-items:center;justify-content:space-between;padding:0 12px;background:#0d2a20cc;border-bottom:1px solid #e8c98322;font-weight:800;color:#e8c983;letter-spacing:.5px}
+.sound-howto-demo .demo-chat{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;border:1px solid #efebd766;background:#193b2b;animation-name:demo-press}
 .sound-howto-demo .demo-chat svg{width:20px;height:20px;fill:none;stroke:#f0eee2;stroke-width:1.8;stroke-linejoin:round}
-.sound-howto-demo .demo-menu{position:absolute;right:10px;top:58px;width:190px;padding:6px;display:flex;flex-direction:column;gap:4px;border:1px solid #d8e9df40;border-radius:16px;background:#143f32f2;box-shadow:0 10px 24px #00190f66;animation:demo-menu var(--loop) infinite}
+.sound-howto-demo .demo-card{position:absolute;width:38px;height:58px;border-radius:5px;background-color:#f5f0df;background-size:400% 100%;box-shadow:0 4px 10px #0007}
+.sound-howto-demo .demo-card.back{background-image:url(assets/tatu-dorso.webp);background-size:cover}
+.sound-howto-demo .r1{left:calc(50% - 62px);top:66px;transform:rotate(-6deg)}.sound-howto-demo .r2{left:calc(50% - 19px);top:62px}.sound-howto-demo .r3{left:calc(50% + 24px);top:66px;transform:rotate(6deg)}
+.sound-howto-demo .muestra{left:calc(50% - 19px);top:138px;transform:rotate(90deg)}
+.sound-howto-demo .m1{left:calc(50% - 66px);top:222px;transform:rotate(-8deg)}.sound-howto-demo .m2{left:calc(50% - 19px);top:216px}.sound-howto-demo .m3{left:calc(50% + 28px);top:222px;transform:rotate(8deg)}
+.sound-howto-demo .demo-menu{position:absolute;right:10px;top:58px;width:190px;padding:6px;display:flex;flex-direction:column;gap:4px;border:1px solid #d8e9df40;border-radius:16px;background:#143f32;box-shadow:0 10px 24px #00190f88;transform-origin:100% 0;animation-name:demo-menu}
 .sound-howto-demo .demo-menu b{display:block;height:33px;line-height:33px;padding:0 12px;border-radius:10px;font-size:13px;font-weight:600;color:#f1f5ee;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.sound-howto-demo .demo-menu b.demo-target{animation:demo-pick var(--loop) infinite}
-.sound-howto-demo .demo-sent{position:absolute;left:14px;bottom:14px;padding:9px 14px;border-radius:14px;background:#fff;color:#14301f;font-weight:800;font-size:14px;box-shadow:0 8px 18px #0007;animation:demo-sent var(--loop) infinite}
-.sound-howto-demo .demo-finger{position:absolute;left:0;top:0;font-size:34px;line-height:1;filter:drop-shadow(0 4px 6px #0008);animation:demo-finger var(--loop) infinite;pointer-events:none}
+.sound-howto-demo .demo-menu b.demo-target{animation-name:demo-pick}
+.sound-howto-demo .demo-sent{position:absolute;left:12px;top:64px;padding:9px 14px;border-radius:14px;background:#fff;color:#14301f;font-weight:800;font-size:14px;box-shadow:0 8px 18px #0007;animation-name:demo-sent}
+.sound-howto-demo .demo-finger,.sound-howto-demo .demo-hold{position:absolute;left:0;top:0;pointer-events:none}
+.sound-howto-demo .demo-finger{margin:-2px 0 0 -17px;font-size:34px;line-height:1;filter:drop-shadow(0 4px 6px #0008);animation-name:demo-finger}
+.sound-howto-demo .demo-hold{width:44px;height:44px;margin:-22px 0 0 -22px;border-radius:50%;border:3px solid #fff;background:#ffffff33;animation-name:demo-hold}
 @keyframes demo-finger{
- 0%{transform:translate(150px,210px);opacity:0}
+ 0%{transform:translate(calc(var(--chat-x) - 70px),250px);opacity:0}
  8%{opacity:1}
- 18%,32%{transform:translate(var(--chat-x,256px),34px) scale(1)}
- 22%,28%{transform:translate(var(--chat-x,256px),34px) scale(.88)}
- 58%,70%{transform:translate(var(--item-x,150px),calc(70px + var(--item) * 37px)) scale(.88)}
- 76%{transform:translate(var(--item-x,150px),calc(70px + var(--item) * 37px)) scale(1);opacity:1}
- 90%,100%{transform:translate(var(--item-x,150px),calc(70px + var(--item) * 37px));opacity:0}}
-@keyframes demo-press{0%,20%{box-shadow:0 0 0 0 #e8c98300}26%,72%{box-shadow:0 0 0 6px #e8c98355}78%,100%{box-shadow:0 0 0 0 #e8c98300}}
-@keyframes demo-menu{0%,29%{opacity:0;transform:scale(.92)}33%,72%{opacity:1;transform:scale(1)}76%,100%{opacity:0;transform:scale(.96)}}
-@keyframes demo-pick{0%,56%{background:transparent;color:#f1f5ee}58%,74%{background:#e8c983;color:#15251b}76%,100%{background:transparent;color:#f1f5ee}}
-@keyframes demo-sent{0%,76%{opacity:0;transform:translateY(10px)}80%,96%{opacity:1;transform:none}100%{opacity:0}}
-@media(prefers-reduced-motion:reduce){.sound-howto-demo *{animation-duration:0s!important}}
-.sound-howto-steps{margin:0 0 10px;padding-left:20px;display:grid;gap:6px;text-align:left;font-size:15px;line-height:1.35}
-.sound-howto-dialog .button{display:flex;align-items:center;justify-content:center;width:100%;min-height:48px;border:0;border-radius:14px;font:inherit;font-weight:700}
+ 20%,40%{transform:translate(var(--chat-x),26px) scale(1)}
+ 24%,36%{transform:translate(var(--chat-x),26px) scale(.85)}
+ 62%,72%{transform:translate(var(--item-x),calc(80px + var(--item) * 37px)) scale(.85)}
+ 76%{transform:translate(var(--item-x),calc(80px + var(--item) * 37px)) scale(1);opacity:1}
+ 90%,100%{transform:translate(var(--item-x),calc(100px + var(--item) * 37px));opacity:0}}
+@keyframes demo-hold{
+ 0%,22%{transform:translate(var(--chat-x),26px) scale(.4);opacity:0}
+ 26%{opacity:1}
+ 26%,38%{transform:translate(var(--chat-x),26px) scale(1.25)}
+ 62%,72%{transform:translate(var(--item-x),calc(80px + var(--item) * 37px)) scale(1);opacity:1}
+ 76%,100%{transform:translate(var(--item-x),calc(80px + var(--item) * 37px)) scale(1.6);opacity:0}}
+@keyframes demo-press{0%,22%{box-shadow:0 0 0 0 #e8c98300;background:#193b2b}26%,74%{box-shadow:0 0 0 6px #e8c98355;background:#2b5a44}78%,100%{box-shadow:0 0 0 0 #e8c98300;background:#193b2b}}
+@keyframes demo-menu{0%,36%{opacity:0;transform:scale(.9)}40%,74%{opacity:1;transform:scale(1)}77%,100%{opacity:0;transform:scale(.96)}}
+@keyframes demo-pick{0%,60%{background:transparent;color:#f1f5ee}62%,76%{background:#e8c983;color:#15251b}78%,100%{background:transparent;color:#f1f5ee}}
+@keyframes demo-sent{0%,77%{opacity:0;transform:translateY(-8px) scale(.9)}81%,96%{opacity:1;transform:none}100%{opacity:0}}
+@media(prefers-reduced-motion:reduce){.sound-howto-demo{--loop:6s}}

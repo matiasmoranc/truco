@@ -46,21 +46,24 @@ export function installProfiles({$,document,services,getState,toast,onChange=()=
  const soundSwitchedOn=id=>{try{return localStorage.getItem(soundKey(id))==='on';}catch{return false;}};
  const switchSound=(id,on)=>{try{localStorage.setItem(soundKey(id),on?'on':'off');}catch{}};
  const soundActive=id=>{const sound=SOUND_MESSAGES.find(s=>s.id===id);return !!sound&&!!getState().uid&&levelOf(mine?.points).level>=sound.level&&soundSwitchedOn(id);};
- // How to send one: hold the messages button during a game and let go on the message.
+ // How to send one: a little table where a finger holds the messages button, slides to the
+ // message and lets go; it plays twice and the window closes by itself.
  function showSoundHowTo(sound){
   const dialog=document.createElement('dialog');dialog.className='credit-join-dialog sound-howto-dialog';
   const items=[...SOUND_MESSAGES.filter(s=>s.id===sound.id||soundActive(s.id)).map(s=>s.text),'Buena jugada!','Jajaja','Que suerte'],target=items.indexOf(sound.text);
-  dialog.innerHTML=`<h2>¡Activaste un audio!</h2><p class="level-dialog-note">Así se lo mandás a tu rival durante la partida:</p>
-   <div class="sound-howto-demo" style="--item:${target}"><div class="demo-bar"><span>Mesa</span><i class="demo-chat"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v12H9l-5 4V4Z"/><path d="M8 8h8M8 12h5"/></svg></i></div>
+  const card=(file,col,cls)=>`<i class="demo-card ${cls}" style="background-image:url(assets/cards/${file}.jpg);background-position:${col/3*100}% 0"></i>`;
+  dialog.innerHTML=`<div class="friends-head"><h2>¡Activaste un audio!</h2><button class="icon-button" type="button" aria-label="Cerrar">×</button></div><p class="sound-howto-label">Cómo usarlo:</p>
+   <div class="sound-howto-demo" style="--item:${target}" aria-hidden="true"><div class="demo-bar"><span>Truco</span><i class="demo-chat"><svg viewBox="0 0 24 24"><path d="M4 4h16v12H9l-5 4V4Z"/><path d="M8 8h8M8 12h5"/></svg></i></div>
+   <div class="demo-table"><i class="demo-card back r1"></i><i class="demo-card back r2"></i><i class="demo-card back r3"></i>${card(2,1,'muestra')}${card(1,0,'m1')}${card(7,2,'m2')}${card(10,0,'m3')}</div>
    <div class="demo-menu">${items.map((t,i)=>`<b class="${i===target?'demo-target':''}">${escapeAttr(t)}</b>`).join('')}</div>
-   <div class="demo-sent">🔊 ${escapeAttr(sound.text)}</div><span class="demo-finger" aria-hidden="true">👆</span></div>
-   <ol class="sound-howto-steps"><li>Dejá el dedo apretado en el botón de mensajes.</li><li>Sin soltar, deslizalo hasta <b>${escapeAttr(sound.text)}</b>.</li><li>Soltá: tu rival ve el mensaje y escucha el audio.</li></ol>
-   <p class="level-dialog-note">Si tu rival silenció los mensajes, no le llega y la opción no aparece.</p>
-   <button type="button" class="button primary">Entendido</button>`;
-  dialog.querySelector('.button').onclick=()=>dialog.close();dialog.onclose=()=>dialog.remove();
+   <div class="demo-sent">🔊 ${escapeAttr(sound.text)}</div><span class="demo-hold"></span><span class="demo-finger">👆</span></div>`;
+  const close=()=>{if(dialog.open)dialog.close();};
+  dialog.querySelector('.icon-button').onclick=close;dialog.onclose=()=>dialog.remove();
+  dialog.onclick=event=>{if(event.target===dialog)close();};
   document.body.append(dialog);dialog.showModal();
   // The finger goes to the real spots of this demo, whatever the dialog width.
-  const demo=dialog.querySelector('.sound-howto-demo'),w=demo.clientWidth;demo.style.setProperty('--chat-x',(w-12-19-17)+'px');demo.style.setProperty('--item-x',(w-10-95-17)+'px');
+  const demo=dialog.querySelector('.sound-howto-demo'),w=demo.clientWidth;demo.style.setProperty('--chat-x',(w-12-19)+'px');demo.style.setProperty('--item-x',(w-10-95)+'px');
+  dialog.querySelector('.demo-finger').addEventListener('animationend',()=>setTimeout(close,400));
  }
 
  // Header: the level number and its bar; the account button shows the avatar.
