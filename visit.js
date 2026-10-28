@@ -44,10 +44,15 @@ export function recordVisit({fetch=globalThis.fetch,nav=globalThis.navigator,loc
  if(nav?.webdriver||/bot|crawl|spider|slurp|lighthouse|headless|Claude\//i.test(nav?.userAgent||''))return null;
  const day=uruguayDay(),first=storedDay()!==day;storeDay(day);
  const data={platform:visitPlatform(nav),page:visitPage(location?.pathname),first,ref:visitReferrer(location),...(testDevice()?{test:true}:{})};
- return fetch(ENDPOINT,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({data}),keepalive:true})
+ return visitRequest=fetch(ENDPOINT,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({data}),keepalive:true})
   .then(response=>response?.json?.()).then(body=>{const r=body?.result;if(r?.id&&r?.day)pendingVisit={visitId:r.id,visitDay:r.day};}).catch(()=>null);
 }
 // The visit that opened this page, handed once to the first signal after signing in.
-let pendingVisit=null;
-export function takeVisit(){const visit=pendingVisit;pendingVisit=null;return visit;}
+// In the app the session comes back before the visit is answered, so the first signal
+// waits for it a few seconds instead of going out without it.
+let pendingVisit=null,visitRequest=null;
+export async function takeVisit(wait=4000){
+ if(!pendingVisit&&visitRequest)await Promise.race([visitRequest,new Promise(done=>setTimeout(done,wait))]);
+ visitRequest=null;const visit=pendingVisit;pendingVisit=null;return visit;
+}
 recordVisit();

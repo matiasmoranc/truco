@@ -1,5 +1,5 @@
 import './chat-moderation.js?v=20261013-moderation1';
-import { visitPlatform,takeVisit,markTestDevice } from './visit.js?v=20261024-visits5';
+import { visitPlatform,takeVisit,markTestDevice } from './visit.js?v=20261028-visits6';
 import { installFriends } from './friends.js?v=20261027-friends3';
 import { installPlayerPanel } from './player-panel.js?v=20261013-blocklist1';
 import { installScorer,renderCompactTally } from './scorer.js?v=20261026-people1';
@@ -709,7 +709,7 @@ async function offerAppUpdate(){
   dialog.showModal();
 }
 setTimeout(()=>{offerAppUpdate().catch(()=>{});},3000);
-const activity=installActivity({send:async data=>{const result=await creditApi('playerActivity',{...data,platform:visitPlatform(),...(data.visible?takeVisit():null)});if(typeof result?.testDevice==='boolean')markTestDevice(result.testDevice);return result;},getUid:()=>state.uid,document});
+const activity=installActivity({send:async data=>{const result=await creditApi('playerActivity',{...data,platform:visitPlatform(),...(data.visible?await takeVisit():null)});if(typeof result?.testDevice==='boolean')markTestDevice(result.testDevice);return result;},getUid:()=>state.uid,document});
 // Coming from the scorer page (?anotador): sign in or create the account first, then the
 // scorer opens by itself, full screen.
 let scorerAfterSignIn=new URLSearchParams(location.search).has('anotador');
