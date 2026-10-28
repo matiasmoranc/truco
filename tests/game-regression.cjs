@@ -372,9 +372,10 @@ test('Sound messages show only when unlocked and switched on and nobody muted th
  c.openChatHoldMenu();assert.deepEqual(buttons.map(b=>b.hidden),[false,true]);
  active.add('falta');c.openChatHoldMenu();assert.deepEqual(buttons.map(b=>b.hidden),[false,false]);
  room.chatPreferences.player2={muted:true,uid:'b'};c.openChatHoldMenu();assert.deepEqual(buttons.map(b=>b.hidden),[true,true]);
- const played=[],levels={a:1,b:3},s={SOUND_MESSAGES:[{text:'Andate Fernando!',level:2,src:'f.mp3'},{text:'Falta envido y truco!',level:3,src:'t.mp3'}],soundEnabled:true,chatMuted:false,profiles:{levelNumber:uid=>levels[uid]??null},startChatSound:src=>played.push(src)};
+ const played=[],levels={a:1,b:3},s={SOUND_MESSAGES:[{text:'Andate Fernando!',level:2,src:'f.mp3'},{text:'Falta envido y truco!',level:3,src:'t.mp3'}],muted:false,chatSoundsMuted:()=>s.muted,chatMuted:false,profiles:{levelNumber:uid=>levels[uid]??null},startChatSound:src=>played.push(src)};
  vm.createContext(s);vm.runInContext(source.match(/const chatSoundKey=[^\n]+\r?\nconst CHAT_SOUNDS=[^\n]+/)[0].replace(/^const /gm,'var ')+'\n'+extract('playChatSound'),s);
  s.playChatSound('Andate Fernando!','b');s.playChatSound('Falta envido y truco!','b');s.playChatSound('Andate Fernando!','a');s.playChatSound('Jajaja','b');
  assert.deepEqual(played,['f.mp3','t.mp3']);
  s.chatMuted=true;s.playChatSound('Andate Fernando!','b');assert.equal(played.length,2);
+ s.chatMuted=false;s.muted=true;s.playChatSound('Andate Fernando!','b');assert.equal(played.length,2);
 });

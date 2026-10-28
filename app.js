@@ -452,8 +452,10 @@ const receivedCallNotices=new Map();
 let soundEnabled=localStorage.getItem('truco-call-sound')==='on';
 let voiceUnlocked=false;
 let activeVoiceUtterance=null;
+// The sound messages play unless the player turned the voice off on purpose (the voice itself starts off).
+const chatSoundsMuted=()=>{try{return localStorage.getItem('truco-call-sound')==='off';}catch{return false;}};
 function unlockVoice(){
-  if(soundEnabled)unlockChatSounds();
+  if(!chatSoundsMuted())unlockChatSounds();
   if(voiceUnlocked||!soundEnabled||!('speechSynthesis' in window))return;
   // Start a silent synthesis session directly inside the user's gesture on iOS.
   try{
@@ -483,14 +485,24 @@ function unlockChatSounds(){
   if(ctx.state!=='running'){ctx.resume().catch(()=>{});const silent=ctx.createBufferSource();silent.buffer=ctx.createBuffer(1,1,22050);silent.connect(ctx.destination);silent.start(0);}
   for(const sound of Object.values(CHAT_SOUNDS))loadChatSound(sound.src).catch(()=>{});
 }
+// iOS keeps web sounds quiet with the silent switch on; while a clip plays the page asks
+// for media playback (iOS 17+), and afterwards gives the sound back to the other apps.
+let chatClipsPlaying=0;
+function mediaSession(type){try{if(navigator.audioSession)navigator.audioSession.type=type;}catch{/* Not supported. */}}
 function startChatSound(src){
   const ctx=chatContext();
   if(!ctx){new Audio(src).play().catch(()=>{});return;}
-  loadChatSound(src).then(buffer=>{if(ctx.state!=='running')ctx.resume().catch(()=>{});const source=ctx.createBufferSource();source.buffer=buffer;source.connect(ctx.destination);source.start(0);}).catch(()=>{});
+  loadChatSound(src).then(buffer=>{
+    mediaSession('playback');
+    if(ctx.state!=='running')ctx.resume().catch(()=>{});
+    const source=ctx.createBufferSource();source.buffer=buffer;source.connect(ctx.destination);
+    chatClipsPlaying++;source.onended=()=>{if(--chatClipsPlaying===0)mediaSession('auto');};
+    source.start(0);
+  }).catch(()=>{});
 }
 // Anyone hears it (voice on, chat not muted); it plays only if the sender's level has it.
 function playChatSound(text,senderUid){
-  const sound=CHAT_SOUNDS[chatSoundKey(text)];if(!sound||!soundEnabled||chatMuted)return;
+  const sound=CHAT_SOUNDS[chatSoundKey(text)];if(!sound||chatSoundsMuted()||chatMuted)return;
   const level=senderUid?profiles.levelNumber(senderUid):null;if(level!=null&&level<sound.level)return;
   startChatSound(sound.src);
 }
