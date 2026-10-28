@@ -33,7 +33,7 @@ const root = path.resolve(__dirname, '..');
   const nativeHtml = path.join(root,'www/index.html');
   await fs.writeFile(nativeHtml,(await fs.readFile(nativeHtml,'utf8')).replace('viewport-fit=cover','viewport-fit=auto'));
   await fs.copyFile(path.join(root,'favicon.svg'), path.join(root,'www/favicon.svg'));
-  await Promise.all(['privacidad.html','soporte.html','eliminar-cuenta.html','reglas.html','legal.css','aprender-truco-uruguayo.html','anotador-de-truco.html','scorer.js','visit.js'].map(file=>fs.copyFile(path.join(root,file),path.join(root,'www',file))));
+  await Promise.all(['privacidad.html','soporte.html','eliminar-cuenta.html','reglas.html','legal.css','aprender-truco-uruguayo.html','cartas-truco-uruguayo.html','guia.css','anotador-de-truco.html','scorer.js','visit.js'].map(file=>fs.copyFile(path.join(root,file),path.join(root,'www',file))));
   // Code and the static pages load some images and videos by path at runtime
   // (card sprites, tutorial videos, page logos). Copy only what the packaged
   // files mention, so source photos and unused art stay out of the app.
