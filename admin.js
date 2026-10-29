@@ -2,6 +2,16 @@ import {initializeApp} from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-
 import {getAuth,onAuthStateChanged,GoogleAuthProvider,signInWithPopup,signOut,browserLocalPersistence,setPersistence} from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js';
 import {getFunctions,httpsCallable} from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-functions.js';
 import {levelFor,pointsToReach} from './levels.js?v=20261027-sounds1';
+// The same panel also reads Truco Argentino: its adminConsole answers the same actions.
+const GAMES={
+ uy:{label:'Truco Uruguayo',zone:'America/Montevideo'},
+ ar:{label:'Truco Argentino',zone:'America/Argentina/Buenos_Aires',config:{apiKey:'AIzaSyC7NKRqDT_R4Uu9pOGyq7cU5C_z-FwHq3o',authDomain:'truco-argentino-ar.firebaseapp.com',databaseURL:'https://truco-argentino-ar-default-rtdb.firebaseio.com',projectId:'truco-argentino-ar',storageBucket:'truco-argentino-ar.firebasestorage.app',messagingSenderId:'275278687284',appId:'1:275278687284:web:f5a7b01ba97d7ed565ae61'}}
+};
+const GAME=new URLSearchParams(location.search).get('juego')==='ar'?'ar':'uy',ZONE=GAMES[GAME].zone;
+document.title='Administración · '+GAMES[GAME].label;
+for(const label of document.querySelectorAll('.game-name'))label.textContent=GAMES[GAME].label.toUpperCase();
+document.getElementById('page-kicker').textContent=GAMES[GAME].label+' · Administración';
+for(const picker of document.querySelectorAll('.game-picker')){picker.value=GAME;picker.onchange=()=>{location.search=picker.value==='ar'?'?juego=ar':'';};}
 const $=id=>document.getElementById(id);
 const points=tenths=>(tenths/10).toLocaleString('es-UY',{maximumFractionDigits:1});
 // Level filter: "from-to" levels, empty for all.
@@ -120,7 +130,7 @@ async function refresh(more=false,preservePages=false){
    const card=node('article','','card');card.append(node('h3',AUDIT_LABELS[a.action]||a.action),node('p',a.reason),node('p',a.uid||a.code||''),node('small',new Date(a.at).toLocaleString('es-UY')),node('small','Administrador: '+a.actor));
    if(a.before!==undefined)card.append(node('p',String(a.before)+' → '+String(a.after)));$('audit-list').append(card);
   }await refreshMetrics();await loadMessages();say('');
-  $('updated').textContent='Actualizado '+new Intl.DateTimeFormat('es-UY',{timeZone:'America/Montevideo',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date());
+  $('updated').textContent='Actualizado '+new Intl.DateTimeFormat('es-UY',{timeZone:ZONE,hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date());
  }catch(e){if(generation===epoch)say(errorText(e));}finally{busy=false;$('more').disabled=false;$('user-scope').disabled=false;for(const b of document.querySelectorAll('[data-scope]'))b.disabled=false;}
 }
 // Tables created by players and games finished in the chosen period (Uruguay days);
@@ -171,7 +181,7 @@ function formatTableTime(value){
  if(!value)return 'Sin fecha registrada';
  const date=new Date(value);
  if(!Number.isFinite(date.getTime()))return 'Sin fecha registrada';
- return new Intl.DateTimeFormat('es-UY',{timeZone:'America/Montevideo',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:false}).format(date);
+ return new Intl.DateTimeFormat('es-UY',{timeZone:ZONE,day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:false}).format(date);
 }
 function sortedTables(list){
  const order=$('table-order').value;
@@ -296,7 +306,7 @@ function renderHours(){
 }
 const addDays=(day,n)=>new Date(Date.parse(day+'T12:00:00Z')+n*86400000).toISOString().slice(0,10);
 const longDay=day=>new Intl.DateTimeFormat('es-UY',{weekday:'short',day:'2-digit',month:'2-digit',timeZone:'UTC'}).format(new Date(day+'T12:00:00Z'));
-const visitTime=at=>new Intl.DateTimeFormat('es-UY',{timeZone:'America/Montevideo',day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(at));
+const visitTime=at=>new Intl.DateTimeFormat('es-UY',{timeZone:ZONE,day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(at));
 let visitDetail=null,visitDetailRequest=0,visitGrouped=false;
 // Opens the Visits section on one day or the current period, with a platform or page detail.
 function goVisits({day=null,platform='all',page=null,measure=null}={}){
@@ -345,7 +355,7 @@ function renderVisits(){
  const periodDays=[];for(let d=from;d<=to;d=addDays(d,1))periodDays.push(d);
  // The most players connected at once each day of the period, and the record day.
  const concurrentByDay=new Map((metrics?.days||[]).map(d=>[d.day,d.concurrent]));
- const peakTime=at=>at?new Intl.DateTimeFormat('es-UY',{timeZone:'America/Montevideo',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(at)):'';
+ const peakTime=at=>at?new Intl.DateTimeFormat('es-UY',{timeZone:ZONE,hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(at)):'';
  const periodPeaks=periodDays.map(d=>({day:d,peak:concurrentByDay.get(d)||null}));
  columns($('concurrent-chart'),periodPeaks.map(({day,peak})=>({label:shortDay(day),value:peak?.count||0,tooltip:shortDay(day)+' · '+(peak?.count||0)+' a la vez'+(peak?.at?' (a las '+peakTime(peak.at)+')':'')})),{labelEvery:Math.max(1,Math.ceil(periodDays.length/12))});
  const best=periodPeaks.reduce((a,b)=>(b.peak?.count||0)>(a?.peak?.count||0)?b:a,null),record=metrics?.concurrentRecord;
@@ -495,7 +505,8 @@ $('message-form').onsubmit=async event=>{
 };
 async function start(){
  try{
-  let config;try{config=(await import('./firebase-config.js')).firebaseConfig;}catch{config=JSON.parse(localStorage.getItem('truco-firebase-config')||'null');}
+  let config=GAMES[GAME].config;
+  if(!config)try{config=(await import('./firebase-config.js')).firebaseConfig;}catch{config=JSON.parse(localStorage.getItem('truco-firebase-config')||'null');}
   if(!config)throw new Error('Abrí el juego primero para cargar su configuración.');
   auth=getAuth(initializeApp(config));call=httpsCallable(getFunctions(auth.app,'us-central1'),'adminConsole');
   await setPersistence(auth,browserLocalPersistence);

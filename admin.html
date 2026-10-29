@@ -1,11 +1,12 @@
 <!doctype html>
 <html lang="es"><head><meta charset="utf-8">
-  <meta name="robots" content="noindex, nofollow"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Administración · Truco Uruguayo</title><link rel="stylesheet" href="admin.css?v=20"></head>
+  <meta name="robots" content="noindex, nofollow"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Administración · Truco Uruguayo</title><link rel="stylesheet" href="admin.css?v=21"></head>
 <body>
-<section id="access" class="access"><div class="access-card"><img src="assets/truco-v3.png" alt=""><small>TRUCO URUGUAYO</small><h1>Administración</h1><p id="identity"></p><p id="access-status">Verificando sesión…</p><button id="login" class="primary" hidden>Continuar con Google</button><button id="switch-account" hidden>Usar otra cuenta</button><a href="./">Volver al juego</a></div></section>
+<section id="access" class="access"><div class="access-card"><img src="assets/truco-v3.png" alt=""><small class="game-name">TRUCO URUGUAYO</small><h1>Administración</h1><select class="game-picker" aria-label="Juego"><option value="uy">Truco Uruguayo</option><option value="ar">Truco Argentino</option></select><p id="identity"></p><p id="access-status">Verificando sesión…</p><button id="login" class="primary" hidden>Continuar con Google</button><button id="switch-account" hidden>Usar otra cuenta</button><a href="./">Volver al juego</a></div></section>
 <div id="console" class="shell" hidden>
  <aside class="sidebar">
-  <a class="brand" href="./" title="Volver al juego"><img src="assets/truco-v3.png" alt=""><span><small>TRUCO URUGUAYO</small>Administración</span></a>
+  <a class="brand" href="./" title="Volver al juego"><img src="assets/truco-v3.png" alt=""><span><small class="game-name">TRUCO URUGUAYO</small>Administración</span></a>
+  <select class="game-picker" aria-label="Juego"><option value="uy">Truco Uruguayo</option><option value="ar">Truco Argentino</option></select>
   <nav aria-label="Secciones">
    <button data-tab="metrics" class="active"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Resumen</button>
    <button data-tab="visits"><svg viewBox="0 0 24 24"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>Visitas</button>
@@ -87,4 +88,4 @@
  </main>
 </div>
 <dialog id="edit"><form id="edit-form"><div class="dialog-head"><h2 id="edit-title"></h2><button type="button" id="close" aria-label="Cerrar">×</button></div><p id="edit-description"></p><label id="value-label">Nuevo valor<input id="value" required></label><div id="level-fields" class="level-fields" hidden><label>Nivel<input id="level-value" type="number" min="1" max="200" step="1"></label><label>Puntos totales<input id="points-value" type="number" min="0" max="1000000" step="0.1"></label><small id="level-preview"></small></div><label id="delete-label" hidden>Escribí el nombre exacto para confirmar<input id="delete-confirm" autocomplete="off"></label><label>Motivo<input id="reason" required minlength="3" maxlength="200" placeholder="Por qué realizás este cambio"></label><p id="edit-error" role="alert"></p><div class="dialog-actions"><button id="cancel" type="button">Cancelar</button><button id="save" class="primary" type="submit">Confirmar cambio</button></div></form></dialog>
-<script type="module" src="admin.js?v=26"></script></body></html>
+<script type="module" src="admin.js?v=27"></script></body></html>

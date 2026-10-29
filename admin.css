@@ -224,3 +224,6 @@ textarea:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 .audience .audience-count{font-size:22px;line-height:1;text-align:right}
 .audience .audience-share{text-align:right;opacity:.75}
 .audience.active{outline:2px solid #e8c983;background:#e8c98322}
+/* Uruguayo / Argentino project picker */
+.game-picker{margin:0 0 16px;min-height:36px;font-weight:650}
+.access-card .game-picker{margin:4px 0 14px}
