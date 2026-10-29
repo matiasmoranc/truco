@@ -510,7 +510,10 @@ $('message-form').onsubmit=async event=>{
 // Each game loads as the default Firebase app of the page. Its session is saved under its
 // own key in this browser, so switching reloads the page but signs in only once per game.
 // (A second, named app in the same page never finished the Google popup sign-in.)
-function useGame(game){location.search=game==='ar'?'?juego=ar':'';}
+// Truco Argentino has its own panel on trucoargentino.net: signing in to another
+// project from this domain fails on iPhone and in some browsers.
+function useGame(game){if(game==='ar')location.href='https://trucoargentino.net/admin.html';}
+if(GAME==='ar')location.replace('https://trucoargentino.net/admin.html');
 async function start(){
  try{
   let config=GAMES[GAME].config;
