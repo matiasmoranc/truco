@@ -1,5 +1,5 @@
 import {initializeApp} from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js';
-import {getAuth,onAuthStateChanged,GoogleAuthProvider,signInWithPopup,signInWithCredential,signOut,browserLocalPersistence,setPersistence} from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js';
+import {getAuth,onAuthStateChanged,GoogleAuthProvider,signInWithPopup,signOut,browserLocalPersistence,setPersistence} from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js';
 import {getFunctions,httpsCallable} from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-functions.js';
 import {levelFor,pointsToReach} from './levels.js?v=20261027-sounds1';
 // The same panel also reads Truco Argentino: its adminConsole answers the same actions.
@@ -507,41 +507,21 @@ $('message-form').onsubmit=async event=>{
  catch(e){$('message-error').textContent=errorText(e);}
  finally{$('message-send').disabled=false;}
 };
-// Each game keeps its own Firebase session in this browser, so switching does not reload
-// the page nor ask to sign in again once both sessions exist.
-const sessions={};
-async function session(game){
- if(sessions[game])return sessions[game];
- let config=GAMES[game].config;
- if(!config)try{config=(await import('./firebase-config.js')).firebaseConfig;}catch{config=JSON.parse(localStorage.getItem('truco-firebase-config')||'null');}
- if(!config)throw new Error('Abrí el juego primero para cargar su configuración.');
- // The Uruguayan app keeps the default name so its saved session stays valid.
- const app=game==='uy'?initializeApp(config):initializeApp(config,game),gameAuth=getAuth(app);
- await setPersistence(gameAuth,browserLocalPersistence);
- return sessions[game]={auth:gameAuth,call:httpsCallable(getFunctions(app,'us-central1'),'adminConsole')};
-}
-let stopWatching=null;
-async function useGame(game){
- GAME=game==='ar'?'ar':'uy';showGame();
- history.replaceState(null,'',GAME==='ar'?'?juego=ar':location.pathname);
- try{
-  ({auth,call}=await session(GAME));
-  if(stopWatching)stopWatching();
-  stopWatching=onAuthStateChanged(auth,showSession);
- }catch(e){$('access-status').textContent=errorText(e);}
-}
-// One Google sign-in also tries the other game, so the same address opens both panels.
-async function login(){
- try{
-  const result=await signInWithPopup(auth,new GoogleAuthProvider()),token=GoogleAuthProvider.credentialFromResult(result)?.accessToken;
-  const other=await session(GAME==='ar'?'uy':'ar');
-  if(token&&!other.auth.currentUser)signInWithCredential(other.auth,GoogleAuthProvider.credential(null,token)).catch(()=>{});
- }catch(e){$('access-status').textContent=errorText(e);}
-}
+// Each game loads as the default Firebase app of the page. Its session is saved under its
+// own key in this browser, so switching reloads the page but signs in only once per game.
+// (A second, named app in the same page never finished the Google popup sign-in.)
+function useGame(game){location.search=game==='ar'?'?juego=ar':'';}
 async function start(){
- $('login').onclick=login;
- $('logout').onclick=$('switch-account').onclick=()=>signOut(auth);
- await useGame(GAME);
+ try{
+  let config=GAMES[GAME].config;
+  if(!config)try{config=(await import('./firebase-config.js')).firebaseConfig;}catch{config=JSON.parse(localStorage.getItem('truco-firebase-config')||'null');}
+  if(!config)throw new Error('Abrí el juego primero para cargar su configuración.');
+  auth=getAuth(initializeApp(config));call=httpsCallable(getFunctions(auth.app,'us-central1'),'adminConsole');
+  await setPersistence(auth,browserLocalPersistence);
+  $('login').onclick=async()=>{try{await signInWithPopup(auth,new GoogleAuthProvider());}catch(e){$('access-status').textContent=errorText(e);}};
+  $('logout').onclick=$('switch-account').onclick=()=>signOut(auth);
+  onAuthStateChanged(auth,showSession);
+ }catch(e){$('access-status').textContent=errorText(e);}
 }
 async function showSession(user){
  const generation=++epoch;pagesLoaded=1;userScope='all';$('user-scope').value='all';clearInterval(metricsTimer);metricsTimer=null;metrics=null;users=[];pageToken=null;$('console').hidden=true;$('access').hidden=false;$('logout').hidden=!user;$('switch-account').hidden=!user;$('login').hidden=!!user;
