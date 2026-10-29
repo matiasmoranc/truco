@@ -4602,11 +4602,13 @@ installPlayerPanel({document,api:creditApi,getState:()=>state});
 
 // Online features ask a guest to sign in first.
 $('guest-signin-open').addEventListener('click',()=>account.askSignIn());
+$('guest-online-signin').addEventListener('click',()=>{$('guest-online-dialog').close();account.askSignIn();});
+$('guest-online-bot').addEventListener('click',()=>$('guest-online-dialog').close());
 for(const id of ['open-friends','level-open'])$(id).addEventListener('click',event=>{if(!account.isGuest())return;event.stopImmediatePropagation();account.askSignIn();},true);
 
 // Visible choices keep the underlying values used by online and bot games.
 document.querySelectorAll('[data-table-mode]').forEach(button=>button.addEventListener('click',()=>{
-  if(account.isGuest()&&button.dataset.tableMode!=='bot'){account.askSignIn();return;}
+  if(account.isGuest()&&button.dataset.tableMode!=='bot'){$('guest-online-dialog').showModal();return;}
   $('play-bot').checked=button.dataset.tableMode==='bot';
   if(!$('play-bot').checked)$('table-mode').value=button.dataset.tableMode;
   $('table-mode').dispatchEvent(new Event('change'));
