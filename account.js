@@ -6,11 +6,15 @@ export function isAppleDevice(navigator=globalThis.navigator) {
   return /Mac|iPhone|iPad|iPod/i.test(platform)||/iPhone|iPad|iPod|Macintosh/i.test(ua);
 }
 
-export function installAccount({ api, services, getState, rememberName, document, storage=globalThis.localStorage, navigator=globalThis.navigator, onReady=()=>{}, onIdentityChange=()=>{}, onNameChanged=()=>{}, onRegistered=()=>{}, inRoom=()=>!!getState().room }) {
+export function installAccount({ api, services, getState, rememberName, document, storage=globalThis.localStorage, navigator=globalThis.navigator, onReady=()=>{}, onIdentityChange=()=>{}, onNameChanged=()=>{}, onRegistered=()=>{}, onGuest=()=>{}, guestAllowed=()=>true, inRoom=()=>!!getState().room }) {
   const el=id=>document.getElementById(id);
   let slowLoading=false;
   let busy=false, ready=false, profileKey=null, profilePromise=null, currentUser=null;
   let profileName='', readyUid=null, generation=0, loaded=false, startupPromise=Promise.resolve();
+  // Guests play without an account: practice, learning and the scorer. Online play asks to sign in.
+  let guest=false, autoNaming=false, nameHint='';
+  const guestSaved=()=>{try{return storage?.getItem('truco-guest')==='1';}catch{return false;}};
+  const saveGuest=on=>{try{on?storage?.setItem('truco-guest','1'):storage?.removeItem('truco-guest');}catch{}};
   const message=text=>{
     el('auth-status').textContent=text;
     el('account-status').textContent=text;
@@ -29,10 +33,12 @@ export function installAccount({ api, services, getState, rememberName, document
   let loginProvider='Google';
   function render() {
     const google=registered(currentUser);
-    el('auth-gate').hidden=ready;
-    el('app').inert=!ready;
+    el('auth-gate').hidden=ready||guest;
+    el('app').inert=!(ready||guest);
+    document.body?.classList.toggle('guest-mode',guest&&!ready);
+    if(guest&&!ready)el('account-username').textContent='Invitado';
     el('auth-login').hidden=google;
-    el('auth-register').hidden=!google||!loaded;
+    el('auth-register').hidden=!google||!loaded||autoNaming||ready;
     el('account-google').disabled=busy||!getState().firebase;
     el('account-apple').hidden=!appleDevice;
     el('account-apple').disabled=busy||!getState().firebase;
@@ -60,11 +66,12 @@ export function installAccount({ api, services, getState, rememberName, document
     if(getState().uid&&getState().uid!==user?.uid)onIdentityChange();
     profileKey=key;currentUser=user;getState().uid=user?.uid||null;
     const epoch=++generation;
-    ready=false;loaded=false;profileName='';render();
+    ready=false;loaded=false;profileName='';guest=!registered(user)&&guestSaved()&&guestAllowed();render();
     if(!registered(user)) {
       readyUid=null;el('account-username').textContent='';rememberName('');el('player-name').value='';el('invite-name').value='';
       el('auth-name').value='';message('');
       if(el('account-panel').open)el('account-panel').close();
+      render();if(guest)onGuest();
       profilePromise=Promise.resolve();return profilePromise;
     }
     const uid=user.uid;
@@ -82,6 +89,15 @@ export function installAccount({ api, services, getState, rememberName, document
         loaded=true;
         const name=cleanName(snapshot.val()?.name);
         if(name){activate(user,name);message('');}
+        else if(!cached&&user.providerData?.some(p=>p.providerId==='apple.com')){
+          // Apple already gave us who the player is: never ask again, pick a name they can change later.
+          autoNaming=true;message('Creando tu cuenta…');
+          let named=false;
+          try{named=await assignName(fb,user);}catch(error){console.warn('[truco:auto-name]',error);}
+          autoNaming=false;
+          if(epoch!==generation)return;
+          if(!named){el('auth-name').value='';message('Elegí el nombre con el que vas a jugar.');}
+        }
         else if(!cached){
           el('auth-name').value='';
           message('Elegí el nombre con el que vas a jugar.');
@@ -96,6 +112,28 @@ export function installAccount({ api, services, getState, rememberName, document
       }finally{clearTimeout(timer);if(epoch===generation)render();}
     })();
     return profilePromise;
+  }
+  function nameBase(hint) {
+    const first=String(hint||'').normalize('NFC').trim().split(/\s+/)[0]||'';
+    const base=first.replace(/[^A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9._-]/g,'').slice(0,14);
+    return base.length>=2?base:'Jugador';
+  }
+  // Claims the first free name: the Apple first name, then the same with four digits.
+  async function assignName(fb,user) {
+    if((await fb.get(fb.ref(fb.db,'usernameIndexReady'))).val()!==true)return false;
+    const base=nameBase(nameHint||user.displayName);nameHint='';
+    for(let attempt=0;attempt<6;attempt++){
+      const name=attempt===0&&base!=='Jugador'?base:base+String(1000+Math.floor(Math.random()*9000));
+      const key=nameKey(name);
+      const owner=(await fb.get(fb.ref(fb.db,'usernames/'+key))).val();
+      if(owner&&owner!==user.uid)continue;
+      try{await fb.update(fb.ref(fb.db),{['profiles/'+user.uid+'/name']:name,['usernames/'+key]:user.uid});}
+      catch(error){if(attempt<5)continue;throw error;}
+      if(fb.auth.currentUser?.uid!==user.uid)return true;
+      loaded=true;activate(user,name);message('');onRegistered(user.uid);
+      return true;
+    }
+    return false;
   }
   function errorText(error) {
     switch(error?.code){
@@ -165,7 +203,7 @@ export function installAccount({ api, services, getState, rememberName, document
     if(!appleDevice)return;
     return action(async fb=>{
       loginProvider='Apple';message('Abriendo Apple…');
-      if(globalThis.trucoNative?.isNative){const result=await globalThis.trucoNative.signIn(fb,'apple.com');await observe(fb,result.user);return;}
+      if(globalThis.trucoNative?.isNative){const result=await globalThis.trucoNative.signIn(fb,'apple.com');nameHint=result.nameHint||'';await observe(fb,result.user);return;}
       const provider=new fb.authSdk.OAuthProvider('apple.com');
       provider.addScope('email');provider.addScope('name');
       provider.setCustomParameters({locale:'es'});
@@ -191,6 +229,7 @@ export function installAccount({ api, services, getState, rememberName, document
       // currentUser value which may still be updating when the popup closes.
       const user=result?.user;
       if(!user){const error=new Error('Missing Apple session');error.code='auth/apple-session-missing';throw error;}
+      nameHint=fb.authSdk.getAdditionalUserInfo?.(result)?.profile?.firstName||user.displayName||'';
       message('Apple confirmó el acceso. Cargando tu cuenta…');
       await observe(fb,user);
     },{allowRegistration:true});
@@ -313,7 +352,16 @@ export function installAccount({ api, services, getState, rememberName, document
   el('account-edit-back').addEventListener('click',()=>{
     message('');el('account-edit').hidden=true;el('account-menu').hidden=false;
   });
+  function askSignIn() {
+    guest=false;saveGuest(false);message('');render();
+    el('auth-gate').scrollTop=0;el('account-google').focus();
+  }
+  el('auth-guest')?.addEventListener('click',()=>{
+    if(busy||ready)return;
+    guest=true;saveGuest(true);message('');render();onGuest();
+  });
   el('account-open').addEventListener('click',()=>{
+    if(guest&&!ready){askSignIn();return;}
     if(busy||!ready)return;
     el('account-menu').hidden=false;el('account-edit').hidden=true;el('account-delete-confirm').hidden=true;message('');render();
     el('account-panel').showModal();el('account-close').focus();
@@ -331,7 +379,7 @@ export function installAccount({ api, services, getState, rememberName, document
     url.searchParams.delete('appleLogin');
     globalThis.history.replaceState(null,'',url.href);
     if(!registered(currentUser))return el('account-apple').click();
-  },whenReady:()=>startupPromise,isReady:()=>ready,loadingSlow:stage=>{if(ready)return;slowLoading=true;message(stage==='session'?'Estamos restaurando tu sesión guardada. Si no avanza, volvé a intentar.':stage==='modules'?'El servicio de inicio de sesión todavía no terminó de cargar. Podés volver a intentar.':'Estamos preparando el acceso. Podés volver a intentar.');render();},failed:error=>{slowLoading=true;message(errorText(error));render();}};
+  },whenReady:()=>startupPromise,isReady:()=>ready,isGuest:()=>guest&&!ready,askSignIn,loadingSlow:stage=>{if(ready)return;slowLoading=true;message(stage==='session'?'Estamos restaurando tu sesión guardada. Si no avanza, volvé a intentar.':stage==='modules'?'El servicio de inicio de sesión todavía no terminó de cargar. Podés volver a intentar.':'Estamos preparando el acceso. Podés volver a intentar.');render();},failed:error=>{slowLoading=true;message(errorText(error));render();}};
 }
 
 

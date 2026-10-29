@@ -5,7 +5,7 @@ import { installPlayerPanel } from './player-panel.js?v=20261013-blocklist1';
 import { installScorer,renderCompactTally } from './scorer.js?v=20261026-people1';
 import { installActivity } from './activity.js?v=20261010-adminstats32';
 import { installCredits } from './credits.js?v=20261025-claim1';
-import { installAccount } from './account.js?v=20261022-ios-redirect';
+import { installAccount } from './account.js?v=20261029-guest2';
 import { initializeGameAuth } from './auth-init.js?v=20261016-android-google';
 import {installTeamTable,TEAM_SEATS,playerTeam,positionDealerDeck,renderTeamLobbySeats,renderWaitingSeats} from './team-table-ui.js?v=20261026-flor1';
 import {createLiveTables,LiveError} from './live-tables.js?v=20261025-close1';
@@ -677,7 +677,8 @@ function configureSetup() {
   $('table-visibility').value='public';$('table-password-row').hidden=true;
   document.querySelectorAll('[data-visibility]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.visibility==='public')));
   $('target-points').value='20';renderPointsPicker();
-  $('play-bot').checked=false;updateBotSetup();
+  // Guests can only practice against the bot.
+  $('play-bot').checked=account.isGuest();updateBotSetup();
   state.joining = false;
   if(!state.enteringRoom)$('enter-room').disabled=false;
   showView('setup-view');
@@ -732,7 +733,10 @@ const account=installAccount({api:creditApi,services:firebaseServices,getState:(
   await Promise.all([openInitialRoom(),initialCredits]);
   if(scorerAfterSignIn&&!state.room){scorerAfterSignIn=false;history.replaceState(null,'',location.pathname);$('open-scorer').click();}
   else showLobbyOnboarding();
-},onIdentityChange:(...args)=>{friends?.stop();profiles.stop();return resetAccountRoom(...args);},onNameChanged:()=>showView('welcome-view'),onRegistered:uid=>{state.lobbyOnboardingUid=uid;requestAnimationFrame(showLobbyOnboarding);},inRoom:()=>!!state.room&&!$('welcome-view').classList.contains('active')});
+},onIdentityChange:(...args)=>{friends?.stop();profiles.stop();return resetAccountRoom(...args);},onNameChanged:()=>showView('welcome-view'),onRegistered:uid=>{state.lobbyOnboardingUid=uid;requestAnimationFrame(showLobbyOnboarding);},onGuest:()=>{
+  showView('welcome-view');
+  if(scorerAfterSignIn){scorerAfterSignIn=false;history.replaceState(null,'',location.pathname);$('open-scorer').click();}
+},guestAllowed:()=>!new URLSearchParams(location.search).has('mesa'),inRoom:()=>!!state.room&&!$('welcome-view').classList.contains('active')});
 const credits=installCredits({services:firebaseServices,walletSource:creditWalletSource,api:creditApi,getState:()=>state,document,notify:message=>toast(message,true,2000),onChange:()=>{showLobbyOnboarding();if(state.lobbyRooms)renderLobby(state.lobbyRooms);
   if(state.room)renderMatchEnd();$('table-stake-available').textContent=String(credits.wallet()?.balance??'—');updateStakeControl();}});
 let lobbyWelcomeDialog=null,lobbyWelcomeStep=0,lobbyWelcomeTarget=null;
@@ -938,7 +942,7 @@ async function openInitialRoom(){
 }
 
 async function enterRoom() {
-  if(!account.isReady())return;
+  if(!account.isReady()&&!(account.isGuest()&&!state.joining&&$('play-bot').checked))return;
   if(state.enteringRoom)return;
   if(!state.joining&&!$('play-bot').checked){
     // The wallet subscription is already live; the server checks the reservation atomically.
@@ -4403,7 +4407,7 @@ $('learn-coach-menu').addEventListener('click',openLearning);
 
 async function initializePage(){
   const releaseLoading=()=>{
-    $('app').inert=!account.isReady();
+    $('app').inert=!(account.isReady()||account.isGuest());
     $('startup-loading').hidden=true;
     document.documentElement.classList.remove('page-loading');
   };
@@ -4596,8 +4600,13 @@ installScorer({document,showView,renderTally:renderCompactTally,
 
 installPlayerPanel({document,api:creditApi,getState:()=>state});
 
+// Online features ask a guest to sign in first.
+$('guest-signin-open').addEventListener('click',()=>account.askSignIn());
+for(const id of ['open-friends','level-open'])$(id).addEventListener('click',event=>{if(!account.isGuest())return;event.stopImmediatePropagation();account.askSignIn();},true);
+
 // Visible choices keep the underlying values used by online and bot games.
 document.querySelectorAll('[data-table-mode]').forEach(button=>button.addEventListener('click',()=>{
+  if(account.isGuest()&&button.dataset.tableMode!=='bot'){account.askSignIn();return;}
   $('play-bot').checked=button.dataset.tableMode==='bot';
   if(!$('play-bot').checked)$('table-mode').value=button.dataset.tableMode;
   $('table-mode').dispatchEvent(new Event('change'));

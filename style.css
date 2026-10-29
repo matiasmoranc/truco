@@ -2442,3 +2442,13 @@ input,textarea,[contenteditable=""],[contenteditable="true"]{-webkit-user-select
 .match-photo-theme{width:34px;height:34px;padding:0;border-radius:50%;border:2px solid var(--edge);background:var(--swatch);box-shadow:0 2px 6px #0006;cursor:pointer;touch-action:manipulation}
 .match-photo-theme.active{outline:3px solid #e8c983;outline-offset:3px}
 
+/* Guest mode: practice, learning and the scorer without an account. */
+.auth-card .auth-guest{align-self:center;min-height:44px;padding:8px 16px;border:0;background:none;color:#e8c983;font:600 15px 'DM Sans',sans-serif;text-decoration:underline;text-underline-offset:4px;cursor:pointer}
+.auth-card .auth-guest:disabled{opacity:.5}
+.guest-signin{display:none}
+.guest-mode .guest-signin{display:flex;flex-direction:column;align-items:center;gap:10px;margin:auto 0;padding:clamp(18px,4vh,32px) 16px;text-align:center}
+.guest-signin h2{margin:0;font-family:'Playfair Display',serif;font-size:clamp(22px,2.5vw,28px);font-weight:600;line-height:1.15;color:#e8c983}
+.guest-signin p{margin:0;max-width:340px;color:#c9d2ca;font-size:14px;line-height:1.5}
+.guest-signin .button{width:min(280px,100%);margin-top:6px;justify-content:center;text-align:center}
+.guest-mode .home-lobby-heading,.guest-mode #open-room-list,.guest-mode #lobby-report,.guest-mode #level-open{display:none!important}
+.guest-mode .home-lobby{justify-content:center}

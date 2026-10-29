@@ -83,7 +83,10 @@ globalThis.trucoNative = {
     const credential = provider === 'apple.com'
       ? new fb.authSdk.OAuthProvider(provider).credential({ idToken: native.idToken, rawNonce: native.nonce })
       : fb.authSdk.GoogleAuthProvider.credential(native.idToken, native.accessToken);
-    return fb.authSdk.signInWithCredential(fb.auth, credential);
+    const signedIn = await fb.authSdk.signInWithCredential(fb.auth, credential);
+    // Apple shares the name only on the first sign-in; keep it to name the new account.
+    signedIn.nameHint = result.user?.displayName || result.additionalUserInfo?.profile?.firstName || '';
+    return signedIn;
   }
 };
 await import('../app.js');

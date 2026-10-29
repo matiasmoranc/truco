@@ -189,12 +189,26 @@ test('iPhone Apple access redirects to the Firebase origin, preserving the exist
 });
 
 test('Welcome tour is requested only for a new profile, including recreated Google and Apple accounts',async()=>{
- for(const provider of ['google.com','apple.com']){
-  const user={uid:'new-'+provider,isAnonymous:false,providerData:[{providerId:provider}]};
-  const h=await harness(user);h.nodes['auth-name'].value='Nuevo';await h.submit('auth-register');assert.deepEqual(h.registrations,[user.uid]);
-  const existing=await harness(user,{name:'Nuevo'});assert.deepEqual(existing.registrations,[]);
-  const recreated=await harness({...user,uid:'recreated-'+provider});recreated.nodes['auth-name'].value='Nuevo';await recreated.submit('auth-register');assert.deepEqual(recreated.registrations,['recreated-'+provider]);
- }
+ const user={uid:'new-google',isAnonymous:false,providerData:[{providerId:'google.com'}]};
+ const h=await harness(user);h.nodes['auth-name'].value='Nuevo';await h.submit('auth-register');assert.deepEqual(h.registrations,[user.uid]);
+ const existing=await harness(user,{name:'Nuevo'});assert.deepEqual(existing.registrations,[]);
+ const recreated=await harness({...user,uid:'recreated-google'});recreated.nodes['auth-name'].value='Nuevo';await recreated.submit('auth-register');assert.deepEqual(recreated.registrations,['recreated-google']);
+ const apple=await harness({uid:'new-apple',isAnonymous:false,providerData:[{providerId:'apple.com'}]});assert.deepEqual(apple.registrations,['new-apple']);
+ const appleExisting=await harness({uid:'new-apple',isAnonymous:false,providerData:[{providerId:'apple.com'}]},{name:'Nuevo'});assert.deepEqual(appleExisting.registrations,[]);
+});
+test('A new Apple account never asks for a name: it uses the Apple first name or a numbered player name',async()=>{
+ const named=await harness({uid:'a1',isAnonymous:false,displayName:'Ana María López',providerData:[{providerId:'apple.com'}]});
+ assert.equal(named.account.isReady(),true);assert.equal(named.nodes['auth-register'].hidden,true);assert.equal(named.name(),'Ana');
+ assert.deepEqual(named.writes,[{ref:undefined,value:{'profiles/a1/name':'Ana','usernames/ana':'a1'}}]);
+ const hidden=await harness({uid:'a2',isAnonymous:false,providerData:[{providerId:'apple.com'}]});
+ assert.equal(hidden.account.isReady(),true);assert.match(hidden.name(),/^Jugador\d{4}$/);
+});
+test('Guests enter without an account and online features send them back to sign in',async()=>{
+ const h=await harness();assert.equal(h.account.isGuest(),false);assert.equal(h.nodes['auth-gate'].hidden,false);
+ await h.click('auth-guest');
+ assert.equal(h.account.isGuest(),true);assert.equal(h.nodes['auth-gate'].hidden,true);assert.equal(h.nodes.app.inert,false);assert.equal(h.cache.get('truco-guest'),'1');
+ assert.equal(h.account.isReady(),false);assert.equal(h.starts(),0);
+ await h.click('account-open');assert.equal(h.account.isGuest(),false);assert.equal(h.nodes['auth-gate'].hidden,false);
 });
 
 test('Account deletion reauthenticates before server deletion and signs out on success',async()=>{
