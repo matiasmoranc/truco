@@ -1,5 +1,5 @@
 import {initializeApp} from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js';
-import {getAuth,onAuthStateChanged,GoogleAuthProvider,signInWithPopup,signOut,browserLocalPersistence,setPersistence} from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js';
+import {getAuth,onAuthStateChanged,GoogleAuthProvider,signInWithPopup,signInWithCredential,signOut,browserLocalPersistence,setPersistence} from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js';
 import {getFunctions,httpsCallable} from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-functions.js';
 import {levelFor,pointsToReach} from './levels.js?v=20261027-sounds1';
 // The same panel also reads Truco Argentino: its adminConsole answers the same actions.
@@ -7,11 +7,15 @@ const GAMES={
  uy:{label:'Truco Uruguayo',zone:'America/Montevideo'},
  ar:{label:'Truco Argentino',zone:'America/Argentina/Buenos_Aires',config:{apiKey:'AIzaSyC7NKRqDT_R4Uu9pOGyq7cU5C_z-FwHq3o',authDomain:'truco-argentino-ar.firebaseapp.com',databaseURL:'https://truco-argentino-ar-default-rtdb.firebaseio.com',projectId:'truco-argentino-ar',storageBucket:'truco-argentino-ar.firebasestorage.app',messagingSenderId:'275278687284',appId:'1:275278687284:web:f5a7b01ba97d7ed565ae61'}}
 };
-const GAME=new URLSearchParams(location.search).get('juego')==='ar'?'ar':'uy',ZONE=GAMES[GAME].zone;
-document.title='Administración · '+GAMES[GAME].label;
-for(const label of document.querySelectorAll('.game-name'))label.textContent=GAMES[GAME].label.toUpperCase();
-document.getElementById('page-kicker').textContent=GAMES[GAME].label+' · Administración';
-for(const picker of document.querySelectorAll('.game-picker')){picker.value=GAME;picker.onchange=()=>{location.search=picker.value==='ar'?'?juego=ar':'';};}
+let GAME=new URLSearchParams(location.search).get('juego')==='ar'?'ar':'uy',ZONE=GAMES[GAME].zone;
+function showGame(){
+ ZONE=GAMES[GAME].zone;document.title='Administración · '+GAMES[GAME].label;
+ for(const label of document.querySelectorAll('.game-name'))label.textContent=GAMES[GAME].label.toUpperCase();
+ document.getElementById('page-kicker').textContent=GAMES[GAME].label+' · Administración';
+ for(const picker of document.querySelectorAll('.game-picker'))picker.value=GAME;
+}
+showGame();
+for(const picker of document.querySelectorAll('.game-picker'))picker.onchange=()=>useGame(picker.value);
 const $=id=>document.getElementById(id);
 const points=tenths=>(tenths/10).toLocaleString('es-UY',{maximumFractionDigits:1});
 // Level filter: "from-to" levels, empty for all.
@@ -503,22 +507,47 @@ $('message-form').onsubmit=async event=>{
  catch(e){$('message-error').textContent=errorText(e);}
  finally{$('message-send').disabled=false;}
 };
-async function start(){
+// Each game keeps its own Firebase session in this browser, so switching does not reload
+// the page nor ask to sign in again once both sessions exist.
+const sessions={};
+async function session(game){
+ if(sessions[game])return sessions[game];
+ let config=GAMES[game].config;
+ if(!config)try{config=(await import('./firebase-config.js')).firebaseConfig;}catch{config=JSON.parse(localStorage.getItem('truco-firebase-config')||'null');}
+ if(!config)throw new Error('Abrí el juego primero para cargar su configuración.');
+ // The Uruguayan app keeps the default name so its saved session stays valid.
+ const app=game==='uy'?initializeApp(config):initializeApp(config,game),gameAuth=getAuth(app);
+ await setPersistence(gameAuth,browserLocalPersistence);
+ return sessions[game]={auth:gameAuth,call:httpsCallable(getFunctions(app,'us-central1'),'adminConsole')};
+}
+let stopWatching=null;
+async function useGame(game){
+ GAME=game==='ar'?'ar':'uy';showGame();
+ history.replaceState(null,'',GAME==='ar'?'?juego=ar':location.pathname);
  try{
-  let config=GAMES[GAME].config;
-  if(!config)try{config=(await import('./firebase-config.js')).firebaseConfig;}catch{config=JSON.parse(localStorage.getItem('truco-firebase-config')||'null');}
-  if(!config)throw new Error('Abrí el juego primero para cargar su configuración.');
-  auth=getAuth(initializeApp(config));call=httpsCallable(getFunctions(auth.app,'us-central1'),'adminConsole');
-  await setPersistence(auth,browserLocalPersistence);
-  $('login').onclick=async()=>{try{await signInWithPopup(auth,new GoogleAuthProvider());}catch(e){$('access-status').textContent=errorText(e);}};
-  $('logout').onclick=$('switch-account').onclick=()=>signOut(auth);
-  onAuthStateChanged(auth,async user=>{
-   const generation=++epoch;pagesLoaded=1;userScope='all';$('user-scope').value='all';clearInterval(metricsTimer);metricsTimer=null;metrics=null;users=[];pageToken=null;$('console').hidden=true;$('access').hidden=false;$('logout').hidden=!user;$('switch-account').hidden=!user;$('login').hidden=!!user;
-   $('identity').textContent=user?'Tu UID: '+user.uid:'';$('access-status').textContent=user?'Verificando permisos…':'Iniciá sesión con tu cuenta administradora.';
-   if(!user)return;
-   try{const result=await call({action:'users'});if(generation!==epoch)return;users=result.data.users;pageToken=result.data.pageToken;$('access').hidden=true;$('console').hidden=false;renderUsers();await refresh();if(generation===epoch)metricsTimer=setInterval(()=>{if(!document.hidden&&!$('edit').open)refresh(false,true);},60000);}
-   catch(e){if(generation===epoch)$('access-status').textContent=errorText(e);}
-  });
+  ({auth,call}=await session(GAME));
+  if(stopWatching)stopWatching();
+  stopWatching=onAuthStateChanged(auth,showSession);
  }catch(e){$('access-status').textContent=errorText(e);}
+}
+// One Google sign-in also tries the other game, so the same address opens both panels.
+async function login(){
+ try{
+  const result=await signInWithPopup(auth,new GoogleAuthProvider()),token=GoogleAuthProvider.credentialFromResult(result)?.accessToken;
+  const other=await session(GAME==='ar'?'uy':'ar');
+  if(token&&!other.auth.currentUser)signInWithCredential(other.auth,GoogleAuthProvider.credential(null,token)).catch(()=>{});
+ }catch(e){$('access-status').textContent=errorText(e);}
+}
+async function start(){
+ $('login').onclick=login;
+ $('logout').onclick=$('switch-account').onclick=()=>signOut(auth);
+ await useGame(GAME);
+}
+async function showSession(user){
+ const generation=++epoch;pagesLoaded=1;userScope='all';$('user-scope').value='all';clearInterval(metricsTimer);metricsTimer=null;metrics=null;users=[];pageToken=null;$('console').hidden=true;$('access').hidden=false;$('logout').hidden=!user;$('switch-account').hidden=!user;$('login').hidden=!!user;
+ $('identity').textContent=user?'Tu UID: '+user.uid:'';$('access-status').textContent=user?'Verificando permisos…':'Iniciá sesión con tu cuenta administradora.';
+ if(!user)return;
+ try{const result=await call({action:'users'});if(generation!==epoch)return;users=result.data.users;pageToken=result.data.pageToken;$('access').hidden=true;$('console').hidden=false;renderUsers();await refresh();if(generation===epoch)metricsTimer=setInterval(()=>{if(!document.hidden&&!$('edit').open)refresh(false,true);},60000);}
+ catch(e){if(generation===epoch)$('access-status').textContent=errorText(e);}
 }
 start();
