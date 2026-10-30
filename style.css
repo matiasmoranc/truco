@@ -1009,6 +1009,9 @@ body { min-height:100dvh; }
 .turn-badge.pause-countdown .turn-badge-label,.turn-badge.pause-countdown .inactivity-life{display:none!important}
 .turn-badge.pause-countdown .round-pause-timer{border-left:0;padding-left:0}
 .folding-hand .hand{visibility:hidden}
+.deck-flight{position:fixed;z-index:160;pointer-events:none;transform-style:preserve-3d;will-change:transform}
+.deck-flight-face{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;background-repeat:no-repeat}
+.deck-flight-back{transform:rotateY(180deg);box-shadow:0 2px 6px #0006}
 .fold-card-flight{position:fixed!important;z-index:160!important;visibility:visible!important;pointer-events:none!important;animation:none!important;transform:none;margin:0!important}
 
 

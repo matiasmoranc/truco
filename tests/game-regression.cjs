@@ -23,10 +23,12 @@ test('Folding with cards renders its animation and schedules the following hand 
   const rect={left:50,top:400,width:100,height:160};
   const source={offsetWidth:90,offsetHeight:150,getBoundingClientRect:()=>rect,cloneNode:()=>({style:{},classList:{remove(){},add(){}},removeAttribute(){},setAttribute(){},animate(){},remove(){}})};
   const nodes={'game-view':{classList:{toggle(){}}},hand:{querySelectorAll:()=>[source,source]},'deck-stack':{getBoundingClientRect:()=>({left:250,top:200,width:60,height:100})}};
-  c.$=id=>nodes[id];c.document={body:{append:flight=>flights.push(flight)}};c.setTimeout=()=>1;
+  const element=()=>({style:{},className:'',append(){},setAttribute(){},animate:()=>({finished:new Promise(()=>{})}),remove(){}});
+  c.$=id=>nodes[id];c.document={createElement:element,body:{append:flight=>flights.push(flight)}};c.setTimeout=()=>1;
+  c.matchMedia=()=>({matches:false});c.getComputedStyle=()=>({transform:'none'});
   c.toast=message=>errors.push(message);c.state={room:r,playerId:'player1',localGame:true,learning:practice?{}:null};
   c.renderGame=()=>c.animateFoldedHand();
-  vm.runInContext(['canFoldHand','foldHandChanges','animateFoldedHand','scheduleLocalNextHand','foldHand'].map(extract).join('\n'),c);
+  vm.runInContext(['canFoldHand','foldHandChanges','flyCardsToDeck','animateFoldedHand','scheduleLocalNextHand','foldHand'].map(extract).join('\n'),c);
   c.clearTimeout=()=>{};
   await c.foldHand();
   assert.deepEqual(errors,[]);assert.equal(flights.length,2);

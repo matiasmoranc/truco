@@ -480,7 +480,26 @@ function loadChatSound(src){
   if(!chatBuffers.has(src))chatBuffers.set(src,fetch(src).then(r=>r.arrayBuffer()).then(data=>new Promise((resolve,reject)=>ctx.decodeAudioData(data,resolve,reject))).catch(error=>{chatBuffers.delete(src);throw error;}));
   return chatBuffers.get(src);
 }
+// Desktop Safari can leave Web Audio suspended (or "interrupted") and then drops the clip
+// silently, so computers also keep a plain audio element per clip, started once inside a
+// tap so it may play later without one.
+const touchDevice=()=>navigator.maxTouchPoints>0;
+const chatElements=new Map();
+function chatElement(src){
+  let audio=chatElements.get(src);
+  if(!audio){audio=new Audio(src);audio.preload='auto';chatElements.set(src,audio);}
+  return audio;
+}
+function primeChatElements(){
+  for(const sound of Object.values(CHAT_SOUNDS)){
+    if(chatElements.has(sound.src))continue;
+    const audio=chatElement(sound.src);audio.muted=true;
+    audio.play().then(()=>{audio.pause();audio.currentTime=0;}).catch(()=>{}).finally(()=>{audio.muted=false;});
+  }
+}
+function playChatElement(src){const audio=chatElement(src);try{audio.currentTime=0;}catch{/* Not loaded yet. */}audio.play().catch(()=>{});}
 function unlockChatSounds(){
+  if(!touchDevice())primeChatElements();
   const ctx=chatContext();if(!ctx)return;
   if(ctx.state!=='running'){ctx.resume().catch(()=>{});const silent=ctx.createBufferSource();silent.buffer=ctx.createBuffer(1,1,22050);silent.connect(ctx.destination);silent.start(0);}
   for(const sound of Object.values(CHAT_SOUNDS))loadChatSound(sound.src).catch(()=>{});
@@ -488,17 +507,19 @@ function unlockChatSounds(){
 // iOS keeps web sounds quiet with the silent switch on; while a clip plays the page asks
 // for media playback (iOS 17+), and afterwards gives the sound back to the other apps.
 let chatClipsPlaying=0;
-function mediaSession(type){try{if(navigator.audioSession)navigator.audioSession.type=type;}catch{/* Not supported. */}}
+function mediaSession(type){try{if(navigator.audioSession&&touchDevice())navigator.audioSession.type=type;}catch{/* Not supported. */}}
 function startChatSound(src){
   const ctx=chatContext();
-  if(!ctx){new Audio(src).play().catch(()=>{});return;}
-  loadChatSound(src).then(buffer=>{
+  if(!ctx){playChatElement(src);return;}
+  loadChatSound(src).then(async buffer=>{
+    if(ctx.state!=='running')await Promise.race([ctx.resume().catch(()=>{}),new Promise(done=>setTimeout(done,300))]);
+    // Still not running: the computer plays it through the audio element instead.
+    if(ctx.state!=='running'&&!touchDevice()){playChatElement(src);return;}
     mediaSession('playback');
-    if(ctx.state!=='running')ctx.resume().catch(()=>{});
     const source=ctx.createBufferSource();source.buffer=buffer;source.connect(ctx.destination);
     chatClipsPlaying++;source.onended=()=>{if(--chatClipsPlaying===0)mediaSession('auto');};
     source.start(0);
-  }).catch(()=>{});
+  }).catch(()=>{if(!touchDevice())playChatElement(src);});
 }
 // Anyone hears it (voice on, chat not muted); it plays only if the sender's level has it.
 function playChatSound(text,senderUid){
@@ -2000,6 +2021,36 @@ function foldHandChanges(room,loser){
   if(earlyFlor)Object.assign(notice,{kind:'flor',from:winner,to:loser,text:(room.players?.[winner]?.name||'El rival')+' canta FLOR.',spoken:'Flor',selfVerb:'Cantaste'});
   return {...sideChanges,callNotice:notice,turn:null,turnClock:null,pendingBet:null,pendingNextHand:{id:'fold:'+crypto.randomUUID(),winner,foldPoints:points,message,endsAt:gameTime()+3000},feed:topFeed(room,message)};
 }
+// Cards leaving the table fly to the deck, turning face down on the way and ending the
+// size of the deck. Each card is measured now, so the caller may remove it right after.
+function flyCardsToDeck(nodes,stagger=80){
+  const deck=$('deck-stack'),target=deck?.getBoundingClientRect();
+  if(!target?.width||!nodes.length||matchMedia('(prefers-reduced-motion: reduce)').matches)return false;
+  const back=getComputedStyle(deck),duration=700;
+  nodes.forEach((source,index)=>{
+    const rect=source.getBoundingClientRect(),width=source.offsetWidth||rect.width,height=source.offsetHeight||rect.height;
+    if(!rect.width||!width||!height)return;
+    const look=getComputedStyle(source),matrix=look.transform==='none'?null:new DOMMatrixReadOnly(look.transform);
+    const angle=matrix?Math.atan2(matrix.b,matrix.a)*180/Math.PI:0;
+    const flight=document.createElement('div'),front=document.createElement('div'),face=document.createElement('div');
+    flight.className='deck-flight';flight.setAttribute('aria-hidden','true');
+    front.className='deck-flight-face';face.className='deck-flight-face deck-flight-back';
+    for(const prop of ['backgroundImage','backgroundSize','backgroundPosition','backgroundColor','borderRadius','boxShadow'])front.style[prop]=look[prop];
+    for(const prop of ['backgroundImage','backgroundSize','backgroundPosition','backgroundColor','borderRadius'])face.style[prop]=back[prop];
+    flight.append(front,face);
+    Object.assign(flight.style,{left:(rect.left+rect.width/2-width/2)+'px',top:(rect.top+rect.height/2-height/2)+'px',width:width+'px',height:height+'px'});
+    document.body.append(flight);
+    const dx=target.left+target.width/2-(rect.left+rect.width/2),dy=target.top+target.height/2-(rect.top+rect.height/2);
+    const sx=target.width/width,sy=target.height/height;
+    const animation=flight.animate([
+      {transform:`perspective(900px) translate(0,0) rotate(${angle}deg) rotateY(0deg) scale(1)`},
+      {transform:`perspective(900px) translate(${dx*.55}px,${dy*.55}px) rotate(${angle/2}deg) rotateY(90deg) scale(${(1+sx)/2},${(1+sy)/2})`,offset:.5},
+      {transform:`perspective(900px) translate(${dx}px,${dy}px) rotate(0deg) rotateY(180deg) scale(${sx},${sy})`}
+    ],{duration,delay:index*stagger,easing:'cubic-bezier(.4,0,.2,1)',fill:'both'});
+    animation.finished.then(()=>flight.remove(),()=>flight.remove());
+  });
+  return true;
+}
 function animateFoldedHand(){
   const room=state.room,notice=room?.callNotice;
   const folding=!!(room?.pendingNextHand?.id?.startsWith('fold:')&&notice?.from===state.playerId&&notice.kind==='fold');
@@ -2008,18 +2059,7 @@ function animateFoldedHand(){
   const cards=[...$('hand').querySelectorAll('.hand-card')],deck=$('deck-stack');
   if(!cards.length||!deck)return;
   state.foldAnimationKey=room.pendingNextHand.id;
-  const target=deck.getBoundingClientRect();
-  cards.forEach((source,index)=>{
-    const rect=source.getBoundingClientRect(),flight=source.cloneNode(true);
-    const width=source.offsetWidth||rect.width,height=source.offsetHeight||rect.height;
-    flight.classList.remove('dragging','launching-card');flight.classList.add('card-flight','fold-card-flight');
-    flight.removeAttribute('data-card');flight.setAttribute('aria-hidden','true');flight.tabIndex=-1;
-    Object.assign(flight.style,{left:(rect.left+rect.width/2-width/2)+'px',top:(rect.top+rect.height/2-height/2)+'px',width:width+'px',height:height+'px'});
-    document.body.append(flight);
-    const dx=target.left+target.width/2-(rect.left+rect.width/2),dy=target.top+target.height/2-(rect.top+rect.height/2);
-    flight.animate?.([{transform:'translate(0,0) scale(1)',opacity:1},{transform:`translate(${dx}px,${dy}px) scale(.28) rotate(12deg)`,opacity:0}],{duration:650,delay:index*80,easing:'cubic-bezier(.4,0,.2,1)',fill:'forwards'});
-    setTimeout(()=>flight.remove(),700+index*80);
-  });
+  flyCardsToDeck(cards);
 }
 async function foldHand(){
   if(liveActionsBlocked())return;
@@ -3487,6 +3527,10 @@ function renderPlayedCards(room){
     if(flying&&activeCardFlight.finished)removeCardFlight();
     node.style.visibility=(flying&&activeCardFlight)||opponentFlights.has(key)?'hidden':'';
   }
+  // Cards picked up from the table (end of a round or of the hand) go to the deck.
+  const leaving=[...existing.values()].filter(node=>node.style.visibility!=='hidden');
+  const match=key=>String(key||'').split(':').slice(0,3).join(':');
+  if(leaving.length&&match(opponentPlaySnapshot.scope)===match(scope)&&$('game-view').classList.contains('active'))flyCardsToDeck(leaving,60);
   for(const node of existing.values())node.remove();
   markTrickWinner(room,container);
   opponentPlaySnapshot={scope,keys:publicKeys};
