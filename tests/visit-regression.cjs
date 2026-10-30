@@ -49,7 +49,7 @@ test('Visit details keep device type, browser and origin without identifiers',()
 test('The visitors list filters by platform and period and joins signed-in players',()=>{
  const {visitRange,visitorsInRange}=require('../functions/visit-service.cjs');
  const now=Date.parse('2026-10-24T15:00:00Z');
- assert.deepEqual(visitRange({from:'2026-10-20',to:'2026-10-24',platform:'web-ios',now}),{from:'2026-10-20',to:'2026-10-24',platform:'web-ios',page:null,hour:null});
+ assert.deepEqual(visitRange({from:'2026-10-20',to:'2026-10-24',platform:'web-ios',now}),{from:'2026-10-20',to:'2026-10-24',platform:'web-ios',page:null,hour:null,guest:false});
  for(const bad of [{from:'2026-10-24',to:'2026-10-20',platform:'all'},{from:'2026-01-01',to:'2026-10-24',platform:'all'},{from:'2026-10-20',to:'2026-10-24',platform:'x'},{from:'../',to:'2026-10-24',platform:'all'}])
   assert.throws(()=>visitRange({...bad,now}));
  const log={'2026-10-23':{a:{at:1,platform:'web-ios',page:'juego'},b:{at:3,platform:'web-android',page:'juego'}},'2026-10-24':{c:{at:2,platform:'web-ios',page:'anotador'}}};
@@ -119,4 +119,24 @@ test("Google's test robots are recognized by their device or by Google's address
  assert.equal(inRanges('190.64.12.5',google),false);
  assert.equal(inRanges('2800:a4::1',google),false);
  assert.equal(inRanges('',google),false);
+});
+test('Guests ("Jugar sin cuenta") count per day and platform, apart from test devices, and filter the visit detail',()=>{
+ const {guestDays,visitorsInRange}=require('../functions/visit-service.cjs');
+ const at=Date.parse('2026-10-29T15:00:00Z');
+ const log={'2026-10-29':{
+  a:{at,platform:'app-ios',page:'juego',first:true,guest:true,guestFirst:true},
+  b:{at:at+1000,platform:'app-ios',page:'juego',first:false,guest:true},
+  c:{at:at+2000,platform:'web-android',page:'juego',first:true,guest:true,guestFirst:true,test:true},
+  d:{at:at+3000,platform:'web-desktop',page:'juego',first:true},
+  e:{at:at+4000,platform:'app-android',page:'juego',first:true,guest:true,guestFirst:true,uid:'p1'}}};
+ const real=guestDays(log);
+ assert.deepEqual(real['2026-10-29'],{visits:{'app-ios':2,'app-android':1},visitors:{'app-ios':1,'app-android':1}});
+ assert.equal(guestDays(log,{includeTest:true})['2026-10-29'].visits['web-android'],1);
+ const summary=visitSummary({now:at,days:1,visits:{},guests:real});
+ assert.equal(summary.days[0].guests.totalVisits,3);assert.equal(summary.days[0].guests.totalVisitors,2);
+ const detail=visitorsInRange({log,activity:{},platform:'all',guest:true,exclude:new Set()});
+ assert.equal(detail.totalVisits,3);assert.equal(detail.guestVisits,3);assert.equal(detail.guestDevices,2);
+ assert.ok(detail.visits.every(v=>v.guest===true));
+ const all=visitorsInRange({log,activity:{},platform:'all'});
+ assert.equal(all.totalVisits,5);assert.equal(all.guestVisits,4);
 });

@@ -313,11 +313,11 @@ const longDay=day=>new Intl.DateTimeFormat('es-UY',{weekday:'short',day:'2-digit
 const visitTime=at=>new Intl.DateTimeFormat('es-UY',{timeZone:ZONE,day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date(at));
 let visitDetail=null,visitDetailRequest=0,visitGrouped=false;
 // Opens the Visits section on one day or the current period, with a platform or page detail.
-function goVisits({day=null,platform='all',page=null,measure=null}={}){
+function goVisits({day=null,platform='all',page=null,measure=null,guest=false}={}){
  showTab('visits');
  if(measure)$('visit-measure').value=measure;
  if(day){const today=metrics?.today;if(day===today)$('visit-range').value='today';else if(day===addDays(today,-1))$('visit-range').value='yesterday';else{$('visit-range').value='custom';$('visit-from').value=day;$('visit-to').value=day;}}
- visitDetail=null;renderVisits();openVisitDetail(platform,{page});
+ visitDetail=null;renderVisits();openVisitDetail(platform,{page,guest});
 }
 // The selected period as Uruguay days, clamped to the stored history.
 function visitPeriod(){
@@ -347,10 +347,12 @@ function renderVisits(){
  const card=(key,label,value,color)=>{
   const k=node('button','','kpi metric-link'),title=node('small',label);k.type='button';k.dataset.platform=key;k.title='Ver quién entró';
   if(color){const swatch=node('i','','swatch');swatch.style.background=color;title.prepend(swatch);}
-  k.classList.toggle('selected',visitDetail?.platform===key);
-  k.append(title,node('strong',number(value)),node('span','Ver quién entró','delta'));k.onclick=()=>openVisitDetail(key);$('visit-totals').append(k);
+  k.classList.toggle('selected',key==='guests'?!!visitDetail?.guest:!visitDetail?.guest&&visitDetail?.platform===key);
+  k.append(title,node('strong',number(value)),node('span','Ver quién entró','delta'));k.onclick=()=>key==='guests'?openVisitDetail('all',{guest:true}):openVisitDetail(key);$('visit-totals').append(k);
  };
  card('all','Total '+unit,grand);for(const [key,label] of Object.entries(PLATFORM_LABELS))card(key,label,sum(key),'var(--'+key+')');
+ const guestTotal=days.reduce((total,d)=>total+(d.guests?.[totalKey]||0),0);
+ card('guests','Invitados (sin cuenta)',guestTotal);
  bars($('visit-pages'),Object.entries(PAGE_LABELS).map(([key,label])=>({label,value:days.reduce((total,d)=>total+(d.pages?.[key]||0),0),onClick:()=>openVisitDetail('all',{page:key})})).sort((a,b)=>b.value-a.value));
  const hours=Array.from({length:24},(_,h)=>days.reduce((total,d)=>total+(d.hours?.[h]||0),0));
  columns($('visit-hours'),hours.map((value,h)=>({label:String(h).padStart(2,'0'),value,tooltip:String(h).padStart(2,'0')+':00 · '+value+' visitas · tocá para ver quién entró',onClick:()=>openVisitDetail('all',{hour:h})})),{labelEvery:3});
@@ -366,13 +368,14 @@ function renderVisits(){
  $('concurrent-record').textContent=(best?.peak?.count?'En el período: máximo de '+best.peak.count+' el '+longDay(best.day)+' a las '+peakTime(best.peak.at)+'. ':'En el período todavía no hay datos. ')+(record?.count?'Récord histórico: '+record.count+' el '+longDay(new Date(record.at-10800000).toISOString().slice(0,10))+' a las '+peakTime(record.at)+'.':'');
  columns($('signup-chart'),periodDays.map(d=>({label:shortDay(d),value:(signups[d]||[]).length,tooltip:shortDay(d)+' · '+(signups[d]||[]).length+' registrados',onClick:()=>openSignupDetail(d)})),{labelEvery:Math.max(1,Math.ceil(periodDays.length/12))});
  const table=$('visit-table');table.replaceChildren();
- const head=node('tr');head.append(node('th','Día'),...Object.values(PLATFORM_LABELS).map(label=>node('th',label)),node('th','Total','total'));table.append(head);
+ const head=node('tr');head.append(node('th','Día'),...Object.values(PLATFORM_LABELS).map(label=>node('th',label)),node('th','Total','total'),node('th','Invitados'));table.append(head);
  for(const d of [...days].reverse()){
   const row=clickable(node('tr'),()=>goVisits({day:d.day}));row.title='Ver quién entró ese día';row.append(node('td',longDay(d.day)));
   for(const key of Object.keys(PLATFORM_LABELS)){const value=d[measure][key]||0;row.append(node('td',number(value),value?'':'zero'));}
-  row.append(node('td',number(d[totalKey]),'total'));table.append(row);
+  const guests=d.guests?.[totalKey]||0;
+  row.append(node('td',number(d[totalKey]),'total'),node('td',number(guests),guests?'':'zero'));table.append(row);
  }
- if(visitDetail&&(visitDetail.from!==from||visitDetail.to!==to))openVisitDetail(visitDetail.platform,{page:visitDetail.page,hour:visitDetail.hour});
+ if(visitDetail&&(visitDetail.from!==from||visitDetail.to!==to))openVisitDetail(visitDetail.platform,{page:visitDetail.page,hour:visitDetail.hour,guest:visitDetail.guest});
 }
 function simpleTable(headers,rows){
  const wrap=node('div','','table-scroll'),table=node('table','','data-table'),head=node('tr');
@@ -381,17 +384,17 @@ function simpleTable(headers,rows){
  wrap.append(table);return wrap;
 }
 // Who came through one platform or page (or all) in the selected period.
-async function openVisitDetail(platform,{page=null,hour=null}={}){
+async function openVisitDetail(platform,{page=null,hour=null,guest=false}={}){
  const {from,to}=visitPeriod(),request=++visitDetailRequest;
- visitDetail={platform,from,to,page,hour};
- for(const k of $('visit-totals').children)k.classList.toggle('selected',!page&&hour==null&&k.dataset.platform===platform);
+ visitDetail={platform,from,to,page,hour,guest};
+ for(const k of $('visit-totals').children)k.classList.toggle('selected',guest?k.dataset.platform==='guests':!page&&hour==null&&k.dataset.platform===platform);
  const hh=h=>String(h).padStart(2,'0')+':00';
- const label=hour!=null?'De '+hh(hour)+' a '+hh((hour+1)%24):page?'Página: '+PAGE_LABELS[page]:platform==='all'?'Todas las plataformas':PLATFORM_LABELS[platform];
+ const label=guest?'Invitados (Jugar sin cuenta)':hour!=null?'De '+hh(hour)+' a '+hh((hour+1)%24):page?'Página: '+PAGE_LABELS[page]:platform==='all'?'Todas las plataformas':PLATFORM_LABELS[platform];
  $('visit-detail').hidden=false;$('visit-detail-title').textContent=label+' · '+(from===to?longDay(from):shortDay(from)+' al '+shortDay(to));
  $('visit-detail-body').replaceChildren(node('p','Cargando…','empty'));
  $('visit-detail').scrollIntoView({behavior:'smooth',block:'start'});
  let data;
- try{data=(await call({action:'visitors',from,to,platform,includeTest:!hideTest(),...(page?{page}:{}),...(hour!=null?{hour}:{})})).data;}
+ try{data=(await call({action:'visitors',from,to,platform,includeTest:!hideTest(),...(page?{page}:{}),...(hour!=null?{hour}:{}),...(guest?{guest:true}:{})})).data;}
  catch(e){if(request===visitDetailRequest)$('visit-detail-body').replaceChildren(node('p',errorText(e),'empty'));return;}
  if(request!==visitDetailRequest)return;
  renderVisitDetail(data,platform);
@@ -411,7 +414,7 @@ function renderVisitDetail(data,platform){
  const names=new Map(data.players.map(p=>[p.uid,p.name||'Jugador sin nombre']));
  const withVisits=data.players.filter(p=>p.visits).length;
  // In words: how many visits came from players and how many from people without a session.
- body.append(node('p',number(data.totalVisits)+' visitas: '+number(data.signedVisits||0)+' de '+number(withVisits)+(withVisits===1?' jugador':' jugadores')+' con sesión · '+number(data.anonymousVisits||0)+' sin sesión'+(data.anonymousVisits?' (de unos '+number(Math.max(1,data.anonymousDevices||0))+' dispositivos)':'')+'.','detail-summary'));
+ body.append(node('p',number(data.totalVisits)+' visitas: '+number(data.signedVisits||0)+' de '+number(withVisits)+(withVisits===1?' jugador':' jugadores')+' con sesión · '+number(data.anonymousVisits||0)+' sin sesión'+(data.anonymousVisits?' (de unos '+number(Math.max(1,data.anonymousDevices||0))+' dispositivos)':'')+(data.guestVisits?' · '+number(data.guestVisits)+' entraron como invitados ('+number(data.guestDevices||0)+' invitados distintos)':'')+'.','detail-summary'));
  const players=node('div','','detail-block');players.append(node('h3','Jugadores con sesión ('+data.players.length+')'));
  if(data.players.length)players.append(simpleTable(['Jugador','Visitas','Plataformas','Días que entró','Última vez'],data.players.map(p=>[p.name||p.uid,String(p.visits||0),p.platforms.map(k=>PLATFORM_LABELS[k]).join(', '),String(p.days),p.lastDay?longDay(p.lastDay):'—'])));
  else players.append(node('p','Nadie con sesión iniciada entró por acá en este período.','empty'));
@@ -426,14 +429,15 @@ function renderVisitDetail(data,platform){
   let rows=data.visits.slice(0,300).map(v=>({v,count:1}));
   if(visitGrouped){const seen=new Map();rows=[];for(const v of data.visits){if(typeof v.uid!=='string'){rows.push({v,count:1});continue;}const row=seen.get(v.uid);if(row)row.count++;else{const fresh={v,count:1};seen.set(v.uid,fresh);rows.push(fresh);}}rows=rows.slice(0,300);}
   const headers=['Fecha y hora','Jugador',...(visitGrouped?['Visitas']:[]),...(platform==='all'?['Plataforma']:[]),'Página','Dispositivo','Navegador','Origen','Tipo'];
-  visits.append(simpleTable(headers,rows.map(({v,count})=>[visitTime(v.at),typeof v.uid==='string'?names.get(v.uid)||'Jugador':'Sin sesión',...(visitGrouped?[String(count)]:[]),...(platform==='all'?[PLATFORM_LABELS[v.platform]||v.platform]:[]),PAGE_LABELS[v.page]||v.page,v.os+(v.model?' · '+v.model:''),v.browser,v.origin||'Directo',v.first?'Nueva del día':'Repetida'])));
+  visits.append(simpleTable(headers,rows.map(({v,count})=>[visitTime(v.at),typeof v.uid==='string'?(names.get(v.uid)||'Jugador')+(v.guest?' (antes invitado)':''):v.guest?'Invitado':'Sin sesión',...(visitGrouped?[String(count)]:[]),...(platform==='all'?[PLATFORM_LABELS[v.platform]||v.platform]:[]),PAGE_LABELS[v.page]||v.page,v.os+(v.model?' · '+v.model:''),v.browser,v.origin||'Directo',v.first?'Nueva del día':'Repetida'])));
   if(data.totalVisits>300)visits.append(node('p','Se muestran las 300 más recientes.','note'));
  }else visits.append(node('p','No hay visitas con detalle en este período.','empty'));
- visits.append(node('p','"Sin sesión": la persona no inició sesión en esa visita. El jugador de cada visita se registra desde el 24/10/2026.','note'));
+ visits.append(node('p','"Invitado": entró con "Jugar sin cuenta" (se registra desde el 29/10/2026). "Sin sesión": no inició sesión ni eligió jugar sin cuenta. El jugador de cada visita se registra desde el 24/10/2026.','note'));
  body.append(players,visits);
 }
 $('go-visitors').onclick=()=>goVisits({day:metrics?.today,measure:'visitors'});
 $('go-visits').onclick=()=>goVisits({day:metrics?.today,measure:'visits'});
+$('go-guests').onclick=()=>goVisits({day:metrics?.today,measure:'visitors',guest:true});
 $('go-tables').onclick=()=>{showTab('tables');$('table-state').value='active';renderTables();};
 $('visit-detail-close').onclick=()=>{visitDetail=null;visitDetailRequest++;$('visit-detail').hidden=true;for(const k of $('visit-totals').children)k.classList.remove('selected');};
 function renderMetrics(){
@@ -442,6 +446,7 @@ function renderMetrics(){
  const visitDays=metrics.visits?.days||[],today=visitDays[visitDays.length-1],yesterday=visitDays[visitDays.length-2];
  $('kpi-visitors').textContent=number(today?.totalVisitors||0);$('kpi-visits').textContent=number(today?.totalVisits||0);
  delta($('kpi-visitors-delta'),today?.totalVisitors||0,yesterday?.totalVisitors||0);delta($('kpi-visits-delta'),today?.totalVisits||0,yesterday?.totalVisits||0);
+ $('kpi-guests').textContent=number(today?.guests?.totalVisitors||0);delta($('kpi-guests-delta'),today?.guests?.totalVisitors||0,yesterday?.guests?.totalVisitors||0);
  bars($('platform-today'),Object.entries(PLATFORM_LABELS).map(([key,label])=>({label,value:today?.visitors[key]||0,color:'var(--'+key+')',onClick:()=>goVisits({day:metrics.today,platform:key})})));
  columns($('visits-mini'),visitDays.slice(-14).map(d=>({label:shortDay(d.day),segments:platformSegments(d.visitors),tooltip:platformTooltip(d.day,d.visitors,'visitantes'),onClick:()=>goVisits({day:d.day})})),{labelEvery:2});
  const selected=$('metric-day').value;$('metric-day').replaceChildren();

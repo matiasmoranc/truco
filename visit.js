@@ -1,7 +1,8 @@
 // Counts one anonymous visit per page load for the admin statistics. It sends
 // only the platform, the page and whether this device already came today.
 const ENDPOINT='https://us-central1-truco-6553d.cloudfunctions.net/siteVisit';
-const DAY_KEY='truco-visit-day',TEST_KEY='truco-test-device';
+const DAY_KEY='truco-visit-day',TEST_KEY='truco-test-device',GUEST_DAY_KEY='truco-guest-day';
+const GUEST_ENDPOINT='https://us-central1-truco-6553d.cloudfunctions.net/guestVisit';
 
 // Static pages inside the app have no trucoNative, but the native bridge still
 // injects Capacitor into every page.
@@ -54,5 +55,18 @@ let pendingVisit=null,visitRequest=null;
 export async function takeVisit(wait=4000){
  if(!pendingVisit&&visitRequest)await Promise.race([visitRequest,new Promise(done=>setTimeout(done,wait))]);
  visitRequest=null;const visit=pendingVisit;pendingVisit=null;return visit;
+}
+// "Jugar sin cuenta": marks this page's visit as a guest one, once per page load. The
+// visit stays available, so it can still be claimed if the guest signs in later.
+let guestMarked=false;
+export async function markGuestVisit({fetch=globalThis.fetch,wait=6000}={}){
+ if(guestMarked||typeof fetch!=='function')return false;
+ guestMarked=true;
+ if(!pendingVisit&&visitRequest)await Promise.race([visitRequest,new Promise(done=>setTimeout(done,wait))]);
+ const visit=pendingVisit;if(!visit)return false;
+ const day=uruguayDay();let first=true;
+ try{first=localStorage.getItem(GUEST_DAY_KEY)!==day;localStorage.setItem(GUEST_DAY_KEY,day);}catch{/* Private mode: counts as a new guest. */}
+ await fetch(GUEST_ENDPOINT,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({data:{...visit,first}}),keepalive:true}).catch(()=>null);
+ return true;
 }
 recordVisit();

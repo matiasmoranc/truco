@@ -62,26 +62,41 @@ function rememberDevice({seen,key,day,page,now,id}){
  if(seen.size>5000)for(const [k,v] of seen)if(now-v.at>=DEVICE_MEMORY_MS)seen.delete(k);
 }
 const count=value=>Number.isSafeInteger(value)&&value>0?value:0;
-function visitSummary({visits,now,days=30}){
+// Visits from people who chose "Jugar sin cuenta", per day and platform. A guest counts as
+// a visitor once per day (guestFirst), like the other visitors.
+function guestDays(log,{includeTest=false}={}){
+ const days={};
+ for(const [day,records] of Object.entries(log||{}))for(const r of Object.values(records||{})){
+  if(r?.guest!==true||!PLATFORMS.includes(r.platform)||(!includeTest&&r.test===true))continue;
+  const d=days[day]??={visits:{},visitors:{}};
+  d.visits[r.platform]=(d.visits[r.platform]||0)+1;
+  if(r.guestFirst===true)d.visitors[r.platform]=(d.visitors[r.platform]||0)+1;
+ }
+ return days;
+}
+function visitSummary({visits,guests={},now,days=30}){
  const list=[];
  for(let i=days-1;i>=0;i--){
   const day=uruguayDate(now-i*86400000).day,data=visits?.[day]||{};
   const byPlatform=key=>Object.fromEntries(PLATFORMS.map(p=>[p,count(data[key]?.[p])]));
   const visitsBy=byPlatform('visits'),visitorsBy=byPlatform('visitors');
+  const guest=guests[day]||{},guestBy=key=>Object.fromEntries(PLATFORMS.map(p=>[p,count(guest[key]?.[p])]));
+  const guestVisits=guestBy('visits'),guestVisitors=guestBy('visitors');
   list.push({day,visits:visitsBy,visitors:visitorsBy,
+   guests:{visits:guestVisits,visitors:guestVisitors,totalVisits:Object.values(guestVisits).reduce((a,b)=>a+b,0),totalVisitors:Object.values(guestVisitors).reduce((a,b)=>a+b,0)},
    totalVisits:Object.values(visitsBy).reduce((a,b)=>a+b,0),totalVisitors:Object.values(visitorsBy).reduce((a,b)=>a+b,0),
    pages:Object.fromEntries(PAGES.map(p=>[p,count(data.pages?.[p])])),
    hours:Array.from({length:24},(_,h)=>count(data.hours?.[String(h).padStart(2,'0')]))});
  }
  return {platforms:PLATFORMS,days:list};
 }
-function visitRange({from,to,platform,page,hour,now}){
+function visitRange({from,to,platform,page,hour,guest,now}){
  if(!DAY.test(from||'')||!DAY.test(to||'')||from>to)throw new Error('Período inválido.');
  if(from<uruguayDate(now-(VISIT_DAYS-1)*86400000).day)throw new Error('El período puede abarcar hasta '+VISIT_DAYS+' días atrás.');
  if(platform!=='all'&&!PLATFORMS.includes(platform))throw new Error('Plataforma inválida.');
  if(page!=null&&!PAGES.includes(page))throw new Error('Página inválida.');
  if(hour!=null&&!(Number.isInteger(hour)&&hour>=0&&hour<24))throw new Error('Hora inválida.');
- return {from,to,platform,page:page??null,hour:hour??null};
+ return {from,to,platform,page:page??null,hour:hour??null,guest:guest===true};
 }
 // The visit a signed-in player's first signal claims: only a well-formed id.
 function visitClaimPath(data){
@@ -91,16 +106,16 @@ function visitClaimPath(data){
 // Who came in a period: visit details (with the player when one signed in) and signed-in players.
 // exclude: test account uids to leave out, together with visits from test devices (null keeps everything).
 // hour: only the visits that started in that hour of the day (Uruguay), on any day of the range.
-function visitorsInRange({log,activity,platform,page=null,hour=null,exclude=null,limit=1000}){
+function visitorsInRange({log,activity,platform,page=null,hour=null,guest=false,exclude=null,limit=1000}){
  const matches=p=>platform==='all'||p===platform,hidden=r=>exclude&&(r.test===true||exclude.has(r.uid));
  const inHour=r=>hour==null||Number(uruguayDate(r.at).hour)===hour;
  const visits=[];
- for(const records of Object.values(log||{}))for(const r of Object.values(records||{}))if(r&&Number.isFinite(r.at)&&matches(r.platform)&&(!page||r.page===page)&&inHour(r)&&!hidden(r))visits.push(r);
+ for(const records of Object.values(log||{}))for(const r of Object.values(records||{}))if(r&&Number.isFinite(r.at)&&matches(r.platform)&&(!page||r.page===page)&&inHour(r)&&(!guest||r.guest===true)&&!hidden(r))visits.push(r);
  visits.sort((a,b)=>b.at-a.at);
  const players=new Map();
  const player=uid=>players.get(uid)||{uid,days:0,lastDay:'',platforms:[],visits:0};
  // Activity says which days and platforms a player used; a page filter only has the visits.
- if(!page&&hour==null)for(const [day,data] of Object.entries(activity||{})){
+ if(!page&&hour==null&&!guest)for(const [day,data] of Object.entries(activity||{})){
   for(const [uid,platforms] of Object.entries(data?.platforms||{})){
    if(exclude?.has(uid))continue;
    const used=Object.keys(platforms||{}).filter(p=>PLATFORMS.includes(p)&&matches(p));
@@ -115,8 +130,8 @@ function visitorsInRange({log,activity,platform,page=null,hour=null,exclude=null
   p.visits++;if(!p.days)p.lastDay=day>p.lastDay?day:p.lastDay;if(!p.platforms.includes(v.platform))p.platforms.push(v.platform);players.set(v.uid,p);
  }
  for(const p of players.values())if(!p.days)p.days=new Set(visits.filter(v=>v.uid===p.uid).map(v=>uruguayDate(v.at).day)).size;
- const anonymous=visits.filter(v=>typeof v.uid!=='string');
- return {visits:visits.slice(0,limit),totalVisits:visits.length,signedVisits:visits.length-anonymous.length,anonymousVisits:anonymous.length,anonymousDevices:anonymous.filter(v=>v.first).length,
+ const anonymous=visits.filter(v=>typeof v.uid!=='string'),guests=visits.filter(v=>v.guest===true);
+ return {visits:visits.slice(0,limit),totalVisits:visits.length,signedVisits:visits.length-anonymous.length,anonymousVisits:anonymous.length,anonymousDevices:anonymous.filter(v=>v.first).length,guestVisits:guests.length,guestDevices:guests.filter(v=>v.guestFirst).length,
   players:[...players.values()].sort((a,b)=>b.visits-a.visits||b.lastDay.localeCompare(a.lastDay)||b.days-a.days)};
 }
 // Google's own test robots (the Play Console pre-launch report, Firebase Test Lab) open
@@ -145,4 +160,4 @@ function inRanges(ip,prefixes){
  return false;
 }
 module.exports.robotDevice=robotDevice;module.exports.inRanges=inRanges;
-module.exports={...module.exports,dedupeVisit,rememberDevice,PLATFORMS,PAGES,VISIT_DAYS,visitUpdates,visitSummary,deviceFacts,visitOrigin,visitRecord,visitRange,visitorsInRange,visitClaimPath};
+module.exports={...module.exports,dedupeVisit,rememberDevice,PLATFORMS,PAGES,VISIT_DAYS,visitUpdates,visitSummary,guestDays,deviceFacts,visitOrigin,visitRecord,visitRange,visitorsInRange,visitClaimPath};

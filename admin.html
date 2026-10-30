@@ -25,12 +25,13 @@
    <div class="kpis">
     <button type="button" class="kpi metric-link" id="go-visitors" title="Ver quién entró hoy"><small>Visitantes hoy</small><strong id="kpi-visitors">—</strong><span id="kpi-visitors-delta" class="delta"></span></button>
     <button type="button" class="kpi metric-link" id="go-visits" title="Ver cada visita de hoy"><small>Visitas hoy</small><strong id="kpi-visits">—</strong><span id="kpi-visits-delta" class="delta"></span></button>
+    <button type="button" class="kpi metric-link" id="go-guests" title="Ver quién entró hoy sin cuenta"><small>Invitados hoy</small><strong id="kpi-guests">—</strong><span id="kpi-guests-delta" class="delta"></span></button>
     <button class="kpi metric-link" data-scope="active"><small><i class="live-dot"></i>Jugando ahora</small><strong id="metric-active">—</strong><span class="delta">Ver lista</span></button>
     <button class="kpi metric-link" data-scope="today"><small>Jugadores hoy</small><strong id="metric-today">—</strong><span class="delta">Ver lista</span></button>
     <button type="button" class="kpi metric-link" data-scope="all"><small>Usuarios registrados</small><strong id="metric-total">—</strong><span class="delta">Ver lista</span></button>
     <button type="button" class="kpi metric-link" id="go-tables"><small>Mesas activas</small><strong id="kpi-tables">—</strong><span class="delta" id="kpi-tables-note"></span></button>
    </div>
-   <p class="note"><strong>Visitantes</strong>: personas (dispositivos) distintas en el día; cada una cuenta una vez aunque entre varias veces. <strong>Visitas</strong>: cada vez que se abrió el juego o una de sus páginas. Tocá cualquier número, barra o día para ver el detalle.</p>
+   <p class="note"><strong>Visitantes</strong>: personas (dispositivos) distintas en el día; cada una cuenta una vez aunque entre varias veces. <strong>Visitas</strong>: cada vez que se abrió el juego o una de sus páginas. <strong>Invitados</strong>: visitantes que entraron con "Jugar sin cuenta". Tocá cualquier número, barra o día para ver el detalle.</p>
    <div class="panels">
     <article class="panel"><div class="panel-head"><h2>Visitantes de hoy por plataforma</h2></div><div id="platform-today" class="platform-bars"></div></article>
     <article class="panel"><div class="panel-head"><h2>Visitantes · últimos 14 días</h2><div class="legend" data-legend></div></div><div id="visits-mini" class="bar-chart stacked"></div></article>
@@ -88,4 +89,4 @@
  </main>
 </div>
 <dialog id="edit"><form id="edit-form"><div class="dialog-head"><h2 id="edit-title"></h2><button type="button" id="close" aria-label="Cerrar">×</button></div><p id="edit-description"></p><label id="value-label">Nuevo valor<input id="value" required></label><div id="level-fields" class="level-fields" hidden><label>Nivel<input id="level-value" type="number" min="1" max="200" step="1"></label><label>Puntos totales<input id="points-value" type="number" min="0" max="1000000" step="0.1"></label><small id="level-preview"></small></div><label id="delete-label" hidden>Escribí el nombre exacto para confirmar<input id="delete-confirm" autocomplete="off"></label><label>Motivo<input id="reason" required minlength="3" maxlength="200" placeholder="Por qué realizás este cambio"></label><p id="edit-error" role="alert"></p><div class="dialog-actions"><button id="cancel" type="button">Cancelar</button><button id="save" class="primary" type="submit">Confirmar cambio</button></div></form></dialog>
-<script type="module" src="admin.js?v=30"></script></body></html>
+<script type="module" src="admin.js?v=31"></script></body></html>

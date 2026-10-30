@@ -239,6 +239,8 @@ exports.adminConsole=onCall({...options,secrets:[liveInternalSecret]},async requ
   const now=Date.now(),cutoff=uruguayDate(now-29*86400000).day;
   const visitStart=uruguayDate(now-(VISIT_DAYS-1)*86400000).day;
   const [days,presence,start,visits,testVisits,testUsers]=await Promise.all([db.ref('adminMetrics/days').orderByKey().startAt(cutoff).get(),db.ref('adminMetrics/presence').get(),db.ref('adminMetrics/startedAt').get(),db.ref('adminMetrics/visits').orderByKey().startAt(visitStart).get(),db.ref('adminMetrics/visitsTest').orderByKey().startAt(visitStart).get(),db.ref('adminConfig/testUsers').get()]);
+  // Guests ("Jugar sin cuenta") are marked on their visit details.
+  const guestLog=(await db.ref('adminMetrics/visitLog').orderByKey().startAt(visitStart).get()).val()||{};
   const testUids=Object.keys(testUsers.val()||{}),include=data.includeTest===true;
   // Without test data: test accounts leave the totals and test visits stay in their own counters.
   const activity=include?{days:days.val()||{},presence:presence.val()||{}}:withoutTestActivity({days:days.val()||{},presence:presence.val()||{}},new Set(testUids));
@@ -250,13 +252,13 @@ exports.adminConsole=onCall({...options,secrets:[liveInternalSecret]},async requ
   const registrations={};recent.forEach((s,i)=>{const day=uruguayDate(s.at).day;(registrations[day]??=[]).push({uid:s.uid,name:signupNames[i].val()||'',email:s.email,at:s.at});});
   for(const list of Object.values(registrations))list.sort((a,b)=>a.at-b.at);
   const record=(await db.ref('adminMetrics/concurrentRecord/'+(include?'all':'real')).get()).val()||null;
-  return {registrations,concurrentRecord:record,...activitySummary({registeredUids:counted,now,concurrentKey:include?'all':'real',metrics:{...activity,startedAt:start.val()}}),visits:visitSummary({visits:visitCounters,now,days:VISIT_DAYS}),testUids,includeTest:include};
+  return {registrations,concurrentRecord:record,...activitySummary({registeredUids:counted,now,concurrentKey:include?'all':'real',metrics:{...activity,startedAt:start.val()}}),visits:visitSummary({visits:visitCounters,guests:guestDays(guestLog,{includeTest:include}),now,days:VISIT_DAYS}),testUids,includeTest:include};
  }
  if(action==='visitors'){
   let range;try{range=visitRange({...data,now:Date.now()});}catch(e){throw new HttpsError('invalid-argument',e.message);}
   const [log,activity]=await Promise.all(['visitLog','days'].map(key=>db.ref('adminMetrics/'+key).orderByKey().startAt(range.from).endAt(range.to).get()));
   const testUids=data.includeTest===true?null:new Set(Object.keys((await db.ref('adminConfig/testUsers').get()).val()||{}));
-  const result=visitorsInRange({log:log.val()||{},activity:activity.val()||{},platform:range.platform,page:range.page,hour:range.hour,exclude:testUids});
+  const result=visitorsInRange({log:log.val()||{},activity:activity.val()||{},platform:range.platform,page:range.page,hour:range.hour,guest:range.guest,exclude:testUids});
   result.players=result.players.slice(0,300);
   const names=await Promise.all(result.players.map(p=>db.ref('profiles/'+p.uid+'/name').get()));
   result.players=result.players.map((p,i)=>({...p,name:names[i].val()||''}));
@@ -460,7 +462,7 @@ exports.playerActivity=onCall({...options,maxInstances:3},async request=>{
 });
 // Anonymous visit counters for the admin panel. No login and no stored
 // identifiers; a per-instance limit keeps one address from inflating them.
-const {visitUpdates,visitSummary,visitRecord,visitRange,visitorsInRange,visitClaimPath,deviceFacts,dedupeVisit,rememberDevice,VISIT_DAYS,robotDevice,inRanges}=require('./visit-service.cjs');
+const {visitUpdates,visitSummary,guestDays,visitRecord,visitRange,visitorsInRange,visitClaimPath,deviceFacts,dedupeVisit,rememberDevice,VISIT_DAYS,robotDevice,inRanges}=require('./visit-service.cjs');
 // Google's address list, read at most once a day per server; without it only the known robot devices are caught.
 let googleRanges={at:0,prefixes:[]};
 async function googleAddresses(now){
@@ -494,6 +496,21 @@ exports.siteVisit=onCall({region:'us-central1',maxInstances:3,timeoutSeconds:10,
  await Promise.all([db.ref(record.test?'adminMetrics/visitsTest':'adminMetrics/visits').update(updates),entry.set(record)]);
  // The page hands this id to the player's first signal after signing in.
  return {ok:true,id:entry.key,day};
+});
+// A visitor chose "Jugar sin cuenta": the page marks its own visit (recent, not yet a guest one).
+const guestLimits=new Map();
+exports.guestVisit=onCall({region:'us-central1',maxInstances:3,timeoutSeconds:10,cors:true},async request=>{
+ const now=Date.now(),ip=String(request.rawRequest?.ip||'');
+ const recent=(guestLimits.get(ip)||[]).filter(at=>now-at<60000);
+ if(recent.length>=20)throw new HttpsError('resource-exhausted','Demasiadas visitas.');
+ recent.push(now);guestLimits.set(ip,recent);
+ if(guestLimits.size>5000)for(const [key,list] of guestLimits)if(list.every(at=>now-at>=60000))guestLimits.delete(key);
+ const path=visitClaimPath(request.data);
+ if(!path)throw new HttpsError('invalid-argument','Visita inválida.');
+ const entry=db.ref(path),record=(await entry.get()).val();
+ if(!Number.isFinite(record?.at)||now-record.at>12*3600000||record.guest===true)return {ok:false};
+ await entry.update({guest:true,...(request.data?.first===true?{guestFirst:true}:{})});
+ return {ok:true};
 });
 exports.activityCleanup=onSchedule({schedule:'every day 04:00',timeZone:'America/Montevideo',region:'us-central1',maxInstances:1},async()=>{
  const now=Date.now();

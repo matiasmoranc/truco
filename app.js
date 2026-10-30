@@ -1,5 +1,5 @@
 import './chat-moderation.js?v=20261013-moderation1';
-import { visitPlatform,takeVisit,markTestDevice } from './visit.js?v=20261028-visits6';
+import { visitPlatform,takeVisit,markTestDevice,markGuestVisit } from './visit.js?v=20261029-guests1';
 import { installFriends } from './friends.js?v=20261027-friends3';
 import { installPlayerPanel } from './player-panel.js?v=20261013-blocklist1';
 import { installScorer,renderCompactTally } from './scorer.js?v=20261026-people1';
@@ -734,7 +734,7 @@ const account=installAccount({api:creditApi,services:firebaseServices,getState:(
   if(scorerAfterSignIn&&!state.room){scorerAfterSignIn=false;history.replaceState(null,'',location.pathname);$('open-scorer').click();}
   else showLobbyOnboarding();
 },onIdentityChange:(...args)=>{friends?.stop();profiles.stop();return resetAccountRoom(...args);},onNameChanged:()=>showView('welcome-view'),onRegistered:uid=>{state.lobbyOnboardingUid=uid;requestAnimationFrame(showLobbyOnboarding);},onGuest:()=>{
-  showView('welcome-view');
+  showView('welcome-view');markGuestVisit().catch(()=>{});
   if(scorerAfterSignIn){scorerAfterSignIn=false;history.replaceState(null,'',location.pathname);$('open-scorer').click();}
 },guestAllowed:()=>!new URLSearchParams(location.search).has('mesa'),inRoom:()=>!!state.room&&!$('welcome-view').classList.contains('active')});
 const credits=installCredits({services:firebaseServices,walletSource:creditWalletSource,api:creditApi,getState:()=>state,document,notify:message=>toast(message,true,2000),onChange:()=>{showLobbyOnboarding();if(state.lobbyRooms)renderLobby(state.lobbyRooms);
