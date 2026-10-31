@@ -11,7 +11,7 @@ function extract(name){
  for(;depth&&end<source.length;end++){if(source[end]==='{')depth++;else if(source[end]==='}')depth--;}
  return source.slice(start,end);
 }
-const names=['roomTransportConnected','liveSnapshot','envidoAuditResult','settleAuditedHand','auditEnvidoScores','trickWinnerMark','botRivalHands','canRaiseEnvido','closeFinishedRoomChanges','pieceOrder','cardStrength','envidoValue','hasFlor','handEnvido','florValue','normalizeTargetPoints','targetPoints','capScores','faltanParaGanar','faltaEnvidoPoints','envidoBetPoints','florBetPoints','declinedFlorPoints','florAnswers','otherPlayer','settleHand','topFeed','matchWinner','matchFinished','sessionMatchResults','sessionWins','rematchRoom','rematchChanges','botDeck','botHandOutcome','rememberBotCards','botRiskAdjustment','assessBotHand','chooseBotDecision','disconnectedPlayer','disconnectMatchChanges','turnClockPlayer','turnClockRemaining','turnTimeoutChanges','declinedTrucoChanges','liveActionsBlocked','runLiveAction','privateHandMatchesRoom','roomHasFlor','canCallFirstRoundEnvido','enqueueLearningHelp','rememberLearningHelp','learningHelpTopic','localHand','localFeed','localCallAction','localAnswerAction','localPlay'];
+const names=['keepFinishedResult','watchRoom','renderMatchEnd','matchEndKey','closeFinishedRoom','refreshLiveConnection','respondRematch','roomTransportConnected','liveSnapshot','envidoAuditResult','settleAuditedHand','auditEnvidoScores','trickWinnerMark','botRivalHands','canRaiseEnvido','closeFinishedRoomChanges','pieceOrder','cardStrength','envidoValue','hasFlor','handEnvido','florValue','normalizeTargetPoints','targetPoints','capScores','faltanParaGanar','faltaEnvidoPoints','envidoBetPoints','florBetPoints','declinedFlorPoints','florAnswers','otherPlayer','settleHand','topFeed','matchWinner','matchFinished','sessionMatchResults','sessionWins','rematchRoom','rematchChanges','botDeck','botHandOutcome','rememberBotCards','botRiskAdjustment','assessBotHand','chooseBotDecision','disconnectedPlayer','disconnectMatchChanges','turnClockPlayer','turnClockRemaining','turnTimeoutChanges','declinedTrucoChanges','liveActionsBlocked','runLiveAction','privateHandMatchesRoom','roomHasFlor','canCallFirstRoundEnvido','enqueueLearningHelp','rememberLearningHelp','learningHelpTopic','localHand','localFeed','localCallAction','localAnswerAction','localPlay'];
 function harness(){
  const context={account:{isReady:()=>true},console,Math:Object.create(Math),Date,crypto:require('node:crypto').webcrypto,structuredClone,Set,Map,navigator:{onLine:true},state:{},localStorage:{setItem(){}},learningSeen:new Set(),VALID_TARGET_POINTS:[10,20,30,40,50,60],RECONNECT_GRACE_MS:45000,PRACTICE_PAUSE_MS:5000,gameTime:()=>100000,newOpeningDraw:()=>({cards:{}}),makeCallNotice:text=>({text}),renderGame(){},renderConnectionNotice(){},syncLiveControls(){},touchFeedback(){},toast(){},firebaseError:String,queueLearningAction(){},queueLearningTrucoCall(){},turnClockKey:()=>null,pauseMessage:()=>null,animatePlayedHandCard(){},shakeTurnBadge(){},scheduleLocalNextHand(){},scheduleLocalTransition(room,fn){context.transition=fn;},localFinishHand(winner,points){context.finished={winner,points};},localScore(player,points){context.state.room.scores[player]=Math.min(20,context.state.room.scores[player]+points);},localResolveFlor(){},revealEnvido(){}};
  vm.createContext(context);vm.runInContext(names.map(extract).join('\n'),context);return context;
@@ -233,6 +233,26 @@ test('Practice menu remembers the first start and shows three modes on later vis
 
 test('Flor can be declared after the rival opening card while own three cards remain',()=>{const c=harness(),r=room();r.playedCount=1;r.turn='player2';c.state={room:r,playerId:'player2',localHands:{player2:[card('♥',3),card('♥',6),card('♥',7)]}};vm.runInContext(extract('localAction'),c);c.localAction('flor');assert.equal(r.flors.player2,36);assert.equal(r.pendingBet,null);assert.equal(r.florSettled,true);});
 
+test('The result stays open when the rival leaves, without rematch, so it can still be shared',()=>{
+ const c=harness(),els={},lobby=[];let renders=0,listener=null,unsubscribed=0;
+ const finished={status:'complete',matchNumber:1,targetPoints:20,createdAt:1,scores:{player1:20,player2:7},players:{player1:{uid:'a',name:'Ana'},player2:{uid:'b',name:'Beto'}},matchResult:{winner:'player1',loser:'player2',reason:'score'},endReveal:{done:true}};
+ Object.assign(c,{rematchInFlight:false,$:id=>els[id]??={classList:{toggle(name,on){this[name]=on;}},focus(){}},escapeHtml:text=>text,syncRematchCreditControls(){},stopRoomPresence(){},stopLiveTable(){},renderGame(){renders++;c.renderMatchEnd();},returnToLobby:message=>lobby.push(message??''),rememberRoomSeat(){},syncRoomPresence(){},isCoordinator:()=>false,showView(){},watchPrivateHand(){},renderWaiting(){},publishChatMute(){},isOlderRoom:()=>false,roomExpired:()=>false});
+ c.state=Object.assign(c.state,{roomCode:'ABCDE',playerId:'player1',uid:'a',firebaseConnected:true,connectionReady:true,firebase:{db:{},ref:(_,where)=>where,onValue:(_,fn)=>{listener=fn;return ()=>unsubscribed++;}},room:{...finished,rematch:{id:'r',requester:'player1',status:'pending'}}});
+ c.watchRoom();
+ listener({exists:()=>true,val:()=>({...finished,status:'closed',closeReason:'match-left',rematch:null})});
+ assert.deepEqual(lobby,[]);assert.equal(unsubscribed,1);assert.equal(c.state.room.status,'complete');assert.equal(c.state.room.tableClosed,true);
+ assert.equal(els['match-end'].classList.hidden,false);assert.equal(els['match-end-message'].textContent,'Tu rival se fue de la mesa.');
+ for(const id of ['request-rematch','accept-rematch','decline-rematch'])assert.equal(els[id].classList.hidden,true);
+ c.state.firebaseConnected=false;assert.equal(c.liveActionsBlocked(),false);
+ c.closeFinishedRoom();assert.deepEqual(lobby,['']);
+});
+test('The result closes as before for whoever leaves and for a rematch nobody finished',()=>{
+ const c=harness();let kept=0;Object.assign(c,{stopRoomPresence(){},stopLiveTable(){},renderGame(){kept++;}});
+ const finished={matchNumber:1,targetPoints:20,scores:{player1:20,player2:7},players:{},endReveal:{done:true},status:'closed',closeReason:'match-left'};
+ c.state=Object.assign(c.state,{roomCode:'ABCDE',leavingRoom:'ABCDE'});assert.equal(c.keepFinishedResult(finished),false);
+ c.state.leavingRoom=null;assert.equal(c.keepFinishedResult({...finished,scores:{player1:0,player2:0},status:'closed',closeReason:'draw-left'}),false);
+ assert.equal(c.keepFinishedResult(null),false);assert.equal(kept,0);
+});
 test('Abandonment cannot request or accept a rematch',()=>{
  const c=harness(),ended={status:'complete',targetPoints:20,scores:{player1:20,player2:0},players:{player1:{uid:'a'},player2:{uid:'b'}},matchResult:{winner:'player1',loser:'player2',reason:'abandon'},endReveal:{done:true},rematch:{id:'old',requester:'player2',status:'pending'}};
  for(const action of ['request','accept','decline'])assert.equal(c.rematchChanges(ended,'player1',action,'old'),null);

@@ -7,7 +7,7 @@ function setup(mobile=false){
  const container={children:[],append(node){this.children.push(node);node.parent=this;}};
  const document={createElement(){return {style:{},dataset:{},setAttribute(){},remove(){this.parent.children=this.parent.children.filter(n=>n!==this);}};}};
  const state={roomCode:'room',playerId:'player1'};
- const context={opponentFlights:new Map(),opponentPlaySnapshot:{scope:null,keys:new Set()},matchMedia:()=>({matches:mobile}),document,state,$:id=>id==='trick-cards'?container:{querySelector:()=>null},CSS:{escape:x=>x},cardImageStyle:()=>'',cardAccessibleName:()=>''};
+ const context={opponentFlights:new Map(),opponentPlaySnapshot:{scope:null,keys:new Set()},matchMedia:()=>({matches:mobile}),document,state,$:id=>id==='trick-cards'?container:{querySelector:()=>null,classList:{contains:()=>false}},CSS:{escape:x=>x},cardImageStyle:()=>'',cardAccessibleName:()=>''};
  context.animateOpponentCard=(card,playerId,node,key)=>{context.flights.push(key);context.opponentFlights.set(key,{node,target:node});};context.flights=[];context.clearOpponentFlight=key=>{context.opponentFlights.delete(key);};
  vm.createContext(context);vm.runInContext(source.slice(source.indexOf('let activeCardFlight=null;'),source.indexOf('function animatePlayedHandCard('))+';globalThis.setFlight=value=>activeCardFlight=value;globalThis.getFlight=()=>activeCardFlight;',context);
  return {context,container};

@@ -128,8 +128,8 @@ export function installTeamTable({$,getState,command,runAction,renderPlayerHand,
   // Without stake there is nothing to pay: the winners add points to their level.
   const paid=Number(r.creditMatch?.stake)>0;$('match-session-score').textContent=paid?(r.creditResult?'Cada ganador recibe '+r.creditResult.payout+' créditos.':'Confirmando los créditos…'):'Los ganadores suman puntos para su nivel.';$('match-session-score').classList.remove('hidden');
   const votes=r.rematch?.status==='pending'?r.rematch.votes||{}:{};const voted=!!votes[s.playerId];
-  $('match-end-message').textContent=Object.keys(votes).length?'Revancha: '+Object.keys(votes).length+' de 4 confirmaron.':'La revancha necesita la confirmación de los cuatro.';
-  $('request-rematch').classList.toggle('hidden',voted);$('accept-rematch').classList.add('hidden');$('decline-rematch').classList.add('hidden');
+  $('match-end-message').textContent=r.tableClosed?'Un jugador se fue de la mesa.':Object.keys(votes).length?'Revancha: '+Object.keys(votes).length+' de 4 confirmaron.':'La revancha necesita la confirmación de los cuatro.';
+  $('request-rematch').classList.toggle('hidden',voted||!!r.tableClosed);$('accept-rematch').classList.add('hidden');$('decline-rematch').classList.add('hidden');
  }
  function render(){const s=getState(),r=s.room,p=s.playerId;if(r?.mode!=='2v2'){$('signal-timer')?.classList.add('hidden');return;}
   const game=$('game-view'),felt=$('felt-area'),seats=teamSeatsFor(p),mineTeam=playerTeam(p),enemyTeam=mineTeam==='player1'?'player2':'player1';
