@@ -167,3 +167,11 @@ test('Gritá is only accepted while the team has the word to call truco',()=>{
  s.room.lastTrucoTeam='player2';l=act(l,'c',{kind:'team-signal',value:'grita'},1001);
  assert.equal(l.matches.m1.session.room.teamSignal.value,'grita');
 });
+test('Running out of time holding a flor answers no quiero instead of trapping the table',()=>{
+ const players=Object.fromEntries(SEATS.map(p=>[p,{uid:p,name:p}]));let s,responder;
+ do{s=newTeamSession('ABCDE',players,30,{id:'m',stake:0,pot:0},100);createTeamReferee(s,{now:100}).start();responder=SEATS.find(p=>team(p)!==team(s.room.mano)&&flower(s.hands[p],s.room.muestra));}while(!responder);
+ const r=s.room;r.pendingBet={id:'b',type:'envido',called:'envido',caller:r.mano,callerTeam:team(r.mano),responder,stake:2,accepted:0};
+ createTeamReferee(s,{now:200}).advance();assert.equal(r.turnClock.player,responder);
+ assert.doesNotThrow(()=>createTeamReferee(s,{now:45300}).advance());
+ assert.equal(r.pendingBet,null);assert.equal(r.timeoutCounts[responder],1);assert.equal(r.status,'started');
+});

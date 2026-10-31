@@ -89,10 +89,10 @@ function createTeamReferee(s,{now=Date.now(),deckFactory=deck}={}){
  }
  // Bots holding a flower sing it the moment another flor is sung, before any card.
  function singBotFlors(){for(const q of ordered(r.mano||'player1')){if(r.status!=='started')return;if(String(r.players?.[q]?.uid||'').startsWith('bot:')&&canSing(q))flor(q);}}
- function call(p,v){const b=r.pendingBet;
+ function call(p,v,timedOut=false){const b=r.pendingBet;
   if(v==='flor'){flor(p);singBotFlors();return;}
   if(['yes','no','raise'].includes(v)||v.startsWith('raise-')){if(!b||b.responder!==p||b.revealMode)throw new Error('Le corresponde responder a la mano del equipo.');
-   if(b.type!=='flor'&&canSing(p))throw new Error('Tenés flor. Cantala antes de responder.');
+   if(b.type!=='flor'&&canSing(p)&&!timedOut)throw new Error('Tenés flor. Cantala antes de responder.');
    if(b.type==='flor'&&v!=='no'&&canSing(p))r.flors[p]=true;
    if(v==='no'){if(b.type==='truco'){r.pendingNextHand={id:'declined:'+crypto.randomUUID(),winner:b.callerTeam,foldPoints:b.stake-1,endsAt:now+3000};r.pendingBet=null;r.turn=null;}else resolveSide(false);notice(p,b.type==='flor'?'Con flor me achico':'No quiero');return;}
    if(v==='raise'||v.startsWith('raise-')){
@@ -163,7 +163,7 @@ function createTeamReferee(s,{now=Date.now(),deckFactory=deck}={}){
   if(r.status==='started'&&r.pendingNextHand&&now>=r.pendingNextHand.endsAt){const b=r.pendingNextHand;finish(b.winner,b.foldPoints,'El equipo rival se retiró o no quiso.');}
   if(r.status==='complete'&&r.endReveal&&!r.endReveal.done&&now>=r.endReveal.endsAt)r.endReveal.done=true;
   if(r.status==='revealing'&&now>=r.endReveal.endsAt)deal(nextSeat(r.dealer));
-  if(r.status==='started'&&r.turnClock&&now-r.turnClock.startedAt>=45000){const p=r.turnClock.player;r.timeoutCounts[p]=(r.timeoutCounts[p]||0)+1;if(r.timeoutCounts[p]>=3){finish(opponent(team(p)),r.targetPoints,'Inactividad.');r.endReveal.done=true;}else if(r.pendingBet?.responder===p&&!r.pendingBet.revealMode)call(p,'no');else if(r.pendingBet?.revealMode)autoDeclare(p);else fold(p);}
+  if(r.status==='started'&&r.turnClock&&now-r.turnClock.startedAt>=45000){const p=r.turnClock.player;r.timeoutCounts[p]=(r.timeoutCounts[p]||0)+1;if(r.timeoutCounts[p]>=3){finish(opponent(team(p)),r.targetPoints,'Inactividad.');r.endReveal.done=true;}else if(r.pendingBet?.responder===p&&!r.pendingBet.revealMode)call(p,'no',true);else if(r.pendingBet?.revealMode)autoDeclare(p);else fold(p);}
   clock();return s;
  }
  function signal(p,value){
