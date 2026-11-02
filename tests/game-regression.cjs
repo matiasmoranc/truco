@@ -187,7 +187,7 @@ test('Final practice points announce victory without offering another deal',()=>
 test('Stages two and three open study introduction before queued table guidance',async()=>{
  for(const stage of [0,1,2]){
   const c=harness(),r=room(),events=[];c.state={room:r,localHands:{player1:[card('♥',1),card('♥',7),card('♣',3)],player2:[card('♦',1),card('♦',7),card('♣',3)]}};
-  c.$=()=>({value:'Mati',close(){}});c.startLocalBotGame=async()=>true;c.cleanName=value=>value;c.savedPlayerName=()=>'';c.showView=()=>{};c.openLearningHelp=()=>events.push('study-intro');c.resumeLearning=()=>events.push('table-guidance');c.learningDeck=()=>[...c.state.localHands.player1,...c.state.localHands.player2,card('♠',6)];
+  c.$=()=>({value:'Mati',close(){}});c.startLocalBotGame=async()=>true;c.cleanName=value=>value;c.savedPlayerName=()=>'';c.showView=()=>{};c.trackUsage=()=>{};c.openLearningHelp=()=>events.push('study-intro');c.resumeLearning=()=>events.push('table-guidance');c.learningDeck=()=>[...c.state.localHands.player1,...c.state.localHands.player2,card('♠',6)];
   vm.runInContext(['rememberLearningPractice','startLearning'].map(extract).join('\n'),c);await c.startLearning(stage);
   assert.deepEqual(events,[stage?'study-intro':'table-guidance']);
   assert.equal(c.state.learning.tutorialMessages[0].pointAtGuide,true);assert.equal(c.state.learning.tutorialMessages[1].pointAtOptions,true);assert.match(c.state.learning.tutorialMessages[2].text,/Seleccioná/);

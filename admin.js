@@ -39,7 +39,7 @@ function say(message){$('status').textContent=message;}
 // Test accounts and test devices stay out of every number unless this switch is off.
 function hideTest(){return $('hide-test').checked;}
 try{$('hide-test').checked=localStorage.getItem('admin-show-test')!=='1';}catch{/* Storage unavailable: hide by default. */}
-$('hide-test').onchange=()=>{try{localStorage.setItem('admin-show-test',hideTest()?'0':'1');}catch{}refresh(false,true).then(()=>{if(visitDetail)openVisitDetail(visitDetail.platform,{page:visitDetail.page,hour:visitDetail.hour});});};
+$('hide-test').onchange=()=>{try{localStorage.setItem('admin-show-test',hideTest()?'0':'1');}catch{}refresh(false,true).then(()=>{if(visitDetail)openVisitDetail(visitDetail.platform,{page:visitDetail.page,hour:visitDetail.hour});if(!$('usage').hidden)refreshUsage();});};
 async function setTestUser(u,test){
  try{say(test?'Marcando como prueba…':'Quitando de prueba…');const result=(await call({action:'test-user',uid:u.uid,test})).data;await refresh(false,true);say((u.name||'El usuario')+(test?' quedó marcado como prueba':' vuelve a contar en los números')+(result?.moved?' ('+result.moved+' visitas movidas).':'.'));}
  catch(e){say(errorText(e));}
@@ -47,7 +47,7 @@ async function setTestUser(u,test){
 const number=value=>new Intl.NumberFormat('es-UY').format(Number(value)||0);
 const PLATFORM_LABELS={'app-ios':'App iPhone','app-android':'App Android','web-ios':'Web iPhone','web-android':'Web Android','web-desktop':'Web computadora'};
 const PAGE_LABELS={juego:'Juego',anotador:'Anotador',aprender:'Aprender a jugar',otra:'Reglas y otras'};
-const TAB_TITLES={metrics:'Resumen',visits:'Visitas',users:'Usuarios',tables:'Mesas y partidas',reports:'Problemas reportados',messages:'Mensajes a jugadores',audit:'Historial de cambios'};
+const TAB_TITLES={metrics:'Resumen',visits:'Visitas',usage:'Anotador y Aprender',users:'Usuarios',tables:'Mesas y partidas',reports:'Problemas reportados',messages:'Mensajes a jugadores',audit:'Historial de cambios'};
 function errorText(e){return e.code==='functions/not-found'?'Falta publicar las funciones de administración en Firebase.':e.message||'No se pudo completar el cambio.';}
 const AUDIT_LABELS={level:'Cambio de nivel y puntos',rename:'Cambio de nombre',block:'Bloqueo',delete:'Eliminación de cuenta',credits:'Créditos','close-table':'Cierre de mesa','close-legacy-table':'Cierre de mesa','repair-reservation':'Reparación de reserva'};
 function node(tag,text,className){const el=document.createElement(tag);el.textContent=text;if(className)el.className=className;return el;}
@@ -250,8 +250,8 @@ $('table-state').addEventListener('change',renderTables);
 $('search').addEventListener('input',renderUsers);
 // Tapping a column header orders by it; tapping it again flips the order.
 for(const button of document.querySelectorAll('[data-sort]'))button.onclick=()=>{const key=button.dataset.sort;sortBy=sortBy.key===key?{key,dir:-sortBy.dir}:{key,dir:key==='name'?1:-1};renderUsers();};$('photo-filter').onchange=$('level-filter').onchange=renderUsers;$('more').onclick=()=>refresh(true);
-function showTab(name){for(const section of Object.keys(TAB_TITLES))$(section).hidden=section!==name;for(const tab of document.querySelectorAll('[data-tab]'))tab.classList.toggle('active',tab.dataset.tab===name);$('page-title').textContent=TAB_TITLES[name];}
-$('refresh').onclick=()=>refresh(false,true);
+function showTab(name){for(const section of Object.keys(TAB_TITLES))$(section).hidden=section!==name;for(const tab of document.querySelectorAll('[data-tab]'))tab.classList.toggle('active',tab.dataset.tab===name);$('page-title').textContent=TAB_TITLES[name];if(name==='usage')refreshUsage();}
+$('refresh').onclick=()=>{refresh(false,true);if(!$('usage').hidden)refreshUsage();};
 for(const b of document.querySelectorAll('[data-tab]'))b.onclick=()=>showTab(b.dataset.tab);
 async function showUsers(scope){if(busy)return;userScope=scope;pagesLoaded=1;pageToken=null;users=[];$('search').value='';$('user-scope').value=scope;renderUsers();showTab('users');await refresh();}
 for(const b of document.querySelectorAll('[data-scope]'))b.onclick=()=>showUsers(b.dataset.scope);
@@ -332,21 +332,88 @@ function goVisits({day=null,platform='all',page=null,measure=null,guest=false}={
  visitDetail=null;renderVisits();openVisitDetail(platform,{page,guest});
 }
 // The selected period as Uruguay days, clamped to the stored history.
-function visitPeriod(){
- const today=metrics?.today||new Date(Date.now()-10800000).toISOString().slice(0,10),oldest=addDays(today,-89),choice=$('visit-range').value;
- const custom=choice==='custom';for(const field of document.querySelectorAll('.date-field'))field.hidden=!custom;
- for(const id of ['visit-from','visit-to']){$(id).min=oldest;$(id).max=today;}
+function selectedPeriod(prefix,fields){
+ const today=metrics?.today||new Date(Date.now()-10800000).toISOString().slice(0,10),oldest=addDays(today,-89),choice=$(prefix+'-range').value;
+ const custom=choice==='custom';for(const field of document.querySelectorAll(fields))field.hidden=!custom;
+ for(const id of [prefix+'-from',prefix+'-to']){$(id).min=oldest;$(id).max=today;}
  let from,to=today;
  if(choice==='today')from=today;
  else if(choice==='yesterday')from=to=addDays(today,-1);
  else if(custom){
-  if(!$('visit-from').value)$('visit-from').value=addDays(today,-6);if(!$('visit-to').value)$('visit-to').value=today;
-  from=$('visit-from').value;to=$('visit-to').value;
+  if(!$(prefix+'-from').value)$(prefix+'-from').value=addDays(today,-6);if(!$(prefix+'-to').value)$(prefix+'-to').value=today;
+  from=$(prefix+'-from').value;to=$(prefix+'-to').value;
   if(from>to)[from,to]=[to,from];
  }else from=addDays(today,-(Number(choice)-1));
  if(from<oldest)from=oldest;if(to>today)to=today;
  return {from,to};
 }
+const visitPeriod=()=>selectedPeriod('visit','.date-field');
+// Scorer and learning: who uses them, on the web pages and inside the game, and what came next.
+const JOURNEY_ROWS={
+ anotador:[['landing','Llegaron por primera vez'],['used','Usaron el anotador'],['finished','Terminaron de anotar una partida'],['game','Llegaron al juego'],['entered','Entraron con cuenta o invitados'],['registered','Crearon cuenta'],['scorer','Abrieron el anotador del juego'],['played','Jugaron una partida'],['returned','Volvieron otro día']],
+ aprender:[['landing','Llegaron por primera vez'],['used','Leyeron hasta el final'],['game','Llegaron al juego'],['entered','Entraron con cuenta o invitados'],['registered','Crearon cuenta'],['learn','Abrieron Aprender en el juego'],['played','Jugaron una partida'],['returned','Volvieron otro día']]
+};
+const ANOTADOR_ROWS=[['Página','Empezaron a anotar','anotador-web-start'],['Página','Terminaron una partida','anotador-web-finish'],['Página','Tocaron «Abrir» (pantalla completa)','anotador-web-promo'],['Página','Tocaron «Jugar truco online»','anotador-web-play'],['Juego','Abrieron el anotador','anotador-game-open'],['Juego','Empezaron a anotar','anotador-game-start'],['Juego','Terminaron una partida','anotador-game-finish'],['Juego','Compartieron el resultado','anotador-game-share']];
+const APRENDER_ROWS=[['Guía web','Leyeron hasta el final','aprender-web-end'],['Guía web','Tocaron «Practicar gratis»','aprender-web-play'],['Juego','Abrieron Aprender','aprender-game-open'],['Juego','Vieron los videos','aprender-game-videos'],['Juego','Terminaron los videos','aprender-game-videos-end'],['Juego','Empezaron partida simple','aprender-game-stage-0'],['Juego','Terminaron partida simple','aprender-game-finish-0'],['Juego','Empezaron partida con envido','aprender-game-stage-1'],['Juego','Terminaron partida con envido','aprender-game-finish-1'],['Juego','Empezaron partida con flor','aprender-game-stage-2'],['Juego','Terminaron partida con flor','aprender-game-finish-2'],['Juego','Practicaron envido','aprender-game-envido'],['Juego','Practicaron flor','aprender-game-flor'],['Juego','Practicaron puntos de flor','aprender-game-flor-points'],['Juego','Abrieron la guía de cartas','aprender-game-guide']];
+let usage=null,usageRequest=0;
+const percent=(part,whole)=>whole?Math.round(part*100/whole)+'%':'—';
+async function refreshUsage(){
+ const period=selectedPeriod('usage','.usage-date-field'),request=++usageRequest;
+ $('usage-period').textContent=period.from===period.to?'Período: '+longDay(period.from):'Período: del '+longDay(period.from)+' al '+longDay(period.to);
+ try{const data=(await call({action:'usage',...period,includeTest:!hideTest()})).data;if(request!==usageRequest)return;usage=data;$('usage-status').hidden=true;renderUsage();}
+ catch(e){if(request===usageRequest){$('usage-status').hidden=false;$('usage-status').textContent=e.code==='functions/invalid-argument'?'Falta publicar las funciones de administración en Firebase.':errorText(e);}}
+}
+function fillOrigins(select,journeys){
+ const first=!select.options.length,previous=select.value,found=Object.keys(journeys||{}).sort((a,b)=>a==='Google'?-1:b==='Google'?1:a.localeCompare(b,'es'));
+ select.replaceChildren(node('option','Todos'),...found.map(o=>node('option',o)));select.options[0].value='';
+ select.value=first&&found.includes('Google')?'Google':found.includes(previous)?previous:'';
+}
+// Each step is measured against everyone who arrived, not against the previous step.
+function renderJourney(page){
+ const journeys=usage?.journeys?.[page]||{},select=$('journey-'+page+'-origin'),target=$('journey-'+page),origin=select.value,steps={};
+ for(const [name,counts] of Object.entries(journeys))if(!origin||name===origin)for(const [step,value] of Object.entries(counts))steps[step]=(steps[step]||0)+value;
+ const arrived=steps.landing||0,reached=steps.game||0;target.replaceChildren();
+ $('journey-'+page+'-summary').textContent=arrived?number(arrived)+(arrived===1?' persona nueva':' personas nuevas')+(origin?' desde '+origin:'')+': '+number(reached)+' llegaron al juego ('+percent(reached,arrived)+') y '+number(Math.max(0,arrived-reached))+' se quedaron solo en la página.':'';
+ if(!arrived){target.append(node('p','Todavía no hay datos para este período.','empty'));return;}
+ for(const [key,label] of JOURNEY_ROWS[page]){
+  const value=steps[key]||0,row=node('div','','pbar'),track=node('div','','track'),fill=node('div','','fill');
+  fill.style.width=(value/arrived*100)+'%';fill.style.background='var(--gold)';track.append(fill);
+  const total=node('strong',number(value));total.append(node('small',percent(value,arrived)));
+  row.append(node('span',label),track,total);target.append(row);
+ }
+}
+function usageTable(target,rows){
+ const events=usage?.events||{};
+ target.replaceChildren(simpleTable(['Dónde','Qué hicieron','Personas','Veces','Web','Apps'],rows.map(([place,label,key])=>{const e=events[key]||{};return [place,label,number(e.people),number(e.count),number(e.web),number(e.apps)];})));
+}
+function originBarsFor(page,target){
+ const origins=usage?.pages?.[page]?.origins||{};
+ bars(target,Object.entries(origins).map(([label,o])=>({label,value:o.people})).sort((a,b)=>b.value-a.value));
+}
+function usageDays(target,key){
+ const days=usage?.days||[];
+ columns(target,days.map(d=>({label:shortDay(d.day),segments:[{key:'usage-page',value:d[key].page},{key:'usage-game',value:d[key].game}],tooltip:shortDay(d.day)+'\nPágina: '+number(d[key].page)+' ('+number(d[key].google)+' desde Google)\nJuego: '+number(d[key].game)})),{labelEvery:Math.max(1,Math.ceil(days.length/12))});
+}
+function renderUsage(){
+ if(!usage)return;
+ const anotador=usage.pages?.anotador||{},aprender=usage.pages?.aprender||{},events=usage.events||{},kpis=$('usage-kpis');
+ const google=page=>page.origins?.Google?.people||0;
+ const kpi=(label,value,note)=>{const k=node('div','','kpi');k.append(node('small',label),node('strong',number(value)),node('span',note,'delta'));kpis.append(k);};
+ kpis.replaceChildren();
+ kpi('Página del anotador',anotador.people,number(anotador.visits)+' visitas');
+ kpi('Anotador desde Google',google(anotador),percent(google(anotador),anotador.people)+' de la página');
+ kpi('Anotador del juego',events['anotador-game-open']?.people,number(events['anotador-game-open']?.count)+' aperturas');
+ kpi('Guía Aprender (web)',aprender.people,number(aprender.visits)+' visitas');
+ kpi('Guía desde Google',google(aprender),percent(google(aprender),aprender.people)+' de la guía');
+ kpi('Aprender del juego',events['aprender-game-open']?.people,number(events['aprender-game-open']?.count)+' aperturas');
+ for(const page of ['anotador','aprender']){fillOrigins($('journey-'+page+'-origin'),usage.journeys?.[page]);renderJourney(page);}
+ usageDays($('usage-anotador-days'),'anotador');usageDays($('usage-aprender-days'),'aprender');
+ usageTable($('usage-anotador-table'),ANOTADOR_ROWS);usageTable($('usage-aprender-table'),APRENDER_ROWS);
+ originBarsFor('anotador',$('usage-anotador-origins'));originBarsFor('aprender',$('usage-aprender-origins'));
+ bars($('usage-targets'),Object.entries(usage.targets||{}).map(([target,value])=>({label:'A '+target,value})).sort((a,b)=>b.value-a.value));
+}
+for(const id of ['usage-range','usage-from','usage-to'])$(id).addEventListener('change',refreshUsage);
+for(const page of ['anotador','aprender'])$('journey-'+page+'-origin').addEventListener('change',()=>renderJourney(page));
 function renderVisits(){
  const all=metrics?.visits?.days||[],{from,to}=visitPeriod();
  const measure=$('visit-measure').value,unit=measure==='visits'?'visitas':'visitantes',totalKey=measure==='visits'?'totalVisits':'totalVisitors';

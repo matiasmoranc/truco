@@ -53,7 +53,7 @@
   <header class="top"><a class="brand" href="./">Truco Uruguayo</a><nav aria-label="Páginas"><a href="./">Jugar online</a><a href="./aprender-truco-uruguayo.html">Cómo jugar</a><a href="./cartas-truco-uruguayo.html">Guía de cartas</a></nav></header>
   <aside class="scorer-promo" aria-label="Anotador en pantalla completa">
     <div><strong>Usalo en pantalla completa y con función para compartir el resultado</strong></div>
-    <a class="cta" href="https://trucouruguayo.uy/?anotador">Abrir</a>
+    <a class="cta" id="scorer-open-game" href="https://trucouruguayo.uy/?anotador">Abrir</a>
   </aside>
 
   <section class="scorer scorer-view active" id="scorer-view" aria-label="Anotador">
@@ -66,7 +66,7 @@
     </div>
   </section>
 
-  <section class="card"><h2>¿No tienen cartas a mano?</h2><p>Jugá al truco uruguayo online y gratis, de a dos o de a cuatro con amigos, o practicá contra el bot.</p><a class="cta" href="./">Jugar truco online</a></section>
+  <section class="card"><h2>¿No tienen cartas a mano?</h2><p>Jugá al truco uruguayo online y gratis, de a dos o de a cuatro con amigos, o practicá contra el bot.</p><a class="cta" id="scorer-play" href="./">Jugar truco online</a></section>
 
   <p class="eyebrow">Gratis y sin descargar nada</p>
   <h1>Anotador para jugar al truco</h1>
@@ -85,8 +85,11 @@
   <footer class="footer">Truco Uruguayo · <a href="./reglas.html">Reglas</a> · <a href="./privacidad.html">Privacidad</a> · <a href="./soporte.html">Soporte</a> · <a href="https://trucoargentino.net/">Truco argentino online</a></footer>
 </main>
 <script type="module">
-  import {installScorer} from './scorer.js?v=20261026-people1';
-  installScorer({document,showView(){},standalone:true});
+  import {installScorer} from './scorer.js?v=20261101-usage1';
+  import {trackUsage} from './visit.js?v=20261101-usage1';
+  installScorer({document,showView(){},standalone:true,onEvent:(event,extra)=>trackUsage('anotador-web-'+event,extra)});
+  document.getElementById('scorer-open-game').addEventListener('click',()=>trackUsage('anotador-web-promo'));
+  document.getElementById('scorer-play').addEventListener('click',()=>trackUsage('anotador-web-play'));
 </script>
-<script type="module" src="visit.js?v=20261029-guests1"></script>
+<script type="module" src="visit.js?v=20261101-usage1"></script>
 </body></html>

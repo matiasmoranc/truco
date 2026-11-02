@@ -2,7 +2,7 @@
 // standalone: the scorer is the whole page (anotador page), so it shows at once.
 // people: names offered for Nosotros and Ellos (the player and their friends), when signed in.
 // onShare: called with the final score when the player wants to share it on a photo.
-export function installScorer({document,storage=globalThis.localStorage,showView,renderTally=renderCompactTally,now=()=>Date.now(),standalone=false,people=null,onShare=null}) {
+export function installScorer({document,storage=globalThis.localStorage,showView,renderTally=renderCompactTally,now=()=>Date.now(),standalone=false,people=null,onShare=null,onEvent=()=>{}}) {
   const $=id=>document.getElementById(id),key='truco-manual-score-v1';
   const screen = installScorerScreen({document});
   $('scorer-colors')?.addEventListener('click',()=>{
@@ -42,16 +42,16 @@ export function installScorer({document,storage=globalThis.localStorage,showView
       $(`scorer-add-${team}`).classList.toggle('scorer-winner',winner===team);
     }
   }
-  $('open-scorer')?.addEventListener('click',()=>{if(match&&now()-match.startedAt>=86400000){match=null;save();}render();showView('scorer-view');screen.setActive(true);});
+  $('open-scorer')?.addEventListener('click',()=>{onEvent('open');if(match&&now()-match.startedAt>=86400000){match=null;save();}render();showView('scorer-view');screen.setActive(true);});
   $('scorer-back')?.addEventListener('click',()=>{screen.setActive(false);showView('welcome-view');});
   $('scorer-new').addEventListener('click',()=>{match=null;save();render();});
-  document.querySelectorAll('[data-scorer-target]').forEach(button=>button.addEventListener('click',()=>{match={target:Number(button.dataset.scorerTarget),scores:[0,0],startedAt:now(),names:[0,1].map(team=>$('scorer-people')?.hidden===false&&$('scorer-person-'+team)?.value||DEFAULT_NAMES[team])};save();render();}));
-  $('scorer-share')?.addEventListener('click',()=>{if(!match||!onShare)return;const winner=match.scores.findIndex(n=>n===match.target);onShare({target:match.target,sides:[0,1].map(team=>({name:sideName(team),points:match.scores[team],winner:team===winner}))});});
+  document.querySelectorAll('[data-scorer-target]').forEach(button=>button.addEventListener('click',()=>{match={target:Number(button.dataset.scorerTarget),scores:[0,0],startedAt:now(),names:[0,1].map(team=>$('scorer-people')?.hidden===false&&$('scorer-person-'+team)?.value||DEFAULT_NAMES[team])};save();render();onEvent('start',{target:match.target});}));
+  $('scorer-share')?.addEventListener('click',()=>{if(!match||!onShare)return;onEvent('share');const winner=match.scores.findIndex(n=>n===match.target);onShare({target:match.target,sides:[0,1].map(team=>({name:sideName(team),points:match.scores[team],winner:team===winner}))});});
   if(standalone){if(match&&now()-match.startedAt>=86400000){match=null;save();}render();screen.setActive(true);}
   for(let team=0;team<2;team++){
     $(`scorer-add-${team}`).addEventListener('click',()=>{
       if(!match||match.scores.some(n=>n===match.target))return;
-      match.scores[team]++;save();render();
+      match.scores[team]++;save();render();if(match.scores[team]===match.target)onEvent('finish');
     });
     $(`scorer-minus-${team}`).addEventListener('click',()=>{
       if(!match)return;match.scores[team]=Math.max(0,match.scores[team]-1);save();render();

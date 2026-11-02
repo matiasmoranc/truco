@@ -264,6 +264,12 @@ exports.adminConsole=onCall({...options,secrets:[liveInternalSecret]},async requ
   result.players=result.players.map((p,i)=>({...p,name:names[i].val()||''}));
   return result;
  }
+ if(action==='usage'){
+  let range;try{range=visitRange({...data,platform:'all',page:null,hour:null,now:Date.now()});}catch(e){throw new HttpsError('invalid-argument',e.message);}
+  const [log,usage,testUsage]=await Promise.all(['visitLog','usage','usageTest'].map(key=>db.ref('adminMetrics/'+key).orderByKey().startAt(range.from).endAt(range.to).get()));
+  const include=data.includeTest===true,exclude=include?null:new Set(Object.keys((await db.ref('adminConfig/testUsers').get()).val()||{}));
+  return usageSummary({log:log.val()||{},usage:include?mergeUsage(usage.val()||{},testUsage.val()||{}):usage.val()||{},from:range.from,to:range.to,exclude});
+ }
  if(action==='test-user'){
   if(!validKey(data.uid)||typeof data.test!=='boolean')throw new HttpsError('invalid-argument','Usuario inválido.');
   await db.ref('adminConfig/testUsers/'+data.uid).set(data.test||null);
@@ -473,6 +479,7 @@ async function googleAddresses(now){
  return googleRanges.prefixes;
 }
 const {moveVisitUpdates,moveVisitsUpdates,mergeVisitCounters,withoutTestActivity}=require('./test-data.cjs');
+const {usageUpdates,mergeUsage,usageSummary}=require('./usage-service.cjs');
 const visitLimits=new Map(),visitDevices=new Map();
 exports.siteVisit=onCall({region:'us-central1',maxInstances:3,timeoutSeconds:10,cors:true},async request=>{
  const now=Date.now(),ip=String(request.rawRequest?.ip||'');
@@ -512,6 +519,21 @@ exports.guestVisit=onCall({region:'us-central1',maxInstances:3,timeoutSeconds:10
  await entry.update({guest:true,...(request.data?.first===true?{guestFirst:true}:{})});
  return {ok:true};
 });
+// What was used in the scorer and the learning section, and what came after a first landing.
+const usageLimits=new Map();
+exports.siteUsage=onCall({region:'us-central1',maxInstances:3,timeoutSeconds:10,cors:true},async request=>{
+ const now=Date.now(),ip=String(request.rawRequest?.ip||'');
+ const recent=(usageLimits.get(ip)||[]).filter(at=>now-at<60000);
+ if(recent.length>=40)throw new HttpsError('resource-exhausted','Demasiados registros.');
+ recent.push(now);usageLimits.set(ip,recent);
+ if(usageLimits.size>5000)for(const [key,list] of usageLimits)if(list.every(at=>now-at>=60000))usageLimits.delete(key);
+ const data=request.data||{};let updates;
+ try{updates=usageUpdates({...data,now,increment:ServerValue.increment});}catch(e){throw new HttpsError('invalid-argument',e.message);}
+ // Test devices and Google's own addresses (its test robots) count apart, like their visits.
+ const test=data.test===true||inRanges(ip,await googleAddresses(now));
+ await db.ref(test?'adminMetrics/usageTest':'adminMetrics/usage').update(updates);
+ return {ok:true};
+});
 exports.activityCleanup=onSchedule({schedule:'every day 04:00',timeZone:'America/Montevideo',region:'us-central1',maxInstances:1},async()=>{
  const now=Date.now();
  // Table invitations and their answers older than a day are not useful anymore.
@@ -524,7 +546,7 @@ exports.activityCleanup=onSchedule({schedule:'every day 04:00',timeZone:'America
   if(robots.length){const moves=moveVisitsUpdates(robots,true,n=>n);for(const [path,n] of Object.entries(moves)){const keys=path.split('/');let node=metrics;for(const k of keys.slice(0,-1))node=node[k]??={};const last=keys.at(-1);node[last]=Math.max(0,(Number(node[last])||0)+n);}}
   // Daily activity, counters and visit details are kept for VISIT_DAYS.
   const visitCutoff=uruguayDate(now-(VISIT_DAYS-1)*86400000).day;
-  for(const key of ['days','visits','visitsTest','visitLog'])for(const day of Object.keys(metrics[key]||{}))if(day<visitCutoff)delete metrics[key][day];
+  for(const key of ['days','visits','visitsTest','visitLog','usage','usageTest'])for(const day of Object.keys(metrics[key]||{}))if(day<visitCutoff)delete metrics[key][day];
   for(const [uid,sessions] of Object.entries(metrics.presence||{})){
    for(const [id,session] of Object.entries(sessions))if(now-session.at>=90000)delete sessions[id];
    if(!Object.keys(sessions).length)delete metrics.presence[uid];

@@ -2,7 +2,7 @@
 :root{color-scheme:dark;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
  --bg:#0b231b;--side:#0e2a20;--surface:#12332a;--surface-2:#173d32;--line:#ffffff14;--line-2:#ffffff22;
  --text:#eef2ea;--muted:#9db3a7;--gold:#e8c983;--green:#8fd19e;--red:#ff9b8f;
- --app-ios:#e8c983;--app-android:#8fd19e;--web-ios:#f0a35e;--web-android:#6fb7e8;--web-desktop:#b79ce8}
+ --usage-page:#6fb7e8;--usage-game:#e8c983;--app-ios:#e8c983;--app-android:#8fd19e;--web-ios:#f0a35e;--web-android:#6fb7e8;--web-desktop:#b79ce8}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--text);font-size:14px;min-height:100dvh}
 a{color:var(--gold)}p{line-height:1.5;color:var(--muted);margin:0 0 12px}
@@ -229,3 +229,7 @@ textarea:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 /* Uruguayo / Argentino project picker */
 .game-picker{margin:0 0 16px;min-height:36px;font-weight:650}
 .access-card .game-picker{margin:4px 0 14px}
+.funnel{margin-top:14px}
+.funnel .pbar{grid-template-columns:minmax(0,170px) minmax(0,1fr) 72px}
+.toolbar .usage-date-field{min-width:150px}
+#usage .data-table th:nth-child(2),#usage .data-table td:nth-child(2){text-align:left}

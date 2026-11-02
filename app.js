@@ -1,8 +1,8 @@
 import './chat-moderation.js?v=20261013-moderation1';
-import { visitPlatform,takeVisit,markTestDevice,markGuestVisit } from './visit.js?v=20261029-guests1';
+import { visitPlatform,takeVisit,markTestDevice,markGuestVisit,trackUsage,journeyStep } from './visit.js?v=20261101-usage1';
 import { installFriends } from './friends.js?v=20261027-friends3';
 import { installPlayerPanel } from './player-panel.js?v=20261013-blocklist1';
-import { installScorer,renderCompactTally } from './scorer.js?v=20261026-people1';
+import { installScorer,renderCompactTally } from './scorer.js?v=20261101-usage1';
 import { installActivity } from './activity.js?v=20261010-adminstats32';
 import { installCredits } from './credits.js?v=20261025-claim1';
 import { installAccount } from './account.js?v=20261029-guest2';
@@ -279,7 +279,7 @@ async function sendMatchChat(event,preset){
     }
   }finally{if(key===chatContextKey()){matchChat.sending=false;renderChatComposer();}}
 }
-function showView(id) { if(!$(id).classList.contains('active'))clearToast(); if(id!=='game-view'){state.preparingRoom=null;$('game-view').classList.remove('table-preparing');}document.documentElement.classList.remove('opening-invitation'); views.forEach((name) => $(name).classList.toggle('active', name === id)); if(id!=='game-view')closeMatchChat(true); if(id==='welcome-view')requestAnimationFrame(showLobbyOnboarding); }
+function showView(id) { if(id==='game-view')journeyStep('played'); if(!$(id).classList.contains('active'))clearToast(); if(id!=='game-view'){state.preparingRoom=null;$('game-view').classList.remove('table-preparing');}document.documentElement.classList.remove('opening-invitation'); views.forEach((name) => $(name).classList.toggle('active', name === id)); if(id!=='game-view')closeMatchChat(true); if(id==='welcome-view')requestAnimationFrame(showLobbyOnboarding); }
 function liveActionsBlocked(){
   return !!(state.room&&!state.localGame&&!state.room.tableClosed&&(navigator.onLine===false||!roomTransportConnected()||state.connectionReady!==true));
 }
@@ -749,13 +749,14 @@ const activity=installActivity({send:async data=>{const result=await creditApi('
 let scorerAfterSignIn=new URLSearchParams(location.search).has('anotador');
 if(scorerAfterSignIn)$('auth-title').textContent='Iniciá sesión o creá tu cuenta para usar el anotador';
 const account=installAccount({api:creditApi,services:firebaseServices,getState:()=>state,rememberName:rememberPlayerName,document,onReady:async()=>{
+  journeyStep('entered');
   const initialCredits=credits.start().then(()=>credits.whenReady());
   loadCreditFunctions().catch(()=>{});activity.start();friends?.start().catch(()=>{});profiles.start().catch(()=>{});registerPush().catch(()=>{});
   await Promise.all([openInitialRoom(),initialCredits]);
   if(scorerAfterSignIn&&!state.room){scorerAfterSignIn=false;history.replaceState(null,'',location.pathname);$('open-scorer').click();}
   else showLobbyOnboarding();
-},onIdentityChange:(...args)=>{friends?.stop();profiles.stop();return resetAccountRoom(...args);},onNameChanged:()=>showView('welcome-view'),onRegistered:uid=>{state.lobbyOnboardingUid=uid;requestAnimationFrame(showLobbyOnboarding);},onGuest:()=>{
-  showView('welcome-view');markGuestVisit().catch(()=>{});
+},onIdentityChange:(...args)=>{friends?.stop();profiles.stop();return resetAccountRoom(...args);},onNameChanged:()=>showView('welcome-view'),onRegistered:uid=>{journeyStep('registered');state.lobbyOnboardingUid=uid;requestAnimationFrame(showLobbyOnboarding);},onGuest:()=>{
+  journeyStep('entered');showView('welcome-view');markGuestVisit().catch(()=>{});
   if(scorerAfterSignIn){scorerAfterSignIn=false;history.replaceState(null,'',location.pathname);$('open-scorer').click();}
 },guestAllowed:()=>!new URLSearchParams(location.search).has('mesa'),inRoom:()=>!!state.room&&!$('welcome-view').classList.contains('active')});
 const credits=installCredits({services:firebaseServices,walletSource:creditWalletSource,api:creditApi,getState:()=>state,document,notify:message=>toast(message,true,2000),onChange:()=>{showLobbyOnboarding();if(state.lobbyRooms)renderLobby(state.lobbyRooms);
@@ -3871,6 +3872,7 @@ function showLearnVideo(index){
   $('learn-videos-next').textContent=last?'Listo':'Siguiente';
 }
 function openLearnVideos(index=0){
+  trackUsage('aprender-game-videos');
   try{localStorage.setItem('truco-learn-videos-seen-v1','true');}catch{}
   if(!$('learn-videos-dialog').open)$('learn-videos-dialog').showModal();
   showLearnVideo(index);
@@ -3880,7 +3882,7 @@ async function startLearning(stage=0){
   try{
     $('learn-coach-dialog').close();
     if(!await startLocalBotGame())return;
-    rememberLearningPractice();
+    rememberLearningPractice();trackUsage('aprender-game-stage-'+stage);
     state.learning={stage,hints:true,pointsInfo:true,whoWins:true,roundMessages:[],paused:true,pausedAt:gameTime(),complete:false,scoreMessages:[],tutorialMessages:[{title:'Guía de cartas',pointAtGuide:true,text:'Podés tocar este ícono cuando quieras para abrir la guía. Te ayuda a reconocer tus cartas y saber cuáles son más poderosas.'},{title:'Ayudas',pointAtOptions:true,text:'Aquí podés deshabilitar las ayudas cuando vayas entendiendo.'},{title:'Elegí una carta para empezar',introLast:true,text:'Seleccioná cualquier carta de tu mano para empezar a jugar.'}]};
     state.bot=true;state.botDifficulty='normal';state.botMemory=null;
     state.room.players={player1:{name:cleanName($('player-name').value||savedPlayerName(),'Vos')},player2:{name:'Bot de práctica'}};
@@ -4254,7 +4256,7 @@ function openLearningHelp(){
 function finishLearningHand(){
   if(!state.learning||Math.max(...Object.values(state.room?.scores||{}))<10)return false;
   if(state.learning.complete)return true;
-  state.learning.complete=true;pauseLearning();
+  state.learning.complete=true;pauseLearning();trackUsage('aprender-game-finish-'+state.learning.stage);
   Object.assign(state.room,{status:'complete',pendingBet:null,turn:null,turnClock:null,endReveal:{done:true}});
   renderGame();openLearningHelp();return true;
 }
@@ -4301,7 +4303,7 @@ function makeStudyExercise(kind){
   do{pool=shuffleDeck();hand=pool.slice(0,3);muestra=pool[3];}while(kind==='envido'?hasFlor(hand,muestra):hasFlor(hand,muestra)!==wantFlor);
   return {kind,hand,muestra,answered:false};
 }
-function openStudy(kind){pauseLearning();nextStudy(kind);if(!$('learn-study-dialog').open)$('learn-study-dialog').showModal();}
+function openStudy(kind){trackUsage('aprender-game-'+kind);pauseLearning();nextStudy(kind);if(!$('learn-study-dialog').open)$('learn-study-dialog').showModal();}
 function nextStudy(kind=studyExercise?.kind||'envido'){
   studyExercise=makeStudyExercise(kind);
   $('learn-study-title').textContent=kind==='envido'?'¿Cuántos tantos tenés?':kind==='flor-points'?'¿Cuántos puntos tiene tu flor?':'¿Tenés flor?';
@@ -4367,14 +4369,14 @@ function renderGuidePlayedCards(){
   }
   el.append(cards);
 }
-function openStudySheet(){pauseLearning();renderGuidePlayedCards();markPracticeGuideCards();if(!$('learn-sheet-dialog').open)$('learn-sheet-dialog').showModal();}
+function openStudySheet(){trackUsage('aprender-game-guide');pauseLearning();renderGuidePlayedCards();markPracticeGuideCards();if(!$('learn-sheet-dialog').open)$('learn-sheet-dialog').showModal();}
 function continueLearningStage(){
   const stage=state.learning?.stage||0,complete=state.learning?.complete;
   if(!complete&&stage>=1)openStudy(stage===2?'flor':'envido');
   $('learn-coach-dialog').close();
   if(complete)startLearning(stage);
 }
-$('learn-game').addEventListener('click',openLearning);
+$('learn-game').addEventListener('click',()=>{trackUsage('aprender-game-open');openLearning();});
 $('seats').addEventListener('click',async event=>{
   const button=event.target.closest('[data-add-bot]');if(!button||button.disabled)return;
   button.disabled=true;
@@ -4388,7 +4390,7 @@ $('seats').addEventListener('click',async event=>{
 $('learn-videos').addEventListener('click',()=>openLearnVideos(0));
 $('learn-videos-close').addEventListener('click',()=>$('learn-videos-dialog').close());
 $('learn-videos-prev').addEventListener('click',()=>showLearnVideo(learnVideoIndex-1));
-$('learn-videos-next').addEventListener('click',()=>{if(learnVideoIndex===LEARN_VIDEOS.length-1)$('learn-videos-dialog').close();else showLearnVideo(learnVideoIndex+1);});
+$('learn-videos-next').addEventListener('click',()=>{if(learnVideoIndex===LEARN_VIDEOS.length-1){trackUsage('aprender-game-videos-end');$('learn-videos-dialog').close();}else showLearnVideo(learnVideoIndex+1);});
 // Tapping the video pauses it, resumes it, or replays it once it ended.
 $('learn-videos-player').addEventListener('click',event=>{const video=event.currentTarget;if(video.paused||video.ended)video.play?.()?.catch?.(()=>{});else video.pause();});
 $('learn-videos-dialog').addEventListener('close',()=>{const video=$('learn-videos-player');video.pause();video.removeAttribute('src');video.load();});
@@ -4650,7 +4652,7 @@ for(const button of document.querySelectorAll('[data-password-toggle]')){
   });
 }
 
-installScorer({document,showView,renderTally:renderCompactTally,
+installScorer({document,showView,renderTally:renderCompactTally,onEvent:(event,extra)=>trackUsage('anotador-game-'+event,extra),
   people:()=>[$('account-username').textContent,...friends.friendNames()],
   onShare:score=>matchPhoto.start(()=>score)});
 

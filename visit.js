@@ -3,6 +3,8 @@
 const ENDPOINT='https://us-central1-truco-6553d.cloudfunctions.net/siteVisit';
 const DAY_KEY='truco-visit-day',TEST_KEY='truco-test-device',GUEST_DAY_KEY='truco-guest-day';
 const GUEST_ENDPOINT='https://us-central1-truco-6553d.cloudfunctions.net/guestVisit';
+const USAGE_ENDPOINT='https://us-central1-truco-6553d.cloudfunctions.net/siteUsage';
+const JOURNEY_KEY='truco-journey',USAGE_DAY_KEY='truco-usage-day',JOURNEY_PAGES=['anotador','aprender'];
 
 // Static pages inside the app have no trucoNative, but the native bridge still
 // injects Capacitor into every page.
@@ -43,8 +45,12 @@ export function recordVisit({fetch=globalThis.fetch,nav=globalThis.navigator,loc
  if(!nativePlatform()&&/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location?.hostname||''))return null;
  // Claude's own browser checks the live site while working on it: not a visitor.
  if(nav?.webdriver||/bot|crawl|spider|slurp|lighthouse|headless|Claude\//i.test(nav?.userAgent||''))return null;
- const day=uruguayDay(),first=storedDay()!==day;storeDay(day);
+ const day=uruguayDay(),known=storedDay()!==null,first=storedDay()!==day;storeDay(day);
  const data={platform:visitPlatform(nav),page:visitPage(location?.pathname),first,ref:visitReferrer(location),...(testDevice()?{test:true}:{})};
+ usageContext={fetch,platform:data.platform};
+ if(!known&&JOURNEY_PAGES.includes(data.page))startJourney({page:data.page,ref:data.ref,day});
+ if(data.page==='juego')journeyStep('game');
+ if(readStored(JOURNEY_KEY)?.day!==day&&readStored(JOURNEY_KEY))journeyStep('returned');
  return visitRequest=fetch(ENDPOINT,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({data}),keepalive:true})
   .then(response=>response?.json?.()).then(body=>{const r=body?.result;if(r?.id&&r?.day)pendingVisit={visitId:r.id,visitDay:r.day};}).catch(()=>null);
 }
@@ -68,5 +74,38 @@ export async function markGuestVisit({fetch=globalThis.fetch,wait=6000}={}){
  try{first=localStorage.getItem(GUEST_DAY_KEY)!==day;localStorage.setItem(GUEST_DAY_KEY,day);}catch{/* Private mode: counts as a new guest. */}
  await fetch(GUEST_ENDPOINT,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({data:{...visit,first}}),keepalive:true}).catch(()=>null);
  return true;
+}
+// Use of the scorer and the learning section. It stays silent where visits are not counted.
+let usageContext=null;
+function readStored(key){try{return JSON.parse(localStorage.getItem(key));}catch{return null;}}
+function store(key,value){try{localStorage.setItem(key,JSON.stringify(value));return true;}catch{return false;}}
+function sendUsage(data){
+ if(!usageContext)return;
+ const body={platform:usageContext.platform,...data,...(testDevice()?{test:true}:{})};
+ usageContext.fetch(USAGE_ENDPOINT,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({data:body}),keepalive:true})?.catch?.(()=>null);
+}
+// A device that first came through the scorer or the guide keeps that landing, and each
+// next step counts once for it. Devices that already knew the site have no journey.
+function claimStep(step){
+ const journey=readStored(JOURNEY_KEY);
+ if(!usageContext||!step||!journey||journey.steps?.includes(step))return null;
+ if(!store(JOURNEY_KEY,{...journey,steps:[...(journey.steps||[]),step]}))return null;
+ return {step,landing:{page:journey.page,ref:journey.ref,day:journey.day}};
+}
+function startJourney({page,ref,day}){if(store(JOURNEY_KEY,{page,ref,day,steps:[]}))journeyStep('landing');}
+export function journeyStep(step){const data=claimStep(step);if(data)sendUsage(data);}
+function eventStep(event){
+ if(event==='anotador-game-open')return 'scorer';
+ if(event==='aprender-game-open')return 'learn';
+ const page=readStored(JOURNEY_KEY)?.page;
+ if(page==='anotador')return {'anotador-web-start':'used','anotador-web-finish':'finished'}[event]||null;
+ return page==='aprender'&&event==='aprender-web-end'?'used':null;
+}
+// extra: the points chosen when a scorer match starts.
+export function trackUsage(event,extra={}){
+ if(!usageContext)return;
+ const day=uruguayDay(),stored=readStored(USAGE_DAY_KEY),seen=stored?.day===day&&Array.isArray(stored.events)?stored.events:[],first=!seen.includes(event);
+ if(first)store(USAGE_DAY_KEY,{day,events:[...seen,event]});
+ sendUsage({event,first,...extra,...claimStep(eventStep(event))});
 }
 recordVisit();

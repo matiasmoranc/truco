@@ -183,10 +183,17 @@
 
   <section class="card" id="practicar"><h2>Practicá jugando</h2>
     <p>La mejor forma de aprender es jugar. En la práctica contra el bot el juego te explica cada canto, te muestra quién gana cada mano y por qué, y te enseña a contar el envido y la flor.</p>
-    <a class="cta" href="./">Practicar gratis</a>
+    <a class="cta" id="guide-play" href="./">Practicar gratis</a>
     <p>¿Juegan con cartas de verdad? Usá el <a href="./anotador-de-truco.html">anotador de truco</a> para llevar los puntos.</p>
   </section>
 
   <footer class="footer">Truco Uruguayo · <a href="./cartas-truco-uruguayo.html">Guía de cartas</a> · <a href="./anotador-de-truco.html">Anotador</a> · <a href="./reglas.html">Reglas de la app</a> · <a href="./privacidad.html">Privacidad</a> · <a href="./soporte.html">Soporte</a> · <a href="https://trucoargentino.net/">Truco argentino online</a></footer>
-</main><script type="module" src="visit.js?v=20261029-guests1"></script>
+</main><script type="module">
+  import {trackUsage} from './visit.js?v=20261101-usage1';
+  // Reaching the last section counts as having read the guide.
+  const end=document.getElementById('practicar');
+  const seen=new IntersectionObserver(entries=>{if(entries.some(entry=>entry.isIntersecting)){seen.disconnect();trackUsage('aprender-web-end');}});
+  seen.observe(end);
+  document.getElementById('guide-play').addEventListener('click',()=>trackUsage('aprender-web-play'));
+</script>
 </body></html>
