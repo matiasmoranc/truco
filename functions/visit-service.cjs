@@ -74,7 +74,21 @@ function guestDays(log,{includeTest=false}={}){
  }
  return days;
 }
-function visitSummary({visits,guests={},now,days=30}){
+// Visits from signed-in players, per day and platform. A player counts as a visitor once
+// per day and platform; the day's total counts each player once.
+// exclude: test account uids to leave out, together with visits from test devices (null keeps everything).
+function userDays(log,{exclude=null}={}){
+ const days={};
+ for(const [day,records] of Object.entries(log||{}))for(const r of Object.values(records||{})){
+  if(typeof r?.uid!=='string'||!PLATFORMS.includes(r.platform)||(exclude&&(r.test===true||exclude.has(r.uid))))continue;
+  const d=days[day]??={visits:{},visitors:{},seen:{},all:new Set()};
+  d.visits[r.platform]=(d.visits[r.platform]||0)+1;
+  (d.seen[r.platform]??=new Set()).add(r.uid);d.all.add(r.uid);
+ }
+ for(const d of Object.values(days)){d.visitors=Object.fromEntries(Object.entries(d.seen).map(([p,set])=>[p,set.size]));d.totalVisitors=d.all.size;delete d.seen;delete d.all;}
+ return days;
+}
+function visitSummary({visits,guests={},users={},now,days=30}){
  const list=[];
  for(let i=days-1;i>=0;i--){
   const day=uruguayDate(now-i*86400000).day,data=visits?.[day]||{};
@@ -82,7 +96,10 @@ function visitSummary({visits,guests={},now,days=30}){
   const visitsBy=byPlatform('visits'),visitorsBy=byPlatform('visitors');
   const guest=guests[day]||{},guestBy=key=>Object.fromEntries(PLATFORMS.map(p=>[p,count(guest[key]?.[p])]));
   const guestVisits=guestBy('visits'),guestVisitors=guestBy('visitors');
+  const user=users[day]||{},userBy=key=>Object.fromEntries(PLATFORMS.map(p=>[p,count(user[key]?.[p])]));
+  const userVisits=userBy('visits'),userVisitors=userBy('visitors');
   list.push({day,visits:visitsBy,visitors:visitorsBy,
+   users:{visits:userVisits,visitors:userVisitors,totalVisits:Object.values(userVisits).reduce((a,b)=>a+b,0),totalVisitors:count(user.totalVisitors)},
    guests:{visits:guestVisits,visitors:guestVisitors,totalVisits:Object.values(guestVisits).reduce((a,b)=>a+b,0),totalVisitors:Object.values(guestVisitors).reduce((a,b)=>a+b,0)},
    totalVisits:Object.values(visitsBy).reduce((a,b)=>a+b,0),totalVisitors:Object.values(visitorsBy).reduce((a,b)=>a+b,0),
    pages:Object.fromEntries(PAGES.map(p=>[p,count(data.pages?.[p])])),
@@ -90,13 +107,13 @@ function visitSummary({visits,guests={},now,days=30}){
  }
  return {platforms:PLATFORMS,days:list};
 }
-function visitRange({from,to,platform,page,hour,guest,now}){
+function visitRange({from,to,platform,page,hour,guest,signed,now}){
  if(!DAY.test(from||'')||!DAY.test(to||'')||from>to)throw new Error('Período inválido.');
  if(from<uruguayDate(now-(VISIT_DAYS-1)*86400000).day)throw new Error('El período puede abarcar hasta '+VISIT_DAYS+' días atrás.');
  if(platform!=='all'&&!PLATFORMS.includes(platform))throw new Error('Plataforma inválida.');
  if(page!=null&&!PAGES.includes(page))throw new Error('Página inválida.');
  if(hour!=null&&!(Number.isInteger(hour)&&hour>=0&&hour<24))throw new Error('Hora inválida.');
- return {from,to,platform,page:page??null,hour:hour??null,guest:guest===true};
+ return {from,to,platform,page:page??null,hour:hour??null,guest:guest===true,signed:signed===true};
 }
 // The visit a signed-in player's first signal claims: only a well-formed id.
 function visitClaimPath(data){
@@ -106,16 +123,17 @@ function visitClaimPath(data){
 // Who came in a period: visit details (with the player when one signed in) and signed-in players.
 // exclude: test account uids to leave out, together with visits from test devices (null keeps everything).
 // hour: only the visits that started in that hour of the day (Uruguay), on any day of the range.
-function visitorsInRange({log,activity,platform,page=null,hour=null,guest=false,exclude=null,limit=1000}){
+// signed: only the visits of signed-in players.
+function visitorsInRange({log,activity,platform,page=null,hour=null,guest=false,signed=false,exclude=null,limit=1000}){
  const matches=p=>platform==='all'||p===platform,hidden=r=>exclude&&(r.test===true||exclude.has(r.uid));
  const inHour=r=>hour==null||Number(uruguayDate(r.at).hour)===hour;
  const visits=[];
- for(const records of Object.values(log||{}))for(const r of Object.values(records||{}))if(r&&Number.isFinite(r.at)&&matches(r.platform)&&(!page||r.page===page)&&inHour(r)&&(!guest||r.guest===true)&&!hidden(r))visits.push(r);
+ for(const records of Object.values(log||{}))for(const r of Object.values(records||{}))if(r&&Number.isFinite(r.at)&&matches(r.platform)&&(!page||r.page===page)&&inHour(r)&&(!guest||r.guest===true)&&(!signed||typeof r.uid==='string')&&!hidden(r))visits.push(r);
  visits.sort((a,b)=>b.at-a.at);
  const players=new Map();
  const player=uid=>players.get(uid)||{uid,days:0,lastDay:'',platforms:[],visits:0};
  // Activity says which days and platforms a player used; a page filter only has the visits.
- if(!page&&hour==null&&!guest)for(const [day,data] of Object.entries(activity||{})){
+ if(!page&&hour==null&&!guest&&!signed)for(const [day,data] of Object.entries(activity||{})){
   for(const [uid,platforms] of Object.entries(data?.platforms||{})){
    if(exclude?.has(uid))continue;
    const used=Object.keys(platforms||{}).filter(p=>PLATFORMS.includes(p)&&matches(p));
@@ -160,4 +178,4 @@ function inRanges(ip,prefixes){
  return false;
 }
 module.exports.robotDevice=robotDevice;module.exports.inRanges=inRanges;
-module.exports={...module.exports,dedupeVisit,rememberDevice,PLATFORMS,PAGES,VISIT_DAYS,visitUpdates,visitSummary,guestDays,deviceFacts,visitOrigin,visitRecord,visitRange,visitorsInRange,visitClaimPath};
+module.exports={...module.exports,dedupeVisit,rememberDevice,PLATFORMS,PAGES,VISIT_DAYS,visitUpdates,visitSummary,guestDays,userDays,deviceFacts,visitOrigin,visitRecord,visitRange,visitorsInRange,visitClaimPath};

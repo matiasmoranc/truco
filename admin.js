@@ -426,10 +426,12 @@ function renderVisits(){
  const card=(key,label,value,color)=>{
   const k=node('button','','kpi metric-link'),title=node('small',label);k.type='button';k.dataset.platform=key;k.title='Ver quién entró';
   if(color){const swatch=node('i','','swatch');swatch.style.background=color;title.prepend(swatch);}
-  k.classList.toggle('selected',key==='guests'?!!visitDetail?.guest:!visitDetail?.guest&&visitDetail?.platform===key);
-  k.append(title,node('strong',number(value)),node('span','Ver quién entró','delta'));k.onclick=()=>key==='guests'?openVisitDetail('all',{guest:true}):openVisitDetail(key);$('visit-totals').append(k);
+  k.classList.toggle('selected',key==='guests'?!!visitDetail?.guest:key==='signed'?!!visitDetail?.signed:!visitDetail?.guest&&!visitDetail?.signed&&visitDetail?.platform===key);
+  k.append(title,node('strong',number(value)),node('span','Ver quién entró','delta'));k.onclick=()=>key==='guests'?openVisitDetail('all',{guest:true}):key==='signed'?openVisitDetail('all',{signed:true}):openVisitDetail(key);$('visit-totals').append(k);
  };
  card('all','Total '+unit,grand);for(const [key,label] of Object.entries(PLATFORM_LABELS))card(key,label,sum(key),'var(--'+key+')');
+ const userTotal=days.reduce((total,d)=>total+(d.users?.[totalKey]||0),0);
+ card('signed',measure==='visits'?'De usuarios con cuenta':'Usuarios con cuenta',userTotal);
  const guestTotal=days.reduce((total,d)=>total+(d.guests?.[totalKey]||0),0);
  card('guests','Invitados (sin cuenta)',guestTotal);
  bars($('visit-pages'),Object.entries(PAGE_LABELS).map(([key,label])=>({label,value:days.reduce((total,d)=>total+(d.pages?.[key]||0),0),onClick:()=>openVisitDetail('all',{page:key})})).sort((a,b)=>b.value-a.value));
@@ -447,14 +449,14 @@ function renderVisits(){
  $('concurrent-record').textContent=(best?.peak?.count?'En el período: máximo de '+best.peak.count+' el '+longDay(best.day)+' a las '+peakTime(best.peak.at)+'. ':'En el período todavía no hay datos. ')+(record?.count?'Récord histórico: '+record.count+' el '+longDay(new Date(record.at-10800000).toISOString().slice(0,10))+' a las '+peakTime(record.at)+'.':'');
  columns($('signup-chart'),periodDays.map(d=>({label:shortDay(d),value:(signups[d]||[]).length,tooltip:shortDay(d)+' · '+(signups[d]||[]).length+' registrados',onClick:()=>openSignupDetail(d)})),{labelEvery:Math.max(1,Math.ceil(periodDays.length/12))});
  const table=$('visit-table');table.replaceChildren();
- const head=node('tr');head.append(node('th','Día'),...Object.values(PLATFORM_LABELS).map(label=>node('th',label)),node('th','Total','total'),node('th','Invitados'));table.append(head);
+ const head=node('tr');head.append(node('th','Día'),...Object.values(PLATFORM_LABELS).map(label=>node('th',label)),node('th','Total','total'),node('th','Usuarios'),node('th','Invitados'));table.append(head);
  for(const d of [...days].reverse()){
   const row=clickable(node('tr'),()=>goVisits({day:d.day}));row.title='Ver quién entró ese día';row.append(node('td',longDay(d.day)));
   for(const key of Object.keys(PLATFORM_LABELS)){const value=d[measure][key]||0;row.append(node('td',number(value),value?'':'zero'));}
-  const guests=d.guests?.[totalKey]||0;
-  row.append(node('td',number(d[totalKey]),'total'),node('td',number(guests),guests?'':'zero'));table.append(row);
+  const users=d.users?.[totalKey]||0,guests=d.guests?.[totalKey]||0;
+  row.append(node('td',number(d[totalKey]),'total'),node('td',number(users),users?'':'zero'),node('td',number(guests),guests?'':'zero'));table.append(row);
  }
- if(visitDetail&&(visitDetail.from!==from||visitDetail.to!==to))openVisitDetail(visitDetail.platform,{page:visitDetail.page,hour:visitDetail.hour,guest:visitDetail.guest});
+ if(visitDetail&&(visitDetail.from!==from||visitDetail.to!==to))openVisitDetail(visitDetail.platform,{page:visitDetail.page,hour:visitDetail.hour,guest:visitDetail.guest,signed:visitDetail.signed});
 }
 function simpleTable(headers,rows){
  const wrap=node('div','','table-scroll'),table=node('table','','data-table'),head=node('tr');
@@ -463,17 +465,17 @@ function simpleTable(headers,rows){
  wrap.append(table);return wrap;
 }
 // Who came through one platform or page (or all) in the selected period.
-async function openVisitDetail(platform,{page=null,hour=null,guest=false}={}){
+async function openVisitDetail(platform,{page=null,hour=null,guest=false,signed=false}={}){
  const {from,to}=visitPeriod(),request=++visitDetailRequest;
- visitDetail={platform,from,to,page,hour,guest};
- for(const k of $('visit-totals').children)k.classList.toggle('selected',guest?k.dataset.platform==='guests':!page&&hour==null&&k.dataset.platform===platform);
+ visitDetail={platform,from,to,page,hour,guest,signed};
+ for(const k of $('visit-totals').children)k.classList.toggle('selected',guest?k.dataset.platform==='guests':signed?k.dataset.platform==='signed':!page&&hour==null&&k.dataset.platform===platform);
  const hh=h=>String(h).padStart(2,'0')+':00';
- const label=guest?'Invitados (Jugar sin cuenta)':hour!=null?'De '+hh(hour)+' a '+hh((hour+1)%24):page?'Página: '+PAGE_LABELS[page]:platform==='all'?'Todas las plataformas':PLATFORM_LABELS[platform];
+ const label=guest?'Invitados (Jugar sin cuenta)':signed?'Usuarios con cuenta':hour!=null?'De '+hh(hour)+' a '+hh((hour+1)%24):page?'Página: '+PAGE_LABELS[page]:platform==='all'?'Todas las plataformas':PLATFORM_LABELS[platform];
  $('visit-detail').hidden=false;$('visit-detail-title').textContent=label+' · '+(from===to?longDay(from):shortDay(from)+' al '+shortDay(to));
  $('visit-detail-body').replaceChildren(node('p','Cargando…','empty'));
  $('visit-detail').scrollIntoView({behavior:'smooth',block:'start'});
  let data;
- try{data=(await call({action:'visitors',from,to,platform,includeTest:!hideTest(),...(page?{page}:{}),...(hour!=null?{hour}:{}),...(guest?{guest:true}:{})})).data;}
+ try{data=(await call({action:'visitors',from,to,platform,includeTest:!hideTest(),...(page?{page}:{}),...(hour!=null?{hour}:{}),...(guest?{guest:true}:{}),...(signed?{signed:true}:{})})).data;}
  catch(e){if(request===visitDetailRequest)$('visit-detail-body').replaceChildren(node('p',errorText(e),'empty'));return;}
  if(request!==visitDetailRequest)return;
  renderVisitDetail(data,platform);

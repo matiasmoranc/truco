@@ -49,7 +49,7 @@ test('Visit details keep device type, browser and origin without identifiers',()
 test('The visitors list filters by platform and period and joins signed-in players',()=>{
  const {visitRange,visitorsInRange}=require('../functions/visit-service.cjs');
  const now=Date.parse('2026-10-24T15:00:00Z');
- assert.deepEqual(visitRange({from:'2026-10-20',to:'2026-10-24',platform:'web-ios',now}),{from:'2026-10-20',to:'2026-10-24',platform:'web-ios',page:null,hour:null,guest:false});
+ assert.deepEqual(visitRange({from:'2026-10-20',to:'2026-10-24',platform:'web-ios',now}),{from:'2026-10-20',to:'2026-10-24',platform:'web-ios',page:null,hour:null,guest:false,signed:false});
  for(const bad of [{from:'2026-10-24',to:'2026-10-20',platform:'all'},{from:'2026-01-01',to:'2026-10-24',platform:'all'},{from:'2026-10-20',to:'2026-10-24',platform:'x'},{from:'../',to:'2026-10-24',platform:'all'}])
   assert.throws(()=>visitRange({...bad,now}));
  const log={'2026-10-23':{a:{at:1,platform:'web-ios',page:'juego'},b:{at:3,platform:'web-android',page:'juego'}},'2026-10-24':{c:{at:2,platform:'web-ios',page:'anotador'}}};
@@ -139,4 +139,23 @@ test('Guests ("Jugar sin cuenta") count per day and platform, apart from test de
  assert.ok(detail.visits.every(v=>v.guest===true));
  const all=visitorsInRange({log,activity:{},platform:'all'});
  assert.equal(all.totalVisits,5);assert.equal(all.guestVisits,4);
+});
+test('Visits of signed-in players count per day and platform, each player once a day, apart from test accounts',()=>{
+ const {userDays,visitorsInRange}=require('../functions/visit-service.cjs');
+ const at=Date.parse('2026-11-03T15:00:00Z');
+ const log={'2026-11-03':{
+  a:{at,platform:'app-ios',page:'juego',first:true,uid:'p1'},
+  b:{at:at+1000,platform:'app-ios',page:'juego',first:false,uid:'p1'},
+  c:{at:at+2000,platform:'web-android',page:'juego',first:true,uid:'p1'},
+  d:{at:at+3000,platform:'web-android',page:'juego',first:true,uid:'p2'},
+  e:{at:at+4000,platform:'web-desktop',page:'juego',first:true},
+  f:{at:at+5000,platform:'web-desktop',page:'juego',first:true,uid:'t1'},
+  g:{at:at+6000,platform:'web-desktop',page:'juego',first:true,uid:'p3',test:true}}};
+ const real=userDays(log,{exclude:new Set(['t1'])});
+ assert.deepEqual(real['2026-11-03'],{visits:{'app-ios':2,'web-android':2},visitors:{'app-ios':1,'web-android':2},totalVisitors:2});
+ assert.equal(userDays(log)['2026-11-03'].totalVisitors,4);
+ const day=visitSummary({now:at,days:1,visits:{},users:real}).days[0];
+ assert.equal(day.users.totalVisits,4);assert.equal(day.users.totalVisitors,2);assert.equal(day.users.visitors['web-android'],2);
+ const detail=visitorsInRange({log,activity:{},platform:'all',signed:true,exclude:new Set(['t1'])});
+ assert.equal(detail.totalVisits,4);assert.ok(detail.visits.every(v=>typeof v.uid==='string'));
 });

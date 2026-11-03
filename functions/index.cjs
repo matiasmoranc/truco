@@ -252,13 +252,13 @@ exports.adminConsole=onCall({...options,secrets:[liveInternalSecret]},async requ
   const registrations={};recent.forEach((s,i)=>{const day=uruguayDate(s.at).day;(registrations[day]??=[]).push({uid:s.uid,name:signupNames[i].val()||'',email:s.email,at:s.at});});
   for(const list of Object.values(registrations))list.sort((a,b)=>a.at-b.at);
   const record=(await db.ref('adminMetrics/concurrentRecord/'+(include?'all':'real')).get()).val()||null;
-  return {registrations,concurrentRecord:record,...activitySummary({registeredUids:counted,now,concurrentKey:include?'all':'real',metrics:{...activity,startedAt:start.val()}}),visits:visitSummary({visits:visitCounters,guests:guestDays(guestLog,{includeTest:include}),now,days:VISIT_DAYS}),testUids,includeTest:include};
+  return {registrations,concurrentRecord:record,...activitySummary({registeredUids:counted,now,concurrentKey:include?'all':'real',metrics:{...activity,startedAt:start.val()}}),visits:visitSummary({visits:visitCounters,guests:guestDays(guestLog,{includeTest:include}),users:userDays(guestLog,{exclude:include?null:new Set(testUids)}),now,days:VISIT_DAYS}),testUids,includeTest:include};
  }
  if(action==='visitors'){
   let range;try{range=visitRange({...data,now:Date.now()});}catch(e){throw new HttpsError('invalid-argument',e.message);}
   const [log,activity]=await Promise.all(['visitLog','days'].map(key=>db.ref('adminMetrics/'+key).orderByKey().startAt(range.from).endAt(range.to).get()));
   const testUids=data.includeTest===true?null:new Set(Object.keys((await db.ref('adminConfig/testUsers').get()).val()||{}));
-  const result=visitorsInRange({log:log.val()||{},activity:activity.val()||{},platform:range.platform,page:range.page,hour:range.hour,guest:range.guest,exclude:testUids});
+  const result=visitorsInRange({log:log.val()||{},activity:activity.val()||{},platform:range.platform,page:range.page,hour:range.hour,guest:range.guest,signed:range.signed,exclude:testUids});
   result.players=result.players.slice(0,300);
   const names=await Promise.all(result.players.map(p=>db.ref('profiles/'+p.uid+'/name').get()));
   result.players=result.players.map((p,i)=>({...p,name:names[i].val()||''}));
@@ -468,7 +468,7 @@ exports.playerActivity=onCall({...options,maxInstances:3},async request=>{
 });
 // Anonymous visit counters for the admin panel. No login and no stored
 // identifiers; a per-instance limit keeps one address from inflating them.
-const {visitUpdates,visitSummary,guestDays,visitRecord,visitRange,visitorsInRange,visitClaimPath,deviceFacts,dedupeVisit,rememberDevice,VISIT_DAYS,robotDevice,inRanges}=require('./visit-service.cjs');
+const {visitUpdates,visitSummary,guestDays,userDays,visitRecord,visitRange,visitorsInRange,visitClaimPath,deviceFacts,dedupeVisit,rememberDevice,VISIT_DAYS,robotDevice,inRanges}=require('./visit-service.cjs');
 // Google's address list, read at most once a day per server; without it only the known robot devices are caught.
 let googleRanges={at:0,prefixes:[]};
 async function googleAddresses(now){
