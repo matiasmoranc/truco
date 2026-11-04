@@ -175,3 +175,15 @@ test('Running out of time holding a flor answers no quiero instead of trapping t
  assert.doesNotThrow(()=>createTeamReferee(s,{now:45300}).advance());
  assert.equal(r.pendingBet,null);assert.equal(r.timeoutCounts[responder],1);assert.equal(r.status,'started');
 });
+test('In 2 vs 2 no envido plays for more than the leading team still needs to win',()=>{
+ const players=Object.fromEntries(SEATS.map(p=>[p,{uid:p,name:p}]));
+ const stakeFor=(scores,calls)=>{
+  let s;do{s=newTeamSession('ABCDE',players,30,{id:'m',stake:0,pot:0},100);createTeamReferee(s,{now:100}).start();}while(SEATS.some(p=>flower(s.hands[p],s.room.muestra)));
+  const r=s.room,[a,b]=Object.keys(r.scores);r.scores={[a]:scores[0],[b]:scores[1]};
+  createTeamReferee(s,{now:200}).action(r.turn,{kind:'call',value:calls[0]});
+  for(const [i,call] of calls.slice(1).entries())createTeamReferee(s,{now:300+i}).action(r.pendingBet.responder,{kind:'call',value:'raise-'+call});
+  return r.pendingBet.stake;
+ };
+ for(const kind of ['envido','real','falta'])assert.equal(stakeFor([2,29],[kind]),1);
+ assert.equal(stakeFor([4,0],['falta']),26);assert.equal(stakeFor([26,0],['envido','real']),4);assert.equal(stakeFor([0,0],['envido','real']),5);
+});

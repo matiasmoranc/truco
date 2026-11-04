@@ -1260,10 +1260,6 @@ body { min-height:100dvh; }
 .hand-card.card-touch,.hand-card.card-pending{filter:brightness(1.08)}
 .action-pending{box-shadow:inset 0 0 0 2px #fff7;animation:pending-action-glow 1s ease-in-out infinite}
 @keyframes pending-action-glow{50%{filter:brightness(1.18)}}
-.chat-quick{display:flex;flex-wrap:wrap;gap:7px;margin:10px 0}
-.chat-quick button{background:transparent;border:1px solid #e8c98366;border-radius:8px;padding:7px 9px;color:#e8c983;font:inherit;font-size:12px;cursor:pointer}
-.chat-quick button:disabled{opacity:.5;cursor:default}
-.chat-quick button:focus-visible{outline:2px solid #e8c983;outline-offset:2px}
 .session-score{font-size:13px;color:#e8c983;line-height:1.4;text-align:center;margin:10px 0}
 @media(prefers-reduced-motion:reduce){.action-pending{animation:none}}
 
@@ -1587,6 +1583,11 @@ html,body,#app{touch-action:pan-x pan-y}
 .lobby-welcome-copy p{font-size:15px;line-height:1.45;margin:8px 0}
 .lobby-welcome-step{color:#e8c983;text-align:center;font-size:12px;margin:12px 0 0}
 .lobby-welcome-arrow{position:fixed;inset:0;width:100vw;height:100dvh;pointer-events:none;overflow:visible}
+.table-tip-dialog{z-index:7000;max-height:none}
+.table-tip-text{font-size:15px;line-height:1.45;margin:0 0 14px}
+.table-tip-actions{display:flex;flex-direction:column;align-items:center;gap:6px}
+.table-tip-actions .table-tip-ok{width:100%;min-height:46px;border:0;border-radius:12px;background:#e8c983;color:#15251b;font:inherit;font-size:16px;font-weight:700;cursor:pointer}
+.table-tip-never{padding:8px;border:0;background:transparent;color:#ead39b;font:inherit;font-size:14px;text-decoration:underline;cursor:pointer}
 .lobby-welcome-highlight{outline:2px solid #ead39b;outline-offset:5px;border-radius:14px}
 
 .learn-game-modes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}

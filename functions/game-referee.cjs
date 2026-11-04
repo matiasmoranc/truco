@@ -71,14 +71,10 @@ function capScores(room,scores){
   return Object.fromEntries(Object.entries(scores||{}).map(([player,value])=>[player,Math.min(maximum,Math.max(0,Number(value)||0))]));
 }
 function faltanParaGanar(room) { return Math.max(1,targetPoints(room)-Math.max(Number(room.scores?.player1)||0,Number(room.scores?.player2)||0)); }
-function faltaEnvidoPoints(room){
-  const target=targetPoints(room),leader=Math.max(Number(room.scores?.player1)||0,Number(room.scores?.player2)||0);
-  return leader<target/2?target:faltanParaGanar(room);
-}
+function faltaEnvidoPoints(room){ return faltanParaGanar(room); }
 function envidoBetPoints(room,kind,base=0){
   if(kind==='falta')return faltaEnvidoPoints(room);
-  const points=(Number(base)||0)+(kind==='real'?3:2);
-  return points>faltanParaGanar(room)?2:points;
+  return Math.min((Number(base)||0)+(kind==='real'?3:2),faltanParaGanar(room));
 }
 function florBetPoints(room,kind){
   return kind==='falta'?targetPoints(room):5;

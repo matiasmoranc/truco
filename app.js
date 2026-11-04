@@ -10,7 +10,7 @@ import { initializeGameAuth } from './auth-init.js?v=20261016-android-google';
 import {installTeamTable,TEAM_SEATS,playerTeam,positionDealerDeck,renderTeamLobbySeats,renderWaitingSeats} from './team-table-ui.js?v=20261031-left1';
 import {createLiveTables,LiveError} from './live-tables.js?v=20261025-close1';
 import {installMatchPhoto} from './share-photo.js?v=20261027-photo2';
-import {installProfiles,SOUND_MESSAGES} from './profile-level.js?v=20261027-levelup1';
+import {installProfiles,SOUND_MESSAGES} from './profile-level.js?v=20261103-viral1';
 const FIREBASE_VERSION = '12.4.0';
 const $ = (id) => document.getElementById(id);
 const views = ['welcome-view', 'invite-view', 'setup-view', 'waiting-view', 'game-view', 'config-view', 'learn-view', 'scorer-view', 'friends-view'];
@@ -66,8 +66,6 @@ function renderChatComposer(){
   $('chat-count').classList.toggle('hidden',blocked);
   $('chat-blocked').classList.toggle('hidden',!blocked);
   $('chat-blocked').textContent=blocked?(chatPlayerBlocked?'Bloqueaste a este jugador. El chat está cerrado y no podrán entrar juntos a futuras mesas.':chatMuted?'Silenciaste los mensajes. El chat está cerrado para ambos en esta partida.':`${state.room.players[otherPlayer(state.playerId)].name||'El rival'} silenció los mensajes. El chat está cerrado en esta partida.`):'';
-  for(const button of $('chat-quick').querySelectorAll('button'))button.disabled=blocked||liveActionsBlocked()||matchChat.sending;
-  $('chat-quick').classList.toggle('hidden',blocked);
   if(blocked)$('chat-error').classList.add('hidden');
 }
 let publishingChatMute=false;
@@ -279,7 +277,7 @@ async function sendMatchChat(event,preset){
     }
   }finally{if(key===chatContextKey()){matchChat.sending=false;renderChatComposer();}}
 }
-function showView(id) { if(id==='game-view')journeyStep('played'); if(!$(id).classList.contains('active'))clearToast(); if(id!=='game-view'){state.preparingRoom=null;$('game-view').classList.remove('table-preparing');}document.documentElement.classList.remove('opening-invitation'); views.forEach((name) => $(name).classList.toggle('active', name === id)); if(id!=='game-view')closeMatchChat(true); if(id==='welcome-view')requestAnimationFrame(showLobbyOnboarding); }
+function showView(id) { if(id==='game-view')journeyStep('played'); if(!$(id).classList.contains('active'))clearToast(); if(id!=='game-view'){state.preparingRoom=null;$('game-view').classList.remove('table-preparing');}document.documentElement.classList.remove('opening-invitation'); views.forEach((name) => $(name).classList.toggle('active', name === id)); if(id!=='game-view'){closeMatchChat(true);closeTableTips();} if(id==='welcome-view')requestAnimationFrame(showLobbyOnboarding); }
 function liveActionsBlocked(){
   return !!(state.room&&!state.localGame&&!state.room.tableClosed&&(navigator.onLine===false||!roomTransportConnected()||state.connectionReady!==true));
 }
@@ -798,6 +796,60 @@ function showLobbyOnboarding(){
   window.addEventListener('resize',positionLobbyWelcomeArrow);window.addEventListener('scroll',positionLobbyWelcomeArrow,true);
  }
  lobbyWelcomeStep=0;renderLobbyWelcomeStep();lobbyWelcomeDialog.showModal();requestAnimationFrame(positionLobbyWelcomeArrow);
+}
+// Table tips: when a table starts, one card points at the tally and then one at the chat
+// button. Each comes back at every new table until the player asks not to see it again.
+const TABLE_TIPS=[
+ {id:'score',title:'El marcador',text:'Tocando el marcador podés ver qué puntos se anotaron en cada mano.',target:()=>[...document.querySelectorAll('.mobile-score,.scoreboard')].find(el=>el.getBoundingClientRect().width&&el.getBoundingClientRect().height)},
+ {id:'chat',title:'Mensajes',text:'Dejando apretado este botón podés enviar mensajes rápidos. Tocándolo una vez podés escribir un mensaje.',target:()=>chatAvailable()&&!$('chat-toggle').classList.contains('hidden')?$('chat-toggle'):null}
+];
+let tableTipDialog=null,tableTipQueue=[],tableTipTarget=null,tableTipsKey=null;
+const tableTipHidden=id=>{try{return localStorage.getItem('truco-tip-'+id)==='off';}catch{return false;}};
+function maybeShowTableTips(){
+ const room=state.room;
+ if(!room||state.learning||!$('game-view').classList.contains('active')||['waiting','closed','complete'].includes(room.status)||room.tableClosed)return;
+ // Online tables wait until every seat is taken, so the chat button is there.
+ if(!state.localGame&&!chatAvailable())return;
+ const key=(state.localGame?'local:':state.roomCode+':')+(room.createdAt||'')+':'+(room.matchNumber||1);
+ if(tableTipsKey===key)return;
+ tableTipsKey=key;tableTipQueue=TABLE_TIPS.filter(tip=>!tableTipHidden(tip.id));
+ showNextTableTip();
+}
+function showNextTableTip(){
+ tableTipTarget?.classList.remove('lobby-welcome-highlight');tableTipTarget=null;
+ let tip,target;
+ while((tip=tableTipQueue.shift())&&!(target=tip.target()));
+ if(!tip){tableTipDialog?.close();return;}
+ if(!tableTipDialog){
+  tableTipDialog=document.createElement('dialog');tableTipDialog.className='lobby-welcome-dialog table-tip-dialog';tableTipDialog.setAttribute('aria-labelledby','table-tip-title');
+  tableTipDialog.innerHTML='<svg class="lobby-welcome-arrow" aria-hidden="true"><defs><marker id="table-tip-head" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0 L10 5 L0 10 Z" fill="#ead39b"/></marker></defs><path class="lobby-welcome-path" fill="none" stroke="#ead39b" stroke-width="3" marker-end="url(#table-tip-head)"/></svg><h2 id="table-tip-title"></h2><p class="table-tip-text"></p><div class="table-tip-actions"><button type="button" class="table-tip-ok" data-tip="ok">Entendido</button><button type="button" class="table-tip-never" data-tip="never">No volver a mostrar</button></div>';
+  document.body.append(tableTipDialog);
+  tableTipDialog.addEventListener('click',event=>{
+   const action=event.target.closest('[data-tip]')?.dataset.tip;if(!action)return;
+   if(action==='never')try{localStorage.setItem('truco-tip-'+tableTipDialog.dataset.tip,'off');}catch{}
+   showNextTableTip();
+  });
+  tableTipDialog.addEventListener('cancel',event=>{event.preventDefault();showNextTableTip();});
+  window.addEventListener('resize',positionTableTip);window.addEventListener('scroll',positionTableTip,true);
+ }
+ tableTipDialog.dataset.tip=tip.id;tableTipDialog.querySelector('h2').textContent=tip.title;tableTipDialog.querySelector('.table-tip-text').textContent=tip.text;
+ tableTipTarget=target;target.classList.add('lobby-welcome-highlight');
+ // Not modal: the turn clock keeps running, so the table stays playable underneath.
+ if(!tableTipDialog.open)tableTipDialog.show();
+ requestAnimationFrame(positionTableTip);
+}
+function closeTableTips(){tableTipQueue=[];if(tableTipDialog?.open)showNextTableTip();}
+function positionTableTip(){
+ if(!tableTipDialog?.open||!tableTipTarget)return;
+ const target=tableTipTarget.getBoundingClientRect(),height=tableTipDialog.getBoundingClientRect().height;
+ // Below the target when it sits in the upper half of the screen, above it otherwise.
+ const below=target.top+target.height/2<innerHeight/2;
+ const top=below?Math.min(innerHeight-height-16,target.bottom+56):Math.max(16,target.top-56-height);
+ tableTipDialog.style.top=Math.max(16,top)+'px';tableTipDialog.style.bottom='auto';tableTipDialog.style.margin='0 auto';
+ const box=tableTipDialog.getBoundingClientRect(),x1=box.left+box.width/2,y1=below?box.top-2:box.bottom+2;
+ const x2=target.left+target.width/2,y2=below?target.bottom+8:target.top-8,bend=Math.max(20,Math.min(60,Math.abs(y2-y1)*.35)),neckY=y2+(below?16:-16);
+ const svg=tableTipDialog.querySelector('svg');svg.setAttribute('viewBox','0 0 '+innerWidth+' '+innerHeight);
+ svg.querySelector('path.lobby-welcome-path').setAttribute('d','M '+x1+' '+y1+' C '+x1+' '+(y1+(below?bend:-bend))+' '+x2+' '+(neckY+(below?-bend:bend))+' '+x2+' '+neckY+' L '+x2+' '+y2);
 }
 function renderLobbyWelcomeStep(){
  lobbyWelcomeTarget?.classList.remove('lobby-welcome-highlight');
@@ -1527,14 +1579,11 @@ function florAnswers(bet,hasFlower){
 }
 function targetPoints(room) { return normalizeTargetPoints(room?.targetPoints); }
 function faltanParaGanar(room) { return Math.max(1,targetPoints(room)-Math.max(Number(room.scores?.player1)||0,Number(room.scores?.player2)||0)); }
-function faltaEnvidoPoints(room){
-  const target=targetPoints(room),leader=Math.max(Number(room.scores?.player1)||0,Number(room.scores?.player2)||0);
-  return leader<target/2?target:faltanParaGanar(room);
-}
+// The envido never plays for more than the leader still needs to win the match.
+function faltaEnvidoPoints(room){ return faltanParaGanar(room); }
 function envidoBetPoints(room,kind,base=0){
   if(kind==='falta')return faltaEnvidoPoints(room);
-  const points=(Number(base)||0)+(kind==='real'?3:2);
-  return points>faltanParaGanar(room)?2:points;
+  return Math.min((Number(base)||0)+(kind==='real'?3:2),faltanParaGanar(room));
 }
 function florBetPoints(room,kind){
   return kind==='falta'?targetPoints(room):5;
@@ -2497,6 +2546,7 @@ function finishRoomPreparation(){
 }
 function renderGame() {
   if (!state.room||state.botActing) return;
+  queueMicrotask(maybeShowTableTips);
   $('game-view').classList.toggle('team-mode',state.room.mode==='2v2');
   // Team tables count down their pauses (tricks, shown flowers and envidos) like 1v1.
   if(state.room.mode==='2v2'){syncPrivateHand();syncMatchChat();renderCallNotice();teamTable.render();renderTurnTimer();renderRoundPauseTimer();placeMyFlor();finishRoomPreparation();return;}
@@ -3766,7 +3816,6 @@ $('player-sound-toggle').addEventListener('click',()=>{
 document.addEventListener('click',event=>{if(event.isTrusted)unlockVoice();},{capture:true});
 document.addEventListener('touchend',event=>{if(event.isTrusted)unlockVoice();},{capture:true,passive:true});
 $('sound-toggle').addEventListener('click',()=>$('player-sound-toggle').click());
-$('chat-quick').addEventListener('click',event=>{const button=event.target.closest('[data-quick-message]');if(!button||button.disabled||chatMuted||peerChatMuted()||liveActionsBlocked())return;touchFeedback(button);sendMatchChat(event,button.dataset.quickMessage);});
 // Holding the chat button opens quick messages under it; the one under the finger on release is sent.
 const CHAT_HOLD_MS=380,chatHold={timer:null,open:false,pointer:null,suppressClick:false};
 document.body.append($('chat-hold-menu'));

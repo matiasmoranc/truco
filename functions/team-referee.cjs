@@ -42,7 +42,8 @@ function createTeamReferee(s,{now=Date.now(),deckFactory=deck}={}){
  const bestFlor=t=>ordered(r.mano||'player1').filter(q=>r.flors?.[q]!=null&&(!t||team(q)===t)).reduce((a,q)=>!a||florValue(s.originals[q],r.muestra)>florValue(s.originals[a],r.muestra)?q:a,null);
  function resume(bet){r.pendingBet=bet||null;if(bet&&!active(bet.responder))bet.responder=responder(opponent(bet.callerTeam),bet.type==='flor');}
  const rest=()=>Math.max(1,r.targetPoints-Math.max(...Object.values(r.scores)));
- const envidoStake=(kind,base=0)=>kind==='falta'?(Math.max(...Object.values(r.scores))<r.targetPoints/2?r.targetPoints:rest()):base+(kind==='real'?3:2)>rest()?2:base+(kind==='real'?3:2);
+ // The envido never plays for more than the leader still needs to win the match.
+ const envidoStake=(kind,base=0)=>kind==='falta'?rest():Math.min(base+(kind==='real'?3:2),rest());
  function award(t,n,detail){r.scores[t]=Math.min(r.targetPoints,r.scores[t]+n);r.handScoreEntries??=[];r.handScoreEntries.push({player:t,points:n,detail});feed(detail);}
  function evidence(){const groups=[];for(const p of r.florWinner?[r.florWinner]:Object.keys(r.flors||{}))groups.push({player:p,name:r.players[p].name,cards:s.originals[p],label:'FLOR'+(r.florCompared?' · '+florValue(s.originals[p],r.muestra):'')});if(r.envidoAudit){const p=r.envidoAudit.winner;groups.push({player:p,name:r.players[p].name,cards:s.originals[p],label:r.envidoAudit.value+' TANTOS'});}return groups;}
  function finish(winner,points,reason='Mano ganada.'){

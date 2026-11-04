@@ -2,7 +2,7 @@ import {initializeApp} from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-
 import {getAuth,onAuthStateChanged,GoogleAuthProvider,signInWithPopup,signOut,browserLocalPersistence,setPersistence} from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js';
 import {getFunctions,httpsCallable} from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-functions.js';
 import {getDatabase,ref,get} from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-database.js';
-import {levelFor,pointsToReach} from './levels.js?v=20261027-sounds1';
+import {levelFor,pointsToReach} from './levels.js?v=20261103-viral1';
 // The same panel also reads Truco Argentino: its adminConsole answers the same actions.
 const GAMES={
  uy:{label:'Truco Uruguayo',zone:'America/Montevideo'},

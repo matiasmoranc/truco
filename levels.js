@@ -26,7 +26,7 @@ export const badgeFor=level=>BADGES.find(b=>level>=b.level)||null;
 export const ICONS=[{id:'persona',level:1,name:'Muñequito'},{id:'mate',level:2,name:'Mate'},{id:'espada',level:3,name:'Ancho de espada'},{id:'bandera',level:4,name:'Bandera'},{id:'gaucho',level:6,name:'Escudo de Uruguay'},{id:'termo',level:8,name:'Termo'}];
 export const PHOTO_LEVEL=6;
 // Quick messages with an audio clip: each level unlocks one, switched on in the level details.
-export const SOUND_MESSAGES=[{id:'fernando',level:2,text:'Andate Fernando!',name:'Mensaje/Audio de Andate Fernando!',src:'assets/sounds/andate-fernando.mp3'},{id:'falta',level:3,text:'Falta envido y truco!',name:'Mensaje/Audio de Falta envido y truco!',src:'assets/sounds/falta-envido-y-truco.mp3'}];
+export const SOUND_MESSAGES=[{id:'fernando',level:2,text:'Andate Fernando!',name:'Audio Viral de Andate Fernando!',src:'assets/sounds/andate-fernando.mp3'},{id:'falta',level:3,text:'Falta envido y truco!',name:'Audio Viral de Falta envido y truco!',src:'assets/sounds/falta-envido-y-truco.mp3'}];
 // Everything a level unlocks, in order, for the level details.
 export function unlocks(){
  return [...ICONS.map(i=>({level:i.level,kind:'icon',id:i.id,name:'Ícono: '+i.name})),...BADGES.map(b=>({level:b.level,kind:'badge',id:b.id,name:b.name})),{level:PHOTO_LEVEL,kind:'photo',id:'photo',name:'Tu foto de perfil'},...SOUND_MESSAGES.map(s=>({level:s.level,kind:'sound',id:s.id,name:s.name}))].sort((a,b)=>a.level-b.level||(a.kind==='badge'?-1:1));
