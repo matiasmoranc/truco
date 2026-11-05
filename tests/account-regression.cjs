@@ -245,9 +245,16 @@ test('A popup with no Google session shows an error instead of silently returnin
  const h=await harness();h.fb.authSdk.signInWithPopup=async()=>({});await h.click('account-google');assert.equal(h.account.isReady(),false);assert.match(h.nodes['auth-status'].textContent,/auth\/google-session-missing/);
 });
 
-test('The sign-in screen offers no email and password access',()=>{
+test('Email and password access shows only in the Android app',()=>{
  const html=require('node:fs').readFileSync(require('node:path').join(__dirname,'../index.html'),'utf8');
- assert.doesNotMatch(html,/auth-email|Ingresar con correo/);
+ assert.match(html,/<details id="auth-email-access" class="email-access" hidden>/);
+ assert.match(require('node:fs').readFileSync(require('node:path').join(__dirname,'../account.js'),'utf8'),/emailAccess=!!globalThis\.trucoNative\?\.isNative&&globalThis\.trucoNative\.platform==='android'/);
+});
+test('Password account signs in through Firebase and clears the entered password',async()=>{
+ const h=await harness();const user={uid:'review',isAnonymous:false,email:'review@example.test',providerData:[{providerId:'password'}]};
+ h.fb.authSdk.signInWithEmailAndPassword=async(auth,email,password)=>{assert.equal(email,'review@example.test');assert.equal(password,'test-password');auth.currentUser=user;return {user};};
+ h.nodes['auth-email'].value=' review@example.test ';h.nodes['auth-password'].value='test-password';
+ await h.submit('auth-email-form');assert.equal(h.nodes['auth-password'].value,'');assert.equal(h.nodes['auth-register'].hidden,false);
 });
 
 test('iPhone and iPad Google use the same-origin redirect; a desktop Mac keeps the popup',async()=>{
