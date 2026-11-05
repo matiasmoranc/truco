@@ -91,7 +91,7 @@ Para aparecer arriba al buscar "truco uruguayo", con o sin coma:
 - Descripción completa: empieza con "Truco Uruguayo" y repite "truco uruguayo" de forma natural un par de veces más (Play indexa la descripción; Apple no).
 - Apple, nombre: se mantiene `Truco, Uruguayo` si `Truco Uruguayo` sigue ocupado. Apple trata la coma como separador, así que la búsqueda "truco uruguayo" coincide igual.
 - Apple, subtítulo (máx. 30): `Jugá truco uruguayo en línea`.
-- Apple, palabras clave (máx. 100; el propietario pidió incluir truco, uruguayo, uruguay y aprender): `truco,uruguayo,uruguay,aprender,cartas,naipes,envido,flor,muestra,retruco,online,amigos,anotador`
+- Apple, palabras clave (máx. 100; el propietario pidió incluir truco, uruguayo, uruguay y aprender): `truco,uruguayo,uruguay,aprender,cartas,multijugador,envido,muestra,retruco,online,amigos,anotador`
 - Apple, idioma principal: Español (México) o Español (España) en Información de la app. La lista de idiomas de la página pública sale del binario: desde la 1.0.1 declara español.
 
 Capturas (publication/assets/appstore y play), en este orden:
