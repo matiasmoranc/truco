@@ -82,6 +82,28 @@ Fuentes:
 - https://support.google.com/googleplay/android-developer/answer/1078870
 - https://developer.apple.com/app-store/review/guidelines/
 
+## Versión 1.0.1 (5/11/2026): búsqueda y capturas
+
+Para aparecer arriba al buscar "truco uruguayo", con o sin coma:
+
+- Google Play, nombre: `Truco Uruguayo` (sin coma; Play no exige nombres únicos).
+- Google Play, descripción breve (máx. 80): `Truco uruguayo con muestra: jugá online 1 vs 1, 2 vs 2 o contra el bot.`
+- Descripción completa: empieza con "Truco Uruguayo" y repite "truco uruguayo" de forma natural un par de veces más (Play indexa la descripción; Apple no).
+- Apple, nombre: se mantiene `Truco, Uruguayo` si `Truco Uruguayo` sigue ocupado. Apple trata la coma como separador, así que la búsqueda "truco uruguayo" coincide igual.
+- Apple, subtítulo (máx. 30): `Cartas con muestra y amigos`.
+- Apple, palabras clave (máx. 100, sin repetir las palabras del nombre): `muestra,envido,flor,cartas,naipes,amigos,retruco,vale cuatro,anotador,uy`
+- Apple, idioma principal: Español (México) o Español (España) en Información de la app. La lista de idiomas de la página pública sale del binario: desde la 1.0.1 declara español.
+
+Capturas (publication/assets/appstore y play), en este orden:
+
+1. Mesa normal contra Martín con el mensaje "Buena jugada!" (Truco uruguayo · con muestra, envido y flor).
+2. Crear mesa (Jugá 1 vs 1, 2 vs 2 · o contra el bot).
+3. Mesa de práctica con "Ganás vos · ¿Por qué?" (Aprendé jugando · con ayudas en cada jugada).
+4. Guía de cartas (Guía de cartas · para saber cuánto vale cada una).
+5. Anotador (Anotador para jugar · con cartas de verdad).
+
+Notas para revisión 1.0.1: ya no hay ingreso con correo y contraseña. Revisión: "Jugar sin cuenta" en la primera pantalla, o "Continuar con Apple".
+
 ## Actualización funcional 19/10/2026
 
 Las descripciones y capturas deben reflejar mesas de 1 vs 1 y 2 vs 2, elección de equipo desde el lobby, reparto sin sorteo y las funciones del compañero descritas en ../REGLAS.md. Publicar Hosting no actualiza los binarios instalados: verificar la build antes de enviar una ficha a las tiendas.
