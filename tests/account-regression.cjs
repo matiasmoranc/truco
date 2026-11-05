@@ -245,16 +245,9 @@ test('A popup with no Google session shows an error instead of silently returnin
  const h=await harness();h.fb.authSdk.signInWithPopup=async()=>({});await h.click('account-google');assert.equal(h.account.isReady(),false);assert.match(h.nodes['auth-status'].textContent,/auth\/google-session-missing/);
 });
 
-test('Password account signs in through Firebase and clears the entered password',async()=>{
- const h=await harness();const user={uid:'review',isAnonymous:false,email:'review@example.test',providerData:[{providerId:'password'}]};
- h.fb.authSdk.signInWithEmailAndPassword=async(auth,email,password)=>{assert.equal(email,'review@example.test');assert.equal(password,'test-password');auth.currentUser=user;return {user};};
- h.nodes['auth-email'].value=' review@example.test ';h.nodes['auth-password'].value='test-password';
- await h.submit('auth-email-form');assert.equal(h.nodes['auth-password'].value,'');assert.equal(h.nodes['auth-register'].hidden,false);
-});
-test('Invalid password cannot unlock gameplay and is cleared',async()=>{
- const h=await harness();h.fb.authSdk.signInWithEmailAndPassword=async()=>{throw {code:'auth/invalid-credential'};};
- h.nodes['auth-email'].value='review@example.test';h.nodes['auth-password'].value='wrong';
- await h.submit('auth-email-form');assert.equal(h.account.isReady(),false);assert.equal(h.nodes['auth-password'].value,'');assert.match(h.nodes['auth-status'].textContent,/Correo o contraseña incorrectos/);
+test('The sign-in screen offers no email and password access',()=>{
+ const html=require('node:fs').readFileSync(require('node:path').join(__dirname,'../index.html'),'utf8');
+ assert.doesNotMatch(html,/auth-email|Ingresar con correo/);
 });
 
 test('iPhone and iPad Google use the same-origin redirect; a desktop Mac keeps the popup',async()=>{

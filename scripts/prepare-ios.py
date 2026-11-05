@@ -23,7 +23,10 @@ info = plistlib.loads(info_path.read_bytes())
 info["CFBundleURLTypes"] = [{"CFBundleURLSchemes": [firebase["REVERSED_CLIENT_ID"]]}]
 # Use a unique increasing number for each build of this Codemagic application.
 info["CFBundleVersion"] = str(int(os.environ.get("PROJECT_BUILD_NUMBER", "1")))
-info["CFBundleShortVersionString"] = "1.0.0"
+info["CFBundleShortVersionString"] = "1.0.1"
+# The app is in Spanish: the App Store lists the languages declared by the binary.
+info["CFBundleDevelopmentRegion"] = "es"
+info["CFBundleLocalizations"] = ["es"]
 # Only standard platform/provider encryption is used; no proprietary encryption.
 info["ITSAppUsesNonExemptEncryption"] = False
 # Remove legacy advertising metadata when regenerating an existing project.
@@ -83,6 +86,10 @@ if resource_id not in project:
         project = project.replace(marker, replacement)
 if "CODE_SIGN_ENTITLEMENTS = App/App.entitlements;" not in project:
     project = project.replace("INFOPLIST_FILE = App/Info.plist;", "INFOPLIST_FILE = App/Info.plist;\n\t\t\t\tCODE_SIGN_ENTITLEMENTS = App/App.entitlements;")
+# Spanish as the project's development language, the one the App Store shows.
+project = project.replace("developmentRegion = en;", "developmentRegion = es;")
+if "knownRegions = (" in project and "\t\t\t\tes,\n" not in project:
+    project = project.replace("knownRegions = (", "knownRegions = (\n\t\t\t\tes,", 1)
 # iPhone only: no iPad build, screenshots or iPad review for this release.
 project, families = re.subn(r"TARGETED_DEVICE_FAMILY = [^;]+;", "TARGETED_DEVICE_FAMILY = 1;", project)
 if not families:

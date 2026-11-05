@@ -42,8 +42,7 @@ export function installAccount({ api, services, getState, rememberName, document
     el('account-google').disabled=busy||!getState().firebase;
     el('account-apple').hidden=!appleDevice;
     el('account-apple').disabled=busy||!getState().firebase;
-    if(el('auth-email-submit'))el('auth-email-submit').disabled=busy||!getState().firebase;
-    el('auth-name-save').disabled=busy||!google||!loaded;
+       el('auth-name-save').disabled=busy||!google||!loaded;
     for(const id of ['account-change-name','account-logout','account-save','account-delete','account-delete-submit','account-delete-back'])el(id).disabled=busy||!ready||inRoom();
     el('auth-retry').hidden=!slowLoading&&(!getState().firebase||(!google||loaded));
     el('auth-retry').disabled=busy;
@@ -232,16 +231,6 @@ export function installAccount({ api, services, getState, rememberName, document
       nameHint=fb.authSdk.getAdditionalUserInfo?.(result)?.profile?.firstName||user.displayName||'';
       message('Apple confirmó el acceso. Cargando tu cuenta…');
       await observe(fb,user);
-    },{allowRegistration:true});
-  });
-  el('auth-email-form')?.addEventListener('submit',event=>{
-    event.preventDefault();
-    return action(async fb=>{
-      loginProvider='correo';message('Ingresando…');
-      try{
-        const result=await fb.authSdk.signInWithEmailAndPassword(fb.auth,el('auth-email').value.trim(),el('auth-password').value);
-        await observe(fb,result.user);
-      }finally{el('auth-password').value='';}
     },{allowRegistration:true});
   });
   async function save(fb,input,registration) {
