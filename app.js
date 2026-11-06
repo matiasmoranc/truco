@@ -11,6 +11,7 @@ import {installTeamTable,TEAM_SEATS,playerTeam,positionDealerDeck,renderTeamLobb
 import {createLiveTables,LiveError} from './live-tables.js?v=20261025-close1';
 import {installMatchPhoto} from './share-photo.js?v=20261027-photo2';
 import {installProfiles,SOUND_MESSAGES} from './profile-level.js?v=20261103-viral1';
+import {installIosPromo} from './ios-promo.js?v=20261105-promo1';
 const FIREBASE_VERSION = '12.4.0';
 const $ = (id) => document.getElementById(id);
 const views = ['welcome-view', 'invite-view', 'setup-view', 'waiting-view', 'game-view', 'config-view', 'learn-view', 'scorer-view', 'friends-view'];
@@ -731,6 +732,7 @@ const friends=installFriends({$,api:creditApi,services:firebaseServices,getState
   }});
 // Share the final score on a photo (share-photo.js), read from the result panel.
 const matchPhoto=installMatchPhoto({$,document,toast:message=>toast(message,true,2600),score:()=>({target:normalizeTargetPoints(state.room?.targetPoints),sides:[...$('match-end-score').querySelectorAll(':scope>div')].map(d=>({name:d.querySelector('span')?.textContent||'',points:Number(d.querySelector('strong')?.textContent)||0,winner:d.classList.contains('match-score-winner')}))})});
+installIosPromo({document});
 // In the apps: when Google Play or the App Store has a newer version, offer it once per start.
 async function offerAppUpdate(){
   const native=globalThis.trucoNative;if(!native?.checkForUpdate)return;
