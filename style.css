@@ -2485,7 +2485,9 @@ input,textarea,[contenteditable=""],[contenteditable="true"]{-webkit-user-select
 .seat-chip-name{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;font-weight:700;line-height:1.2;text-shadow:0 1px 3px #000a}
 .seat-chip-level{font-size:10px;color:#e8c983;line-height:1}
 .rival-seat{right:8px;top:calc(var(--board-rivalCenter,84px) - 34px)}
-.my-seat{right:10px;top:calc(var(--board-ownNoticeBottom,420px) - 50px);width:auto}
+/* My picture sits beside my cards, vertically centered on the hand; the hand moves a little left to make room. */
+.my-seat{right:8px;top:calc(var(--board-handCenter,560px) - 30px);width:auto}
+.game.player-mode.two-device-mode.has-my-seat:not(.team-mode):not(.learning-mode) .hand{left:calc(50% - 24px)}
 .my-seat .seat-avatar{width:40px;height:40px}
 @media(min-width:701px){.rival-seat{right:auto;left:calc(50% + 150px)}.my-seat{right:auto;left:calc(50% + 190px)}}
 /* 2 vs 2: the picture inside each name tag. */

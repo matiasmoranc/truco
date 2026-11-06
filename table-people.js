@@ -29,6 +29,7 @@ export function installTablePeople({$,document,getState,profiles,friends,signedI
   const s=getState(),r=s.room;
   const shown=!!r&&r.mode!=='2v2'&&!s.learning&&s.playerId&&!['waiting','drawing'].includes(r.status);
   const rival=s.playerId==='player1'?'player2':'player1';
+  $('game-view').classList.toggle('has-my-seat',!!shown);
   for(const [id,seat] of [['rival-seat',rival],['my-seat',s.playerId]]){
    const node=chip(id);node.hidden=!shown||!r?.players?.[seat];if(node.hidden)continue;
    const profile=profileFor(seat),name=nameOf(seat);
