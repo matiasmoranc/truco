@@ -109,7 +109,7 @@ export function installTablePeople({$,document,getState,profiles,friends,signedI
  function renderEndChat(){
   const s=getState(),r=s.room,box=$('match-end-chat');if(!box||!r)return;
   const info=chat.state(),peers=seatsOf(r).filter(q=>q!==s.playerId&&r.players?.[q]&&!r.players[q].bot);
-  box.hidden=s.localGame||!peers.length;if(box.hidden)return;
+  box.hidden=s.localGame||!peers.length||info.gone;if(box.hidden)return;
   $('end-chat-title').textContent=r.mode==='2v2'?'Chat de la mesa':'Chat con '+(r.players[peers[0]]?.name||'tu rival');
   const history=$('end-chat-history'),near=history.scrollHeight-history.scrollTop-history.clientHeight<24;
   const items=[...info.messages,...info.pending.map(m=>({...m,pending:true}))];

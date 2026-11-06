@@ -8,7 +8,7 @@ import { installCredits } from './credits.js?v=20261025-claim1';
 import { installAccount } from './account.js?v=20261105-email2';
 import { initializeGameAuth } from './auth-init.js?v=20261016-android-google';
 import {installTeamTable,TEAM_SEATS,playerTeam,positionDealerDeck,renderTeamLobbySeats,renderWaitingSeats} from './team-table-ui.js?v=20261106-social1';
-import {installTablePeople} from './table-people.js?v=20261106-social1';
+import {installTablePeople} from './table-people.js?v=20261106-social2';
 import {createLiveTables,LiveError} from './live-tables.js?v=20261025-close1';
 import {installMatchPhoto} from './share-photo.js?v=20261027-photo2';
 import {installProfiles,SOUND_MESSAGES} from './profile-level.js?v=20261103-viral1';
@@ -286,7 +286,9 @@ function endChatState(){
   const room=state.room,left=room?.tableClosed;
   const unavailable=left?(room.mode==='2v2'?'Un jugador se fue de la mesa: el chat se cerró.':(room.players?.[otherPlayer(state.playerId)]?.name||'Tu rival')+' se fue de la mesa. Ya no puede leer mensajes.'):
     !chatAvailable()?'El chat no está disponible.':liveActionsBlocked()?'Sin conexión. Esperá un momento.':chatMuted?'Silenciaste los mensajes de esta mesa.':peerChatMuted()?'Tu rival silenció los mensajes.':'';
-  return {messages:matchChat.messages||[],pending:matchChat.pendingOwn||[],sending:!!matchChat.sending,unavailable};
+  // Someone left (abandoned, dropped or closed the table): nobody is there to read, so no chat.
+  const gone=!!left||['abandon','disconnect'].includes(room?.matchResult?.reason);
+  return {messages:matchChat.messages||[],pending:matchChat.pendingOwn||[],sending:!!matchChat.sending,unavailable,gone};
 }
 function sendEndChat(text){return sendMatchChat(null,text,true);}
 function showView(id) { if(id==='game-view')journeyStep('played'); if(!$(id).classList.contains('active'))clearToast(); if(id!=='game-view'){state.preparingRoom=null;$('game-view').classList.remove('table-preparing');}document.documentElement.classList.remove('opening-invitation'); views.forEach((name) => $(name).classList.toggle('active', name === id)); if(id!=='game-view'){closeMatchChat(true);closeTableTips();} if(id==='welcome-view')requestAnimationFrame(showLobbyOnboarding); }

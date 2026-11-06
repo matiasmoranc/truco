@@ -2566,3 +2566,7 @@ input,textarea,[contenteditable=""],[contenteditable="true"]{-webkit-user-select
 .friends-hint{margin:2px 0 8px;color:#9fb4a6;font-size:13px}
 .friends-share{display:flex;align-items:center;gap:10px;min-height:48px;padding:10px 14px;border:1px dashed #e8c98377;border-radius:14px;background:#e8c9830f;color:#f2dca6;font-size:14px;font-weight:600;text-decoration:none}
 .friends-share svg{flex:none;width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+/* Leaving the table goes under sharing the result, as the last step. */
+.match-end-foot .match-end-leave{width:100%;height:50px;margin-top:6px;justify-content:center;border-radius:12px;background:#ffffff08;border:1px solid #ffffff30}
+.match-end-chat .end-chat-history{margin-bottom:10px}
+.end-person .friend-tag{align-self:center;margin:0}
