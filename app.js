@@ -1,13 +1,14 @@
 import './chat-moderation.js?v=20261013-moderation1';
 import { visitPlatform,takeVisit,markTestDevice,markGuestVisit,trackUsage,journeyStep } from './visit.js?v=20261101-usage1';
-import { installFriends } from './friends.js?v=20261027-friends3';
+import { installFriends } from './friends.js?v=20261106-social1';
 import { installPlayerPanel } from './player-panel.js?v=20261013-blocklist1';
 import { installScorer,renderCompactTally } from './scorer.js?v=20261101-usage1';
 import { installActivity } from './activity.js?v=20261010-adminstats32';
 import { installCredits } from './credits.js?v=20261025-claim1';
 import { installAccount } from './account.js?v=20261105-email2';
 import { initializeGameAuth } from './auth-init.js?v=20261016-android-google';
-import {installTeamTable,TEAM_SEATS,playerTeam,positionDealerDeck,renderTeamLobbySeats,renderWaitingSeats} from './team-table-ui.js?v=20261031-left1';
+import {installTeamTable,TEAM_SEATS,playerTeam,positionDealerDeck,renderTeamLobbySeats,renderWaitingSeats} from './team-table-ui.js?v=20261106-social1';
+import {installTablePeople} from './table-people.js?v=20261106-social1';
 import {createLiveTables,LiveError} from './live-tables.js?v=20261025-close1';
 import {installMatchPhoto} from './share-photo.js?v=20261027-photo2';
 import {installProfiles,SOUND_MESSAGES} from './profile-level.js?v=20261103-viral1';
@@ -146,7 +147,7 @@ function clearChatNotices(){
 }
 function closeMatchChat(clearNotices=false){
   const options=$('chat-options');if(options)options.open=false;
-  matchChat.open=false;$('chat-backdrop')?.classList.add('hidden');$('match-chat')?.classList.add('hidden');$('chat-toggle')?.setAttribute('aria-expanded','false');
+  matchChat.open=false;$('game-view')?.classList.remove('chat-open');$('chat-backdrop')?.classList.add('hidden');$('match-chat')?.classList.add('hidden');$('chat-toggle')?.setAttribute('aria-expanded','false');
   if(clearNotices)clearChatNotices();
 }
 function chatMessageList(room){
@@ -226,12 +227,12 @@ function syncMatchChat(){
       // Already shown when it was sent.
       const pending=matchChat.pendingOwn.findIndex(item=>item.text===message.text);
       if(pending>=0){matchChat.pendingOwn.splice(pending,1);continue;}
-      if(!chatMuted&&!matchChat.open&&$('game-view').classList.contains('active'))showChatNotice(message);
+      if(!chatMuted&&!matchChat.open&&!tablePeople?.endVisible()&&$('game-view').classList.contains('active'))showChatNotice(message);
       continue;
     }
     playChatSound(message.text,state.room.players?.[message.sender]?.uid);
-    if(!matchChat.open&&!chatMuted)matchChat.unread++;
-    if(!chatMuted&&!matchChat.open&&$('game-view').classList.contains('active'))showChatNotice(message);
+    if(!matchChat.open&&!chatMuted&&!tablePeople?.endVisible())matchChat.unread++;
+    if(!chatMuted&&!matchChat.open&&!tablePeople?.endVisible()&&$('game-view').classList.contains('active'))showChatNotice(message);
   }
   matchChat.messages=messages;
   const signature=JSON.stringify(messages);
@@ -242,21 +243,22 @@ function syncMatchChat(){
 function openMatchChat(){
   syncMatchChat();if(!chatAvailable())return;
   matchChat.open=true;matchChat.unread=0;clearChatNotices();updateChatUnread();
-  $('chat-backdrop').classList.remove('hidden');$('match-chat').classList.remove('hidden');$('chat-toggle').setAttribute('aria-expanded','true');
+  $('game-view').classList.add('chat-open');$('chat-backdrop').classList.remove('hidden');$('match-chat').classList.remove('hidden');$('chat-toggle').setAttribute('aria-expanded','true');
   $('chat-history').scrollTop=$('chat-history').scrollHeight;$('chat-close').focus();
 }
-// preset: a quick message sent without touching the typed draft.
-async function sendMatchChat(event,preset){
-  event?.preventDefault();if(liveActionsBlocked()||!chatAvailable()||matchChat.sending||chatMuted||peerChatMuted()){renderChatComposer();return;}
+// preset: a quick message sent without touching the typed draft. quiet: sent from the
+// result screen, which shows the message itself; the error comes back instead of opening the chat.
+async function sendMatchChat(event,preset,quiet=false){
+  event?.preventDefault();if(liveActionsBlocked()||!chatAvailable()||matchChat.sending||chatMuted||peerChatMuted()){renderChatComposer();return quiet?'No se puede enviar ahora.':undefined;}
   const input=$('chat-input'),draft=preset??input.value,text=draft.trim();
   if(!text||text.length>CHAT_LIMIT)return;
   const moderationReason=chatModeration?.blockedChatReason(text);
-  if(moderationReason){$('chat-error').textContent=moderationReason==='threat'?'No se puede enviar una amenaza. Mantené el respeto en la mesa.':'No se pudo enviar el mensaje porque contiene lenguaje ofensivo. Mantené el respeto en la mesa.';$('chat-error').classList.remove('hidden');return;}
+  if(moderationReason){const reason=moderationReason==='threat'?'No se puede enviar una amenaza. Mantené el respeto en la mesa.':'No se pudo enviar el mensaje porque contiene lenguaje ofensivo. Mantené el respeto en la mesa.';if(quiet)return reason;$('chat-error').textContent=reason;$('chat-error').classList.remove('hidden');return;}
   const code=state.roomCode,key=chatContextKey(),sender=state.playerId,uid=state.uid,matchNumber=Number(state.room.matchNumber||1);
   matchChat.sending=true;$('chat-send').disabled=true;$('chat-error').classList.add('hidden');
   // Close at once and show the message the way the rival sees it; the server copy is then skipped.
   const own={id:`local-${Date.now()}`,sender,text};matchChat.pendingOwn.push(own);
-  closeMatchChat();const dismissOwn=showChatNotice(own);playChatSound(text,state.uid);
+  let dismissOwn=()=>{};if(!quiet){closeMatchChat();dismissOwn=showChatNotice(own);}playChatSound(text,state.uid);
   if(preset==null){input.value='';$('chat-count').textContent='0/40';}
   try{
     if(state.room?.managedCredits){await creditCommand({kind:'chat',text});return;}
@@ -273,11 +275,20 @@ async function sendMatchChat(event,preset){
     console.error('[truco:chat]',error);
     if(key===chatContextKey()){
       matchChat.pendingOwn=matchChat.pendingOwn.filter(item=>item!==own);dismissOwn();
+      if(quiet)return 'No se pudo enviar. Volvé a intentar.';
       if(preset==null&&!input.value){input.value=draft;$('chat-count').textContent=`${draft.length}/${CHAT_LIMIT}`;}
       openMatchChat();$('chat-error').textContent='No se pudo enviar. Volvé a intentar.';$('chat-error').classList.remove('hidden');
     }
   }finally{if(key===chatContextKey()){matchChat.sending=false;renderChatComposer();}}
 }
+// The result screen's chat: the table chat's messages and why it cannot be used, if so.
+function endChatState(){
+  const room=state.room,left=room?.tableClosed;
+  const unavailable=left?(room.mode==='2v2'?'Un jugador se fue de la mesa: el chat se cerró.':(room.players?.[otherPlayer(state.playerId)]?.name||'Tu rival')+' se fue de la mesa. Ya no puede leer mensajes.'):
+    !chatAvailable()?'El chat no está disponible.':liveActionsBlocked()?'Sin conexión. Esperá un momento.':chatMuted?'Silenciaste los mensajes de esta mesa.':peerChatMuted()?'Tu rival silenció los mensajes.':'';
+  return {messages:matchChat.messages||[],pending:matchChat.pendingOwn||[],sending:!!matchChat.sending,unavailable};
+}
+function sendEndChat(text){return sendMatchChat(null,text,true);}
 function showView(id) { if(id==='game-view')journeyStep('played'); if(!$(id).classList.contains('active'))clearToast(); if(id!=='game-view'){state.preparingRoom=null;$('game-view').classList.remove('table-preparing');}document.documentElement.classList.remove('opening-invitation'); views.forEach((name) => $(name).classList.toggle('active', name === id)); if(id!=='game-view'){closeMatchChat(true);closeTableTips();} if(id==='welcome-view')requestAnimationFrame(showLobbyOnboarding); }
 function liveActionsBlocked(){
   return !!(state.room&&!state.localGame&&!state.room.tableClosed&&(navigator.onLine===false||!roomTransportConnected()||state.connectionReady!==true));
@@ -717,11 +728,13 @@ async function registerPush(){
   if(token)await creditApi('playerSocial',{action:'register-push',token,platform:native.platform});
 }
 // Levels and profile pictures (profile-level.js); the lobby re-renders when a rival's level arrives.
-const profiles=installProfiles({$,document,services:firebaseServices,getState:()=>state,toast:message=>toast(message,true,2600),onChange:()=>{if(state.lobbyRooms&&$('welcome-view').classList.contains('active'))renderLobby(state.lobbyRooms);refreshFriends();}});
+// Pictures at the table, player cards and the people on the result screen (table-people.js).
+let tablePeople=null;
+const profiles=installProfiles({$,document,services:firebaseServices,getState:()=>state,toast:message=>toast(message,true,2600),onChange:()=>{if(state.lobbyRooms&&$('welcome-view').classList.contains('active'))renderLobby(state.lobbyRooms);refreshFriends();tablePeople?.refresh();}});
 // Friends' avatars arrive after the list: redraw it then (friends is installed just below).
 function refreshFriends(){try{if($('friends-view').classList.contains('active'))friends.render();}catch{}}
 // Friends and table invitations (friends.js).
-const friends=installFriends({$,api:creditApi,services:firebaseServices,getState:()=>state,document,showView,profiles,createTable:()=>{warmGameConnection();configureSetup();},isPlaying:()=>!!state.room&&!state.learning&&$("game-view").classList.contains("active")&&!["waiting","complete"].includes(state.room.status),balance:()=>credits.wallet()?.balance,canClaim:()=>credits.canClaim(),claimCredits:()=>credits.claim(),openLobby:()=>openLobby(),
+const friends=installFriends({$,api:creditApi,services:firebaseServices,getState:()=>state,document,showView,profiles,createTable:()=>{warmGameConnection();configureSetup();},isPlaying:()=>!!state.room&&!state.learning&&$("game-view").classList.contains("active")&&!["waiting","complete"].includes(state.room.status),balance:()=>credits.wallet()?.balance,canClaim:()=>credits.canClaim(),claimCredits:()=>credits.claim(),openLobby:()=>openLobby(),onChange:()=>tablePeople?.refresh(),
   toast:(message,error=false,duration=2600)=>toast(message,true,duration),
   tableToInvite:()=>{const room=state.room;if(!state.roomCode||state.localGame||room?.status!=='waiting')return null;
     return {code:state.roomCode,mode:room.mode==='2v2'?'2v2':'1v1',targetPoints:Number(room.targetPoints)||null,stake:Number(room.creditMatch?.stake)||null,password:state.hostTablePassword?.code===state.roomCode?state.hostTablePassword.password:''};},
@@ -730,8 +743,9 @@ const friends=installFriends({$,api:creditApi,services:firebaseServices,getState
     state.invitePassword=password?{code,password}:null;state.directJoin=code;
     await openInvitation(code);$('invite-form').requestSubmit();
   }});
+tablePeople=installTablePeople({$,document,getState:()=>state,profiles,friends,signedIn:()=>!!state.uid&&!account.isGuest(),escapeHtml,toast:message=>toast(message,true,2600),chat:{state:endChatState,send:sendEndChat}});
 // Share the final score on a photo (share-photo.js), read from the result panel.
-const matchPhoto=installMatchPhoto({$,document,toast:message=>toast(message,true,2600),score:()=>({target:normalizeTargetPoints(state.room?.targetPoints),sides:[...$('match-end-score').querySelectorAll(':scope>div')].map(d=>({name:d.querySelector('span')?.textContent||'',points:Number(d.querySelector('strong')?.textContent)||0,winner:d.classList.contains('match-score-winner')}))})});
+const matchPhoto=installMatchPhoto({$,document,toast:message=>toast(message,true,2600),score:()=>({target:normalizeTargetPoints(state.room?.targetPoints),sides:[...$('match-end-score').querySelectorAll(':scope>div')].map(d=>({name:(d.querySelector('.match-score-name')||d.querySelector('span'))?.textContent||'',points:Number(d.querySelector('strong')?.textContent)||0,winner:d.classList.contains('match-score-winner')}))})});
 installIosPromo({document});
 // In the apps: when Google Play or the App Store has a newer version, offer it once per start.
 async function offerAppUpdate(){
@@ -2551,10 +2565,11 @@ function renderGame() {
   queueMicrotask(maybeShowTableTips);
   $('game-view').classList.toggle('team-mode',state.room.mode==='2v2');
   // Team tables count down their pauses (tricks, shown flowers and envidos) like 1v1.
-  if(state.room.mode==='2v2'){syncPrivateHand();syncMatchChat();renderCallNotice();teamTable.render();renderTurnTimer();renderRoundPauseTimer();placeMyFlor();finishRoomPreparation();return;}
+  if(state.room.mode==='2v2'){syncPrivateHand();syncMatchChat();renderCallNotice();teamTable.render();tablePeople.decorateTeamSeats();tablePeople.renderEnd();tablePeople.renderSeats();renderTurnTimer();renderRoundPauseTimer();placeMyFlor();finishRoomPreparation();return;}
   $('opponent-hand').classList.remove('hidden');
   $('team-seats')?.remove();
   syncMatchChat();
+  tablePeople.renderSeats();
   renderLearning();
   scheduleBot();
   renderMatchEnd();
@@ -2665,7 +2680,7 @@ function renderGame() {
   alignHandWithControls();
   actions.querySelectorAll('[data-action]').forEach((button)=>button.addEventListener('click',()=>runLiveAction(button,()=>{const act=button.dataset.action;if(state.localGame)return localAction(act);if(['yes','no','raise'].includes(act)||act.startsWith('raise-'))return answerBet(act);if(act==='reveal')return revealEnvido();if(act==='flor')return callFlor();return callBet(act);})));
   setTurnBadge(roundPauseInfo(room)?'ESPERÁ':pending?(pending.responder===state.playerId?'RESPONDÉ':'ESPERANDO'):myTurn?'TU TURNO':'ESPERÁ');$('turn-badge').classList.toggle('waiting-turn',!myTurn||!!pending);
-  renderMatchEnd();syncLiveControls();finishRoomPreparation();
+  renderMatchEnd();tablePeople.renderSeats();syncLiveControls();finishRoomPreparation();
 }
 function matchEndKey(room=state.room){
   return [state.roomCode,room?.matchNumber||1,room?.rematch?.id||'',room?.rematch?.status||''].join(':');
@@ -2753,34 +2768,44 @@ async function respondRematch(action){
 }
 function syncRematchCreditControls(){
   const insufficient=!!state.room?.managedCredits&&Number(state.room.creditMatch?.stake)>0&&((credits.wallet()?.balance??0)<state.room.creditMatch.stake||(credits.wallet()?.locked??0)>0);
-  for(const [id,label] of [['request-rematch','Revancha'],['accept-rematch','Aceptar']]){
+  for(const [id,label] of [['request-rematch','Revancha'],['accept-rematch','Aceptar revancha']]){
     $(id).textContent=insufficient?'Créditos insuficientes':label;
     if(insufficient)$(id).disabled=true;
   }
 }
 function renderMatchEnd(){
-  if(state.room?.mode==='2v2'){teamTable.renderEnd();return;}
+  if(state.room?.mode==='2v2'){teamTable.renderEnd();tablePeople?.renderEnd();return;}
   const panel=$('match-end'),room=state.room,winner=room&&matchWinner(room);
   const visible=!state.learning&&matchFinished(room)&&!!winner&&state.dismissedMatchEnd!==matchEndKey(room);
   panel.classList.toggle('hidden',!visible);
   if(!visible)return;
-  const name=room.players?.[winner]?.name||'Jugador';
-  $('match-end-title').textContent='Ganó '+name;
+  const player=state.playerId,isPlayer=['player1','player2'].includes(player),rival=otherPlayer(player);
+  const name=room.players?.[winner]?.name||'Jugador',rivalName=room.players?.[rival]?.name||'Tu rival',won=isPlayer&&winner===player;
+  $('match-end-title').textContent=won?'¡Ganaste!':'Ganó '+name;
+  panel.classList.toggle('is-win',won);panel.classList.toggle('is-loss',isPlayer&&!won);
+  const reason=room.matchResult?.reason;
+  $('match-end-kicker').textContent=!isPlayer?'Partida terminada':reason==='inactivity'?(won?rivalName+' no jugó a tiempo':'Se te terminó el tiempo'):reason==='disconnect'?(won?rivalName+' se desconectó':'Te desconectaste'):reason==='abandon'?(won?rivalName+' abandonó la partida':'Abandonaste la partida'):'Partida terminada';
   const wins=sessionWins(room),totalMatches=wins.player1+wins.player2;
   const sessionScore=$('match-session-score');
-  sessionScore.textContent=totalMatches>=2?'Ganadas: '+(room.players?.player1?.name||'Jugador 1')+' '+wins.player1+' – '+wins.player2+' '+(room.players?.player2?.name||'Jugador 2'):'';
+  sessionScore.textContent=totalMatches>=2?'Partidas ganadas: '+(room.players?.player1?.name||'Jugador 1')+' '+wins.player1+' – '+wins.player2+' '+(room.players?.player2?.name||'Jugador 2'):'';
   sessionScore.classList.toggle('hidden',totalMatches<2);
-  $('match-end-score').innerHTML=['player1','player2'].map(player=>`<div class="${player===winner?'match-score-winner':''}"><strong>${capScores(room,room.scores)[player]||0}</strong><span>${escapeHtml(room.players?.[player]?.name||'Jugador')}</span></div>`).join('<b aria-hidden="true">–</b>');
-  const request=room.rematch,player=state.playerId,isPlayer=['player1','player2'].includes(player);
-  const canRematch=room.matchResult?.reason!=='abandon'&&!room.tableClosed;
+  const avatarOf=seat=>{const p=room.players?.[seat],own=seat===player&&state.uid;const profile=(own?profiles.profileOf(state.uid,p?.name):p?.uid?profiles.profileOf(p.uid,p.name):null)||{};return profiles.avatarHtml(profile,'player-avatar match-score-avatar');};
+  $('match-end-score').innerHTML=['player1','player2'].map(seat=>`<div class="${seat===winner?'match-score-winner':''}">${avatarOf(seat)}<strong>${capScores(room,room.scores)[seat]||0}</strong><span class="match-score-name">${escapeHtml(room.players?.[seat]?.name||'Jugador')}</span></div>`).join('<b aria-hidden="true">–</b>');
+  const request=room.rematch;
+  const canRematch=reason!=='abandon'&&!room.tableClosed;
   const pending=canRematch&&request?.status==='pending',incoming=pending&&request.requester!==player;
-  $('match-end-message').textContent=room.tableClosed?(room.closeReason==='match-left'?'Tu rival se fue de la mesa.':'La mesa se cerró.'):pending?(incoming?(room.players?.[request.requester]?.name||'Tu rival')+' quiere jugar la revancha.':'Revancha enviada. Esperando al rival…'):request?.status==='declined'?'La revancha no fue aceptada.':room.matchResult?.reason==='inactivity'?'Victoria por inactividad.':room.matchResult?.reason==='disconnect'?'Victoria por desconexión.':room.matchResult?.reason==='abandon'?'El rival abandonó la partida.':'Partida terminada';
-
+  // What the other side is doing: it asks for a rematch, waits for one or left the table.
+  const status=room.tableClosed?(room.closeReason==='match-left'?rivalName+' se fue de la mesa.':'La mesa se cerró.'):pending?(incoming?rivalName+' quiere jugar la revancha.':'Revancha enviada. Esperando a '+rivalName+'…'):request?.status==='declined'?'La revancha no fue aceptada.':'';
+  const message=$('match-end-message');message.textContent=status;message.hidden=!status;
+  message.className='match-end-status'+(room.tableClosed?' is-left':incoming?' is-asking':'');
   $('request-rematch').classList.toggle('hidden',!isPlayer||!canRematch||pending);
   $('accept-rematch').classList.toggle('hidden',!isPlayer||!canRematch||!incoming);
-  $('decline-rematch').classList.toggle('hidden',!isPlayer||!canRematch);
-  for(const id of ['request-rematch','accept-rematch','decline-rematch'])$(id).disabled=rematchInFlight||liveActionsBlocked();
+  $('decline-rematch').classList.toggle('hidden',!isPlayer);
+  $('decline-rematch').textContent=room.tableClosed?'Volver al inicio':'Salir de la mesa';
+  for(const id of ['request-rematch','accept-rematch'])$(id).disabled=rematchInFlight||liveActionsBlocked();
+  $('decline-rematch').disabled=rematchInFlight||(!room.tableClosed&&liveActionsBlocked());
   syncRematchCreditControls();
+  tablePeople?.renderEnd();
   if(state.focusedMatchEnd!==matchEndKey(room)){
     state.focusedMatchEnd=matchEndKey(room);
     (isPlayer&&canRematch?(incoming?$('accept-rematch'):pending?$('close-match-end'):$('request-rematch')):$('close-match-end')).focus({preventScroll:true});

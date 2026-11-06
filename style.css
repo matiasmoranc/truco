@@ -1002,7 +1002,9 @@ body { min-height:100dvh; }
 .chat-report-hint{margin:0 0 10px;color:#ead7a5;font-size:13px}
 .chat-mute{font-size:14px;font-weight:600;color:#f7f3e9}
 
-.chat-backdrop{position:fixed;inset:0;z-index:175;background:rgba(4,20,12,.2);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);touch-action:manipulation}
+/* While chatting the table stays sharp: the clock and whose turn it is stay readable above the backdrop. */
+.chat-backdrop{position:fixed;inset:0;z-index:175;background:rgba(4,20,12,.14);touch-action:manipulation}
+.game.chat-open .game-topbar{position:relative;z-index:178}
 .chat-backdrop.hidden{display:none!important}
 
 
@@ -2472,3 +2474,95 @@ input,textarea,[contenteditable=""],[contenteditable="true"]{-webkit-user-select
 .guest-signin .button{width:min(280px,100%);margin-top:6px;justify-content:center;text-align:center}
 .guest-mode .home-lobby-heading,.guest-mode #open-room-list,.guest-mode #lobby-report,.guest-mode #level-open{display:none!important}
 .guest-mode .home-lobby{justify-content:center}
+
+/* Players' pictures on the table: the rival beside their cards, mine above my hand. */
+.seat-chip{position:absolute;z-index:12;display:flex;flex-direction:column;align-items:center;gap:3px;width:76px;padding:0;border:0;background:none;color:#f4eedc;touch-action:manipulation}
+.seat-chip[hidden],.game.learning-mode .seat-chip,.game.team-mode .seat-chip,.game.drawing-mode .seat-chip{display:none!important}
+.seat-chip .seat-avatar{width:48px;height:48px;box-shadow:0 0 0 2px #e8c98355,0 4px 12px #0007;border-radius:50%;background:#1a4334;transition:box-shadow .2s}
+.seat-chip .seat-avatar.has-icon{background:#1a4334;box-shadow:0 4px 12px #0007}
+.seat-chip.is-turn .seat-avatar,.seat-chip.is-turn .seat-avatar.has-icon{box-shadow:0 0 0 3px #f7d88b,0 0 16px #f7d88b88}
+.seat-chip .level-badge{width:20px;height:20px;right:-4px;bottom:-4px}
+.seat-chip-name{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;font-weight:700;line-height:1.2;text-shadow:0 1px 3px #000a}
+.seat-chip-level{font-size:10px;color:#e8c983;line-height:1}
+.rival-seat{right:8px;top:calc(var(--board-rivalCenter,84px) - 34px)}
+.my-seat{right:10px;top:calc(var(--board-ownNoticeBottom,420px) - 50px);width:auto}
+.my-seat .seat-avatar{width:40px;height:40px}
+@media(min-width:701px){.rival-seat{right:auto;left:calc(50% + 150px)}.my-seat{right:auto;left:calc(50% + 190px)}}
+/* 2 vs 2: the picture inside each name tag. */
+.team-seat .team-player-name.with-avatar{display:flex;flex-direction:row;align-items:center;gap:6px;text-align:left}
+.team-seat-avatar{flex:none;padding:0;border:0;background:none;border-radius:50%;line-height:0;touch-action:manipulation}
+.team-seat-avatar .player-avatar{width:30px;height:30px}
+.team-seat-avatar .level-badge{width:14px;height:14px;right:-3px;bottom:-3px}
+.team-seat.is-turn .team-seat-avatar .player-avatar{box-shadow:0 0 0 2px #f7d88b}
+
+/* A player's card, opened by tapping a picture. */
+.player-card-dialog{width:min(320px,calc(100% - 32px));padding:26px 22px 20px;border:1px solid #d8b87566;border-radius:22px;background:#153e2e;color:#f4eedc;text-align:center;box-shadow:0 20px 60px #000a}
+.player-card-dialog[open]{display:flex;flex-direction:column;align-items:center;gap:8px}
+.player-card-dialog::backdrop{background:#04140ccc}
+.player-card-avatar .player-avatar{width:150px;height:150px}.player-card-avatar .player-avatar.has-photo{box-shadow:0 0 0 3px #e8c983}
+.player-card-avatar .player-avatar.has-icon{background:#1a4334}
+.player-card-avatar .level-badge{width:44px;height:44px;right:0;bottom:0}
+.player-card-name{margin-top:10px;font-size:22px;overflow-wrap:anywhere}
+.player-card-level{padding:3px 10px;border-radius:999px;background:#e8c98322;color:#e8c983;font-size:13px;font-weight:700}
+.player-card-note{color:#aebbb2}
+.player-card-dialog .add-friend-button,.player-card-dialog .friend-tag{margin-top:8px;min-height:44px;padding:0 18px;font-size:15px}
+.player-card-close{width:100%;margin-top:10px;justify-content:center;border-radius:12px;height:46px}
+
+/* The result screen: who won, the score with both pictures, the rematch, the people and the chat. */
+.match-end{align-items:flex-start;padding:16px}
+.match-end-panel{margin:auto;width:min(440px,100%);padding:22px 18px 16px;border-radius:22px;background:linear-gradient(180deg,#1b4a37 0,#143a2b 160px)}
+.match-end-panel.is-win{border-color:#e8c983aa;box-shadow:0 0 0 1px #e8c98333,0 20px 70px #0008}
+.match-end-close{right:10px;top:10px;width:38px;height:38px;color:#d6e0d8}
+.match-end-kicker{margin:0 44px 2px!important;font-size:12px!important;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#9fb4a6!important}
+.match-end h2{margin:0 36px 14px;font-size:clamp(28px,8vw,36px)}
+.match-end-panel.is-loss h2{color:#f4eedc}
+.match-end-score{align-items:center;gap:10px;padding:14px 8px;border-radius:16px;background:#0d2b20aa}
+.match-end-score>div{display:flex;flex-direction:column;align-items:center;gap:6px}
+.match-end-score .match-score-avatar{width:54px;height:54px}
+.match-end-score .match-score-winner .match-score-avatar.has-photo{box-shadow:0 0 0 3px #e8c983}
+.match-end-score .level-badge{width:20px;height:20px;right:-4px;bottom:-4px}
+.match-end-score strong{font-size:clamp(40px,12vw,56px)}
+.match-end-score .match-score-name{display:block;margin:0;max-width:100%;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.match-end-score>b{padding:0;align-self:center}
+.match-end .session-score{margin:8px 0 0}
+.match-end p.match-end-status{margin:12px 0 0;padding:10px 12px;border-radius:12px;background:#ffffff0d;color:#e3ece5;font-size:14px;line-height:1.4}
+.match-end p.match-end-status[hidden]{display:none}
+.match-end p.match-end-status.is-asking{background:#e8c98326;color:#f7e3b0;font-weight:700}
+.match-end p.match-end-status.is-left{background:#59271e;color:#ffe0ca;font-weight:700}
+.match-end-actions{margin-top:14px;gap:8px}
+.match-end-actions .button{height:50px}
+.match-end-people{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.match-end-people[hidden]{display:none}
+.end-person{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid #ffffff1c;border-radius:14px;background:#ffffff08;text-align:left}
+.end-person.is-asking{border-color:#e8c983aa;background:#e8c9831a}
+.end-person-avatar{flex:none;padding:0;border:0;background:none;line-height:0;border-radius:50%}
+.end-person-avatar .player-avatar{width:42px;height:42px}
+.end-person-avatar .level-badge{width:16px;height:16px;right:-3px;bottom:-3px}
+.end-person-who{flex:1;min-width:0}
+.end-person-who strong{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:15px}
+.end-person-who small{display:block;color:#aebbb2;font-size:12px;line-height:1.3}
+.end-person.is-asking .end-person-who small{color:#f7e3b0}
+.end-person .friend-button,.end-person .friend-tag{flex:none;min-height:38px;padding:0 12px;font-size:13px;white-space:nowrap}
+.friend-tag.is-friend{color:#9fe0b0;border-color:#9fe0b066}
+.match-end-chat{margin-top:14px;padding:12px;border:1px solid #ffffff1c;border-radius:16px;background:#0d2b20aa;text-align:left}
+.match-end-chat[hidden]{display:none}
+.match-end-chat h3{margin:0 0 8px;font-size:14px;color:#e8c983}
+.end-chat-history{display:flex;flex-direction:column;gap:6px;max-height:150px;min-height:44px;overflow-y:auto;padding:2px}
+.end-chat-message{align-self:flex-start;max-width:85%;padding:7px 11px;border-radius:14px 14px 14px 4px;background:#ffffff14;font-size:14px;line-height:1.3;overflow-wrap:anywhere}
+.end-chat-message strong{display:block;font-size:11px;color:#e8c983}
+.end-chat-message.mine{align-self:flex-end;border-radius:14px 14px 4px 14px;background:#e8c983;color:#182219}
+.end-chat-empty{margin:6px 0!important;color:#9fb4a6!important;font-size:13px!important}
+.end-chat-quick{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 8px}
+.end-chat-quick button{flex:none;min-height:34px;padding:0 12px;border:1px solid #e8c98366;border-radius:999px;background:#e8c98314;color:#f2dca6;font-size:13px;touch-action:manipulation}
+.end-chat-form{display:flex;gap:8px}
+.end-chat-form input{flex:1;min-width:0;height:42px;padding:0 12px;border:1px solid #ffffff30;border-radius:12px;background:#00000026;color:#f7f3e9;font-size:16px}
+.end-chat-form button{flex:none;height:42px;padding:0 14px;border:0;border-radius:12px;background:#e8c983;color:#182219;font-weight:700}
+.match-end-chat button:disabled,.end-chat-form input:disabled{opacity:.45;cursor:not-allowed}
+.match-end p.end-chat-note{margin:8px 0 0;color:#ffcfb8;font-size:13px}
+.match-end p.end-chat-note[hidden]{display:none}
+.match-end-foot{display:flex;flex-direction:column;align-items:center;gap:0;margin-top:14px}
+.match-end-foot .match-end-share{margin:0 auto 4px}
+/* Friends: the people you played with come first, and a way to send your name by WhatsApp. */
+.friends-hint{margin:2px 0 8px;color:#9fb4a6;font-size:13px}
+.friends-share{display:flex;align-items:center;gap:10px;min-height:48px;padding:10px 14px;border:1px dashed #e8c98377;border-radius:14px;background:#e8c9830f;color:#f2dca6;font-size:14px;font-weight:600;text-decoration:none}
+.friends-share svg{flex:none;width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}

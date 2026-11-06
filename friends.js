@@ -4,7 +4,7 @@
 // friend, who gets the invitation live in the game (and as a phone notification)
 // with Entrar / Rechazar.
 const coinIcon='<svg class="credit-coin-icon" viewBox="-2 -2 52 54" aria-hidden="true"><g transform="rotate(-9 21 35)"><path d="M6 35v7a15 6 0 0 0 30 0v-7"/><ellipse cx="21" cy="35" rx="15" ry="6"/></g><g transform="rotate(9 27 23)"><path d="M12 23v7a15 6 0 0 0 30 0v-7"/><ellipse cx="27" cy="23" rx="15" ry="6"/></g><g transform="rotate(-12 20 12)"><path d="M5 12v7a15 6 0 0 0 30 0v-7"/><ellipse cx="20" cy="12" rx="15" ry="6"/></g></svg>';
-export function installFriends({$,api,services,getState,toast,tableToInvite,joinInvite,showView,openLobby,profiles=null,createTable=()=>{},isPlaying=()=>false,balance=()=>undefined,canClaim=()=>false,claimCredits=async()=>{},document}){
+export function installFriends({$,api,services,getState,toast,tableToInvite,joinInvite,showView,openLobby,profiles=null,createTable=()=>{},isPlaying=()=>false,balance=()=>undefined,canClaim=()=>false,claimCredits=async()=>{},onChange=()=>{},document}){
  let overview={friends:[],incoming:[],outgoing:[]},recent=null,unsubscribers=[],listening=null,statusTimer=null;
  // Friends' presence (presence/{uid}: lobby, playing or off, and since when), one listener each.
  let presence={},presenceSubs=new Map(),presenceFb=null,pendingInvite=null;
@@ -88,7 +88,7 @@ export function installFriends({$,api,services,getState,toast,tableToInvite,join
  }
  function fold(name,toggle,panel){$(toggle).setAttribute('aria-expanded',String(open$[name]));$(toggle).classList.toggle('open',open$[name]);$(panel).hidden=!open$[name];}
  function render(){
-  badge();renderOnline();
+  badge();renderOnline();onChange();
   if(!$('friends-view').classList.contains('active'))return;
   const incoming=overview.incoming.length,count=$('friends-requests-count');count.hidden=!incoming;count.textContent=String(incoming);
   $('friends-count').textContent=String(overview.friends.length);
@@ -128,8 +128,13 @@ export function installFriends({$,api,services,getState,toast,tableToInvite,join
   const results=(await call('search',{query}))?.results||[];if(seq!==searchSeq)return;
   searchResults=results;render();
  }
+ // A message to send by WhatsApp with my name, so a friend can find me in the search.
+ function shareLink(){
+  const me=($('player-name')?.value||'').trim(),text='¡Jugá al truco conmigo! Entrá a https://trucouruguayo.uy, tocá Amigos y buscame como '+(me?'"'+me+'"':'mi nombre')+'.';
+  const link=$('friends-share');if(link)link.href='https://wa.me/?text='+encodeURIComponent(text);
+ }
  async function open(){
-  showView('friends-view');$('friends-search').value='';$('friends-filter').value='';searchResults=null;recent=null;open$.requests=overview.incoming.length>0;open$.list=false;render();
+  shareLink();showView('friends-view');$('friends-search').value='';$('friends-filter').value='';searchResults=null;recent=null;open$.requests=overview.incoming.length>0;open$.list=false;render();
   try{recent=(await call('recent'))?.results||[];}catch(e){recent=[];toast(e?.message||'No se pudieron cargar los últimos jugadores.',true);}
   render();
  }
@@ -285,5 +290,8 @@ export function installFriends({$,api,services,getState,toast,tableToInvite,join
   for(const uid of ids)if(!presenceSubs.has(uid))presenceSubs.set(uid,fb.onValue(fb.ref(fb.db,'presence/'+uid),snap=>{presence[uid]=snap.val()||null;render();},()=>{presence[uid]=null;}));
  }
  function stop(){for(const off of presenceSubs.values())off?.();presenceSubs=new Map();presence={};presenceFb=null;pendingInvite=null;clearInterval(statusTimer);adminInbox=[];if(adminShowing){adminShowing=null;$('admin-message-dialog').close();}statusTimer=null;for(const off of unsubscribers)off?.();unsubscribers=[];listening=null;overview={friends:[],incoming:[],outgoing:[]};badge();}
- return {start,stop,open,render,friendNames:()=>overview.friends.map(f=>f.name)};
+ // For the table and the result screen: how someone relates to me, and asking or accepting.
+ const requestFriend=async(uid,name)=>{const r=(await call('request',{uid}))?.relation;toast(r==='friend'?'Ahora son amigos.':'Solicitud enviada a '+name+'.');return r;};
+ const acceptFriend=async uid=>{await call('respond',{uid,accept:true});toast('Ahora son amigos.');};
+ return {start,stop,open,render,relationOf,requestFriend,acceptFriend,friendNames:()=>overview.friends.map(f=>f.name)};
 }

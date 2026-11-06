@@ -123,13 +123,13 @@ export function installTeamTable({$,getState,command,runAction,renderPlayerHand,
  }
  function renderEnd(){const s=getState(),r=s.room;if(r?.mode!=='2v2')return;const visible=r.status==='complete'&&r.endReveal?.done;$('match-end').classList.toggle('hidden',!visible);if(!visible)return;
   const names=t=>TEAM_SEATS.filter(p=>playerTeam(p)===t).map(p=>seatName(r,p,s.playerId)).join(' + '),won=r.matchResult.winner;
-  $('match-end-title').textContent=playerTeam(s.playerId)===won?'¡Ganó tu equipo!':'Ganó el equipo rival';
-  $('match-end-score').innerHTML=['player1','player2'].map(t=>`<div class="${won===t?'match-score-winner':''}"><strong>${r.scores[t]}</strong><span>${safe(names(t))}</span></div>`).join('<b>–</b>');
+  $('match-end-title').textContent=playerTeam(s.playerId)===won?'¡Ganó tu equipo!':'Ganó el equipo rival';$('match-end').querySelector('.match-end-panel').classList.toggle('is-win',playerTeam(s.playerId)===won);$('match-end').querySelector('.match-end-panel').classList.toggle('is-loss',playerTeam(s.playerId)!==won);if($('match-end-kicker'))$('match-end-kicker').textContent='Partida terminada';
+  $('match-end-score').innerHTML=['player1','player2'].map(t=>`<div class="${won===t?'match-score-winner':''}"><strong>${r.scores[t]}</strong><span class="match-score-name">${safe(names(t))}</span></div>`).join('<b>–</b>');
   // Without stake there is nothing to pay: the winners add points to their level.
   const paid=Number(r.creditMatch?.stake)>0;$('match-session-score').textContent=paid?(r.creditResult?'Cada ganador recibe '+r.creditResult.payout+' créditos.':'Confirmando los créditos…'):'Los ganadores suman puntos para su nivel.';$('match-session-score').classList.remove('hidden');
   const votes=r.rematch?.status==='pending'?r.rematch.votes||{}:{};const voted=!!votes[s.playerId];
-  $('match-end-message').textContent=r.tableClosed?'Un jugador se fue de la mesa.':Object.keys(votes).length?'Revancha: '+Object.keys(votes).length+' de 4 confirmaron.':'La revancha necesita la confirmación de los cuatro.';
-  $('request-rematch').classList.toggle('hidden',voted||!!r.tableClosed);$('accept-rematch').classList.add('hidden');$('decline-rematch').classList.add('hidden');
+  const status=r.tableClosed?'Un jugador se fue de la mesa.':Object.keys(votes).length?'Revancha: '+Object.keys(votes).length+' de 4 confirmaron.':'La revancha necesita la confirmación de los cuatro.';$('match-end-message').textContent=status;$('match-end-message').hidden=false;$('match-end-message').className='match-end-status'+(r.tableClosed?' is-left':'');
+  $('request-rematch').classList.toggle('hidden',voted||!!r.tableClosed);$('accept-rematch').classList.add('hidden');$('decline-rematch').classList.remove('hidden');$('decline-rematch').textContent=r.tableClosed?'Volver al inicio':'Salir de la mesa';
  }
  function render(){const s=getState(),r=s.room,p=s.playerId;if(r?.mode!=='2v2'){$('signal-timer')?.classList.add('hidden');return;}
   const game=$('game-view'),felt=$('felt-area'),seats=teamSeatsFor(p),mineTeam=playerTeam(p),enemyTeam=mineTeam==='player1'?'player2':'player1';
