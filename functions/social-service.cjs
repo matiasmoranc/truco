@@ -62,5 +62,5 @@ function inviteAllowance(sentAt,now){
  if(recent.length<INVITES_PER_FRIEND)return {allowed:true,next:[...recent,now]};
  return {allowed:false,waitMinutes:Math.max(1,Math.ceil((recent[recent.length-INVITES_PER_FRIEND]+INVITE_WINDOW_MS-now)/60000)),next:recent};
 }
-const inviteText=invite=>`${invite.fromName} te invita a jugar al truco: `+[invite.mode==='2v2'?'2 vs 2':'1 vs 1',invite.targetPoints?`a ${invite.targetPoints} puntos`:null,invite.stake?`${invite.stake} crédito${invite.stake===1?'':'s'} por jugador`:'sin créditos'].filter(Boolean).join(', ')+'.';
+const inviteText=invite=>`${invite.fromName} te invita a jugar al truco: `+[invite.mode==='2v2'?'2 vs 2':'1 vs 1',invite.targetPoints?`a ${invite.targetPoints} puntos`:null].filter(Boolean).join(', ')+'.';
 module.exports={INVITE_MS,nameKey,keyName,searchPrefix,recentOpponents,relation,requestUpdates,acceptUpdates,declineUpdates,removeUpdates,inviteRecord,inviteText,PLAYING_FRESH_MS,isPlaying,INVITES_PER_FRIEND,INVITE_WINDOW_MS,inviteAllowance};

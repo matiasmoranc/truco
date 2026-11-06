@@ -21,7 +21,7 @@ test('Friendship steps write both sides and a crossed request becomes a friendsh
 test('A table invitation carries the code, the private password and expires in minutes',()=>{
  const invite=S.inviteRecord({from:'a',fromName:'Ana',table:{code:'ABCDE',mode:'2v2',targetPoints:30,stake:5,password:'clave'},now:1000});
  assert.equal(invite.code,'ABCDE');assert.equal(invite.password,'clave');assert.equal(invite.expiresAt,1000+S.INVITE_MS);
- assert.equal(S.inviteText(invite),'Ana te invita a jugar al truco: 2 vs 2, a 30 puntos, 5 créditos por jugador.');
+ assert.equal(S.inviteText(invite),'Ana te invita a jugar al truco: 2 vs 2, a 30 puntos.');
  assert.equal(S.inviteRecord({from:'a',fromName:'Ana',table:{code:'ABCDE'},now:1}).password,undefined);
  assert.throws(()=>S.inviteRecord({from:'a',fromName:'Ana',table:{code:'../x'},now:1}));
 });

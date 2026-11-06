@@ -281,13 +281,22 @@ async function sendMatchChat(event,preset,quiet=false){
     }
   }finally{if(key===chatContextKey()){matchChat.sending=false;renderChatComposer();}}
 }
+// Another person at the table whose connection the table server saw drop (they closed the
+// page or the app): on the result screen that means they left.
+function offlinePeer(room=state.room){
+  if(!room)return null;
+  return roomSeats(room).find(seat=>{
+    const presence=room.connectionPresence?.[seat],person=room.players?.[seat];
+    return seat!==state.playerId&&person?.uid&&!person.bot&&presence?.online===false&&presence.uid===person.uid&&Number(presence.matchNumber)===Number(room.matchNumber||1);
+  })||null;
+}
 // The result screen's chat: the table chat's messages and why it cannot be used, if so.
 function endChatState(){
   const room=state.room,left=room?.tableClosed;
   const unavailable=left?(room.mode==='2v2'?'Un jugador se fue de la mesa: el chat se cerró.':(room.players?.[otherPlayer(state.playerId)]?.name||'Tu rival')+' se fue de la mesa. Ya no puede leer mensajes.'):
     !chatAvailable()?'El chat no está disponible.':liveActionsBlocked()?'Sin conexión. Esperá un momento.':chatMuted?'Silenciaste los mensajes de esta mesa.':peerChatMuted()?'Tu rival silenció los mensajes.':'';
   // Someone left (abandoned, dropped or closed the table): nobody is there to read, so no chat.
-  const gone=!!left||['abandon','disconnect'].includes(room?.matchResult?.reason);
+  const gone=!!left||['abandon','disconnect'].includes(room?.matchResult?.reason)||!!offlinePeer(room);
   return {messages:matchChat.messages||[],pending:matchChat.pendingOwn||[],sending:!!matchChat.sending,unavailable,gone};
 }
 function sendEndChat(text){return sendMatchChat(null,text,true);}
@@ -2776,7 +2785,12 @@ function syncRematchCreditControls(){
   }
 }
 function renderMatchEnd(){
-  if(state.room?.mode==='2v2'){teamTable.renderEnd();tablePeople?.renderEnd();return;}
+  if(state.room?.mode==='2v2'){
+    teamTable.renderEnd();
+    const gone=!state.room.tableClosed&&offlinePeer(state.room);
+    if(gone&&!$('match-end').classList.contains('hidden')){const m=$('match-end-message');m.textContent=(state.room.players?.[gone]?.name||'Un jugador')+' salió de la mesa.';m.hidden=false;m.className='match-end-status is-left';$('request-rematch').classList.add('hidden');}
+    tablePeople?.renderEnd();return;
+  }
   const panel=$('match-end'),room=state.room,winner=room&&matchWinner(room);
   const visible=!state.learning&&matchFinished(room)&&!!winner&&state.dismissedMatchEnd!==matchEndKey(room);
   panel.classList.toggle('hidden',!visible);
@@ -2797,11 +2811,12 @@ function renderMatchEnd(){
   const canRematch=reason!=='abandon'&&!room.tableClosed;
   const pending=canRematch&&request?.status==='pending',incoming=pending&&request.requester!==player;
   // What the other side is doing: it asks for a rematch, waits for one or left the table.
-  const status=room.tableClosed?(room.closeReason==='match-left'?rivalName+' se fue de la mesa.':'La mesa se cerró.'):pending?(incoming?rivalName+' quiere jugar la revancha.':'Revancha enviada. Esperando a '+rivalName+'…'):request?.status==='declined'?'La revancha no fue aceptada.':'';
+  const gone=!room.tableClosed&&isPlayer&&!!offlinePeer(room);
+  const status=room.tableClosed?(room.closeReason==='match-left'?rivalName+' se fue de la mesa.':'La mesa se cerró.'):gone?rivalName+' salió de la mesa.':pending?(incoming?rivalName+' quiere jugar la revancha.':'Revancha enviada. Esperando a '+rivalName+'…'):request?.status==='declined'?'La revancha no fue aceptada.':'';
   const message=$('match-end-message');message.textContent=status;message.hidden=!status;
-  message.className='match-end-status'+(room.tableClosed?' is-left':incoming?' is-asking':'');
-  $('request-rematch').classList.toggle('hidden',!isPlayer||!canRematch||pending);
-  $('accept-rematch').classList.toggle('hidden',!isPlayer||!canRematch||!incoming);
+  message.className='match-end-status'+(room.tableClosed||gone?' is-left':incoming?' is-asking':'');
+  $('request-rematch').classList.toggle('hidden',!isPlayer||!canRematch||pending||gone);
+  $('accept-rematch').classList.toggle('hidden',!isPlayer||!canRematch||!incoming||gone);
   $('decline-rematch').classList.toggle('hidden',!isPlayer);
   $('decline-rematch').textContent=room.tableClosed?'Volver al inicio':'Salir de la mesa';
   for(const id of ['request-rematch','accept-rematch'])$(id).disabled=rematchInFlight||liveActionsBlocked();
@@ -4614,6 +4629,13 @@ async function confirmedMatchId(code){
   }
   return null;
 }
+// Closing the page while the result is on screen leaves the table, as the × does, so the
+// others see it at once; the table server also notices the dropped connection.
+window.addEventListener('pagehide',()=>{
+  const room=state.room;
+  if(!room?.managedCredits||state.localGame||room.tableClosed||!matchFinished(room)||!roomSeats(room).includes(state.playerId))return;
+  creditCommand({kind:'cancel'}).catch(()=>{});
+});
 async function creditCommand(command){
   const code=state.roomCode;let matchId=state.room?.creditMatch?.id;
   if(code&&!matchId&&command.kind!=='tick'&&state.room?.managedCredits)matchId=await confirmedMatchId(code);

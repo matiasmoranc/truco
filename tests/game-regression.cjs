@@ -404,3 +404,14 @@ test('Sound messages show only when unlocked and switched on and nobody muted th
  s.chatMuted=true;s.playChatSound('Andate Fernando!','b');assert.equal(played.length,2);
  s.chatMuted=false;s.muted=true;s.playChatSound('Andate Fernando!','b');assert.equal(played.length,2);
 });
+test('On the result screen a rival whose connection dropped counts as gone: no chat and a notice that they left',()=>{
+ const c={state:{playerId:'player1'},roomSeats:room=>room?.mode==='2v2'?['player1','player2','player3','player4']:['player1','player2'],matchChat:{messages:[],pendingOwn:[]},chatAvailable:()=>true,liveActionsBlocked:()=>false,chatMuted:false,peerChatMuted:()=>false,otherPlayer:p=>p==='player1'?'player2':'player1'};
+ vm.createContext(c);vm.runInContext(['offlinePeer','endChatState'].map(extract).join('\n'),c);
+ const room={matchNumber:2,status:'complete',players:{player1:{uid:'a',name:'Ana'},player2:{uid:'b',name:'Beto'}},matchResult:{reason:'score'}};
+ c.state.room=room;assert.equal(c.offlinePeer(room),null);assert.equal(c.endChatState().gone,false);
+ room.connectionPresence={player2:{uid:'b',matchNumber:2,online:false,disconnectedAt:1}};
+ assert.equal(c.offlinePeer(room),'player2');assert.equal(c.endChatState().gone,true);
+ // An older match's presence, or the rival back online, does not count.
+ room.connectionPresence={player2:{uid:'b',matchNumber:1,online:false,disconnectedAt:1}};assert.equal(c.offlinePeer(room),null);
+ room.connectionPresence={player2:{uid:'b',matchNumber:2,online:true}};assert.equal(c.offlinePeer(room),null);
+});
