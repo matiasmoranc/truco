@@ -19,8 +19,8 @@ const canOpenEnvido=(r,p)=>r.trickNo===1&&!r.envidoClosed&&(r.playedBy?.[p]||0)=
 // The pie, the team's last player from the mano, is the one who sings envido.
 const isPie=(r,p)=>ordered(r.mano).filter(q=>team(q)===team(p)&&!r.folded?.[q]).at(-1)===p;
 const owesFlor=(s,p)=>!s.room.florClosed&&(s.room.playedBy?.[p]||0)===0&&s.room.flors?.[p]==null&&flower(s.originals?.[p]||[],s.room.muestra);
-// Someone sang flor and no card followed yet: every other flower is sung now.
-const florWindow=(s,p)=>Object.keys(s.room.flors||{}).length>0&&!s.room.pendingBet?.revealMode&&owesFlor(s,p);
+// Someone sang flor (or an envido waits) and no card followed yet: every other flower is sung now.
+const florWindow=(s,p)=>(Object.keys(s.room.flors||{}).length>0||s.room.pendingBet?.type==='envido')&&!s.room.pendingBet?.revealMode&&owesFlor(s,p);
 
 // Every simulated player wins the trick as cheaply as possible, never overtakes
 // a partner, and otherwise throws its lowest card.

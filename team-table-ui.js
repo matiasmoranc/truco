@@ -193,8 +193,8 @@ export function installTeamTable({$,getState,command,runAction,renderPlayerHand,
    const owesFlor=pending&&!pending.revealMode&&pending.responder===p&&pending.type!=='flor'&&mayFlor;
    if(owesFlor)add('flor','FLOR',true);
    else if(pending&&!pending.revealMode&&pending.responder===p){add('yes',pending.type==='flor'&&pending.called==='flor'&&hasFlor(r,s.hand)?'LA MÍA ES FLOR':'QUIERO',true);add('no','NO QUIERO');if(pending.type==='truco'){if(pending.stake<4)add('raise',pending.stake===2?'RETRUCO':'VALE 4');if(!r.envidoClosed&&(r.playedBy?.[p]||0)===0){add('envido','ENVIDO');add('real','REAL');add('falta','FALTA');}}if(pending.type==='envido'&&pending.called!=='falta'){add('raise-envido','ENVIDO');add('raise-real','REAL');add('raise-falta','FALTA');}if(pending.type==='flor'&&pending.called==='flor'){add('raise-conflor','CON FLOR ENVIDO');add('raise-faltaflor','CONTRA FLOR AL RESTO');}}
-   // Someone sang flor: anyone else holding one sings it now, turn or not.
-   if(mayFlor&&Object.keys(r.flors||{}).length&&!pending?.revealMode&&!buttons.some(b=>b.includes('data-team-action="flor"')))add('flor','FLOR',true);
+   // Someone sang flor, or an envido is waiting: anyone else holding one sings it now, turn or not.
+   if(mayFlor&&(Object.keys(r.flors||{}).length||pending?.type==='envido')&&!pending?.revealMode&&!buttons.some(b=>b.includes('data-team-action="flor"')))add('flor','FLOR',true);
   }
   const signalButtons=playing&&!pending&&!r.folded?.[p]&&r.turn!==p&&playerTeam(r.turn)===mineTeam&&!r.folded?.[r.turn]&&teamPie(r,p)===p;
   const signaled=r.teamSignal?.to===r.turn&&r.teamSignal.handNumber===r.handNumber&&r.teamSignal.trickNo===r.trickNo;

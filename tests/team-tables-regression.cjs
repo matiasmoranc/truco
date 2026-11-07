@@ -187,3 +187,13 @@ test('In 2 vs 2 no envido plays for more than the leading team still needs to wi
  for(const kind of ['envido','real','falta'])assert.equal(stakeFor([2,29],[kind]),1);
  assert.equal(stakeFor([4,0],['falta']),26);assert.equal(stakeFor([26,0],['envido','real']),4);assert.equal(stakeFor([0,0],['envido','real']),5);
 });
+test('An envido goes to the rival who holds an unsung flor, who can only sing it, and the flor cancels the envido',()=>{
+ let l=started(),s=l.matches.m1.session;s.room.envidoClosed=false;
+ s.hands.player2=[card('♣',4),card('♣',5),card('♣',7)];s.originals.player2=structuredClone(s.hands.player2);
+ l=act(l,'a',{kind:'call',value:'envido'},1000);
+ let r=l.matches.m1.session.room;assert.equal(r.pendingBet.type,'envido');assert.equal(r.pendingBet.responder,'player2');
+ assert.throws(()=>act(l,'d',{kind:'call',value:'yes'},1001),/responder/);
+ assert.throws(()=>act(l,'b',{kind:'call',value:'yes'},1002),/Tenés flor/);
+ l=act(l,'b',{kind:'call',value:'flor'},1003);r=l.matches.m1.session.room;
+ assert.equal(r.pendingBet?.type||null,null);assert.equal(r.scores.player2,3);assert.equal(r.envidoClosed,true);
+});
