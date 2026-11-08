@@ -2080,6 +2080,9 @@ function canFoldHand(room,player){
 }
 function foldHandChanges(room,loser){
   const winner=otherPlayer(loser);
+  const loserHand=state.localHands?.[loser]||(loser===state.playerId?state.hand:[]);
+  const sung=foldFlorChanges(room,loser,loserHand,state.localHands?.[winner]||[]);
+  if(sung)return foldWithFlor(room,loser,sung);
   const unopened=Number(room.playedCount||0)===0&&Number(room.trucoLevel||1)===1&&!room.pendingBet&&!room.envidoClosed&&!room.envidoAudit&&!Object.keys(room.flors||{}).length;
   const winnerCards=state.localOriginalHands?.[winner]||[];
   const earlyFlor=unopened&&room.practiceRules?.flor!==false&&hasFlor(winnerCards,room.muestra);
@@ -2176,6 +2179,7 @@ function reconcilePendingPlay(){
 async function playManagedCard(card){
   if(liveActionsBlocked()||state.liveAction||state.playActionInFlight||state.room.status!=='started'||!state.hand.some(c=>c.id===card.id))return;
   if(state.room.resolvingTrick||state.room.pendingNextHand||state.room.turn!==state.playerId||state.room.pendingBet){shakeTurnBadge();return;}
+  if(mustSingFlor(state.room,state.playerId,state.hand)){toast('Tenés flor. Cantá flor antes de tirar una carta.');return;}
   const token={code:state.roomCode,hand:state.room.handNumber,cardId:card.id};
   state.playActionToken=token;state.playActionInFlight=true;state.pendingCardId=card.id;syncLiveControls();
   const origin=state.cardLaunchOrigin;state.cardLaunchOrigin=null;
@@ -2294,6 +2298,16 @@ function beginTurnClockWrite(){
 function endTurnClockWrite(token){
   if(turnClockWritePending===token)turnClockWritePending=false;
 }
+// The flower is sung, any envido waiting is cancelled by it, and the hand goes to the rival.
+function foldWithFlor(room,loser,sung){
+  const winner=otherPlayer(loser),loserName=room.players?.[loser]?.name||'El jugador',winnerName=room.players?.[winner]?.name||'El rival';
+  const bet=room.pendingBet,hand=Number(room.trucoLevel)||1;
+  // A truco waiting for an answer is lost at the level already accepted; a flor call from the rival is kept.
+  const points=hand+(sung.rivalFlor?(bet?.type==='flor'?declinedFlorPoints(bet):3):0);
+  const message=loserName+' canta FLOR y se va al mazo. '+(sung.rivalFlor?winnerName+' también tiene flor: gana la flor y la mano y suma '+points+' tantos.':loserName+' suma 3 de flor. '+winnerName+' gana la mano y suma '+hand+' '+(hand===1?'tanto.':'tantos.'));
+  const notice={kind:'fold',id:crypto.randomUUID(),from:loser,to:winner,text:loserName+' canta flor y se va al mazo.',spoken:'Flor y me voy al mazo',time:Date.now(),handNumber:room.handNumber||1};
+  return {...sung.changes,callNotice:notice,turn:null,turnClock:null,pendingBet:null,pendingNextHand:{id:'fold:'+crypto.randomUUID(),winner,foldPoints:points,message,endsAt:gameTime()+3000},feed:topFeed(room,message)};
+}
 function turnClockPlayer(room=state.room){
   if(room?.status==='timed-out')return room.turnTimeout?.loser||otherPlayer(room.turnTimeout?.winner);
   if(room?.pendingBet)return room.pendingBet.revealMode?room.pendingBet.revealTurn:room.pendingBet.responder;
@@ -2318,7 +2332,7 @@ async function settleTurnTimeout(room){
   if(turnTimeoutSettling||room.status!=='timed-out'||!room.turnTimeout||(!state.localGame&&!isCoordinator()))return;
   turnTimeoutSettling=true;
   try{
-    const winner=room.turnTimeout.winner,points=Number(room.trucoLevel)||1;
+    const winner=room.turnTimeout.winner,points=(Number(room.trucoLevel)||1)+(Number(room.turnTimeout.florPoints)||0);
     if(state.localGame){localFeed(room.turnTimeout.message);localFinishHand(winner,points);return;}
     let scores=await verifyEnvido({...room.scores},winner,points);
     scores=settleSingleFlor(room,scores);
@@ -2332,7 +2346,11 @@ function turnTimeoutChanges(room){
   timeoutCounts[loser]=(Number(timeoutCounts[loser])||0)+1;
   const name=room.players?.[loser]?.name||'El jugador';
   if(timeoutCounts[loser]<3){
-    return {timeoutCounts,status:'timed-out',turn:null,turnClock:null,pendingBet:null,turnTimeout:{winner,loser,message:name+' agotó su tiempo y pierde la mano ('+timeoutCounts[loser]+' de 3 faltas por inactividad).'}};
+    // Out of time with an unsung flower: it is sung first, then the hand is lost.
+    const sung=foldFlorChanges(room,loser,state.localHands?.[loser]||(loser===state.playerId?state.hand:[]),state.localHands?.[winner]||[]);
+    const florPoints=sung?.rivalFlor?3:0,said=sung?': cantó flor, se va al mazo y':' y';
+    const notice=sung?{kind:'fold',id:crypto.randomUUID(),from:loser,to:winner,text:name+' canta flor y se va al mazo.',spoken:'Flor y me voy al mazo',time:Date.now(),handNumber:room.handNumber||1}:null;
+    return {timeoutCounts,...(sung?{...sung.changes,callNotice:notice}:{}),status:'timed-out',turn:null,turnClock:null,pendingBet:null,turnTimeout:{winner,loser,florPoints,message:name+' agotó su tiempo'+said+' pierde la mano ('+timeoutCounts[loser]+' de 3 faltas por inactividad).'}};
   }
   const message=name+' agotó los 45 segundos por tercera vez y pierde la partida. '+(room.players?.[winner]?.name||'El rival')+' gana por inactividad.';
   return {timeoutCounts,status:'complete',turn:null,turnClock:null,turnTimeout:null,
@@ -3314,6 +3332,7 @@ function localPlay(card,launchOrigin=null) {
   if(state.room.status!=='started')return;
   if(state.room.pendingBet){shakeTurnBadge();return;}
   if(state.room.turn!==player){shakeTurnBadge();return;}
+  if(mustSingFlor(state.room,player,localHand(player))){toast('Tenés flor. Cantá flor antes de tirar una carta.');return;}
   if(state.learning){state.room.callNotice=null;receivedCallNotices.delete(`${state.roomCode}:player1`);receivedCallNotices.delete(`${state.roomCode}:player2`);}
   animatePlayedHandCard(card,launchOrigin);
   state.localHands[player]=(state.localHands[player]||[]).filter((item)=>item.id!==card.id);state.hand=[...state.localHands[player]];state.room.playedCount=(state.room.playedCount||0)+1;
@@ -3925,6 +3944,20 @@ function learningDeck(room){
   return deck;
 }
 function roomHasFlor(room,hand){return room?.practiceRules?.flor!==false&&hasFlor(hand,room?.muestra);}
+// A player holding a flower that was not sung yet must sing it before throwing any card.
+function mustSingFlor(room,player,hand){
+  if(!room||room.status!=='started'||room.flors?.[player]!=null||room.florSettled||hand?.length!==3||!roomHasFlor(room,hand))return false;
+  return room.mode==='2v2'?!room.florClosed&&!(Number(room.playedBy?.[player])>0):true;
+}
+// Going to the deck (or running out of time) with an unsung flower sings it first:
+// with no flower on the other side it is worth 3; if the rival also holds one, the rival's wins.
+function foldFlorChanges(room,loser,loserHand,winnerHand){
+  if(!mustSingFlor(room,loser,loserHand))return null;
+  const winner=otherPlayer(loser),rivalFlor=room.flors?.[winner]!=null||(winnerHand?.length===3&&roomHasFlor(room,winnerHand));
+  const flors={...(room.flors||{}),[loser]:florValue(loserHand,room.muestra)};
+  if(rivalFlor&&room.flors?.[winner]==null)flors[winner]=florValue(winnerHand,room.muestra);
+  return {rivalFlor,changes:{flors,envidoClosed:true,...(rivalFlor?{florSettled:true}:{})}};
+}
 function hasStartedLearningPractice(){
   if(state.learningPracticeStarted)return true;
   try{return localStorage.getItem('truco-learning-started-v1')==='true';}catch{return false;}

@@ -2,6 +2,9 @@
 const {test}=require('node:test'),assert=require('node:assert/strict');
 const {createTable,joinTable,tableOperation}=require('../functions/table-service.cjs');
 const {liveUpdate,tryLiveAction,withMatchPreload}=require('../functions/live-match.cjs');
+const {flower}=require('../functions/team-referee.cjs');
+// A player holding an unsung flower must sing it before throwing a card.
+const owesFlor=(s,p)=>s.hands[p]?.length===3&&s.room.flors?.[p]==null&&!s.room.florSettled&&!s.room.florClosed&&flower(s.hands[p],s.room.muestra);
 test('Match preload overlaps identity validation, releases on rejection, and never writes',async()=>{
  let listening=false,removed=0;
  const db={ref(path){assert.equal(path,'creditEconomy/matches/m');return {on(){listening=true;},off(){listening=false;removed++;}};}};
@@ -13,7 +16,12 @@ test('Match preload overlaps identity validation, releases on rejection, and nev
  await withMatchPreload({ref(){throw new Error('must not read');}},{...request,auth:null},async()=>{});
  await withMatchPreload({ref(){throw new Error('must not read');}},{...request,data:{...request.data,expectedMatchId:'../wallets'}},async()=>{});
 });
+// Tables dealt with no flower, so the first player can throw a card.
 function fixture(mode='1v1'){
+ for(let i=0;i<200;i++){const l=dealt(mode),s=l.matches.m.session;if(!Object.keys(s.hands||{}).some(p=>owesFlor(s,p)))return l;}
+ throw new Error('No table without flor.');
+}
+function dealt(mode){
  let l={wallets:Object.fromEntries(['a','b','c','d'].map(uid=>[uid,{balance:10,locked:0}]))};
  l=createTable(l,{code:'ABCDE',id:'m',uid:'a',name:'a',mode,stake:1,targetPoints:10,now:100});
  for(const uid of (mode==='1v1'?['b']:['b','c','d']))l=joinTable(l,{code:'ABCDE',uid,name:uid,now:200});
@@ -21,7 +29,7 @@ function fixture(mode='1v1'){
 }
 for(const mode of ['1v1','2v2'])test(mode+' live play matches the full referee without reading wallets',()=>{
  const l=fixture(mode),m=l.matches.m,player=m.session.room.turn,uid=m.players[player].uid;
- const p={code:'ABCDE',uid,command:{kind:'play',cardId:m.session.hands[player][0].id},requestId:'one',expectedMatchId:'m',now:300};
+ const p={code:'ABCDE',uid,command:owesFlor(m.session,player)?{kind:'call',value:'flor'}:{kind:'play',cardId:m.session.hands[player][0].id},requestId:'one',expectedMatchId:'m',now:300};
  const expected=tableOperation(l,p).matches.m,actual=liveUpdate(m,p);
  assert.deepEqual(actual,expected);assert.equal(m.session.hands[player].length,3);
  assert.deepEqual(liveUpdate(actual,p),actual,'duplicate request cannot play twice');
@@ -110,10 +118,12 @@ for(const mode of ['1v1','2v2'])test(mode+' complete game keeps credits outside 
  const wallets=structuredClone(l.wallets);
  for(let n=0;n<2000&&l.matches.m.status==='reserved';n++){
   const m=l.matches.m,r=m.session.room;
-  const waiting=r.status!=='started'||r.resolvingTrick||r.pendingNextHand||!r.turn;
+  const answer=r.status==='started'&&r.pendingBet&&!r.pendingBet.revealMode&&!r.resolvingTrick&&!r.pendingNextHand;
+  const waiting=!answer&&(r.status!=='started'||r.resolvingTrick||r.pendingNextHand||!r.turn||r.pendingBet);
   now+=waiting?10000:1;
-  const player=waiting?'player1':r.turn;
-  const command=waiting?{kind:'tick'}:{kind:'play',cardId:m.session.hands[player][0].id};
+  const player=answer?r.pendingBet.responder:waiting?'player1':r.turn;
+  // Holding a flower the player goes to the deck, which sings it first.
+  const command=waiting?{kind:'tick'}:answer?{kind:'call',value:'no'}:owesFlor(m.session,player)?{kind:'fold'}:{kind:'play',cardId:m.session.hands[player][0].id};
   const p={code:'ABCDE',uid:m.players[player].uid,command,requestId:'step'+n,expectedMatchId:'m',now};
   const updated=liveUpdate(m,p);
   if(updated){l.matches.m=updated;assert.deepEqual(l.wallets,wallets);}

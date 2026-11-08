@@ -10,7 +10,7 @@ function advance(){const room=state.room;
  if(room.pendingNextHand&&now>=room.pendingNextHand.endsAt){const pending=room.pendingNextHand;room.pendingNextHand=null;localFinishHand(pending.winner,pending.foldPoints,pending.id.startsWith('fold:')?'fold':'declined');}
  if(room.status==='revealing'&&now>=room.endReveal.endsAt)localDealAfterHand();
  if(room.status==='complete'&&!room.endReveal){const groups=buildEndEvidence(room,state.localOriginalHands);if(groups.length)localShowEvidence(groups);else room.endReveal={done:true};}
- if(room.status==='started'&&room.turnClock&&turnClockRemaining(room.turnClock,now).expired){const changes=turnTimeoutChanges(room);Object.assign(room,changes);if(room.status==='timed-out'){localFeed(room.turnTimeout.message);localFinishHand(room.turnTimeout.winner,room.trucoLevel||1);}}
+ if(room.status==='started'&&room.turnClock&&turnClockRemaining(room.turnClock,now).expired){const changes=turnTimeoutChanges(room);Object.assign(room,changes);if(room.status==='timed-out'){localFeed(room.turnTimeout.message);localFinishHand(room.turnTimeout.winner,(room.trucoLevel||1)+(Number(room.turnTimeout.florPoints)||0));}}
  clock();return save();
 }
 function action(player,command){
