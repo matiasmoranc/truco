@@ -11,7 +11,7 @@ import {installTeamTable,TEAM_SEATS,playerTeam,positionDealerDeck,renderTeamLobb
 import {installTablePeople} from './table-people.js?v=20261106-social3';
 import {createLiveTables,LiveError} from './live-tables.js?v=20261025-close1';
 import {installMatchPhoto} from './share-photo.js?v=20261027-photo2';
-import {installProfiles,SOUND_MESSAGES} from './profile-level.js?v=20261103-viral1';
+import {installProfiles,SOUND_MESSAGES} from './profile-level.js?v=20261108-viral2';
 import {installIosPromo} from './ios-promo.js?v=20261105-promo1';
 const FIREBASE_VERSION = '12.4.0';
 const $ = (id) => document.getElementById(id);

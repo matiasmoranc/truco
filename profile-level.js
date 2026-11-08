@@ -41,18 +41,15 @@ export function installProfiles({$,document,services,getState,toast,onChange=()=
   return entry?.value||null;
  }
  const levelNumber=uid=>{const p=profileOf(uid);return p?levelOf(p.points).level:null;};
- // Sound messages: unlocked by level, switched on by the player on this device.
- const soundKey=id=>'truco-sound-'+getState().uid+'-'+id;
- const soundSwitchedOn=id=>{try{return localStorage.getItem(soundKey(id))==='on';}catch{return false;}};
- const switchSound=(id,on)=>{try{localStorage.setItem(soundKey(id),on?'on':'off');}catch{}};
- const soundActive=id=>{const sound=SOUND_MESSAGES.find(s=>s.id===id);return !!sound&&!!getState().uid&&levelOf(mine?.points).level>=sound.level&&soundSwitchedOn(id);};
+ // Sound messages: always on once the level unlocks them, on every device.
+ const soundActive=id=>{const sound=SOUND_MESSAGES.find(s=>s.id===id);return !!sound&&!!getState().uid&&levelOf(mine?.points).level>=sound.level;};
  // How to send one: a little table where a finger holds the messages button, slides to the
  // message and lets go; it plays twice and the window closes by itself.
  function showSoundHowTo(sound){
   const dialog=document.createElement('dialog');dialog.className='credit-join-dialog sound-howto-dialog';
   const items=[...SOUND_MESSAGES.filter(s=>s.id===sound.id||soundActive(s.id)).map(s=>s.text),'Buena jugada!','Jajaja','Que suerte'],target=items.indexOf(sound.text);
   const card=(file,col,cls)=>`<i class="demo-card ${cls}" style="background-image:url(assets/cards/${file}.jpg);background-position:${col/3*100}% 0"></i>`;
-  dialog.innerHTML=`<div class="friends-head"><h2>¡Activaste un audio!</h2><button class="icon-button" type="button" aria-label="Cerrar">×</button></div><p class="sound-howto-label">Cómo usarlo:</p>
+  dialog.innerHTML=`<div class="friends-head"><h2>${escapeAttr(sound.name)}</h2><button class="icon-button" type="button" aria-label="Cerrar">×</button></div><p class="sound-howto-label">Cómo usarlo:</p>
    <div class="sound-howto-demo" style="--item:${target}" aria-hidden="true"><div class="demo-bar"><span>Truco</span><i class="demo-chat"><svg viewBox="0 0 24 24"><path d="M4 4h16v12H9l-5 4V4Z"/><path d="M8 8h8M8 12h5"/></svg></i></div>
    <div class="demo-table"><i class="demo-card back r1"></i><i class="demo-card back r2"></i><i class="demo-card back r3"></i>${card(2,1,'muestra')}${card(1,0,'m1')}${card(7,2,'m2')}${card(10,0,'m3')}</div>
    <div class="demo-menu">${items.map((t,i)=>`<b class="${i===target?'demo-target':''}">${escapeAttr(t)}</b>`).join('')}</div>
@@ -93,11 +90,12 @@ export function installProfiles({$,document,services,getState,toast,onChange=()=
   for(const u of unlocks()){
    const got=info.level>=u.level,li=document.createElement('li');li.className='level-unlock'+(got?' unlocked':' locked');
    if(u.kind==='sound'){
-    const sound=SOUND_MESSAGES.find(s=>s.id===u.id),on=got&&soundSwitchedOn(u.id);
+    const sound=SOUND_MESSAGES.find(s=>s.id===u.id),on=got;
     li.innerHTML=`<span class="player-avatar unlock-avatar unlock-sound"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4Z"/><path d="M16 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14"/></svg></span><span class="unlock-name">${escapeAttr(u.name)}</span><span class="unlock-level${on?' in-use':''}">${got?(on?'Activo':''):'Nivel '+u.level}</span>`;
-    if(got){const b=document.createElement('button');b.type='button';b.className='unlock-photo-button'+(on?' secondary':'');b.textContent=on?'Desactivar':'Activar';
-     b.onclick=event=>{event.stopPropagation();switchSound(u.id,!on);renderDetails();if(!on)showSoundHowTo(sound);};
-     const tag=li.querySelector('.unlock-level');if(on)tag.after(b);else tag.replaceWith(b);}
+    // Unlocked sounds are always on: the button only shows how to send them.
+    if(got){const b=document.createElement('button');b.type='button';b.className='unlock-photo-button';b.textContent='Cómo usar';
+     b.onclick=event=>{event.stopPropagation();showSoundHowTo(sound);};
+     li.querySelector('.unlock-level').replaceWith(b);}
     list.append(li);continue;
    }
    const chosen=u.kind==='icon'?!showsPhoto(p)&&(p.icon||'persona')===u.id:u.kind==='photo'?showsPhoto(p):shownBadge(p)?.id===u.id;
