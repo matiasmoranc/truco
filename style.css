@@ -2563,7 +2563,8 @@ input,textarea,[contenteditable=""],[contenteditable="true"]{-webkit-user-select
 .match-end p.end-chat-note{margin:8px 0 0;color:#ffcfb8;font-size:13px}
 .match-end p.end-chat-note[hidden]{display:none}
 .match-end-foot{display:flex;flex-direction:column;align-items:center;gap:0;margin-top:14px}
-.match-end-foot .match-end-share{margin:0 auto 4px}
+/* Compartir resultado sits right under the score. */
+.match-end-panel>.match-end-share{margin:14px auto 4px}
 /* Friends: the people you played with come first, and a way to send your name by WhatsApp. */
 .friends-hint{margin:2px 0 8px;color:#9fb4a6;font-size:13px}
 .friends-share{display:flex;align-items:center;gap:10px;min-height:48px;padding:10px 14px;border:1px dashed #e8c98377;border-radius:14px;background:#e8c9830f;color:#f2dca6;font-size:14px;font-weight:600;text-decoration:none}
