@@ -72,8 +72,8 @@ export function renderTeamLobbySeats(code,room,safe,disabled=false){
  const group=(team,index)=>`<div class="lobby-team" role="group" aria-label="Equipo ${index}">${TEAM_SEATS.filter(p=>playerTeam(p)===team).map(p=>room.players?.[p]?`<span class="lobby-team-name" title="${safe(room.players[p].name)}">${safe(room.players[p].name)}</span>`:`<button class="lobby-team-join" data-room="${safe(code)}" data-seat="player" data-team="${team}" aria-label="Entrar al equipo ${index}" ${disabled?'disabled':''}>Entrar</button>`).join('<span class="lobby-team-dash" aria-hidden="true">–</span>')}</div>`;
  return `<div class="lobby-team-row">${group('player1',1)}<span class="lobby-team-versus">vs</span>${group('player2',2)}</div>`;
 }
-export function installTeamTable({$,getState,command,runAction,renderPlayerHand,orderedHand,cardImageStyle,cardAccessibleName,escapeHtml,renderTally,syncHeader,setTurnBadge,syncControls,gameTime,hasFlor,florPoints=()=>0,speakCall=()=>{}}){
- let scope='',known=new Set(),noticeKey='',declareKey='',partnerMatch='',partnerVisibleUntil=0,partnerTimer=null,noticeTimer=null,partnerFaceScope='',partnerWasFaceUp=false;
+export function installTeamTable({$,getState,command,runAction,renderPlayerHand,orderedHand,cardImageStyle,cardAccessibleName,escapeHtml,renderTally,syncHeader,setTurnBadge,syncControls,gameTime,hasFlor,florPoints=()=>0,speakCall=()=>{},mountDeclarationWheel}){
+ let scope='',known=new Set(),noticeKey='',partnerMatch='',partnerVisibleUntil=0,partnerTimer=null,noticeTimer=null,partnerFaceScope='',partnerWasFaceUp=false;
  function showPartner(){
   partnerVisibleUntil=Date.now()+3000;clearTimeout(partnerTimer);
   const s=getState(),key=s.roomCode+':'+s.room?.creditMatch?.id+':'+s.room?.matchNumber;
@@ -178,11 +178,17 @@ export function installTeamTable({$,getState,command,runAction,renderPlayerHand,
    old.delete(key);
   }for(const el of old.values())el.remove();known=keys;scope=nextScope;
   const evidence=$('end-hand-reveal'),groups=r.endReveal?.groups||[];evidence.classList.toggle('hidden',!groups.length||!['revealing','complete'].includes(r.status)||r.endReveal.done);if(!evidence.classList.contains('hidden'))evidence.innerHTML=groups.map(g=>`<section><strong>${safe(seatName(r,g.player,s.playerId)||g.name)} · ${safe(g.label)}</strong><div>${g.cards.map(c=>`<i class="sprite-card" style="${cardImageStyle(c)}"></i>`).join('')}</div></section>`).join('');
-  const picker=$('envido-picker'),declaring=playing&&pending?.revealMode&&pending.revealTurn===p;picker.classList.toggle('hidden',!declaring);if(declaring){const key=pending.id+':'+p;if(declareKey!==key){declareKey=key;const flower=pending.type==='flor',start=flower&&s.hand.length===3?florPoints(s.hand,r.muestra):0;const best=Math.max(-1,...Object.values(pending.reveals||{})),max=flower?47:37;
+  const picker=$('envido-picker'),declaring=playing&&pending?.revealMode&&pending.revealTurn===p;picker.classList.toggle('hidden',!declaring);game.classList.toggle('declaring-envido',!!declaring);
+  if(declaring){
+   // The same number wheel as in 1v1: it starts at the lowest number that beats the best declaration
+   // (ties go to the earlier seat from the mano; a flower must be higher).
+   const flower=pending.type==='flor',reveals=pending.reveals||{},order=pending.order||[],best=Math.max(-1,...Object.values(reveals));
+   const lead=order.find(q=>reveals[q]===best&&best>=0),min=best<0?0:best+(!flower&&order.indexOf(p)<order.indexOf(lead)?0:1);
+   const own=flower&&s.hand.length===3?florPoints(s.hand,r.muestra):NaN;
    // The first to declare must say a number; after that, "paso" when my partner leads, otherwise "son buenas".
-   const good=best<0?'':'<button class="pass-button" id="team-good">'+(teamLeadsDeclaration(pending,mineTeam)?'PASO':'SON BUENAS')+'</button>';
-   if(best>=max||(flower&&best>=0&&start<=best)){picker.innerHTML='<p class="team-declare-label">'+(best>=max?(flower?'Declararon la flor más alta.':'Declararon el máximo de tantos.'):'Tu flor no supera la declarada.')+'</p><div class="team-declare-buttons">'+good+'</div>';}else{picker.innerHTML='<label class="team-declare-label">'+(flower?'Puntos de tu flor':'Tus tantos')+' <output id="team-declare-value">'+start+'</output><input id="team-declare-slider" type="range" min="0" max="'+(flower?47:37)+'" value="'+start+'" /></label><div class="team-declare-buttons"><button class="call-button" id="team-declare">DECLARAR</button>'+good+'</div>';$('team-declare-slider').oninput=e=>{$('team-declare-value').textContent=e.target.value;};$('team-declare').onclick=e=>send(e.currentTarget,{kind:'declare',value:Number($('team-declare-slider').value)});}
-   if($('team-good'))$('team-good').onclick=e=>send(e.currentTarget,{kind:'declare',good:true});}}else declareKey='';
+   const goodLabel=best<0?'':(teamLeadsDeclaration(pending,mineTeam)?'PASO':'SON BUENAS');
+   mountDeclarationWheel(picker,{key:pending.id+':'+p+':'+JSON.stringify(reveals),flower,min,own,goodLabel,onDeclare:button=>send(button,{kind:'declare',value:Number(picker.dataset.value)}),onGood:button=>send(button,{kind:'declare',good:true})});
+  }else{picker.stopWheelHint?.();picker.dataset.key='';}
   const buttons=[];
   const add=(value,label,primary=false)=>buttons.push(`<button class="${primary?'call-button':'pass-button'}" data-team-action="${value}">${label}</button>`);
   if(playing&&!r.folded?.[p]){

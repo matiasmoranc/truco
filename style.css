@@ -1968,8 +1968,8 @@ input,textarea,[contenteditable=""],[contenteditable="true"]{-webkit-user-select
 .game.team-mode .team-actions{display:flex;flex-wrap:wrap;gap:5px;justify-content:center}
 .game.team-mode .team-actions button{flex:1 1 28%;font-size:11px!important;padding:5px!important;height:34px!important;min-height:34px!important;border-radius:8px}
 .game.team-mode.player-mode .player-controls>.fold-hand{flex-basis:84px;width:84px;height:36px;min-height:36px;font-size:10px;white-space:normal}
-.game.team-mode.player-mode #envido-picker{position:absolute;inset:auto 104px 12px 12px;transform:none;width:auto;max-width:none;padding:0;border:0;background:transparent;z-index:40}
-.team-declare-label{display:flex;flex-wrap:wrap;gap:5px;align-items:center;color:#ead39b;font-size:12px}.team-declare-label output{font-size:22px;font-weight:700}.team-declare-label input{width:100%;accent-color:#ead39b;height:28px}.team-declare-buttons{display:flex;gap:5px}.team-declare-buttons button{flex:1;height:34px;font-size:11px;min-height:34px}
+/* 2v2 declares with the same number wheel as 1v1 (.declaring-envido rules), above the team seats. */
+.game.team-mode.player-mode #envido-picker{z-index:40}
 .team-draw-results{display:flex;justify-content:center;gap:12px;margin-top:20px}.team-draw-results>div{display:flex;flex-direction:column;align-items:center;width:70px;gap:8px;font-size:12px}.team-draw-results .sprite-card{display:block;width:55px;height:85px;border-radius:5px}
 .game.team-mode #end-hand-reveal{position:absolute;top:26%;left:12%;width:76%;max-height:45%;overflow:auto;transform:none;display:flex;gap:10px;flex-wrap:wrap;align-content:center;align-items:center;justify-content:center;background:#103c2ef5;border:1px solid #e8c98388;padding:12px;border-radius:14px;z-index:25}
 .game.team-mode #end-hand-reveal section{flex:1 1 40%;font-size:11px;text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center}.game.team-mode #end-hand-reveal section>div{display:flex;justify-content:center;gap:4px;margin-top:8px}.game.team-mode #end-hand-reveal i{display:block;width:50px;height:77px;border-radius:4px}

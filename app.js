@@ -7,7 +7,7 @@ import { installActivity } from './activity.js?v=20261010-adminstats32';
 import { installCredits } from './credits.js?v=20261025-claim1';
 import { installAccount } from './account.js?v=20261105-email2';
 import { initializeGameAuth } from './auth-init.js?v=20261016-android-google';
-import {installTeamTable,TEAM_SEATS,playerTeam,positionDealerDeck,renderTeamLobbySeats,renderWaitingSeats} from './team-table-ui.js?v=20261108-end1';
+import {installTeamTable,TEAM_SEATS,playerTeam,positionDealerDeck,renderTeamLobbySeats,renderWaitingSeats} from './team-table-ui.js?v=20261108-wheel1';
 import {installTablePeople} from './table-people.js?v=20261106-social3';
 import {createLiveTables,LiveError} from './live-tables.js?v=20261025-close1';
 import {installMatchPhoto} from './share-photo.js?v=20261027-photo2';
@@ -18,7 +18,7 @@ const $ = (id) => document.getElementById(id);
 const views = ['welcome-view', 'invite-view', 'setup-view', 'waiting-view', 'game-view', 'config-view', 'learn-view', 'scorer-view', 'friends-view'];
 const storageKey = 'truco-firebase-config';
 let state = { joining: false, config: null, firebase: null, roomCode: null, selectedRoom: null, uid: null, playerId: null, unsubscribe: null, privateUnsubscribe: null, lobbyUnsubscribe: null, room: null, hand: [], handOrder: [], handOrderKey: null, localGame: false, localHands: {}, nextAction: null, resolutionTimer: null, resolutionTimerKey: null, playActionInFlight: false, legacyRepairKey: null, emptyHandRepairKey: null };
-const teamTable=installTeamTable({$,getState:()=>state,command:creditCommand,runAction:runLiveAction,renderPlayerHand,orderedHand,cardImageStyle,cardAccessibleName,escapeHtml,renderTally:renderCompactTally,syncHeader:syncMobileGameHeader,setTurnBadge,syncControls:syncLiveControls,gameTime,hasFlor:roomHasFlor,florPoints:florValue,speakCall});
+const teamTable=installTeamTable({$,getState:()=>state,command:creditCommand,runAction:runLiveAction,renderPlayerHand,orderedHand,cardImageStyle,cardAccessibleName,escapeHtml,renderTally:renderCompactTally,syncHeader:syncMobileGameHeader,setTurnBadge,syncControls:syncLiveControls,gameTime,hasFlor:roomHasFlor,florPoints:florValue,speakCall,mountDeclarationWheel});
 function roomSeats(room=state.room){return room?.mode==='2v2'?TEAM_SEATS:['player1','player2'];}
 
 const opponentFlights=new Map();
@@ -2956,14 +2956,22 @@ function renderEnvidoPicker(room){
   $('game-view').classList.toggle('declaring-envido',!!active);
   if(!active){el.stopWheelHint?.();el.dataset.key='';return;}
   const opponentPoints=bet.reveals?.[otherPlayer(state.playerId)],second=opponentPoints!=null,min=envidoPickerMinimum(room,state.playerId);
-  const max=bet.type==='flor'?47:37;
-  const key=`${max}:${room.handNumber}:${state.playerId}:${opponentPoints??'first'}`;
-  if(el.dataset.key===key)return;el.stopWheelHint?.();el.dataset.key=key;const own=bet.type==='flor'?Number(room.flors?.[state.playerId]):NaN;const initial=Number.isFinite(own)&&own>=min?own:Math.min(max,Math.max(20,min));el.dataset.value=String(initial);
-  el.innerHTML=`<p>Arrastra los números para seleccionar</p><div class="number-wheel" role="listbox" aria-label="Tantos del 0 al ${max}">${Array.from({length:Math.max(0,max+1-min)},(_,index)=>{const number=min+index;return `<button role="option" aria-selected="${number===min}" ${number<min?'disabled':''} data-number="${number}">${number}</button>`;}).join('')}</div><div class="declaration-buttons">${min<=max?'<button id="declare-points" class="call-button">DECLARAR <span id="selected-points">'+min+'</span></button>':''}${second?'<button id="good-points" class="pass-button">SON BUENAS</button>':''}</div>`;
-  // Nothing left to declare: the rival said the maximum, or this flower cannot beat theirs. Only SON BUENAS.
-  const cannotBeatFlower=bet.type==='flor'&&second&&Number.isFinite(own)&&own<min;
-  el.classList.toggle('only-good',min>max||cannotBeatFlower);
-  if(min>max||cannotBeatFlower){el.querySelector('.number-wheel').classList.add('hidden');$('declare-points')?.remove();el.querySelector('p').textContent=min>max?(bet.type==='flor'?'El rival declaró la flor más alta.':'El rival declaró el máximo de tantos.'):'Tu flor no supera la del rival.';$('good-points')?.addEventListener('click',()=>runLiveAction($('good-points'),()=>revealEnvido(true)));return;}
+  const flower=bet.type==='flor',own=flower?Number(room.flors?.[state.playerId]):NaN;
+  mountDeclarationWheel(el,{key:`${room.handNumber}:${state.playerId}:${opponentPoints??'first'}`,flower,min,own,goodLabel:second?'SON BUENAS':'',
+    onDeclare:button=>runLiveAction(button,()=>revealEnvido()),onGood:button=>runLiveAction(button,()=>revealEnvido(true))});
+}
+// The number wheel to declare envido or flor points, shared by 1v1 and 2v2 tables. `min` is the lowest
+// number that still beats the best one declared, `own` the real flower points, and an empty
+// `goodLabel` hides the SON BUENAS (or PASO) button. The chosen number stays in el.dataset.value.
+function mountDeclarationWheel(el,{key:baseKey,flower=false,min=0,own=NaN,goodLabel='',onDeclare,onGood}){
+  const max=flower?47:37,key=`${max}:${baseKey}`;
+  if(el.dataset.key===key)return;el.stopWheelHint?.();el.dataset.key=key;const initial=Number.isFinite(own)&&own>=min?own:Math.min(max,Math.max(20,min));el.dataset.value=String(initial);
+  el.innerHTML=`<p>Arrastra los números para seleccionar</p><div class="number-wheel" role="listbox" aria-label="Tantos del 0 al ${max}">${Array.from({length:Math.max(0,max+1-min)},(_,index)=>{const number=min+index;return `<button role="option" aria-selected="${number===min}" ${number<min?'disabled':''} data-number="${number}">${number}</button>`;}).join('')}</div><div class="declaration-buttons">${min<=max?'<button id="declare-points" class="call-button">DECLARAR <span id="selected-points">'+min+'</span></button>':''}${goodLabel?'<button id="good-points" class="pass-button">'+goodLabel+'</button>':''}</div>`;
+  const good=()=>$('good-points')?.addEventListener('click',event=>onGood(event.currentTarget));
+  // Nothing left to declare: the best one is the maximum, or this flower cannot beat it. Only SON BUENAS.
+  const cannotBeatFlower=flower&&goodLabel&&Number.isFinite(own)&&own<min;
+  el.classList.toggle('only-good',min>max||!!cannotBeatFlower);
+  if(min>max||cannotBeatFlower){el.querySelector('.number-wheel').classList.add('hidden');$('declare-points')?.remove();el.querySelector('p').textContent=min>max?(flower?'El rival declaró la flor más alta.':'El rival declaró el máximo de tantos.'):'Tu flor no supera la del rival.';good();return;}
   const wheel=el.querySelector('.number-wheel');
   const step=()=>wheel.querySelector('[data-number]').getBoundingClientRect().width;
   let hintRunning=false,hintFrame=null;
@@ -2987,7 +2995,7 @@ function renderEnvidoPicker(room){
     let started=null;
     const animate=now=>{
       if(!hintRunning)return;
-      if(!active||el.dataset.key!==key){stopHint();return;}
+      if(el.classList.contains('hidden')||el.dataset.key!==key){stopHint();return;}
       started??=now;
       const progress=Math.min(1,(now-started)/2400);
       wheel.scrollLeft=Math.max(0,initial-min+2*Math.sin(progress*2*Math.PI))*step();syncWheel();
@@ -2995,8 +3003,8 @@ function renderEnvidoPicker(room){
     };
     hintFrame=requestAnimationFrame(animate);
   }
-  $('declare-points')?.addEventListener('click',()=>{stopHint();runLiveAction($('declare-points'),()=>revealEnvido());});
-  $('good-points')?.addEventListener('click',()=>runLiveAction($('good-points'),()=>revealEnvido(true)));
+  $('declare-points')?.addEventListener('click',event=>{stopHint();onDeclare(event.currentTarget);});
+  good();
 }
 function escapeHtml(value='') { return String(value).replace(/[&<>"']/g,(ch)=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch])); }
 
