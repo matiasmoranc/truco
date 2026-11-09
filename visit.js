@@ -82,7 +82,9 @@ function store(key,value){try{localStorage.setItem(key,JSON.stringify(value));re
 function sendUsage(data){
  if(!usageContext)return;
  const body={platform:usageContext.platform,...data,...(testDevice()?{test:true}:{})};
- usageContext.fetch(USAGE_ENDPOINT,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({data:body}),keepalive:true})?.catch?.(()=>null);
+ // A bare call: the browser fetch fails ("Illegal invocation") when called as a method of another object.
+ const send=usageContext.fetch;
+ send(USAGE_ENDPOINT,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({data:body}),keepalive:true})?.catch?.(()=>null);
 }
 // A device that first came through the scorer or the guide keeps that landing, and each
 // next step counts once for it. Devices that already knew the site have no journey.

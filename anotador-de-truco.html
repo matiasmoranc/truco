@@ -86,10 +86,10 @@
 </main>
 <script type="module">
   import {installScorer} from './scorer.js?v=20261101-usage1';
-  import {trackUsage} from './visit.js?v=20261101-usage1';
+  import {trackUsage} from './visit.js?v=20261108-usage2';
   installScorer({document,showView(){},standalone:true,onEvent:(event,extra)=>trackUsage('anotador-web-'+event,extra)});
   document.getElementById('scorer-open-game').addEventListener('click',()=>trackUsage('anotador-web-promo'));
   document.getElementById('scorer-play').addEventListener('click',()=>trackUsage('anotador-web-play'));
 </script>
-<script type="module" src="visit.js?v=20261101-usage1"></script>
+<script type="module" src="visit.js?v=20261108-usage2"></script>
 </body></html>

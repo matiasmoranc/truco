@@ -29,7 +29,8 @@ test('A new device keeps its landing on the scorer page and each next step count
  define('localStorage',{getItem:k=>store.has(k)?store.get(k):null,setItem:(k,v)=>store.set(k,String(v)),removeItem:k=>store.delete(k)});
  define('document',{referrer:'https://www.google.com/'});
  define('navigator',{userAgent:'Mozilla/5.0 (Linux; Android 14; Pixel 8)'});
- define('fetch',async(url,o)=>{sent.push({url,...JSON.parse(o.body).data});return {json:async()=>({result:{}})};});
+ // Like the browser fetch, it refuses to run as a method of another object (Illegal invocation).
+ define('fetch',async function(url,o){if(this!=null&&this!==globalThis)throw new TypeError('Illegal invocation');sent.push({url,...JSON.parse(o.body).data});return {json:async()=>({result:{}})};});
  const source=fs.readFileSync(path.join(__dirname,'../visit.js'),'utf8');
  const load=(pathname,tag)=>{define('location',{pathname,search:'',hostname:'trucouruguayo.uy'});return import('data:text/javascript;base64,'+Buffer.from(source+'//'+tag).toString('base64'));};
  const usage=()=>sent.filter(s=>s.url.endsWith('siteUsage'));

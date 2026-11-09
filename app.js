@@ -1,5 +1,5 @@
 import './chat-moderation.js?v=20261013-moderation1';
-import { visitPlatform,takeVisit,markTestDevice,markGuestVisit,trackUsage,journeyStep } from './visit.js?v=20261101-usage1';
+import { visitPlatform,takeVisit,markTestDevice,markGuestVisit,trackUsage,journeyStep } from './visit.js?v=20261108-usage2';
 import { installFriends } from './friends.js?v=20261106-social1';
 import { installPlayerPanel } from './player-panel.js?v=20261013-blocklist1';
 import { installScorer,renderCompactTally } from './scorer.js?v=20261101-usage1';

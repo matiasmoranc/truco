@@ -37,6 +37,8 @@ test('Create and join reserve stakes in the ledger; ordinary plays never touch i
  assert.equal(bank.economy.wallets.b.locked,5);assert.equal(engine.lobbyEntry(),null);
  const writes=bank.writes,room=engine.publicRoom();
  assert.equal(room.status,'started');
+ // A random deal may hold a flor, which must be sung before playing: this test is about a plain card.
+ assert.ok(engine.match.session.room);engine.match.session.room.florSettled=true;
  const turn=room.turn,uid=engine.match.players[turn].uid,card=engine.handFor(uid).hand[0];
  advance(100);await engine.act(uid,{command:{kind:'play',cardId:card.id},requestId:'r1',expectedMatchId:'game1'});
  assert.equal(engine.handFor(uid).hand.length,2);
