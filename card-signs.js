@@ -21,7 +21,6 @@ const INK='#3b2416',LIP='#c9584f',SKIN_LINE='#b98560',CUE='#1f6fbf';
 const R=37,L=63;
 const eye=(x,ry=5.2)=>`<ellipse cx="${x}" cy="47" rx="5.6" ry="${ry}" fill="#fff" stroke="${INK}" stroke-width="1.3"/><circle cx="${x}" cy="47.6" r="3" fill="${INK}"/><circle cx="${x+1}" cy="46.4" r="1" fill="#fff"/>`;
 const closedEye=x=>`<path d="M${x-6} 47 Q${x} 52.5 ${x+6} 47" fill="none" stroke="${INK}" stroke-width="2.8" stroke-linecap="round"/><path d="M${x-5} 50 l-2 2.4 M${x} 51.6 v2.8 M${x+5} 50 l2 2.4" stroke="${INK}" stroke-width="1.5" stroke-linecap="round"/>`;
-const squint=x=>`<path d="M${x-6} 49 Q${x} 43.5 ${x+6} 49" fill="none" stroke="${INK}" stroke-width="2.8" stroke-linecap="round"/>`;
 const brow=(x,y=36,frown=0)=>{const inner=x<50?x+7:x-7,outer=x<50?x-7:x+7;return `<path d="M${outer} ${y} Q${x} ${y-4.5} ${inner} ${y+frown}" fill="none" stroke="${INK}" stroke-width="3.2" stroke-linecap="round"/>`;};
 const arrow=(x1,y1,x2,y2)=>{const a=Math.atan2(y2-y1,x2-x1),h=4.2,p=(d)=>`${(x2+h*Math.cos(a+d)).toFixed(1)} ${(y2+h*Math.sin(a+d)).toFixed(1)}`;
  return `<path d="M${x1} ${y1} L${x2} ${y2} M${p(Math.PI*0.8)} L${x2} ${y2} L${p(-Math.PI*0.8)}" fill="none" stroke="#fff" stroke-width="4.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M${x1} ${y1} L${x2} ${y2} M${p(Math.PI*0.8)} L${x2} ${y2} L${p(-Math.PI*0.8)}" fill="none" stroke="${CUE}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>`;};
@@ -37,7 +36,7 @@ const SIGNS={
   extra:arrow(24,40,24,27)+arrow(76,40,76,27)},
  trompa:{mouth:`<ellipse cx="50" cy="75" rx="7" ry="6.2" fill="${LIP}" stroke="#9c3d36" stroke-width="1.2"/><ellipse cx="50" cy="75" rx="2.4" ry="1.8" fill="#6e2622"/><path d="M45 72.5 q1.2 2.5 0 5 M55 72.5 q-1.2 2.5 0 5" fill="none" stroke="#9c3d36" stroke-width="1"/>`,
   extra:`<path d="M71 66 c-2.5-3.6 -7.5-1.2 -5 2.6 l5 4.6 l5-4.6 c2.5-3.8 -2.5-6.2 -5-2.6z" fill="#e2483f" stroke="#fff" stroke-width="1.2"/>`},
- nariz:{brows:brow(R,38,4)+brow(L,38,4),eyes:squint(R)+squint(L),
+ nariz:{brows:brow(R,38,4)+brow(L,38,4),
   nose:`<path d="M47 50 q3 1.6 6 0 M46.5 53.5 q3.5 1.8 7 0" fill="none" stroke="${SKIN_LINE}" stroke-width="1.5" stroke-linecap="round"/><ellipse cx="50" cy="60.5" rx="7.6" ry="5.2" fill="#f0a690" stroke="${SKIN_LINE}" stroke-width="1.6"/><ellipse cx="47.2" cy="60.8" rx="1.6" ry="2.4" fill="#7d4026"/><ellipse cx="52.8" cy="60.8" rx="1.6" ry="2.4" fill="#7d4026"/>`,
   mouth:`<path d="M40 74 Q50 72 60 74" fill="none" stroke="${LIP}" stroke-width="3.4" stroke-linecap="round"/>`},
  'guino-der':{eyes:closedEye(R)+eye(L),brows:brow(R,39)+brow(L),

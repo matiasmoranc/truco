@@ -13,7 +13,7 @@ import {createLiveTables,LiveError} from './live-tables.js?v=20261025-close1';
 import {installMatchPhoto} from './share-photo.js?v=20261027-photo2';
 import {installProfiles,SOUND_MESSAGES} from './profile-level.js?v=20261108-viral2';
 import {installIosPromo} from './ios-promo.js?v=20261105-promo1';
-import {CARD_SIGNS,signFaceSvg} from './card-signs.js?v=20261109-signs2';
+import {CARD_SIGNS,signFaceSvg} from './card-signs.js?v=20261109-signs3';
 const FIREBASE_VERSION = '12.4.0';
 const $ = (id) => document.getElementById(id);
 const views = ['welcome-view', 'invite-view', 'setup-view', 'waiting-view', 'game-view', 'config-view', 'learn-view', 'scorer-view', 'friends-view'];
