@@ -13,6 +13,7 @@ import {createLiveTables,LiveError} from './live-tables.js?v=20261025-close1';
 import {installMatchPhoto} from './share-photo.js?v=20261027-photo2';
 import {installProfiles,SOUND_MESSAGES} from './profile-level.js?v=20261108-viral2';
 import {installIosPromo} from './ios-promo.js?v=20261105-promo1';
+import {CARD_SIGNS,signFaceSvg} from './card-signs.js?v=20261109-signs1';
 const FIREBASE_VERSION = '12.4.0';
 const $ = (id) => document.getElementById(id);
 const views = ['welcome-view', 'invite-view', 'setup-view', 'waiting-view', 'game-view', 'config-view', 'learn-view', 'scorer-view', 'friends-view'];
@@ -4503,7 +4504,42 @@ function renderGuidePlayedCards(){
   }
   el.append(cards);
 }
-function openStudySheet(){trackUsage('aprender-game-guide');pauseLearning();renderGuidePlayedCards();markPracticeGuideCards();if(!$('learn-sheet-dialog').open)$('learn-sheet-dialog').showModal();}
+// From the Aprender menu the guide is "Cartas y Señas": each card with a sign shows the face
+// doing it, and tapping that line plays it. During a game it stays the plain card guide.
+function openStudySheet(signs=false){trackUsage('aprender-game-guide');pauseLearning();renderGuidePlayedCards();markPracticeGuideCards();showCardSigns(signs===true);if(!$('learn-sheet-dialog').open)$('learn-sheet-dialog').showModal();}
+function showCardSigns(on){
+  const dialog=$('learn-sheet-dialog');dialog.classList.toggle('with-signs',on);closeCardSign();
+  $('learn-sheet-title').textContent=on?'Cartas y Señas':'Guía de cartas';
+  dialog.querySelector('.card-guide-intro').textContent=on?'Las cartas están ordenadas de más poderosas a menos poderosas. Tocá una carta para ver su seña.':'Las cartas están ordenadas de más poderosas a menos poderosas.';
+  for(const row of dialog.querySelectorAll('[data-guide-strength]')){
+    row.querySelector('.guide-sign')?.remove();
+    const sign=CARD_SIGNS[row.dataset.guideStrength];
+    row.classList.toggle('guide-has-sign',on&&!!sign);
+    if(!on||!sign){row.removeAttribute('tabindex');row.removeAttribute('role');continue;}
+    const icon=document.createElement(row.tagName==='TR'?'td':'span');icon.className='guide-sign';icon.innerHTML=signFaceSvg(sign.kind,{pose:true});
+    row.append(icon);row.tabIndex=0;row.setAttribute('role','button');
+  }
+}
+function guideCardName(row){return (row.tagName==='TR'?row.cells[0].firstChild?.textContent:row.firstChild?.textContent)?.trim()||'';}
+function openCardSign(row){
+  const sign=CARD_SIGNS[row.dataset.guideStrength];if(!sign)return;
+  const name=guideCardName(row),strength=Number(row.dataset.guideStrength);
+  // The common cards are listed by number alone: "El 3".
+  $('sign-viewer-title').textContent=(strength<87?'El ':'')+name.charAt(0).toUpperCase()+name.slice(1);
+  $('sign-viewer-face').innerHTML=signFaceSvg(sign.kind,{label:sign.text});$('sign-viewer-text').textContent=sign.text;
+  $('sign-viewer').classList.remove('hidden');$('sign-viewer-close').focus();
+}
+function closeCardSign(){$('sign-viewer').classList.add('hidden');$('sign-viewer-face').replaceChildren();}
+$('learn-sheet-dialog').addEventListener('click',event=>{
+  if(!$('learn-sheet-dialog').classList.contains('with-signs'))return;
+  if(event.target.closest('#sign-viewer-close')||event.target.id==='sign-viewer'){closeCardSign();return;}
+  const row=event.target.closest('.guide-has-sign');if(row)openCardSign(row);
+});
+// Escape closes the open sign first, then the guide.
+$('learn-sheet-dialog').addEventListener('cancel',event=>{if(!$('sign-viewer').classList.contains('hidden')){event.preventDefault();closeCardSign();}});
+$('learn-sheet-dialog').addEventListener('keydown',event=>{
+  const row=event.target.closest?.('.guide-has-sign');if(row&&(event.key==='Enter'||event.key===' ')){event.preventDefault();openCardSign(row);}
+});
 function continueLearningStage(){
   const stage=state.learning?.stage||0,complete=state.learning?.complete;
   if(!complete&&stage>=1)openStudy(stage===2?'flor':'envido');
@@ -4556,7 +4592,7 @@ $('learning-message-study').addEventListener('click',event=>{const kind=event.cu
 $('learning-hint').addEventListener('close',()=>{if(state.learning){state.learning.acknowledgedMessage=state.learning.activeMessage;state.learning.activeMessage=null;state.learning.activeScoreMessage=false;state.learning.activeTutorial=null;}positionLearningScoreArrow();resumeLearning();});
 $('learn-menu').addEventListener('click',openLearning);
 $('game-sheet').addEventListener('click',()=>{if(state.learning)openStudySheet();});
-$('learn-sheet-menu').addEventListener('click',openStudySheet);
+$('learn-sheet-menu').addEventListener('click',()=>openStudySheet(true));
 $('learn-sheet-close').addEventListener('click',()=>$('learn-sheet-dialog').close());
 $('learn-sheet-dialog').addEventListener('close',()=>{if(state.learning?.activeTutorial?.trickGuide)state.learning.activeTutorial=null;});
 $('learn-envido-study').addEventListener('click',()=>openStudy('envido'));
