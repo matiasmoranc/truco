@@ -30,8 +30,6 @@ export function installAccount({ api, services, getState, rememberName, document
     try{storage?.setItem('truco-profile-name:'+uid,name);}catch{}
   }
   const appleDevice=globalThis.trucoNative?.isNative ? globalThis.trucoNative.platform==='ios' : isAppleDevice(navigator);
-  // Email and password only in the Android app, where Google Play's reviewers sign in with it.
-  const emailAccess=!!globalThis.trucoNative?.isNative&&globalThis.trucoNative.platform==='android';
   let loginProvider='Google';
   function render() {
     const google=registered(currentUser);
@@ -44,8 +42,6 @@ export function installAccount({ api, services, getState, rememberName, document
     el('account-google').disabled=busy||!getState().firebase;
     el('account-apple').hidden=!appleDevice;
     el('account-apple').disabled=busy||!getState().firebase;
-    if(el('auth-email-access'))el('auth-email-access').hidden=!emailAccess;
-    if(el('auth-email-submit'))el('auth-email-submit').disabled=busy||!getState().firebase;
     el('auth-name-save').disabled=busy||!google||!loaded;
     for(const id of ['account-change-name','account-logout','account-save','account-delete','account-delete-submit','account-delete-back'])el(id).disabled=busy||!ready||inRoom();
     el('auth-retry').hidden=!slowLoading&&(!getState().firebase||(!google||loaded));
@@ -149,7 +145,7 @@ export function installAccount({ api, services, getState, rememberName, document
       case 'auth/account-exists-with-different-credential':return 'Este correo ya está registrado con otra forma de acceso. Entrá con Google para usar tu cuenta existente. (auth/account-exists-with-different-credential)';
       case 'auth/invalid-login-credentials':case 'auth/wrong-password':case 'auth/user-not-found':return 'Correo o contraseña incorrectos.';
       case 'auth/too-many-requests':return 'Demasiados intentos. Esperá unos minutos y volvé a intentar.';
-      case 'auth/invalid-credential':if(loginProvider==='correo')return 'Correo o contraseña incorrectos.';return 'Firebase no pudo validar la respuesta de '+loginProvider+'. Hay que revisar la configuración de ese acceso. (auth/invalid-credential)';
+      case 'auth/invalid-credential':return 'Firebase no pudo validar la respuesta de '+loginProvider+'. Hay que revisar la configuración de ese acceso. (auth/invalid-credential)';
       case 'auth/invalid-oauth-response':return 'No recibimos una respuesta válida de '+loginProvider+'. (auth/invalid-oauth-response)';
       case 'auth/google-session-missing':return 'Google confirmó el acceso, pero no recibimos tu sesión. Volvé a intentar. (auth/google-session-missing)';
       case 'auth/apple-session-missing':return 'Apple confirmó el acceso, pero no recibimos tu sesión en el juego. Volvé a intentar. (auth/apple-session-missing)';
@@ -235,16 +231,6 @@ export function installAccount({ api, services, getState, rememberName, document
       nameHint=fb.authSdk.getAdditionalUserInfo?.(result)?.profile?.firstName||user.displayName||'';
       message('Apple confirmó el acceso. Cargando tu cuenta…');
       await observe(fb,user);
-    },{allowRegistration:true});
-  });
-  el('auth-email-form')?.addEventListener('submit',event=>{
-    event.preventDefault();
-    return action(async fb=>{
-      loginProvider='correo';message('Ingresando…');
-      try{
-        const result=await fb.authSdk.signInWithEmailAndPassword(fb.auth,el('auth-email').value.trim(),el('auth-password').value);
-        await observe(fb,result.user);
-      }finally{el('auth-password').value='';}
     },{allowRegistration:true});
   });
   async function save(fb,input,registration) {
