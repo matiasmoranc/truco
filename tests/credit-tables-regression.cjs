@@ -55,7 +55,7 @@ test('A verified disconnection forfeits the match, while another match’s prese
 test('Chat format is compatible with UI, moderation and silence are enforced and retry is idempotent',()=>{let ledger=join(create());ledger=op(ledger,'a',{kind:'chat',text:'¡Buena mano!'},300);assert.deepEqual(ledger.matches.game1.session.room.chatMessages['req-300'],{sender:'player1',text:'¡Buena mano!',at:300});assert.deepEqual(op(ledger,'a',{kind:'chat',text:'¡Buena mano!'},300),ledger);assert.throws(()=>op(ledger,'a',{kind:'chat',text:'SOS UN PELOTUDO'},350),/lenguaje ofensivo/);ledger=op(ledger,'b',{kind:'mute',value:true},400);assert.throws(()=>op(ledger,'a',{kind:'chat',text:'hola'},500));assert.throws(()=>op(ledger,'b',{kind:'chat',text:'x'.repeat(41)},600));});
 test('Server supports tied envido and suspends truco until envido is answered',()=>{const s=fixture();createReferee(s,{now:200}).action('player1',{kind:'call',value:'truco'});createReferee(s,{now:300}).action('player2',{kind:'call',value:'envido'});assert.equal(s.room.pendingBet.suspendedBet.type,'truco');createReferee(s,{now:400}).action('player1',{kind:'call',value:'yes'});createReferee(s,{now:500}).action('player1',{kind:'declare',value:28});createReferee(s,{now:600}).action('player2',{kind:'declare',value:28});assert.equal(s.room.envidoAudit.winner,'player1');assert.equal(s.room.pendingBet.type,'truco');assert.match(s.room.callNotice?.call||s.room.feed[0].text,/IGUALES|iguales/);});
 test('Two real rounds, including a tied second round, are resolved by the server',()=>{const s=fixture();s.hands.player1=[card('♠',1),card('♦',3),card('♣',6)];s.hands.player2=[card('♥',4),card('♥',3),card('♣',7)];s.originals=structuredClone(s.hands);let now=200;for(let round=0;round<2;round++){const first=s.room.turn,second=first==='player1'?'player2':'player1';createReferee(s,{now:now++}).action(first,{kind:'play',cardId:s.hands[first][0].id});createReferee(s,{now:now++}).action(second,{kind:'play',cardId:s.hands[second][0].id});createReferee(s,{now:now+3000}).advance();now+=4000;}assert.equal(s.room.scores.player1,1);assert.equal(s.room.scores.player2,0);assert.equal(s.room.handNumber,2);});
-test('Falta envido checks real totals, reveals cards and ends the hand without truco points',()=>{const s=fixture();createReferee(s,{now:200}).action('player1',{kind:'call',value:'falta'});createReferee(s,{now:300}).action('player2',{kind:'call',value:'yes'});createReferee(s,{now:400}).action('player1',{kind:'declare',value:28});createReferee(s,{now:500}).action('player2',{kind:'declare',value:28});assert.equal(s.room.scores.player1,10);assert.equal(s.room.status,'revealing');assert.equal(s.room.endReveal.groups.length,1);createReferee(s,{now:5500}).advance();assert.equal(s.room.status,'complete');assert.equal(s.room.endReveal.done,true);});
+test('Falta envido checks real totals, reveals cards and ends the hand without truco points',()=>{const s=fixture();createReferee(s,{now:200}).action('player1',{kind:'call',value:'falta'});createReferee(s,{now:300}).action('player2',{kind:'call',value:'yes'});createReferee(s,{now:400}).action('player1',{kind:'declare',value:28});createReferee(s,{now:500}).action('player2',{kind:'declare',value:28});assert.equal(s.room.status,'started');assert.equal(s.room.turn,null);assert.match(s.room.pendingNextHand.id,/^envido:/);createReferee(s,{now:2000}).advance();assert.equal(s.room.status,'started');createReferee(s,{now:3600}).advance();assert.equal(s.room.scores.player1,10);assert.equal(s.room.status,'revealing');assert.equal(s.room.endReveal.groups.length,1);createReferee(s,{now:9000}).advance();assert.equal(s.room.status,'complete');assert.equal(s.room.endReveal.done,true);});
 test('Real envido chain cannot accept flor responses and declined stakes reflect accepted calls',()=>{const s=fixture();createReferee(s,{now:200}).action('player1',{kind:'call',value:'envido'});assert.throws(()=>createReferee(s,{now:250}).action('player2',{kind:'call',value:'raise-conflor'}));createReferee(s,{now:300}).action('player2',{kind:'call',value:'raise-real'});assert.equal(s.room.pendingBet.stake,5);createReferee(s,{now:400}).action('player1',{kind:'call',value:'no'});assert.equal(s.room.scores.player2,2);assert.equal(s.room.pendingBet,null);});
 test('Flor, con flor envido and contra flor al resto use the real three-card values',()=>{const s=fixture();s.hands={player1:[card('♠',2),card('♠',5),card('♥',6)],player2:[card('♥',3),card('♥',6),card('♥',7)]};s.originals=structuredClone(s.hands);createReferee(s,{now:200}).action('player1',{kind:'call',value:'flor'});createReferee(s,{now:300}).action('player2',{kind:'call',value:'raise-conflor'});assert.equal(s.room.pendingBet.stake,5);createReferee(s,{now:400}).action('player1',{kind:'call',value:'raise-faltaflor'});createReferee(s,{now:500}).action('player2',{kind:'call',value:'yes'});assert.equal(s.room.flors.player1,44);assert.equal(s.room.flors.player2,36);
  // Accepted: nothing is scored until the mano declares and the other answers.
@@ -131,7 +131,7 @@ test('Incorrect falta envido forfeits the hand as well and caps the total at the
  createReferee(s,{now:200}).action('player1',{kind:'call',value:'falta'});
  createReferee(s,{now:300}).action('player2',{kind:'call',value:'yes'});
  createReferee(s,{now:400}).action('player1',{kind:'declare',value:29});
- createReferee(s,{now:500}).action('player2',{kind:'declare',good:true});
+ createReferee(s,{now:500}).action('player2',{kind:'declare',good:true});createReferee(s,{now:3600}).advance();
  assert.equal(s.room.scores.player1,0);assert.equal(s.room.scores.player2,10);
  assert.equal(s.room.endReveal.groups.length,1);assert.equal(s.room.endReveal.groups[0].player,'player1');
  assert.equal(s.room.endReveal.groups[0].envidoAward.player,'player2');
@@ -174,3 +174,41 @@ test('1v1: an unsung flor blocks throwing a card until it is sung',()=>{const s=
 test('1v1: going to the deck with a flor sings it, scores it and then gives up the hand',()=>{const s=florFixture();createReferee(s,{now:200}).action('player1',{kind:'fold'});assert.equal(s.room.callNotice.spoken,'Flor y me voy al mazo');assert.ok(s.room.flors.player1>0);createReferee(s,{now:3500}).advance();assert.equal(s.room.scores.player1,3);assert.equal(s.room.scores.player2,1);});
 test('1v1: going to the deck with a flor against a rival flor gives the rival the flor and the hand',()=>{const s=florFixture(true);createReferee(s,{now:200}).action('player1',{kind:'fold'});createReferee(s,{now:3500}).advance();assert.equal(s.room.scores.player1,0);assert.equal(s.room.scores.player2,4);});
 test('1v1: running out of time with a flor sings it before losing the hand',()=>{const s=florFixture();createReferee(s,{now:200}).advance();createReferee(s,{now:46000}).advance();assert.equal(s.room.scores.player1,3);assert.equal(s.room.scores.player2,1);assert.equal(s.room.callNotice?.spoken,'Flor y me voy al mazo');});
+
+test('A raise accepts the call it answers: going to the deck then gives that value',()=>{
+ const s=fixture();
+ createReferee(s,{now:200}).action('player1',{kind:'call',value:'truco'});
+ createReferee(s,{now:300}).action('player2',{kind:'call',value:'raise'});
+ assert.equal(s.room.trucoLevel,2);
+ createReferee(s,{now:400}).action('player1',{kind:'fold'});createReferee(s,{now:3500}).advance();
+ assert.equal(s.room.scores.player2,2);
+ assert.ok(s.room.lastHandScore.entries.some(e=>e.player==='player2'&&e.points===2&&e.detail==='Mati se fue al mazo: 2 puntos del truco'));
+});
+test('Vale cuatro not wanted after retruco gives the 3 points of the retruco, in plain words',()=>{
+ const s=fixture();
+ createReferee(s,{now:200}).action('player1',{kind:'call',value:'truco'});
+ createReferee(s,{now:300}).action('player2',{kind:'call',value:'raise'});
+ createReferee(s,{now:400}).action('player1',{kind:'call',value:'raise'});
+ assert.equal(s.room.trucoLevel,3);
+ createReferee(s,{now:500}).action('player2',{kind:'call',value:'no'});createReferee(s,{now:3600}).advance();
+ assert.equal(s.room.scores.player1,3);
+ assert.ok(s.room.lastHandScore.entries.some(e=>e.player==='player1'&&e.detail==='3 puntos por vale cuatro no querido'));
+});
+test('An envido whose points reach the target stops the hand, shows the last call 3 seconds and then checks the cards',()=>{
+ const s=fixture();s.room.scores={player1:9,player2:0};
+ createReferee(s,{now:200}).action('player1',{kind:'call',value:'envido'});
+ createReferee(s,{now:300}).action('player2',{kind:'call',value:'yes'});
+ createReferee(s,{now:400}).action('player1',{kind:'declare',value:28});
+ createReferee(s,{now:500}).action('player2',{kind:'declare',good:true});
+ assert.equal(s.room.status,'started');assert.equal(s.room.turn,null);assert.equal(s.room.pendingBet,null);assert.match(s.room.pendingNextHand.id,/^envido:/);
+ createReferee(s,{now:3600}).advance();
+ assert.equal(s.room.scores.player1,10);assert.equal(s.room.status,'revealing');createReferee(s,{now:9000}).advance();assert.equal(s.room.status,'complete');
+});
+test('An envido that does not decide the match lets the hand go on',()=>{
+ const s=fixture();
+ createReferee(s,{now:200}).action('player1',{kind:'call',value:'envido'});
+ createReferee(s,{now:300}).action('player2',{kind:'call',value:'yes'});
+ createReferee(s,{now:400}).action('player1',{kind:'declare',value:28});
+ createReferee(s,{now:500}).action('player2',{kind:'declare',good:true});
+ assert.ok(!s.room.pendingNextHand);assert.equal(s.room.turn,'player1');assert.equal(s.room.status,'started');
+});

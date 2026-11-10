@@ -7,10 +7,10 @@ function advance(){const room=state.room;
   const winner=settleHand(room.tricks,room);room.resolvingTrick=false;room.resolutionEndsAt=null;room.handComplete=false;room.trickCards=[];
   if(winner)localFinishHand(winner,room.trucoLevel||1);else{room.turn=room.resolvedTrickWinner||room.mano;room.trickNo++;}
  }
- if(room.pendingNextHand&&now>=room.pendingNextHand.endsAt){const pending=room.pendingNextHand;room.pendingNextHand=null;localFinishHand(pending.winner,pending.foldPoints,pending.id.startsWith('fold:')?'fold':'declined');}
+ if(room.pendingNextHand&&now>=room.pendingNextHand.endsAt){const pending=room.pendingNextHand;room.pendingNextHand=null;localFinishHand(pending.winner,pending.foldPoints,pending.id.startsWith('fold:')?'fold':pending.id.startsWith('envido:')?'falta':'declined');}
  if(room.status==='revealing'&&now>=room.endReveal.endsAt)localDealAfterHand();
  if(room.status==='complete'&&!room.endReveal){const groups=buildEndEvidence(room,state.localOriginalHands);if(groups.length)localShowEvidence(groups);else room.endReveal={done:true};}
- if(room.status==='started'&&room.turnClock&&turnClockRemaining(room.turnClock,now).expired){const changes=turnTimeoutChanges(room);Object.assign(room,changes);if(room.status==='timed-out'){localFeed(room.turnTimeout.message);localFinishHand(room.turnTimeout.winner,(room.trucoLevel||1)+(Number(room.turnTimeout.florPoints)||0));}}
+ if(room.status==='started'&&room.turnClock&&turnClockRemaining(room.turnClock,now).expired){const changes=turnTimeoutChanges(room);Object.assign(room,changes);if(room.status==='timed-out'){localFeed(room.turnTimeout.message);localFinishHand(room.turnTimeout.winner,(room.trucoLevel||1)+(Number(room.turnTimeout.florPoints)||0),'timeout');}}
  clock();return save();
 }
 function action(player,command){

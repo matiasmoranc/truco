@@ -1619,6 +1619,10 @@ function florBetPoints(room,kind){
 function declinedFlorPoints(bet){
   return bet.called==='conflor'?3:(Number(bet.accepted)||3);
 }
+// Short lines for the points history: "1 punto por envido no querido", "3 puntos por retruco".
+function ptsText(n){return Number(n)===1?'1 punto':n+' puntos';}
+function trucoName(level){return {1:'truco',2:'truco',3:'retruco',4:'vale cuatro'}[Number(level)]||'truco';}
+function trucoPointsText(points,level){return ptsText(points)+(Number(level)>1?' por '+trucoName(level):' de la mano');}
 
 
 function betCallNames(bet){
@@ -1627,17 +1631,11 @@ function betCallNames(bet){
 }
 function declinedBetExplanation(room,bet){
   const points=bet.type==='flor'?declinedFlorPoints(bet):(Number(bet.accepted)||1);
-  const rival=room.players?.[bet.responder]?.name||'el rival',calls=betCallNames(bet);
-  const reason=bet.type==='flor'?(bet.called==='conflor'?'Se suman solo los 3 puntos de la flor.':'Se suman '+points+' puntos de la flor ya en juego.'):Number(bet.accepted)>0?'Se suman los '+points+' puntos del canto anterior; el último canto no fue aceptado.':'Un envido no querido suma 1 punto.';
-  return calls.join(' + ')+' no querido por '+rival+'. '+reason;
+  return ptsText(points)+' por '+betCallNames(bet).at(-1).toLowerCase()+' no querido';
 }
 function acceptedEnvidoExplanation(audit){
-  const bet={...audit,type:'envido'},calls=betCallNames(bet),kinds=audit.calls||[audit.called||'envido'];
-  const values=kinds.map(kind=>kind==='envido'?2:kind==='real'?3:null);
-  const sum=values.every(value=>value!==null)?values.reduce((total,value)=>total+value,0):null;
-  const points=Number(audit.stake)||0;
-  const calculation=sum===points||kinds.includes('falta')?'son '+points+' puntos.':'son '+points+' puntos porque el canto supera lo que falta para ganar.';
-  return calls.join(' + ')+' querido: '+calculation;
+  const calls=betCallNames({...audit,type:'envido'});
+  return ptsText(Number(audit.stake)||0)+' por '+calls.map(call=>call.toLowerCase()).join(' y ');
 }
 
 function scoringEntries(room,scores,reason,truth=null){
@@ -1648,9 +1646,9 @@ function scoringEntries(room,scores,reason,truth=null){
     const audit=room.envidoAudit,award=auditEnvidoScores(room,{player1:0,player2:0},truth);
     const names=p=>room.players?.[p]?.name||'Jugador';
     const liars=Object.keys(audit.reveals||{}).filter(p=>Number(audit.reveals[p])!==Number(truth[p]));
-    const details=liars.map(p=>`${names(p)} declaró ${audit.reveals[p]} y tenía ${truth[p]}.`);
-    const result=liars.length===2?`${names(envidoAuditResult(room,truth).liars[0])} declaró mal primero; el rival gana el envido y la mano.`:liars.length===1?`${names(liars[0])} declaró tantos incorrectos; el rival gana el envido y la mano.`:audit.reveals?.player1===audit.reveals?.player2&&audit.reveals?.player1!=null?'Empate: gana quien es mano.':'Gana el envido.';
-    const detail=acceptedEnvidoExplanation(audit)+(liars.length?' '+details.join(' ')+' '+result:'');
+    const liar=liars.length?envidoAuditResult(room,truth).liars[0]||liars[0]:null;
+    const tie=audit.reveals?.player1===audit.reveals?.player2&&audit.reveals?.player1!=null;
+    const detail=acceptedEnvidoExplanation(audit)+(liar?` (${names(liar)} mintió: dijo ${audit.reveals[liar]} y tenía ${truth[liar]})`:tie?' (empate: gana el mano)':'');
     for(const p of ['player1','player2'])if(award[p]>0&&remaining[p]>=award[p])add(p,award[p],detail);
     if(!award.player1&&!award.player2)entries.push({player:room.mano||'player1',points:0,detail});
   }
@@ -1660,17 +1658,17 @@ function scoringEntries(room,scores,reason,truth=null){
   }
   if(room.pendingBet?.type==='flor'&&room.pendingBet.called==='conflor'){
     for(const player of ['player1','player2'])if(remaining[player]>=5){
-      add(player,3,'Con flor envido · 3 puntos de la flor.');
-      add(player,2,'Con flor envido · 2 puntos del envido.');
+      add(player,3,'3 puntos por flor');
+      add(player,2,'2 puntos por con flor envido');
     }
   }
   const flowers=Object.keys(room.flors||{});
-  if(flowers.length===1&&!room.florSettled&&remaining[flowers[0]]>=3)add(flowers[0],3,`Flor sin rival (${room.flors[flowers[0]]} tantos): suma 3 puntos.`);
+  if(flowers.length===1&&!room.florSettled&&remaining[flowers[0]]>=3)add(flowers[0],3,'3 puntos por flor');
   if(flowers.length===2&&room.florDeferred&&!room.florSettled){
     const winner=Number(room.flors.player1)===Number(room.flors.player2)?room.mano:Number(room.flors.player1)>Number(room.flors.player2)?'player1':'player2';
-    if(remaining[winner]>=Number(room.florDeferred))add(winner,Number(room.florDeferred),`La mía es flor · gana la flor más alta (${room.flors.player1} a ${room.flors.player2}).`);
+    if(remaining[winner]>=Number(room.florDeferred))add(winner,Number(room.florDeferred),ptsText(Number(room.florDeferred))+' por flor');
   }
-  for(const p of ['player1','player2'])if(remaining[p]>0)add(p,remaining[p],reason?.includes('gana la mano')?`Mano ganada${Number(room.trucoLevel)>1?' · '+({2:'Truco',3:'Retruco',4:'Vale cuatro'}[room.trucoLevel]||'Truco')+' aceptado':''}.`:(reason||'Puntos de la mano.'));
+  for(const p of ['player1','player2'])if(remaining[p]>0)add(p,remaining[p],reason||trucoPointsText(remaining[p],room.trucoLevel));
   return entries;
 }
 function verifiedHandTruth(room){
@@ -1772,7 +1770,7 @@ function scheduleLocalNextHand(room){
   state.resolutionTimer=scheduleLocalTransition(room,()=>{
     if(!state.localGame||state.room!==room||room.pendingNextHand?.id!==pending.id)return;
     room.pendingNextHand=null;state.resolutionTimer=null;state.resolutionTimerKey=null;
-    localFinishHand(pending.winner,pending.foldPoints,pending.id.startsWith('fold:')?'fold':'declined');
+    localFinishHand(pending.winner,pending.foldPoints,pending.id.startsWith('fold:')?'fold':pending.id.startsWith('envido:')?'falta':'declined');
   },Math.max(0,pending.endsAt-gameTime()));
 }
 
@@ -1791,7 +1789,7 @@ async function answerBet(answer) {
   if(answer==='raise'){
     if(bet.type==='truco'){
       const raised=Number(bet.stake)===2?'retruco':'vale4',value=raised==='retruco'?3:4;
-      await writeRoom({pendingBet:{...bet,caller:state.playerId,responder:bet.caller,stake:value},lastTrucoCaller:state.playerId,feed:topFeed(state.room,`${state.room.players[state.playerId].name} canta ${raised==='vale4'?'vale cuatro':raised}.`)});return;
+      await writeRoom({trucoLevel:Number(bet.stake),pendingBet:{...bet,caller:state.playerId,responder:bet.caller,stake:value},lastTrucoCaller:state.playerId,feed:topFeed(state.room,`${state.room.players[state.playerId].name} canta ${raised==='vale4'?'vale cuatro':raised}.`)});return;
     }
   }
   if(answer.startsWith('raise-')&&bet.type==='envido'){
@@ -1852,9 +1850,11 @@ async function revealEnvido(good=false,declaredNumber=null) {
     const winner=good||number===Number(bet.reveals?.[first])?first:second;
     changes={pendingBet:bet.suspendedBet||null,envidoClosed:true,envidoAudit:{reveals,declarationOrder:[first,second].filter(p=>reveals[p]!=null),winner,stake:bet.stake,called:bet.called||'envido',calls:bet.calls||[bet.called||'envido'],handNumber:room.handNumber},feed:topFeed(room,good?`${room.players[player].name}: son buenas.`:`${room.players[player].name} canta ${number} ${number===Number(bet.reveals?.[first])?'son iguales':'son mejores'}.`)};
   }
-  const finishFalta=player===second&&bet.called==='falta';
-  if(finishFalta){changes={...changes,pendingBet:null,turn:null,turnClock:null,pendingNextHand:{id:'falta:'+crypto.randomUUID(),winner:changes.envidoAudit.winner,foldPoints:0,endsAt:gameTime(),message:'Falta envido: se verifican los tantos y se asignan '+bet.stake+' puntos.'}};}
-  if(state.localGame){queueLearningAction(good?'good':'declare',bet);const notice=makeCallNotice(changes.feed?.[0]?.text);if(notice)changes.callNotice=notice;Object.assign(room,changes);if(finishFalta){room.pendingNextHand=null;localFinishHand(changes.envidoAudit.winner,0,'falta');return;}renderGame();}else await writeRoom(changes);
+  // Falta envido, or an envido whose points reach the target: the hand stops. The last call stays
+  // 3 seconds and then the cards are shown: the points go to the winner, or to the rival if they lied.
+  const decides=player===second&&(bet.called==='falta'||(Number(room.scores?.[changes.envidoAudit?.winner])||0)+(Number(bet.stake)||0)>=targetPoints(room));
+  if(decides){changes={...changes,pendingBet:null,turn:null,turnClock:null,pendingNextHand:{id:'envido:'+crypto.randomUUID(),winner:changes.envidoAudit.winner,foldPoints:0,endsAt:gameTime()+3000,message:'Se verifican los tantos del envido.'}};}
+  if(state.localGame){queueLearningAction(good?'good':'declare',bet);const notice=makeCallNotice(changes.feed?.[0]?.text);if(notice)changes.callNotice=notice;Object.assign(room,changes);renderGame();if(decides)scheduleLocalNextHand(room);}else await writeRoom(changes);
 }
 function settleSingleFlor(room,scores) {
   const flowers=Object.keys(room.flors||{});
@@ -2334,7 +2334,7 @@ async function settleTurnTimeout(room){
   turnTimeoutSettling=true;
   try{
     const winner=room.turnTimeout.winner,points=(Number(room.trucoLevel)||1)+(Number(room.turnTimeout.florPoints)||0);
-    if(state.localGame){localFeed(room.turnTimeout.message);localFinishHand(winner,points);return;}
+    if(state.localGame){localFeed(room.turnTimeout.message);localFinishHand(winner,points,'timeout');return;}
     let scores=await verifyEnvido({...room.scores},winner,points);
     scores=settleSingleFlor(room,scores);
     await finishLiveHand(winner,scores,room.turnTimeout.message);
@@ -3247,7 +3247,7 @@ function localScore(player,points,description){
 function localResolveFlor(bet,declared=null){
   const values=state.room.flors||{};if(values.player1==null||values.player2==null)return;
   const winner=declared||(values.player1===values.player2?(state.room.mano||'player1'):(values.player1>values.player2?'player1':'player2'));
-  localScore(winner,bet.stake||3,`gana las flores (${values.player1} a ${values.player2})`);
+  localScore(winner,bet.stake||3,ptsText(bet.stake||3)+' por flor');
   state.room.florCompared=bet.called==='conflor'||bet.called==='falta';state.room.pendingBet=bet.suspendedBet||null;state.room.envidoClosed=true;state.room.florSettled=true;
 }
 function localCallAction(kind){
@@ -3283,7 +3283,8 @@ function localAnswerAction(answer){
   if(bet.type==='flor'&&!florAnswers(bet,roomHasFlor(room,localHand(player))).some(([action])=>action===answer))return;
   if(bet.type==='flor'&&bet.single&&answer==='yes'){localAction('flor');return;}
   if(answer==='raise'&&bet.type==='truco'){
-    const value=bet.stake===2?3:4;room.pendingBet={...bet,caller:player,responder:bet.caller,stake:value};room.lastTrucoCaller=player;queueLearningTrucoCall(value,player);localFeed(`${room.players[player].name} canta ${value===3?'retruco':'vale cuatro'}.`);renderGame();return;
+    // Raising accepts the call it answers: from now on the hand is worth at least that.
+    const value=bet.stake===2?3:4;room.trucoLevel=bet.stake;room.pendingBet={...bet,caller:player,responder:bet.caller,stake:value};room.lastTrucoCaller=player;queueLearningTrucoCall(value,player);localFeed(`${room.players[player].name} canta ${value===3?'retruco':'vale cuatro'}.`);renderGame();return;
   }
   if(answer.startsWith('raise-')&&bet.type==='envido'){
     if(!canRaiseEnvido(bet))return;
@@ -3327,7 +3328,7 @@ function localAction(action){
     if(room.flors[other]==null&&!roomHasFlor(room,localHand(other))){
       room.florSettled=true;room.pendingBet=suspendedBet;
       if(room.callNotice)room.callNotice={...room.callNotice,duration:3000};
-      localScore(player,3,overEnvido?'gana la flor; se cancela el envido':'gana la flor');
+      localScore(player,3,'3 puntos por flor');
     }
     renderGame();
   } else if(['yes','no','raise'].includes(action)||action.startsWith('raise-'))localAnswerAction(action);
@@ -3361,7 +3362,8 @@ function localFinishHand(winner,points,ending='rounds'){
   const room=state.room,before={...room,scores:{...room.scores}},groups=buildEndEvidence(room,state.localOriginalHands||{}),auditResult=envidoAuditResult(room,state.localTruth||{});
   room.scores=settleAuditedHand(room,room.scores,state.localTruth||{},winner,points);room.envidoAudit=null;
   room.scores=capScores(room,settleSingleFlor(room,room.scores));
-  const reason=auditResult.liars.length?`${room.players[auditResult.liars[0]].name} declaró mal${auditResult.liars.length>1?' primero':''}. ${room.players[auditResult.winner].name} gana el envido y la mano.`:ending==='falta'?'Falta envido: se verifican los tantos y se asignan los puntos en juego.':ending==='fold'?'Cuando te vas al mazo, el rival gana los puntos que estaban en juego hasta ese momento.':ending==='declined'?`${({1:'Truco',2:'Retruco',3:'Vale cuatro'}[points]||'Truco')} no querido. Se vuelve a repartir.`:`${room.players[winner].name} gana la mano (${points} puntos).`;
+  const loserName=room.players[otherPlayer(winner)]?.name||'El rival';
+  const reason=auditResult.liars.length?`${trucoPointsText(points,room.trucoLevel)} (${room.players[auditResult.liars[0]].name} mintió en el envido)`:ending==='fold'?`${loserName} se fue al mazo: ${ptsText(points)}${Number(room.trucoLevel)>1?' del '+trucoName(room.trucoLevel):''}`:ending==='declined'?`${ptsText(points)} por ${trucoName(Number(points)+1)} no querido`:ending==='timeout'?`${loserName} no jugó a tiempo: ${ptsText(points)}`:'';
   room.lastHandScore=buildHandSummary(before,room.scores,reason,state.localTruth||{});room.handScoreEntries=[];
   room.handScoreHistory=handScoreHistory(room,room.lastHandScore);
   queueLearningPoints(before,room.scores,room.lastHandScore.entries);

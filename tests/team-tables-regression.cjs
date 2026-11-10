@@ -144,7 +144,7 @@ test('La mia es flor in 2v2 keeps playing and the higher flower takes 3 points w
  const sess=l.matches.m1.session,best=['player3','player4'].reduce((a,p)=>florValue(sess.originals[p],room.muestra)>florValue(sess.originals[a],room.muestra)?p:a);
  l=act(l,'a',{kind:'fold'},1002);l=act(l,'c',{kind:'fold'},1003);l=act(l,'b',{kind:'tick'},4200);room=l.matches.m1.session.room;
  const groups=room.endReveal.groups;assert.equal(groups.length,1);assert.equal(groups[0].player,best);assert.match(groups[0].label,/FLOR · /);
- assert.ok(room.handScoreEntries.some(e=>e.player===team(best)&&e.points===3&&/La mía es flor/.test(e.detail||e.reason||JSON.stringify(e))));
+ assert.ok(room.handScoreEntries.some(e=>e.player===team(best)&&e.points===3&&e.detail==='3 puntos por flor'));
 });
 test('A raise against a sung flor is answered by the player who sang it, even if not the pie, and only the winning flor is shown',()=>{
  let l=started(),s=l.matches.m1.session;
@@ -193,4 +193,33 @@ test('An envido goes to the rival who holds an unsung flor, who can only sing it
  assert.throws(()=>act(l,'b',{kind:'call',value:'yes'},1002),/Tenés flor/);
  l=act(l,'b',{kind:'call',value:'flor'},1003);r=l.matches.m1.session.room;
  assert.equal(r.pendingBet?.type||null,null);assert.equal(r.scores.player2,3);assert.equal(r.envidoClosed,true);
+});
+
+test('2v2: a raise accepts the call it answers, and the lines say plainly why the points went',()=>{
+ let l=started();l=act(l,'a',{kind:'call',value:'truco'},1000);l=act(l,'d',{kind:'call',value:'raise'},1001);
+ let room=l.matches.m1.session.room;assert.equal(room.trucoLevel,2);
+ l=act(l,'c',{kind:'call',value:'no'},1002);room=l.matches.m1.session.room;
+ assert.equal(room.pendingNextHand.foldPoints,2);
+ l=act(l,'b',{kind:'tick'},4200);room=l.matches.m1.session.room;
+ assert.ok(room.lastHandScore.entries.some(e=>e.player==='player2'&&e.points===2&&e.detail==='2 puntos por retruco no querido'));
+});
+test('2v2: going to the deck after a raise gives the truco already accepted',()=>{
+ let l=started();l=act(l,'a',{kind:'call',value:'truco'},1000);l=act(l,'d',{kind:'call',value:'raise'},1001);
+ l=act(l,'a',{kind:'fold'},1002);l=act(l,'c',{kind:'fold'},1003);
+ let room=l.matches.m1.session.room;assert.equal(room.pendingNextHand.foldPoints,2);
+ l=act(l,'b',{kind:'tick'},4200);room=l.matches.m1.session.room;
+ assert.ok(room.lastHandScore.entries.some(e=>e.player==='player2'&&e.points===2&&e.detail==='El otro equipo se fue al mazo: 2 puntos del truco'));
+});
+test('2v2: an envido that reaches the target stops the hand for 3 seconds and then checks the cards',()=>{
+ let l=started();const s=l.matches.m1.session;s.room.envidoClosed=false;s.room.scores.player1=s.room.targetPoints-1;s.room.scores.player2=s.room.targetPoints-1;
+ l=act(l,'a',{kind:'call',value:'envido'},1000);
+ const uid={player1:'a',player2:'b',player3:'c',player4:'d'};
+ l=act(l,uid[l.matches.m1.session.room.pendingBet.responder],{kind:'call',value:'yes'},1001);
+ for(let i=0;i<4;i++){const r=l.matches.m1.session.room,b=r.pendingBet;if(!b?.revealMode)break;const p=b.revealTurn,best=Math.max(-1,...Object.values(b.reveals||{})),truth=l.matches.m1.session.truth[p];
+  l=act(l,uid[p],best>=0&&truth<=best?{kind:'declare',good:true}:{kind:'declare',value:truth},1002+i);}
+ let room=l.matches.m1.session.room;
+ assert.equal(room.status,'started');assert.equal(room.turn,null);assert.match(room.pendingNextHand.id,/^envido:/);
+ l=act(l,'b',{kind:'tick'},2500);assert.equal(l.matches.m1.session.room.status,'started');
+ l=act(l,'b',{kind:'tick'},4200);room=l.matches.m1.session.room;
+ assert.notEqual(room.status,'started');assert.ok(room.handScoreHistory.at(-1).entries.some(e=>/por envido/.test(e.detail)));
 });
