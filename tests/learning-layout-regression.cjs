@@ -15,3 +15,9 @@ test('Practice arrows point upward at the guide and downward at actions',()=>{
   assert.ok(arrow(box,{left:300,right:340,top:10,bottom:50,width:40,height:40}).includes('M 314 67 L 320 57 L 326 67'));
   assert.ok(arrow(box,{left:100,right:350,top:600,bottom:640,width:250,height:40}).includes('M 219 583 L 225 593 L 231 583'));
 });
+
+test('Starting a practice closes the first-table tips, so they never sit under the practice help',()=>{
+  const begin=source.indexOf('async function startLearning(');
+  const body=source.slice(begin,source.indexOf('\n}\n',begin));
+  assert.ok(body.indexOf('closeTableTips();')>body.indexOf('state.learning={stage'),'tips close once the game is a practice');
+});
