@@ -1087,8 +1087,8 @@ body { min-height:100dvh; }
 .study-card{min-width:0;text-align:center}
 .study-card>span{display:block;margin-bottom:8px;color:#c2cec4;font-size:12px}
 .study-card>.sprite-card{width:100%;aspect-ratio:280/435;height:auto;border-radius:7px;box-shadow:0 3px 10px #0004}
-/* The muestra under the deck, as on the table: it sticks out to the right of the card backs. */
-.study-deck{grid-column:1/-1;display:flex;flex-direction:column;align-items:center;gap:8px;margin-top:4px}
+/* The muestra under the deck, as on the table, above the hand: it sticks out to the right of the card backs. */
+.study-deck{grid-column:1/-1;order:-1;display:flex;flex-direction:column;align-items:center;gap:8px;margin-bottom:6px}
 .study-deck>span{color:#ead39b;font-size:12px;font-weight:700}
 .study-deck-stack{position:relative;width:132px;height:96px}
 .study-deck-back,.study-muestra{position:absolute;top:0;width:62px;height:96px;border-radius:7px}
