@@ -1597,6 +1597,7 @@ html,body,#app{touch-action:pan-x pan-y}
 .app-store-badge span{display:flex;flex-direction:column;line-height:1.1}
 .app-store-badge small{font-size:12px}
 .app-store-badge strong{font-size:24px;font-weight:600;letter-spacing:-.01em}
+.play-badge{padding:8px 20px 8px 14px}.play-badge small{font-size:11px;letter-spacing:.03em}.play-badge strong{font-size:23px}
 .install-app-chip{display:inline-flex;align-items:center;gap:6px;justify-self:end;align-self:end;margin:0 0 -4px auto;padding:6px 12px;border:1px solid #e8c98399;border-radius:999px;background:#0f2f24;color:#e8c983;font-size:12px;font-weight:600;text-decoration:none;width:max-content}
 .install-app-chip[hidden]{display:none}
 .install-app-chip svg{width:14px;height:14px}

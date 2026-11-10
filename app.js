@@ -12,7 +12,7 @@ import {installTablePeople} from './table-people.js?v=20261106-social3';
 import {createLiveTables,LiveError} from './live-tables.js?v=20261025-close1';
 import {installMatchPhoto} from './share-photo.js?v=20261027-photo2';
 import {installProfiles,SOUND_MESSAGES} from './profile-level.js?v=20261108-viral2';
-import {installIosPromo} from './ios-promo.js?v=20261105-promo1';
+import {installIosPromo} from './ios-promo.js?v=20261110-android1';
 import {CARD_SIGNS,signFaceSvg} from './card-signs.js?v=20261109-signs3';
 const FIREBASE_VERSION = '12.4.0';
 const $ = (id) => document.getElementById(id);

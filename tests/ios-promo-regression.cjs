@@ -18,3 +18,12 @@ test('Once closed, the notice comes back after five more visits; reloads in the 
  const shown=[];for(let i=0;i<5;i++){session=memory();shown.push(promoVisit(storage,session).show);}
  assert.deepEqual(shown,[false,false,false,false,true]);
 });
+test('Android browsers get the Google Play notice, with its own visits; the app and iPhone do not',async()=>{
+ const {storeFor,androidWeb,STORES,promoVisit}=await load();
+ const android={userAgent:'Mozilla/5.0 (Linux; Android 14; Pixel 8)'},iphone={userAgent:'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)'};
+ assert.equal(storeFor(android,false),STORES.android);assert.equal(storeFor(iphone,false),STORES.ios);
+ assert.equal(androidWeb(android,true),false);assert.equal(storeFor({userAgent:'Mozilla/5.0 (Windows NT 10.0)'},false),null);
+ assert.equal(STORES.android.url,'https://play.google.com/store/apps/details?id=com.matiasmoranc.truco');
+ const storage=memory();storage.setItem(STORES.ios.key,JSON.stringify({visits:3,closedAt:3}));
+ assert.equal(promoVisit(storage,memory(),STORES.android.key).show,true);
+});
