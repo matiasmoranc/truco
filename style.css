@@ -1083,18 +1083,26 @@ body { min-height:100dvh; }
 .learn-practice-actions>.button{justify-content:center;min-height:44px;min-width:130px;flex:1;font-size:13px;border-radius:8px}
 .learn-study-dialog{width:min(600px,calc(100vw - 24px))}
 .learn-close{float:right;width:36px;height:36px;border:1px solid #d8b87588;border-radius:8px;background:transparent;color:#ead39b;font-size:25px;line-height:1}
-.study-cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:22px 0}
+.study-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:22px 0}
 .study-card{min-width:0;text-align:center}
 .study-card>span{display:block;margin-bottom:8px;color:#c2cec4;font-size:12px}
 .study-card>.sprite-card{width:100%;aspect-ratio:280/435;height:auto;border-radius:7px;box-shadow:0 3px 10px #0004}
-.study-card:last-child{padding-left:8px;border-left:1px solid #d8b87566}
-.study-card:last-child>span{color:#ead39b;font-weight:700}
+/* The muestra under the deck, as on the table: it sticks out to the right of the card backs. */
+.study-deck{grid-column:1/-1;display:flex;flex-direction:column;align-items:center;gap:8px;margin-top:4px}
+.study-deck>span{color:#ead39b;font-size:12px;font-weight:700}
+.study-deck-stack{position:relative;width:132px;height:96px}
+.study-deck-back,.study-muestra{position:absolute;top:0;width:62px;height:96px;border-radius:7px}
+.study-deck-back{left:0;z-index:2;background:url('./assets/cards/13.jpg') 100% 0/300% 100% no-repeat;box-shadow:3px 3px 0 #142a1d,4px 4px 0 #b19e70}
+.study-muestra{left:44px;transform:rotate(90deg);box-shadow:0 3px 10px #0004}
 .study-envido{display:grid;grid-template-columns:auto 72px 1fr;align-items:center;gap:12px}
 .study-envido input{width:72px;height:44px;border:1px solid #d8b875;background:#0b291f;color:#fff;border-radius:8px;text-align:center;font-size:21px}
 .study-envido>.button{font-size:14px;justify-content:center;min-height:44px;border-radius:8px}
 .study-feedback{font-size:14px;line-height:1.6;margin:18px 0}
-.study-correct{border-left:3px solid #9fc8a1;padding-left:12px;color:#d2ead3}
-.study-incorrect{border-left:3px solid #e8c983;padding-left:12px;color:#ead7a5}
+.study-correct{border-left:3px solid #6fcf7f;padding-left:12px;color:#d2ead3}
+.study-verdict{display:block;font-size:19px;font-weight:800;line-height:1.3;margin-bottom:4px}
+.study-correct .study-verdict{color:#6fcf7f}
+.study-incorrect .study-verdict{color:#ef6b5e}
+.study-incorrect{border-left:3px solid #ef6b5e;padding-left:12px;color:#ead7a5}
 .learn-sheet-dialog{width:min(740px,calc(100vw - 24px))}
 .learn-sheet-dialog img{display:block;width:100%;height:auto;border-radius:10px}
 .learning-toolbar{gap:7px;width:calc(100% - 24px);max-width:440px}

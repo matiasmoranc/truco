@@ -4445,7 +4445,12 @@ function nextStudy(kind=studyExercise?.kind||'envido'){
   $('learn-study-count-help').textContent=kind==='flor'?'Cómo saber si tenés flor':kind==='flor-points'?'Cómo sumar los puntos de la flor':'Cómo contar el envido';
   const cards=$('learn-study-cards');cards.replaceChildren();
   const add=(card,label)=>{const wrap=document.createElement('div'),caption=document.createElement('span'),image=document.createElement('div');wrap.className='study-card';caption.textContent=label;image.className='sprite-card';image.style.cssText=cardImageStyle(card);image.setAttribute('role','img');image.setAttribute('aria-label',cardAccessibleName(card));wrap.append(caption,image);cards.append(wrap);};
-  studyExercise.hand.forEach((card,index)=>add(card,'Carta '+(index+1)));add(studyExercise.muestra,'Muestra');
+  studyExercise.hand.forEach((card,index)=>add(card,'Carta '+(index+1)));
+  // The muestra lies face up under the deck, as on the table.
+  const deck=document.createElement('div'),label=document.createElement('span'),stack=document.createElement('div'),muestra=document.createElement('div'),back=document.createElement('div');
+  deck.className='study-deck';label.textContent='Muestra';stack.className='study-deck-stack';
+  muestra.className='sprite-card study-muestra';muestra.style.cssText=cardImageStyle(studyExercise.muestra);muestra.setAttribute('role','img');muestra.setAttribute('aria-label',cardAccessibleName(studyExercise.muestra)+', muestra');
+  back.className='study-deck-back';back.setAttribute('aria-hidden','true');stack.append(muestra,back);deck.append(label,stack);cards.append(deck);
   $('learn-study-envido').classList.toggle('hidden',kind==='flor');$('learn-study-flor').classList.toggle('hidden',kind!=='flor');
   $('learn-study-value').max=kind==='flor-points'?'47':'37';$('learn-study-value').value='';$('learn-study-check').disabled=false;
   $('learn-study-feedback').textContent='';$('learn-study-feedback').className='study-feedback';
@@ -4459,7 +4464,10 @@ function checkStudy(answer){
   if(exercise.kind!=='flor'&&(!Number.isInteger(answer)||answer<0||answer>max)){ $('learn-study-feedback').textContent=`Escribí un número entero entre 0 y ${max}.`;return;}
   const correct=answer===result.value;exercise.answered=true;
   const feedback=(correct?'¡Correcto! ':exercise.kind!=='flor'?'Tu respuesta fue '+answer+'. '+(exercise.kind==='flor-points'?'Tu flor suma '+result.value+' pts. ':'Tenés '+result.value+' tantos. '):result.value?'Esta mano sí tiene flor. ':'Esta mano no tiene flor. ')+result.explanation;
-  $('learn-study-feedback').textContent=feedback.replace(/\.\s*/g,'.\n').trim();
+  // The verdict first, in green or red, and the explanation under it.
+  const verdict=document.createElement('strong'),body=document.createElement('span');
+  verdict.className='study-verdict';verdict.textContent=correct?'Correcto':'Incorrecto';body.textContent=feedback.replace(/^¡Correcto! /,'').replace(/\.\s*/g,'.\n').trim();
+  $('learn-study-feedback').replaceChildren(verdict,body);
   $('learn-study-feedback').className='study-feedback '+(correct?'study-correct':'study-incorrect');
   $('learn-study-check').disabled=true;$('learn-study-flor').querySelectorAll('button').forEach(button=>button.disabled=true);
   $('learn-study-next').classList.remove('hidden');
