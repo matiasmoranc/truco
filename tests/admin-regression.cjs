@@ -88,7 +88,13 @@ test('Legacy closure cannot bypass the credit ledger or treat a fresh waiting ta
  assert.throws(()=>closeLegacyTable(root,{...args,code:'LIVE'}));
 });
 
-const {adminTableCurrent}=require('../functions/admin-service.cjs');
+const {adminTableCurrent,adminTableListed}=require('../functions/admin-service.cjs');
+test('A table waiting for a rival is listed as active although it has not started; old unstarted ones stay out',()=>{
+ assert.equal(adminTableListed({status:'waiting'},true,false),true);
+ assert.equal(adminTableListed({status:'waiting'},false,false),false);
+ assert.equal(adminTableListed({status:'refunded'},false,false),false);
+ assert.equal(adminTableListed({status:'settled'},false,true),true);
+});
 test('Admin current tables exclude settled games, expired waiting tables and completed rooms',()=>{
  const now=600001;
  assert.equal(adminTableCurrent({status:'settled'},now),false);

@@ -182,7 +182,7 @@ const {getAuth}=require('firebase-admin/auth');
 const adminMessages=require('./admin-messages.cjs');
 const alertAdmin=require('./social.cjs').adminAlerter(db);
 const pushToPlayer=require('./social.cjs').pushSender(db);
-const {pastWins,finishedTables,lastPlayed,tableEvents,requireAdmin,adminLedgerChange,validKey,prepareUserDeletion,finishUserDeletion,legacyTableActive,closeLegacyTable,adminTableCurrent,adminSetPoints}=require('./admin-service.cjs');
+const {pastWins,finishedTables,lastPlayed,tableEvents,requireAdmin,adminLedgerChange,validKey,prepareUserDeletion,finishUserDeletion,legacyTableActive,closeLegacyTable,adminTableListed,adminTableCurrent,adminSetPoints}=require('./admin-service.cjs');
 async function adminIdentity(request){
  const uid=request.auth?.uid;
  if(!uid)throw new HttpsError('unauthenticated','Iniciá sesión primero.');
@@ -350,10 +350,11 @@ exports.adminConsole=onCall({...options,secrets:[liveInternalSecret]},async requ
   const legacy=Object.entries(rooms).filter(([code,entry])=>!ledger.tables?.[code]&&legacyTableActive(entry?.public,Date.now())).map(([code,{public:room}])=>({code,status:room.status,stake:0,targetPoints:room.targetPoints||30,players:Object.values(room.players||{}).map(p=>p.name||p.uid),createdAt:room.createdAt||null,finishedAt:room.matchResult?.at||null}));
   const now=Date.now(),tables=[],archivedTables=[...legacy.map(m=>({...m,status:'Sistema anterior'}))];
   for(const [id,m] of Object.entries(ledger.matches||{})){
-   if(!hasStartedMatch(m))continue;
    const code=m.code||Object.entries(ledger.tables||{}).find(([,value])=>value===id)?.[0]||id;
+   const current=ledger.tables?.[code]===id&&adminTableCurrent(m,now);
+   if(!adminTableListed(m,current,hasStartedMatch(m)))continue;
    const entry={id,code,matchNumber:m.matchNumber||1,rawStatus:m.status,closedAt:m.closedAt||null,stake:m.stake,targetPoints:m.targetPoints,players:Object.values(m.players||{}).map(p=>p.name),createdAt:m.createdAt||null,finishedAt:m.settledAt||m.refundedAt||m.closedAt||null,scores:m.session?.room?.scores||null,winnerName:Object.values(m.players||{}).find(p=>p.uid===m.winner)?.name||null,reason:m.session?.room?.matchResult?.reason||m.closeReason||null,history:Object.values(ledger.history?.[id]||{}).sort((a,b)=>a.at-b.at)};
-   if(ledger.tables?.[code]===id&&adminTableCurrent(m,now))tables.push({...entry,status:m.status==='waiting'?'Esperando rival':'En juego'});
+   if(current)tables.push({...entry,status:m.status==='waiting'?'Esperando rival':'En juego'});
    else archivedTables.push({...entry,status:m.status==='settled'?'Terminada':m.status==='refunded'?'Créditos devueltos':m.closedAt?'Cerrada':m.status==='waiting'?'Vencida':'Finalizando'});
   }
   return {tables,archivedTables,events:tableEvents(ledger,now),movements:ledger.walletMovements||{},alerts:reservationAlerts(ledger,now),reports:Object.entries(reports).map(([id,r])=>({id,...r})).sort((a,b)=>b.at-a.at),
