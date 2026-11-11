@@ -14,7 +14,10 @@ function advance(){const room=state.room;
  clock();return save();
 }
 function action(player,command){
+ // A command answers the hand the player saw: if the clock ran out first and a new hand was dealt, it is refused.
+ const handBefore=state.room.handNumber;
  state.playerId=player;state.hand=localHand(player);advance();const room=state.room;
+ if(command?.kind!=='draw'&&handBefore!=null&&room.handNumber!==handBefore)throw new Error('Se terminó el tiempo de esa mano.');
  if(!['player1','player2'].includes(player))throw new Error('Invalid player.');
  if(command.kind==='draw'){
   if(room.status!=='drawing'||room.openingDraw.cards[player])throw new Error('El sorteo ya cambió.');

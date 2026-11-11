@@ -183,7 +183,9 @@ export function installFriends({$,api,services,getState,toast,tableToInvite,join
   shownInvites.add(id);current={id,invite};
   $('table-invite-text').textContent=invite.fromName+' te invita a jugar en su mesa.';
   renderInviteCredits(invite);
-  $('table-invite-dialog').showModal();$('table-invite-accept').focus({preventScroll:true});
+  // Never on top of another notice: it waits for it to close while the invitation is still valid.
+  const show=()=>{if(current?.id!==id||!(invite.expiresAt>Date.now()))return;if(document.querySelector('dialog[open]')){setTimeout(show,1000);return;}$('table-invite-dialog').showModal();$('table-invite-accept').focus({preventScroll:true});};
+  show();
   setTimeout(()=>{if(current?.id===id&&$('table-invite-dialog').open){$('table-invite-dialog').close();toast('La invitación de '+invite.fromName+' venció.');}},Math.max(0,invite.expiresAt-Date.now()));
  }
  // The table's facts, and whether my credits let me enter: with none left I can claim
@@ -210,6 +212,8 @@ export function installFriends({$,api,services,getState,toast,tableToInvite,join
   finally{b.disabled=false;b.lastChild.textContent='Reclamar 5 créditos';if(current)renderInviteCredits(current.invite);}
  };
  $('table-invite-decline').onclick=()=>answer(false);
+ // Escape or the phone's back button answers "no puedo ahora", so whoever invited is told.
+ $('table-invite-dialog').addEventListener('cancel',event=>{event.preventDefault();answer(false);});
  // The host hears when a friend cannot come.
  function showReply(id,reply){
   if(shownReplies.has(id))return;shownReplies.add(id);

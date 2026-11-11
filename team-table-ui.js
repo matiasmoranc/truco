@@ -181,9 +181,9 @@ export function installTeamTable({$,getState,command,runAction,renderPlayerHand,
   const picker=$('envido-picker'),declaring=playing&&pending?.revealMode&&pending.revealTurn===p;picker.classList.toggle('hidden',!declaring);game.classList.toggle('declaring-envido',!!declaring);
   if(declaring){
    // The same number wheel as in 1v1: it starts at the lowest number that beats the best declaration
-   // (ties go to the earlier seat from the mano; a flower must be higher).
+   // (ties go to the earlier seat from the mano, for envido and flor alike).
    const flower=pending.type==='flor',reveals=pending.reveals||{},order=pending.order||[],best=Math.max(-1,...Object.values(reveals));
-   const lead=order.find(q=>reveals[q]===best&&best>=0),min=best<0?0:best+(!flower&&order.indexOf(p)<order.indexOf(lead)?0:1);
+   const lead=order.find(q=>reveals[q]===best&&best>=0),min=best<0?0:best+(order.indexOf(p)<order.indexOf(lead)?0:1);
    const own=flower&&s.hand.length===3?florPoints(s.hand,r.muestra):NaN;
    // The first to declare must say a number; after that, "paso" when my partner leads, otherwise "son buenas".
    const goodLabel=best<0?'':(teamLeadsDeclaration(pending,mineTeam)?'PASO':'SON BUENAS');
@@ -194,11 +194,11 @@ export function installTeamTable({$,getState,command,runAction,renderPlayerHand,
   if(playing&&!r.folded?.[p]){
    // A flower can be sung until a card follows the first flor of the hand.
    const mayFlor=!r.florClosed&&!r.flors?.[p]&&(r.playedBy?.[p]||0)===0&&hasFlor(r,s.hand);
-   if(!pending&&r.turn===p){const flower=hasFlor(r,s.hand);if(mayFlor)add('flor','FLOR');if(!flower&&!r.envidoClosed&&(r.playedBy?.[p]||0)===0&&r.trickNo===1){add('envido','ENVIDO');add('real','REAL');add('falta','FALTA');}if(!mayFlor&&r.trucoLevel<4&&r.lastTrucoTeam!==mineTeam)add(r.trucoLevel===1?'truco':r.trucoLevel===2?'retruco':'vale4',r.trucoLevel===1?'TRUCO':r.trucoLevel===2?'RETRUCO':'VALE 4',true);}
+   if(!pending&&r.turn===p){const flower=hasFlor(r,s.hand);if(mayFlor)add('flor','FLOR');if(!flower&&!r.envidoClosed&&!(r.trucoLevel>1)&&(r.playedBy?.[p]||0)===0&&r.trickNo===1){add('envido','ENVIDO');add('real','REAL');add('falta','FALTA');}if(!mayFlor&&r.trucoLevel<4&&r.lastTrucoTeam!==mineTeam)add(r.trucoLevel===1?'truco':r.trucoLevel===2?'retruco':'vale4',r.trucoLevel===1?'TRUCO':r.trucoLevel===2?'RETRUCO':'VALE 4',true);}
    // Holding an unsung flor, the only answer is to sing it: no envido, no quiero / no quiero yet.
    const owesFlor=pending&&!pending.revealMode&&pending.responder===p&&pending.type!=='flor'&&mayFlor;
    if(owesFlor)add('flor','FLOR',true);
-   else if(pending&&!pending.revealMode&&pending.responder===p){add('yes',pending.type==='flor'&&pending.called==='flor'&&hasFlor(r,s.hand)?'LA MÍA ES FLOR':'QUIERO',true);add('no','NO QUIERO');if(pending.type==='truco'){if(pending.stake<4)add('raise',pending.stake===2?'RETRUCO':'VALE 4');if(!r.envidoClosed&&(r.playedBy?.[p]||0)===0){add('envido','ENVIDO');add('real','REAL');add('falta','FALTA');}}if(pending.type==='envido'&&pending.called!=='falta'){add('raise-envido','ENVIDO');add('raise-real','REAL');add('raise-falta','FALTA');}if(pending.type==='flor'&&pending.called==='flor'){add('raise-conflor','CON FLOR ENVIDO');add('raise-faltaflor','CONTRA FLOR AL RESTO');}}
+   else if(pending&&!pending.revealMode&&pending.responder===p){add('yes',pending.type==='flor'&&pending.called==='flor'&&hasFlor(r,s.hand)?'LA MÍA ES FLOR':'QUIERO',true);add('no','NO QUIERO');if(pending.type==='truco'){if(pending.stake<4)add('raise',pending.stake===2?'RETRUCO':'VALE 4');if(!r.envidoClosed&&!(r.trucoLevel>1)&&(r.playedBy?.[p]||0)===0){add('envido','ENVIDO');add('real','REAL');add('falta','FALTA');}}if(pending.type==='envido'){const calls=pending.calls?.length?pending.calls:[pending.called||'envido'];if(!calls.includes('falta')){if(!calls.includes('real')&&calls.filter(c=>c==='envido').length<2)add('raise-envido','ENVIDO');if(!calls.includes('real'))add('raise-real','REAL');add('raise-falta','FALTA');}}if(pending.type==='flor'&&pending.called==='flor'){add('raise-conflor','CON FLOR ENVIDO');add('raise-faltaflor','CONTRA FLOR AL RESTO');}}
    // Someone sang flor, or an envido is waiting: anyone else holding one sings it now, turn or not.
    if(mayFlor&&(Object.keys(r.flors||{}).length||pending?.type==='envido')&&!pending?.revealMode&&!buttons.some(b=>b.includes('data-team-action="flor"')))add('flor','FLOR',true);
   }

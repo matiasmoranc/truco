@@ -60,7 +60,9 @@ test('Envido compares all four individual totals and ties prefer the earlier pla
 test('Each teammate sings their own flower and the team scores six; opponents use the strongest individual flower',()=>{let l=started(),s=l.matches.m1.session;s.room.envidoClosed=false;s.hands.player1=[card('♦',2),card('♠',7),card('♠',1)];s.originals.player1=s.hands.player1;s.hands.player3=[card('♦',4),card('♣',5),card('♣',7)];s.originals.player3=s.hands.player3;l=act(l,'a',{kind:'call',value:'flor'},1000);assert.equal(l.matches.m1.session.room.scores.player1,3);assert.equal(l.matches.m1.session.room.flors.player3,undefined);l=act(l,'c',{kind:'call',value:'flor'},1001);assert.equal(l.matches.m1.session.room.scores.player1,6);assert.equal(l.matches.m1.session.room.envidoClosed,true);
  l=started();s=l.matches.m1.session;s.hands.player1=[card('♦',2),card('♦',4),card('♦',5)];s.originals.player1=s.hands.player1;s.hands.player2=[card('♣',4),card('♣',5),card('♣',7)];s.originals.player2=s.hands.player2;l=act(l,'a',{kind:'call',value:'flor'},1000);assert.equal(l.matches.m1.session.room.pendingBet.responder,'player2');l=act(l,'b',{kind:'call',value:'raise-conflor'},1001);assert.equal(l.matches.m1.session.room.pendingBet.responder,'player1');l=act(l,'a',{kind:'call',value:'yes'},1002);assert.equal(l.matches.m1.session.room.pendingBet.revealMode,true);assert.equal(l.matches.m1.session.room.scores.player1,0);
  l=declareFlowers(l,1003);assert.equal(l.matches.m1.session.room.scores.player1,5);assert.equal(l.matches.m1.session.room.florCompared,true);});
-test('A normal complete 2v2 game pays exactly once without abandoning',()=>{let l=started(),now=1000;for(let i=0;i<12&&l.matches.m1.status!=='settled';i++){l=databaseRoundTrip(act(l,'b',{kind:'fold'},now));l=databaseRoundTrip(act(l,'d',{kind:'fold'},now+1));l=databaseRoundTrip(act(l,'a',{kind:'tick'},now+3100));l=databaseRoundTrip(act(l,'a',{kind:'tick'},now+9000));now+=10000;}assert.equal(l.matches.m1.status,'settled');assert.deepEqual(l.matches.m1.winners,['a','c']);assert.equal(l.wallets.c.balance,12);assert.deepEqual(reservationAlerts(l,now),[]);assert.equal(Object.values(l.wallets).reduce((n,w)=>n+w.balance+w.locked,0),50);});
+test('A normal complete 2v2 game pays exactly once without abandoning',()=>{let l=started(),now=1000;for(let i=0;i<12&&l.matches.m1.status!=='settled';i++){for(const [uid,t] of [['b',now],['d',now+1]]){if(l.matches.m1.session.room.status!=='started')break;l=databaseRoundTrip(act(l,uid,{kind:'fold'},t));}l=databaseRoundTrip(act(l,'a',{kind:'tick'},now+3100));l=databaseRoundTrip(act(l,'a',{kind:'tick'},now+9000));now+=10000;}assert.equal(l.matches.m1.status,'settled');
+ // Usually team 1; team 2 can get there first when its flor, sung on the way to the deck, is counted before the hand.
+ const firstTeam=l.matches.m1.session.room.matchResult.winner==='player1',pair=firstTeam?['a','c']:['b','d'];assert.deepEqual(l.matches.m1.winners,pair);assert.equal(l.wallets[pair[1]].balance,12);assert.deepEqual(reservationAlerts(l,now),[]);assert.equal(Object.values(l.wallets).reduce((n,w)=>n+w.balance+w.locked,0),50);});
 test('A wrong Envido declaration is audited and awards the other team both envido and hand',()=>{let l=started();l.matches.m1.session.room.envidoClosed=false;l=act(l,'a',{kind:'call',value:'envido'},1000);l=act(l,'d',{kind:'call',value:'yes'},1001);for(const [uid,value] of [['a',37],['b',6],['d',7]])l=act(l,uid,{kind:'declare',value},1100+uid.charCodeAt(0));l=act(l,'b',{kind:'fold'},1300);l=act(l,'d',{kind:'fold'},1301);l=act(l,'a',{kind:'tick'},4500);assert.equal(l.matches.m1.session.room.scores.player1,0);assert.equal(l.matches.m1.session.room.scores.player2,3);});
 test('Disconnecting player3 loses for their team and does not leave credits reserved',()=>{let l=started();const presence={player3:{uid:'c',matchNumber:1,online:false,disconnectedAt:1000}};l=tableOperation(l,{code:'ABCDE',uid:'a',command:{kind:'tick'},presence,now:47000});assert.equal(l.matches.m1.status,'settled');assert.deepEqual(l.matches.m1.winners,['b','d']);assert.equal(l.wallets.c.locked,0);});
 test('Folding while declaring Envido transfers the card turn and declarations continue',()=>{let l=started();l.matches.m1.session.room.envidoClosed=false;l=act(l,'a',{kind:'call',value:'envido'},1000);l=act(l,'d',{kind:'call',value:'yes'},1001);l=act(l,'a',{kind:'fold'},1002);for(const [uid,value] of [['b',6],['c',6]])l=act(l,uid,{kind:'declare',value},1100+uid.charCodeAt(0));assert.equal(l.matches.m1.session.room.turn,'player2');assert.equal(l.matches.m1.session.room.pendingBet,null);l=act(l,'b',{kind:'play',cardId:'basto-1'},1300);assert.equal(l.matches.m1.session.room.turn,'player3');});
@@ -72,7 +74,7 @@ test('Twenty complete random deals play through four-seat calls, cards, pauses a
    if(r.status==='drawing'){seat=SEATS.find(p=>!r.openingDraw?.cards?.[p]);command=seat?{kind:'draw'}:{kind:'tick'};seat??='player1';if(command.kind==='tick')now+=3000;}
    else if(r.status!=='started'||r.resolvingTrick||r.pendingNextHand){seat='player1';command={kind:'tick'};now+=6000;}
    else if(r.pendingBet){seat=r.pendingBet.revealMode?r.pendingBet.revealTurn:r.pendingBet.responder;command=r.pendingBet.revealMode?(r.pendingBet.type==='flor'?(()=>{const v=florValue(s.originals[seat],r.muestra),best=Math.max(-1,...Object.values(r.pendingBet.reveals||{}));return v>best?{kind:'declare',value:v}:{kind:'declare',good:true};})():{kind:'declare',value:s.truth[seat]}):r.pendingBet.type!=='flor'&&flower(s.originals[seat],r.muestra)&&!r.flors?.[seat]&&!r.florClosed&&!r.playedBy?.[seat]?{kind:'call',value:'flor'}:{kind:'call',value:'yes'};}
-   else{seat=r.turn;command=flower(s.originals[seat],r.muestra)&&!r.flors?.[seat]&&!r.florClosed&&!r.playedBy?.[seat]?{kind:'call',value:'flor'}:!r.envidoClosed&&!r.playedBy?.[seat]&&r.trickNo===1&&step%5===0?{kind:'call',value:'envido'}:r.trucoLevel===1&&step%7===0?{kind:'call',value:'truco'}:{kind:'play',cardId:s.hands[seat][0].id};}
+   else{seat=r.turn;command=flower(s.originals[seat],r.muestra)&&!r.flors?.[seat]&&!r.florClosed&&!r.playedBy?.[seat]?{kind:'call',value:'flor'}:!r.envidoClosed&&r.trucoLevel===1&&!r.playedBy?.[seat]&&r.trickNo===1&&step%5===0?{kind:'call',value:'envido'}:r.trucoLevel===1&&step%7===0?{kind:'call',value:'truco'}:{kind:'play',cardId:s.hands[seat][0].id};}
    now+=20;l=databaseRoundTrip(act(l,l.matches.m1.players[seat].uid,command,now,'g'+game+'s'+step));
   }
   assert.equal(l.matches.m1.status,'settled','game '+game+' must finish');assert.equal(l.matches.m1.winners.length,2);assert.equal(Object.values(l.wallets).reduce((n,w)=>n+w.balance+w.locked,0),50);validateAccounting(base(),l);
@@ -222,4 +224,39 @@ test('2v2: an envido that reaches the target stops the hand for 3 seconds and th
  l=act(l,'b',{kind:'tick'},2500);assert.equal(l.matches.m1.session.room.status,'started');
  l=act(l,'b',{kind:'tick'},4200);room=l.matches.m1.session.room;
  assert.notEqual(room.status,'started');assert.ok(room.handScoreHistory.at(-1).entries.some(e=>/por envido/.test(e.detail)));
+});
+
+// Direct referee sessions for the cases below.
+function seatSession(hands,extra={}){
+ const muestra=card('♦',6),players=Object.fromEntries(SEATS.map(p=>[p,{uid:'u'+p,name:p}]));
+ const s={code:'X',hands:structuredClone(hands),originals:structuredClone(hands),truth:{},room:{mode:'2v2',status:'started',targetPoints:30,players,scores:{player1:0,player2:0},handNumber:1,trickNo:1,playedCount:0,tricks:[],trickCards:[],feed:[],trucoLevel:1,flors:{},timeoutCounts:{},mano:'player1',dealer:'player4',turn:'player1',muestra,playedBy:{},folded:{},envidoClosed:false,...extra}};
+ const {envido}=require('../functions/team-referee.cjs');for(const p of SEATS)s.truth[p]=envido(hands[p],muestra);return s;
+}
+test('2v2: the last of a trick going to the deck with a raise to answer closes the trick; nobody plays twice',()=>{
+ const s=seatSession({player1:[card('♠',4),card('♥',5),card('♣',6)],player2:[card('♣',4),card('♥',7),card('♠',12)],player3:[card('♠',5),card('♣',5),card('♥',12)],player4:[card('♠',3),card('♥',3),card('♣',3)]});
+ let now=1000;const act2=(p,c)=>createTeamReferee(s,{now:now+=10}).action(p,c);
+ act2('player1',{kind:'play',cardId:'espada-4'});act2('player2',{kind:'play',cardId:'basto-4'});act2('player3',{kind:'play',cardId:'espada-5'});
+ act2('player4',{kind:'call',value:'truco'});act2('player3',{kind:'call',value:'raise'});act2('player4',{kind:'fold'});
+ assert.deepEqual(s.room.tricks[0].cards.map(c=>c.playerId),['player1','player2','player3']);
+ createTeamReferee(s,{now:now+=3000}).advance();
+ assert.equal(s.room.trickNo,2);assert.equal(s.room.pendingBet.responder,'player2');
+});
+test('2v2: envido rules — no envido after an accepted truco, two envidos at most, nothing after real but falta',()=>{
+ const hands={player1:[card('♠',4),card('♥',5),card('♣',6)],player2:[card('♣',4),card('♥',7),card('♠',12)],player3:[card('♠',5),card('♣',5),card('♥',12)],player4:[card('♠',3),card('♥',3),card('♣',3)]};
+ const s=seatSession(hands);let now=1000;const act2=(p,c)=>createTeamReferee(s,{now:now+=10}).action(p,c);
+ act2('player1',{kind:'call',value:'envido'});
+ const r1=s.room.pendingBet.responder;act2(r1,{kind:'call',value:'raise-envido'});
+ const r2=s.room.pendingBet.responder;assert.throws(()=>act2(r2,{kind:'call',value:'raise-envido'}));
+ act2(r2,{kind:'call',value:'raise-real'});assert.equal(s.room.pendingBet.stake,7);
+ const r3=s.room.pendingBet.responder;assert.throws(()=>act2(r3,{kind:'call',value:'raise-real'}));
+ act2(r3,{kind:'call',value:'no'});assert.equal(s.room.scores[team(r2)],4);
+ const t=seatSession(hands);now=1000;const act3=(p,c)=>createTeamReferee(t,{now:now+=10}).action(p,c);
+ act3('player1',{kind:'call',value:'truco'});act3(t.room.pendingBet.responder,{kind:'call',value:'yes'});
+ assert.throws(()=>act3('player1',{kind:'call',value:'envido'}));
+});
+test('2v2: when both teams reach the target in one hand, the first one counted wins',()=>{
+ const s=seatSession({player1:[card('♠',4),card('♥',5),card('♣',6)],player2:[card('♣',4),card('♥',7),card('♠',12)],player3:[card('♠',5),card('♣',5),card('♥',12)],player4:[card('♠',3),card('♥',3),card('♣',3)]},{scores:{player1:29,player2:28},florDeferred:3,flors:{player2:true},florSettled:false});
+ s.originals.player2=[card('♦',1),card('♦',3),card('♦',7)];
+ const ref=createTeamReferee(s,{now:2000});s.room.pendingNextHand={id:'fold:x',winner:'player1',foldPoints:1,endsAt:1000,reason:''};ref.advance();
+ assert.equal(s.room.status,'complete');assert.equal(s.room.matchResult.winner,'player2');
 });

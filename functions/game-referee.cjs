@@ -82,6 +82,27 @@ function florBetPoints(room,kind){
 function declinedFlorPoints(bet){
   return bet.called==='conflor'?3:(Number(bet.accepted)||3);
 }
+function pendingSideAward(room,winner){
+  const bet=room.pendingBet;if(!bet||!['envido','flor'].includes(bet.type))return null;
+  const points=bet.revealMode?Number(bet.stake)||0:bet.type==='flor'?declinedFlorPoints(bet):Number(bet.accepted)||1;
+  if(!points)return null;
+  const detail=bet.revealMode?ptsText(points)+' por '+betCallNames(bet).map(call=>call.toLowerCase()).join(' y '):declinedBetExplanation(room,bet);
+  return sideScore(room,winner,points,detail,{envidoClosed:true,...(bet.type==='flor'?{florSettled:true}:{})});
+}
+function sideScore(room,player,points,detail,extra){
+  const scores=capScores(room,{...room.scores,[player]:(Number(room.scores?.[player])||0)+points});
+  return {...(extra||{}),scores,handScoreEntries:[...(room.handScoreEntries||[]),{player,points:scores[player]-(Number(room.scores?.[player])||0),detail}]};
+}
+function envidoRaiseKinds(bet){
+  if(bet?.type!=='envido'||bet.revealMode)return [];
+  const calls=bet.calls?.length?bet.calls:[bet.called||'envido'];
+  if(calls.includes('falta'))return [];
+  const kinds=[];
+  if(!calls.includes('real')&&calls.filter(call=>call==='envido').length<2)kinds.push('envido');
+  if(!calls.includes('real'))kinds.push('real');
+  kinds.push('falta');
+  return kinds;
+}
 function ptsText(n){return Number(n)===1?'1 punto':n+' puntos';}
 function trucoName(level){return {1:'truco',2:'truco',3:'retruco',4:'vale cuatro'}[Number(level)]||'truco';}
 function trucoPointsText(points,level){return ptsText(points)+(Number(level)>1?' por '+trucoName(level):' de la mano');}
@@ -130,9 +151,7 @@ function makeCallNotice(text,bet=state.room?.pendingBet){
   if(!spoken||!['player1','player2'].includes(state.playerId))return null;
   return {...(spoken==='Me voy al mazo'?{kind:'fold'}:{}),id:crypto.randomUUID(),from:state.playerId,to:state.playerId==='player1'?'player2':'player1',text:spoken==='Tiene'||spoken==='Me voy al mazo'?text.split('.')[0]+'.':/\bcanta \d+ (tantos|son mejores|son iguales)\b/i.test(text)?spoken:text,spoken,selfVerb:ownCallVerb(spoken,bet),time:Date.now(),handNumber:state.room?.handNumber||1};
 }
-function canRaiseEnvido(bet){
-  return bet?.type==='envido'&&!bet.revealMode&&bet.called!=='falta'&&!(bet.calls||[]).includes('falta');
-}
+function canRaiseEnvido(bet){return envidoRaiseKinds(bet).length>0;}
 function roomHasFlor(room,hand){return room?.practiceRules?.flor!==false&&hasFlor(hand,room?.muestra);}
 function mustSingFlor(room,player,hand){
   if(!room||room.status!=='started'||room.flors?.[player]!=null||room.florSettled||hand?.length!==3||!roomHasFlor(room,hand))return false;
@@ -147,6 +166,8 @@ function foldFlorChanges(room,loser,loserHand,winnerHand){
 }
 function canCallFirstRoundEnvido(room,player,hand){
   if(!room||room.practiceRules?.envido===false||room.status!=='started'||!['player1','player2'].includes(player)||room.resolvingTrick||room.pendingNextHand||Number(room.trickNo||1)!==1)return false;
+  // Once a truco is accepted (raising it also accepts it) the envido is gone; an unanswered truco still allows it.
+  if(Number(room.trucoLevel||1)>1)return false;
   if(room.envidoClosed||Object.keys(room.flors||{}).length>0||room.pendingBet?.type==='flor'||room.florSettled||Number(room.playedCount||0)>=2||(room.trickCards||[]).some(item=>item.playerId===player))return false;
   return !!hand?.length&&!room.flors?.[player]&&!room.flors?.[otherPlayer(player)]&&!roomHasFlor(room,hand);
 }
@@ -336,6 +357,7 @@ function localCallAction(kind){
   const overTruco=pending?.type==='truco'&&pending.responder===caller;
   
   if(pending&&!overTruco){toast('Respondé el canto.');return;}
+  if(!overTruco&&room.turn!==caller)return;
   if(['envido','real','falta'].includes(kind)){
     if(!canCallFirstRoundEnvido(room,caller,localHand(caller))){toast('El envido está cerrado o hay flor.');return;}
     const base=pending?.type==='envido'?(pending.stake||0):0;
@@ -366,8 +388,8 @@ function localAnswerAction(answer){
     const value=bet.stake===2?3:4;room.trucoLevel=bet.stake;room.pendingBet={...bet,caller:player,responder:bet.caller,stake:value};room.lastTrucoCaller=player;queueLearningTrucoCall(value,player);localFeed(`${room.players[player].name} canta ${value===3?'retruco':'vale cuatro'}.`);renderGame();return;
   }
   if(answer.startsWith('raise-')&&bet.type==='envido'){
-    if(!canRaiseEnvido(bet))return;
-    const kind=answer.slice(6),value=envidoBetPoints(room,kind,bet.stake);
+    const kind=answer.slice(6);if(!envidoRaiseKinds(bet).includes(kind))return;
+    const value=envidoBetPoints(room,kind,bet.stake);
     room.pendingBet={...bet,caller:player,responder:bet.caller,accepted:bet.stake,stake:value,called:kind,calls:[...(bet.calls||[bet.called||'envido']),kind],reveals:{}};queueLearningAction(answer);localFeed(`${room.players[player].name} canta ${kind==='falta'?'falta envido':kind==='real'?'real envido':'envido'}.`);renderGame();return;
   }
   if(bet.type==='flor'&&(answer==='raise-conflor'||answer==='raise-faltaflor')){
@@ -485,14 +507,7 @@ function foldHandChanges(room,loser){
   const points=unopened?(earlyFlor?4:2):Number(room.trucoLevel)||1;
   const message=(room.players?.[loser]?.name||'El jugador')+' se fue al mazo. '+(room.players?.[winner]?.name||'El rival')+(earlyFlor?' canta FLOR y suma 4 puntos (3 de flor y 1 de la mano).':unopened?' suma 2 puntos por irse al mazo antes de jugar o cantar.':' gana la mano y suma '+points+' '+(points===1?'tanto.':'tantos.'));
   const bet=room.pendingBet,sideChanges=earlyFlor?{flors:{[winner]:florValue(winnerCards,room.muestra)},florSettled:true,envidoClosed:true}:{};
-  if(bet&&['envido','flor'].includes(bet.type)){
-    const sidePoints=bet.revealMode?Number(bet.stake)||0:bet.type==='flor'?declinedFlorPoints(bet):Number(bet.accepted)||1;
-    const scores={...room.scores};
-    scores[winner]=(Number(scores[winner])||0)+sidePoints;
-    sideChanges.scores=capScores(room,scores);
-    sideChanges.envidoClosed=true;
-    if(bet.type==='flor')sideChanges.florSettled=true;
-  }
+  if(bet&&['envido','flor'].includes(bet.type))Object.assign(sideChanges,pendingSideAward(room,winner)||{envidoClosed:true});
   const notice={kind:'fold',id:crypto.randomUUID(),from:loser,to:winner,text:(room.players?.[loser]?.name||'El rival')+' se fue al mazo.',spoken:'Me voy al mazo',time:Date.now(),handNumber:room.handNumber||1};
   if(earlyFlor)Object.assign(notice,{kind:'flor',from:winner,to:loser,text:(room.players?.[winner]?.name||'El rival')+' canta FLOR.',spoken:'Flor',selfVerb:'Cantaste'});
   return {...sideChanges,callNotice:notice,turn:null,turnClock:null,pendingBet:null,pendingNextHand:{id:'fold:'+crypto.randomUUID(),winner,foldPoints:points,message,endsAt:gameTime()+3000},feed:topFeed(room,message)};
@@ -501,10 +516,11 @@ function foldWithFlor(room,loser,sung){
   const winner=otherPlayer(loser),loserName=room.players?.[loser]?.name||'El jugador',winnerName=room.players?.[winner]?.name||'El rival';
   const bet=room.pendingBet,hand=Number(room.trucoLevel)||1;
   // A truco waiting for an answer is lost at the level already accepted; a flor call from the rival is kept.
-  const points=hand+(sung.rivalFlor?(bet?.type==='flor'?declinedFlorPoints(bet):3):0);
+  const flor=sung.rivalFlor?(bet?.type==='flor'?declinedFlorPoints(bet):3):0,points=hand+flor;
+  const florScore=flor?sideScore({...room,...sung.changes},winner,flor,ptsText(flor)+' por flor'):{};
   const message=loserName+' canta FLOR y se va al mazo. '+(sung.rivalFlor?winnerName+' también tiene flor: gana la flor y la mano y suma '+points+' tantos.':loserName+' suma 3 de flor. '+winnerName+' gana la mano y suma '+hand+' '+(hand===1?'tanto.':'tantos.'));
   const notice={kind:'fold',id:crypto.randomUUID(),from:loser,to:winner,text:loserName+' canta flor y se va al mazo.',spoken:'Flor y me voy al mazo',time:Date.now(),handNumber:room.handNumber||1};
-  return {...sung.changes,callNotice:notice,turn:null,turnClock:null,pendingBet:null,pendingNextHand:{id:'fold:'+crypto.randomUUID(),winner,foldPoints:points,message,endsAt:gameTime()+3000},feed:topFeed(room,message)};
+  return {...sung.changes,...florScore,callNotice:notice,turn:null,turnClock:null,pendingBet:null,pendingNextHand:{id:'fold:'+crypto.randomUUID(),winner,foldPoints:hand,message,endsAt:gameTime()+3000},feed:topFeed(room,message)};
 }
 function turnClockPlayer(room=state.room){
   if(room?.status==='timed-out')return room.turnTimeout?.loser||otherPlayer(room.turnTimeout?.winner);
@@ -535,8 +551,9 @@ function turnTimeoutChanges(room){
     // Out of time with an unsung flower: it is sung first, then the hand is lost.
     const sung=foldFlorChanges(room,loser,state.localHands?.[loser]||(loser===state.playerId?state.hand:[]),state.localHands?.[winner]||[]);
     const florPoints=sung?.rivalFlor?3:0,said=sung?': cantó flor, se va al mazo y':' y';
+    const side=florPoints?sideScore({...room,...sung.changes},winner,florPoints,'3 puntos por flor'):sung?null:pendingSideAward(room,winner);
     const notice=sung?{kind:'fold',id:crypto.randomUUID(),from:loser,to:winner,text:name+' canta flor y se va al mazo.',spoken:'Flor y me voy al mazo',time:Date.now(),handNumber:room.handNumber||1}:null;
-    return {timeoutCounts,...(sung?{...sung.changes,callNotice:notice}:{}),status:'timed-out',turn:null,turnClock:null,pendingBet:null,turnTimeout:{winner,loser,florPoints,message:name+' agotó su tiempo'+said+' pierde la mano ('+timeoutCounts[loser]+' de 3 faltas por inactividad).'}};
+    return {timeoutCounts,...(sung?{...sung.changes,callNotice:notice}:{}),...(side||{}),status:'timed-out',turn:null,turnClock:null,pendingBet:null,turnTimeout:{winner,loser,florPoints:0,message:name+' agotó su tiempo'+said+' pierde la mano ('+timeoutCounts[loser]+' de 3 faltas por inactividad).'}};
   }
   const message=name+' agotó los 45 segundos por tercera vez y pierde la partida. '+(room.players?.[winner]?.name||'El rival')+' gana por inactividad.';
   return {timeoutCounts,status:'complete',turn:null,turnClock:null,turnTimeout:null,
@@ -562,7 +579,10 @@ function advance(){const room=state.room;
  clock();return save();
 }
 function action(player,command){
+ // A command answers the hand the player saw: if the clock ran out first and a new hand was dealt, it is refused.
+ const handBefore=state.room.handNumber;
  state.playerId=player;state.hand=localHand(player);advance();const room=state.room;
+ if(command?.kind!=='draw'&&handBefore!=null&&room.handNumber!==handBefore)throw new Error('Se terminó el tiempo de esa mano.');
  if(!['player1','player2'].includes(player))throw new Error('Invalid player.');
  if(command.kind==='draw'){
   if(room.status!=='drawing'||room.openingDraw.cards[player])throw new Error('El sorteo ya cambió.');

@@ -15,7 +15,7 @@ const byStrength=m=>(a,b)=>strength(a,m)-strength(b,m);
 const prefer=(ok,yes,no)=>ok?[yes,no]:[no,yes];
 
 function teamTantos(s,p){const r=s.room;return Math.max(...[p,partnerOf(p)].filter(q=>!r.folded?.[q]).map(q=>s.truth?.[q]??0));}
-const canOpenEnvido=(r,p)=>r.trickNo===1&&!r.envidoClosed&&(r.playedBy?.[p]||0)===0;
+const canOpenEnvido=(r,p)=>r.trickNo===1&&!r.envidoClosed&&!(Number(r.trucoLevel)>1)&&(r.playedBy?.[p]||0)===0;
 // The pie, the team's last player from the mano, is the one who sings envido.
 const isPie=(r,p)=>ordered(r.mano).filter(q=>team(q)===team(p)&&!r.folded?.[q]).at(-1)===p;
 const owesFlor=(s,p)=>!s.room.florClosed&&(s.room.playedBy?.[p]||0)===0&&s.room.flors?.[p]==null&&flower(s.originals?.[p]||[],s.room.muestra);
@@ -114,9 +114,11 @@ function rankedCards(s,p,random){
 }
 
 function declarations(s,p){
- const r=s.room,b=r.pendingBet,best=Object.values(b.reveals||{}).reduce((n,v)=>Math.max(n,v),-1);
+ const r=s.room,b=r.pendingBet,order=b.order||[];
  const truth=b.type==='flor'?florValue(s.originals[p],r.muestra):s.truth[p];
- return prefer(best<0||truth>best,{kind:'declare',value:truth,good:false},{kind:'declare',value:0,good:true});
+ // A tie is won by the earlier seat from the mano.
+ const lead=order.filter(q=>(b.reveals?.[q]??-1)>=0).reduce((a,q)=>!a||b.reveals[q]>b.reveals[a]?q:a,null);
+ return prefer(!lead||truth>b.reveals[lead]||(truth===b.reveals[lead]&&order.indexOf(p)<order.indexOf(lead)),{kind:'declare',value:truth,good:false},{kind:'declare',value:0,good:true});
 }
 
 // Envido and flor thresholds: the 1v1 "difícil" bot's plus 3, since a team table plays more reserved.

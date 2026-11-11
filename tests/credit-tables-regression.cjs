@@ -95,7 +95,7 @@ test('Leaving during winner evidence cannot reverse an already decided match',()
 test('Flor over envido cancels the bet and pays three without requiring TIENE, restoring suspended truco',()=>{
  for(const suspended of [false,true]){
   const s=fixture();s.hands.player2=[card('♥',1),card('♥',3),card('♥',7)];s.originals=structuredClone(s.hands);
-  if(suspended)createReferee(s,{now:150}).action('player2',{kind:'call',value:'truco'});
+  if(suspended){s.room.turn='player2';createReferee(s,{now:150}).action('player2',{kind:'call',value:'truco'});}
   createReferee(s,{now:200}).action('player1',{kind:'call',value:'envido'});
   createReferee(s,{now:300}).action('player2',{kind:'call',value:'flor'});
   assert.equal(s.room.scores.player2,3);assert.equal(s.room.scores.player1,0);assert.equal(s.room.florSettled,true);assert.equal(s.room.envidoClosed,true);
@@ -106,9 +106,9 @@ test('Flor over envido cancels the bet and pays three without requiring TIENE, r
 
 test('Incorrect envido declarations forfeit envido and accepted truco; first fault loses if both err',()=>{
  for(const [first,second,winner] of [[29,30,'player2'],[27,28,'player2'],[28,29,'player1'],[28,28,'player1']]){
-  const s=fixture();s.room.trucoLevel=3;
+  const s=fixture();
   createReferee(s,{now:200}).action('player1',{kind:'call',value:'envido'});
-  createReferee(s,{now:300}).action('player2',{kind:'call',value:'yes'});
+  createReferee(s,{now:300}).action('player2',{kind:'call',value:'yes'});s.room.trucoLevel=3;
   createReferee(s,{now:400}).action('player1',{kind:'declare',value:first});
   createReferee(s,{now:500}).action('player2',{kind:'declare',value:second});
   createReferee(s,{now:600}).action('player2',{kind:'fold'});
@@ -127,9 +127,9 @@ test('Son buenas reveals only the player who declared a number',()=>{
 });
 
 test('Incorrect falta envido forfeits the hand as well and caps the total at the match target',()=>{
- const s=fixture();s.room.trucoLevel=3;
+ const s=fixture();
  createReferee(s,{now:200}).action('player1',{kind:'call',value:'falta'});
- createReferee(s,{now:300}).action('player2',{kind:'call',value:'yes'});
+ createReferee(s,{now:300}).action('player2',{kind:'call',value:'yes'});s.room.trucoLevel=3;
  createReferee(s,{now:400}).action('player1',{kind:'declare',value:29});
  createReferee(s,{now:500}).action('player2',{kind:'declare',good:true});createReferee(s,{now:3600}).advance();
  assert.equal(s.room.scores.player1,0);assert.equal(s.room.scores.player2,10);
@@ -211,4 +211,60 @@ test('An envido that does not decide the match lets the hand go on',()=>{
  createReferee(s,{now:400}).action('player1',{kind:'declare',value:28});
  createReferee(s,{now:500}).action('player2',{kind:'declare',good:true});
  assert.ok(!s.room.pendingNextHand);assert.equal(s.room.turn,'player1');assert.equal(s.room.status,'started');
+});
+
+test('A command that arrives after the clock ran out is refused instead of acting on the next hand',()=>{
+ const s=fixture();createReferee(s,{now:100}).advance();
+ assert.throws(()=>createReferee(s,{now:100+45001}).action('player1',{kind:'call',value:'truco'}));
+ assert.equal(s.room.scores.player2,1);assert.equal(s.room.scores.player1,0);
+ assert.notEqual(s.room.pendingBet?.type,'truco');
+});
+
+test('Running out of time with an envido open pays what going to the deck pays, with its own history line',()=>{
+ const s=fixture();
+ createReferee(s,{now:200}).action('player1',{kind:'call',value:'envido'});
+ createReferee(s,{now:300}).action('player2',{kind:'call',value:'raise-real'});
+ createReferee(s,{now:300+45001}).advance();
+ // Envido (2) was accepted by raising; the real envido is left unanswered: 2 points plus the hand.
+ assert.equal(s.room.scores.player2,3);
+ const lines=Object.values(s.room.handScoreHistory||{}).flatMap(h=>h.entries||[]).map(e=>e.detail);
+ assert.ok(lines.includes('2 puntos por real envido no querido'),lines.join(' | '));
+});
+
+test('Envido rules: two envidos at most, real envido once and no envido after it, nothing after falta',()=>{
+ const s=fixture();
+ createReferee(s,{now:200}).action('player1',{kind:'call',value:'envido'});
+ createReferee(s,{now:300}).action('player2',{kind:'call',value:'raise-envido'});
+ createReferee(s,{now:400}).action('player1',{kind:'call',value:'raise-envido'});
+ assert.deepEqual(s.room.pendingBet.calls,['envido','envido']);assert.equal(s.room.pendingBet.stake,4);
+ createReferee(s,{now:500}).action('player1',{kind:'call',value:'raise-real'});
+ assert.deepEqual(s.room.pendingBet.calls,['envido','envido','real']);assert.equal(s.room.pendingBet.stake,7);
+ createReferee(s,{now:600}).action('player2',{kind:'call',value:'raise-real'});
+ createReferee(s,{now:600}).action('player2',{kind:'call',value:'raise-envido'});
+ assert.equal(s.room.pendingBet.calls.length,3);
+ createReferee(s,{now:700}).action('player2',{kind:'call',value:'no'});
+ assert.equal(s.room.scores.player1,4);
+ for(const [calls,declined] of [[['envido'],1],[['envido','envido'],2],[['envido','real'],2],[['real'],1]]){
+  const t=fixture();
+  createReferee(t,{now:200}).action('player1',{kind:'call',value:calls[0]});
+  calls.slice(1).forEach((kind,i)=>createReferee(t,{now:300+i}).action(i%2?'player1':'player2',{kind:'call',value:'raise-'+kind}));
+  const answer=calls.length%2?'player2':'player1';
+  createReferee(t,{now:400}).action(answer,{kind:'call',value:'no'});
+  assert.equal(t.room.scores[answer==='player2'?'player1':'player2'],declined,calls.join('+'));
+ }
+});
+
+test('Once a truco is accepted there is no envido; an unanswered truco still allows it',()=>{
+ const s=fixture();
+ createReferee(s,{now:200}).action('player1',{kind:'call',value:'truco'});
+ createReferee(s,{now:300}).action('player2',{kind:'call',value:'envido'});
+ assert.equal(s.room.pendingBet.type,'envido');
+ const t=fixture();
+ createReferee(t,{now:200}).action('player1',{kind:'call',value:'truco'});
+ createReferee(t,{now:300}).action('player2',{kind:'call',value:'yes'});
+ assert.throws(()=>createReferee(t,{now:400}).action('player1',{kind:'call',value:'envido'}));
+ const u=fixture();
+ createReferee(u,{now:200}).action('player1',{kind:'call',value:'truco'});
+ createReferee(u,{now:300}).action('player2',{kind:'call',value:'raise'});
+ assert.throws(()=>createReferee(u,{now:400}).action('player1',{kind:'call',value:'envido'}));
 });

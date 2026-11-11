@@ -196,7 +196,9 @@ export function installProfiles({$,document,services,getState,toast,onChange=()=
  // Going up a level: congratulations and a way to the level details (once per level and device).
  function celebrate(previous,level){
   $('level-up-number').textContent=String(level);
-  if(!document.querySelector('dialog[open]'))$('level-up-dialog').showModal();
+  // Waits for any other notice to close, so the congratulations are never lost.
+  const show=()=>{if($('level-up-dialog').open)return;if(document.querySelector('dialog[open]')){setTimeout(show,1500);return;}$('level-up-dialog').showModal();};
+  show();
  }
  function seenLevel(uid,level){
   const key='truco-level-seen-'+uid;let previous=null;

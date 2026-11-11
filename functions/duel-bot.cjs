@@ -24,7 +24,7 @@ function power(s,p){
 }
 const hasFlower=(s,p)=>flower(s.originals?.[p]||s.hands?.[p]||[],s.room.muestra);
 const tantos=(s,p)=>Number(s.truth?.[p])||0;
-const firstRound=(r,p)=>Number(r.trickNo||1)===1&&!(r.trickCards||[]).some(c=>c.playerId===p)&&!r.envidoClosed;
+const firstRound=(r,p)=>Number(r.trickNo||1)===1&&!(r.trickCards||[]).some(c=>c.playerId===p)&&!r.envidoClosed&&!(Number(r.trucoLevel)>1);
 
 // Cards in the order the bot prefers to play them.
 function cardOrder(s,p){

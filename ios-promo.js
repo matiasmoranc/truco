@@ -58,8 +58,9 @@ export function installIosPromo({document=globalThis.document,storage=globalThis
  // After the loading screen, and never on top of another notice.
  let tries=0;
  const open=()=>{
-  const busy=!document.getElementById('startup-loading')?.hidden||document.querySelector('dialog[open]');
-  if(busy&&++tries<40){setTimeout(open,750);return;}
+  // Also never during a game: it waits until the player is back out of the table.
+  const busy=!document.getElementById('startup-loading')?.hidden||document.querySelector('dialog[open]')||document.getElementById('game-view')?.classList.contains('active');
+  if(busy){if(++tries<2400)setTimeout(open,750);return;}
   if(!dialog.open)dialog.showModal();
  };
  setTimeout(open,1200);
