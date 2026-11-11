@@ -537,6 +537,9 @@ function renderMetrics(){
  renderHours();
  const byDay=new Map(metrics.days.map(d=>[d.day,d.users]));
  columns($('day-chart'),Array.from({length:30},(_,i)=>{const day=new Date(Date.parse(metrics.today+'T12:00:00Z')-(29-i)*86400000).toISOString().slice(0,10);return {label:shortDay(day),value:byDay.get(day)||0,tooltip:shortDay(day)+' · '+(byDay.get(day)||0)+' jugadores únicos',onClick:()=>goVisits({day})};}),{labelEvery:3});
+ // Sign-ups per day; a day opens who registered.
+ const signupsByDay=metrics.registrations||{};
+ columns($('signup-day-chart'),Array.from({length:30},(_,i)=>{const day=new Date(Date.parse(metrics.today+'T12:00:00Z')-(29-i)*86400000).toISOString().slice(0,10),n=(signupsByDay[day]||[]).length;return {label:shortDay(day),value:n,tooltip:shortDay(day)+' · '+n+' registrados',onClick:()=>{goVisits({day});openSignupDetail(day);}};}),{labelEvery:3});
  renderVisits();renderUsers();
 }
 for(const id of ['visit-range','visit-measure','visit-from','visit-to'])$(id).addEventListener('change',renderVisits);
