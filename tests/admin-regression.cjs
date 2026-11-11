@@ -94,6 +94,8 @@ test('A table waiting for a rival is listed as active although it has not starte
  assert.equal(adminTableListed({status:'waiting'},false,false),false);
  assert.equal(adminTableListed({status:'refunded'},false,false),false);
  assert.equal(adminTableListed({status:'settled'},false,true),true);
+ // A 2v2 table filled with bots is in play, although the credit records never marked it as started.
+ assert.equal(adminTableListed({status:'reserved'},true,false),true);
 });
 test('Admin current tables exclude settled games, expired waiting tables and completed rooms',()=>{
  const now=600001;

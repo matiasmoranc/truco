@@ -77,8 +77,9 @@ function adminTableCurrent(match,now){
  return match.status==='reserved'&&!['complete','closed'].includes(match.session?.room?.status);
 }
 module.exports.adminTableCurrent=adminTableCurrent;
-// The admin lists matches that were played, plus the tables still open waiting for a rival (they never started).
-function adminTableListed(match,current,started){return started||(current&&match?.status==='waiting');}
+// The admin lists matches that were played, plus every table still open: waiting for a rival, or in play
+// although the credit records never saw it start (a 2v2 table filled with bots starts with the opening draw).
+function adminTableListed(match,current,started){return !!(started||current);}
 module.exports.adminTableListed=adminTableListed;
 function closeLegacyTable(root,{code,actor,requestId,reason,now}){
  if(!validKey(code)||!validKey(actor)||!validKey(requestId)||typeof reason!=='string'||reason.trim().length<3||reason.length>200)throw new Error('Mesa o motivo inválido.');
