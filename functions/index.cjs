@@ -337,7 +337,7 @@ exports.adminConsole=onCall({...options,secrets:[liveInternalSecret]},async requ
   }else page=await getAuth().listUsers(100,data.pageToken||undefined);
   const ledger=await creditStore.readLedger(),finished=finishedTables(ledger),wins=pastWins(ledger),played=lastPlayed(ledger);
   const users=await Promise.all(page.users.filter(u=>!u.providerData.every(p=>!['google.com','apple.com','password'].includes(p.providerId))).map(async u=>{
-   const [profile,wallet,points]=await Promise.all([db.ref('profiles/'+u.uid).get(),creditStore.wallet(u.uid).then(value=>({val:()=>value})),db.ref('levels/'+u.uid+'/points').get()]);
+   const [profile,wallet,points]=await Promise.all([db.ref('profiles/'+u.uid).get(),Promise.resolve({val:()=>ledger.wallets?.[u.uid]??null}),db.ref('levels/'+u.uid+'/points').get()]);
    return {uid:u.uid,email:u.email||'',name:profile.val()?.name||'',disabled:u.disabled,createdAt:u.metadata.creationTime,balance:wallet.val()?.balance??0,locked:wallet.val()?.locked??0,points:Number(points.val())||0,finished:finished[u.uid]||0,wins:wins[u.uid]||0,lastPlayedAt:played[u.uid]||null,lastSeenAt:u.metadata.lastRefreshTime||u.metadata.lastSignInTime||null};
   }));
   return {users,pageToken:page.pageToken||null};
