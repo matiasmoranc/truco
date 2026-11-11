@@ -248,8 +248,11 @@ exports.adminConsole=onCall({...options,secrets:[liveInternalSecret]},async requ
   const visitCounters=include?mergeVisitCounters(visits.val()||{},testVisits.val()||{}):visits.val()||{};
   // Who signed up each day of the visits window, with their game name.
   const windowStart=Date.parse(visitStart+'T03:00:00Z'),recent=signups.filter(s=>s.at>=windowStart&&(include||!testUids.includes(s.uid)));
+  // The platform a player signed up on: their first visit with the account (or the last one before it).
+  const visitsByUid={};for(const list of Object.values(guestLog))for(const v of Object.values(list||{}))if(v?.uid&&v.platform&&Number.isFinite(v.at))(visitsByUid[v.uid]??=[]).push(v);
+  const signupPlatform=(uid,at)=>{const own=(visitsByUid[uid]||[]).sort((a,b)=>a.at-b.at);return (own.find(v=>v.at>=at-60000)||own.at(-1))?.platform||null;};
   const signupNames=await Promise.all(recent.map(s=>db.ref('profiles/'+s.uid+'/name').get()));
-  const registrations={};recent.forEach((s,i)=>{const day=uruguayDate(s.at).day;(registrations[day]??=[]).push({uid:s.uid,name:signupNames[i].val()||'',email:s.email,at:s.at});});
+  const registrations={};recent.forEach((s,i)=>{const day=uruguayDate(s.at).day;(registrations[day]??=[]).push({uid:s.uid,name:signupNames[i].val()||'',email:s.email,at:s.at,platform:signupPlatform(s.uid,s.at)});});
   for(const list of Object.values(registrations))list.sort((a,b)=>a.at-b.at);
   const record=(await db.ref('adminMetrics/concurrentRecord/'+(include?'all':'real')).get()).val()||null;
   return {registrations,concurrentRecord:record,...activitySummary({registeredUids:counted,now,concurrentKey:include?'all':'real',metrics:{...activity,startedAt:start.val()}}),visits:visitSummary({visits:visitCounters,guests:guestDays(guestLog,{includeTest:include}),users:userDays(guestLog,{exclude:include?null:new Set(testUids)}),now,days:VISIT_DAYS}),testUids,includeTest:include};

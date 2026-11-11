@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="es"><head><meta charset="utf-8">
-  <meta name="robots" content="noindex, nofollow"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Administración · Truco Uruguayo</title><link rel="stylesheet" href="admin.css?v=23"></head>
+  <meta name="robots" content="noindex, nofollow"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Administración · Truco Uruguayo</title><link rel="stylesheet" href="admin.css?v=24"></head>
 <body>
 <section id="access" class="access"><div class="access-card"><img src="assets/truco-v3.png" alt=""><small class="game-name">TRUCO URUGUAYO</small><h1>Administración</h1><select class="game-picker" aria-label="Juego"><option value="uy">Truco Uruguayo</option><option value="ar">Truco Argentino</option></select><p id="identity"></p><p id="access-status">Verificando sesión…</p><button id="login" class="primary" hidden>Continuar con Google</button><button id="switch-account" hidden>Usar otra cuenta</button><a href="./">Volver al juego</a></div></section>
 <div id="console" class="shell" hidden>
@@ -39,7 +39,7 @@
    </div>
    <article class="panel"><div class="panel-head"><h2>Jugadores con sesión por hora</h2><label>Día<select id="metric-day"></select></label></div><div id="hour-chart" class="bar-chart hours"></div></article>
    <article class="panel"><div class="panel-head"><h2>Jugadores únicos · últimos 30 días</h2></div><div id="day-chart" class="bar-chart"></div></article>
-   <article class="panel"><div class="panel-head"><h2>Usuarios registrados · últimos 30 días</h2></div><div id="signup-day-chart" class="bar-chart"></div></article>
+   <article class="panel"><div class="panel-head"><h2>Usuarios registrados · últimos 30 días</h2><div class="legend" data-legend></div></div><div id="signup-day-chart" class="bar-chart stacked"></div></article>
   </section>
 
   <section id="visits" hidden>
@@ -113,4 +113,4 @@
  </main>
 </div>
 <dialog id="edit"><form id="edit-form"><div class="dialog-head"><h2 id="edit-title"></h2><button type="button" id="close" aria-label="Cerrar">×</button></div><p id="edit-description"></p><label id="value-label">Nuevo valor<input id="value" required></label><div id="level-fields" class="level-fields" hidden><label>Nivel<input id="level-value" type="number" min="1" max="200" step="1"></label><label>Puntos totales<input id="points-value" type="number" min="0" max="1000000" step="0.1"></label><small id="level-preview"></small></div><label id="delete-label" hidden>Escribí el nombre exacto para confirmar<input id="delete-confirm" autocomplete="off"></label><label>Motivo<input id="reason" required minlength="3" maxlength="200" placeholder="Por qué realizás este cambio"></label><p id="edit-error" role="alert"></p><div class="dialog-actions"><button id="cancel" type="button">Cancelar</button><button id="save" class="primary" type="submit">Confirmar cambio</button></div></form></dialog>
-<script type="module" src="admin.js?v=35"></script></body></html>
+<script type="module" src="admin.js?v=36"></script></body></html>

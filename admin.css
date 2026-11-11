@@ -2,7 +2,7 @@
 :root{color-scheme:dark;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
  --bg:#0b231b;--side:#0e2a20;--surface:#12332a;--surface-2:#173d32;--line:#ffffff14;--line-2:#ffffff22;
  --text:#eef2ea;--muted:#9db3a7;--gold:#e8c983;--green:#8fd19e;--red:#ff9b8f;
- --usage-page:#6fb7e8;--usage-game:#e8c983;--app-ios:#e8c983;--app-android:#8fd19e;--web-ios:#f0a35e;--web-android:#6fb7e8;--web-desktop:#b79ce8}
+ --usage-page:#6fb7e8;--usage-game:#e8c983;--app-ios:#e8c983;--app-android:#8fd19e;--web-ios:#f0a35e;--web-android:#6fb7e8;--web-desktop:#b79ce8;--unknown:#6b7f78}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--text);font-size:14px;min-height:100dvh}
 a{color:var(--gold)}p{line-height:1.5;color:var(--muted);margin:0 0 12px}

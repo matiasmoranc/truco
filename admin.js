@@ -539,7 +539,7 @@ function renderMetrics(){
  columns($('day-chart'),Array.from({length:30},(_,i)=>{const day=new Date(Date.parse(metrics.today+'T12:00:00Z')-(29-i)*86400000).toISOString().slice(0,10);return {label:shortDay(day),value:byDay.get(day)||0,tooltip:shortDay(day)+' · '+(byDay.get(day)||0)+' jugadores únicos',onClick:()=>goVisits({day})};}),{labelEvery:3});
  // Sign-ups per day; a day opens who registered.
  const signupsByDay=metrics.registrations||{};
- columns($('signup-day-chart'),Array.from({length:30},(_,i)=>{const day=new Date(Date.parse(metrics.today+'T12:00:00Z')-(29-i)*86400000).toISOString().slice(0,10),n=(signupsByDay[day]||[]).length;return {label:shortDay(day),value:n,tooltip:shortDay(day)+' · '+n+' registrados',onClick:()=>{goVisits({day});openSignupDetail(day);}};}),{labelEvery:3});
+ columns($('signup-day-chart'),Array.from({length:30},(_,i)=>{const day=new Date(Date.parse(metrics.today+'T12:00:00Z')-(29-i)*86400000).toISOString().slice(0,10),list=signupsByDay[day]||[],n=list.length,counts={};for(const u of list){const k=PLATFORM_LABELS[u.platform]?u.platform:'unknown';counts[k]=(counts[k]||0)+1;}return {label:shortDay(day),value:n,segments:[...platformSegments(counts),{key:'unknown',value:counts.unknown||0}],tooltip:platformTooltip(day,counts,'registrados')+(counts.unknown?'\nSin dato: '+counts.unknown:''),onClick:()=>{goVisits({day});openSignupDetail(day);}};}),{labelEvery:3});
  renderVisits();renderUsers();
 }
 for(const id of ['visit-range','visit-measure','visit-from','visit-to'])$(id).addEventListener('change',renderVisits);
