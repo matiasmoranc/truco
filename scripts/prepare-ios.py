@@ -23,7 +23,7 @@ info = plistlib.loads(info_path.read_bytes())
 info["CFBundleURLTypes"] = [{"CFBundleURLSchemes": [firebase["REVERSED_CLIENT_ID"]]}]
 # Use a unique increasing number for each build of this Codemagic application.
 info["CFBundleVersion"] = str(int(os.environ.get("PROJECT_BUILD_NUMBER", "1")))
-info["CFBundleShortVersionString"] = "1.0.4"
+info["CFBundleShortVersionString"] = "1.0.5"
 # The app is in Spanish: the App Store lists the languages declared by the binary.
 info["CFBundleDevelopmentRegion"] = "es"
 info["CFBundleLocalizations"] = ["es"]
