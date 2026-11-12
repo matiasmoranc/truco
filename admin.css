@@ -233,3 +233,13 @@ textarea:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 .funnel .pbar{grid-template-columns:minmax(0,170px) minmax(0,1fr) 72px}
 .toolbar .usage-date-field{min-width:150px}
 #usage .data-table th:nth-child(2),#usage .data-table td:nth-child(2){text-align:left}
+
+.chat-search{flex:1;min-width:200px}.chat-search input{width:100%}
+.chat-log{display:grid;gap:6px;margin-top:12px}
+.chat-day{font-size:13px;color:var(--muted);font-weight:600;margin:14px 0 4px}.chat-day::first-letter{text-transform:uppercase}.chat-day:first-child{margin-top:0}
+.chat-row{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 14px;min-width:0}
+.chat-row-head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+.chat-row-head time{font-variant-numeric:tabular-nums}
+.chat-who{background:none;border:0;padding:0;min-height:0;color:var(--gold);font-weight:700;font-size:14px;cursor:pointer}.chat-who:hover{text-decoration:underline}
+.chat-row-head small{margin-left:auto}
+.chat-text{margin:6px 0 0;font-size:15px;overflow-wrap:anywhere;white-space:pre-wrap}

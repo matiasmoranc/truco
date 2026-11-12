@@ -47,7 +47,7 @@ async function setTestUser(u,test){
 const number=value=>new Intl.NumberFormat('es-UY').format(Number(value)||0);
 const PLATFORM_LABELS={'app-ios':'App iPhone','app-android':'App Android','web-ios':'Web iPhone','web-android':'Web Android','web-desktop':'Web computadora'};
 const PAGE_LABELS={juego:'Juego',anotador:'Anotador',aprender:'Aprender a jugar',otra:'Reglas y otras'};
-const TAB_TITLES={metrics:'Resumen',visits:'Visitas',usage:'Anotador y Aprender',users:'Usuarios',tables:'Mesas y partidas',reports:'Problemas reportados',messages:'Mensajes a jugadores',audit:'Historial de cambios'};
+const TAB_TITLES={metrics:'Resumen',visits:'Visitas',usage:'Anotador y Aprender',users:'Usuarios',tables:'Mesas y partidas',reports:'Problemas reportados',messages:'Mensajes a jugadores',chat:'Chat de las mesas',audit:'Historial de cambios'};
 function errorText(e){return e.code==='functions/not-found'?'Falta publicar las funciones de administración en Firebase.':e.message||'No se pudo completar el cambio.';}
 const AUDIT_LABELS={level:'Cambio de nivel y puntos',rename:'Cambio de nombre',block:'Bloqueo',delete:'Eliminación de cuenta',credits:'Créditos','close-table':'Cierre de mesa','close-legacy-table':'Cierre de mesa','repair-reservation':'Reparación de reserva'};
 function node(tag,text,className){const el=document.createElement(tag);el.textContent=text;if(className)el.className=className;return el;}
@@ -250,8 +250,8 @@ $('table-state').addEventListener('change',renderTables);
 $('search').addEventListener('input',renderUsers);
 // Tapping a column header orders by it; tapping it again flips the order.
 for(const button of document.querySelectorAll('[data-sort]'))button.onclick=()=>{const key=button.dataset.sort;sortBy=sortBy.key===key?{key,dir:-sortBy.dir}:{key,dir:key==='name'?1:-1};renderUsers();};$('photo-filter').onchange=$('level-filter').onchange=renderUsers;$('more').onclick=()=>refresh(true);
-function showTab(name){for(const section of Object.keys(TAB_TITLES))$(section).hidden=section!==name;for(const tab of document.querySelectorAll('[data-tab]'))tab.classList.toggle('active',tab.dataset.tab===name);$('page-title').textContent=TAB_TITLES[name];if(name==='usage')refreshUsage();}
-$('refresh').onclick=()=>{refresh(false,true);if(!$('usage').hidden)refreshUsage();};
+function showTab(name){for(const section of Object.keys(TAB_TITLES))$(section).hidden=section!==name;for(const tab of document.querySelectorAll('[data-tab]'))tab.classList.toggle('active',tab.dataset.tab===name);$('page-title').textContent=TAB_TITLES[name];if(name==='usage')refreshUsage();if(name==='chat')loadChat();}
+$('refresh').onclick=()=>{refresh(false,true);if(!$('usage').hidden)refreshUsage();if(!$('chat').hidden)loadChat();};
 for(const b of document.querySelectorAll('[data-tab]'))b.onclick=()=>showTab(b.dataset.tab);
 async function showUsers(scope){if(busy)return;userScope=scope;pagesLoaded=1;pageToken=null;users=[];$('search').value='';$('user-scope').value=scope;renderUsers();showTab('users');await refresh();}
 for(const b of document.querySelectorAll('[data-scope]'))b.onclick=()=>showUsers(b.dataset.scope);
@@ -563,6 +563,29 @@ function peopleList(){
  for(const u of users.filter(u=>u.name))list.append(Object.assign(document.createElement('option'),{value:u.name}));
 }
 function writeTo(u){showTab('messages');$('message-to').value=u.name||'';$('message-text').focus();}
+// Typed table chat (quick messages are not stored), newest first, grouped by day.
+let chatLog=[],chatRequest=0;
+async function loadChat(){
+ const request=++chatRequest;$('chat-summary').textContent='Cargando…';
+ try{const data=(await call({action:'chat-log',days:Number($('chat-days').value)})).data;if(request!==chatRequest)return;chatLog=data.messages||[];renderChat();}
+ catch(e){if(request===chatRequest){chatLog=[];$('chat-list').replaceChildren();$('chat-summary').textContent='No se pudo cargar el chat'+(GAME==='ar'?' (este juego todavía no lo guarda).':'.');}}
+}
+function renderChat(){
+ const query=$('chat-search').value.trim().toLocaleLowerCase(),list=chatLog.filter(m=>!query||[m.name,m.code,m.text].some(v=>String(v||'').toLocaleLowerCase().includes(query)));
+ const people=new Set(list.map(m=>m.uid)).size;
+ $('chat-summary').textContent=list.length?list.length+(list.length===1?' mensaje':' mensajes')+' de '+people+(people===1?' jugador':' jugadores')+(query?' que coinciden con la búsqueda':''):(query?'Ningún mensaje coincide con la búsqueda.':'Todavía no hay mensajes escritos en este período.');
+ const box=$('chat-list');box.replaceChildren();let day='';
+ for(const m of list){
+  const when=new Date(m.at),label=when.toLocaleDateString('es-UY',{timeZone:ZONE,weekday:'long',day:'numeric',month:'long'});
+  if(label!==day){day=label;box.append(node('h3',label,'chat-day'));}
+  const row=node('div','','chat-row'),head=node('div','','chat-row-head'),who=node('button',m.name||'Sin nombre','chat-who');
+  who.type='button';who.title='Ver a este jugador en Usuarios';who.onclick=()=>{$('search').value=m.name||m.uid;showTab('users');renderUsers();};
+  head.append(node('time',when.toLocaleTimeString('es-UY',{timeZone:ZONE,hour:'2-digit',minute:'2-digit'})),who,node('small','Mesa '+(m.code||'?')+(m.mode==='2v2'?' · 2 vs 2':'')));
+  row.append(head,node('p',m.text,'chat-text'));box.append(row);
+ }
+}
+$('chat-days').addEventListener('change',loadChat);
+$('chat-search').addEventListener('input',renderChat);
 async function loadMessages(){
  try{threads=(await call({action:'messages'})).data.threads||[];}catch(e){return;}
  const unread=threads.reduce((n,t)=>n+t.unread,0);$('messages-count').hidden=!unread;$('messages-count').textContent=unread||'';

@@ -7,6 +7,7 @@ import {createDatabase,createDevDatabase,verifyIdToken,playerIdentity,usersBlock
 import {createFirebaseBank} from './firebase-bank.js';
 import {lobbyStub,bankStub} from './routing.js';
 import {levelAwards} from '../../levels.js';
+import chatLog from '../../functions/chat-log.cjs';
 
 const {passwordHash}=tableService;
 const CLEANUP_MS=30*60*1000;
@@ -127,9 +128,19 @@ export class TableRoom extends DurableObject{
     for(let a=0;a<people.length;a++)for(let b=a+1;b<people.length;b++)if(await usersBlockEachOther(this.db,people[a].uid,people[b].uid))throw new Error('No pueden iniciar una revancha porque hay jugadores bloqueados.');
    }
    await this.engine.act(uid,{command,requestId,expectedMatchId});
+   if(command.kind==='chat')this.logChat(uid,command.text,requestId);
    await this.commit();return this.result(uid);
   }
   throw new Error('Mensaje desconocido.');
+ }
+
+ // A typed chat message is copied for the admin panel; a failure there never touches the table.
+ logChat(uid,text,id){
+  const m=this.engine.match,seat=Object.values(m?.players||{}).find(p=>p?.uid===uid);
+  const record=chatLog.chatLogRecord({at:Date.now(),code:this.code,uid,name:seat?.name,text,mode:m?.mode,id});
+  if(!record)return;
+  const saved=this.db.put(record.path,record.value).catch(error=>console.warn('chat log',error.message));
+  this.ctx.waitUntil?.(saved);
  }
 
  // Entry receipt: the caller gets its private hand with the room, so the table renders without another round trip.

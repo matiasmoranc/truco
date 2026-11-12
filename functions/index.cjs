@@ -233,6 +233,12 @@ exports.adminConsole=onCall({...options,secrets:[liveInternalSecret]},async requ
   for(const m of Object.values(ledger.matches||{}).filter(m=>Object.values(m.players||{}).some(p=>p.uid===data.uid)&&ledger.tables?.[m.code]===m.id))await publish(ledger,m.code);
   return {ok:true};
  }
+ if(action==='chat-log'){
+  const days=Math.min(CHAT_LOG_DAYS,Math.max(1,Math.floor(Number(data.days)||7)));
+  const from=chatDay(Date.now()-(days-1)*86400000);
+  const stored=(await db.ref('chatLog').orderByKey().startAt(from).get()).val()||{};
+  return {days,messages:chatLogList(stored)};
+ }
  if(action==='metrics'){
   const registeredUids=[],signups=[];let token;
   do{const page=await getAuth().listUsers(1000,token);const real=page.users.filter(u=>u.providerData.some(p=>['google.com','apple.com','password'].includes(p.providerId)));registeredUids.push(...real.map(u=>u.uid));for(const u of real)signups.push({uid:u.uid,email:u.email||'',at:Date.parse(u.metadata.creationTime)||0});token=page.pageToken;}while(token);
@@ -542,6 +548,8 @@ exports.activityCleanup=onSchedule({schedule:'every day 04:00',timeZone:'America
  const now=Date.now();
  // Table invitations and their answers older than a day are not useful anymore.
  for(const root of ['tableInvites','tableInviteReplies']){const all=(await db.ref(root).get()).val()||{},gone={};for(const [uid,list] of Object.entries(all))for(const [id,v] of Object.entries(list||{}))if(!(now-(v?.at||0)<86400000))gone[root+'/'+uid+'/'+id]=null;if(Object.keys(gone).length)await db.ref().update(gone);}
+ // Chat copies are kept for CHAT_LOG_DAYS.
+ {const old=(await db.ref('chatLog').orderByKey().endBefore(chatDay(now-(CHAT_LOG_DAYS-1)*86400000)).get()).val()||{},gone={};for(const day of Object.keys(old))gone['chatLog/'+day]=null;if(Object.keys(gone).length)await db.ref().update(gone);}
  await db.ref('adminMetrics').transaction(metrics=>{
   if(!metrics)return undefined;
   // Visits from the robots' known device that never signed in move to the test counters.
@@ -580,7 +588,15 @@ exports.playerConsole=onCall(options,async request=>{
  throw new HttpsError('invalid-argument','Acción inválida.');
 });
 const {onValueWritten,onValueCreated}=require('firebase-functions/v2/database');
+const {CHAT_LOG_DAYS,chatDay,chatLogRecord,chatLogList}=require('./chat-log.cjs');
 // A new player: the first time an account saves its username.
+// Tables kept in the database (older app versions) write chat there; a typed message is copied for the admin panel.
+exports.chatLogCopy=onValueCreated({ref:'/rooms/{code}/public/chatMessages/{id}',region:'us-central1',maxInstances:2},async event=>{
+ const message=event.data.val(),code=event.params.code;if(!message||typeof message.sender!=='string')return;
+ const room=(await db.ref('rooms/'+code+'/public').get()).val()||{},seat=room.players?.[message.sender]||{};
+ const record=chatLogRecord({at:Number.isFinite(message.at)?message.at:Date.now(),code,uid:seat.uid,name:seat.name,text:message.text,mode:room.mode,id:event.params.id});
+ if(record)await db.ref(record.path).set(record.value);
+});
 exports.newPlayerAlert=onValueCreated({ref:'/profiles/{uid}/name',region:'us-central1',maxInstances:2},async event=>{
  const name=event.data.val();if(typeof name!=='string'||!name)return;
  await alertAdmin('Nuevo jugador registrado',name+' se registró en Truco Uruguayo.',{kind:'signup'});
