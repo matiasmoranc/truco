@@ -48,8 +48,10 @@ export function installTablePeople({$,document,getState,profiles,friends,signedI
  function decorateTeamSeats(){
   const s=getState(),r=s.room;if(r?.mode!=='2v2')return;
   for(const seat of seatsOf(r)){
-   const box=$('team-seat-'+seat),label=box?.querySelector('.team-player-name');if(!label||label.querySelector('.team-seat-avatar'))continue;
-   const b=el('button','team-seat-avatar');b.type='button';b.innerHTML=profiles.avatarHtml(profileFor(seat),'player-avatar');
+   const box=$('team-seat-'+seat),label=box?.querySelector('.team-player-name');if(!label)continue;
+   const html=profiles.avatarHtml(profileFor(seat),'player-avatar'),old=label.querySelector('.team-seat-avatar');
+   if(old?.dataset.html===html)continue;old?.remove();
+   const b=el('button','team-seat-avatar');b.type='button';b.innerHTML=html;b.dataset.html=html;
    b.setAttribute('aria-label','Ver el perfil de '+nameOf(seat));b.addEventListener('click',()=>showCard(seat));
    label.prepend(b);label.classList.add('with-avatar');
   }

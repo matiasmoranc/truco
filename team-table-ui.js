@@ -155,7 +155,10 @@ export function installTeamTable({$,getState,command,runAction,renderPlayerHand,
    const backs=i===0?'':r.folded?.[q]?'<div class="team-folded-text">Se fue al mazo</div>':i===2?`<button class="team-backs team-partner-cards" type="button" aria-label="Ver cartas del compañero durante 3 segundos" aria-pressed="${faceUp}" ${count?'':'disabled'}>${fan}</button>`:`<div class="team-backs">${fan}</div>`;
    // Everyone who sang flor shows it beside their cards, you and your partner included.
    const flor=i!==0&&r.status==='started'&&r.flors?.[q]!=null?`<span class="team-flor flor-badge" role="img" aria-label="${safe(seatName(r,q,p)||'Jugador')} cantó flor">${FLOR_ICON}</span>`:'';
+   // The profile picture is kept across redraws (timers redraw too), so it never blinks or goes missing.
+   const avatar=el.querySelector('.team-seat-avatar');
    el.innerHTML=`${i===0?'':`<span class="team-player-name">${safe(seatName(r,q,p)||'Jugador')}</span>`}${backs}${flor}<div class="team-speech hidden"></div>`;
+   const label=el.querySelector('.team-player-name');if(avatar&&label){label.prepend(avatar);label.classList.add('with-avatar');}
    placeSeatFlor(el,positions[i]==='right');
    if(i===2&&flip&&!matchMedia('(prefers-reduced-motion: reduce)').matches)for(const card of el.querySelectorAll('.team-backs>i'))card.animate([{rotate:'y 90deg',opacity:.3,scale:'.94'},{rotate:'y 0deg',opacity:1,scale:'1'}],{duration:280,easing:'ease-out'});
    if(i===2)el.querySelector('.team-partner-cards').onclick=()=>{showPartner();render();};
@@ -233,6 +236,8 @@ export function renderWaitingSeats(room,viewer,safe){
  // Only the creator can fill an empty seat of a team table with a bot.
  const botButtons=teams&&me==='player1'&&room.status==='waiting';
  return seats.map((key,i)=>{const player=players[key],team=playerTeam(key)==='player1'?'1':'2';
-  return '<div class="waiting-player waiting-player-'+positions[i]+' '+(player?'occupied':'empty')+(player?.bot?' bot':'')+'"><span class="waiting-player-name">'+safe((player&&seatName(room,key,me))||'Lugar disponible')+'</span>'+'<div class="waiting-player-cards" aria-hidden="true">'+(player?[-1,0,1].map(n=>'<span class="opponent-card-back" style="--fan-index:'+n+'"></span>').join(''):'<span class="waiting-empty-place">+</span>')+'</div>'+(!player&&botButtons?'<button type="button" class="waiting-bot-button" data-add-bot="'+key+'">Usar bot</button>':'')+'</div>';
+  // Someone whose connection dropped is shown as such (after a while they lose the seat).
+  const seen=room.connectionPresence?.[key],away=!!(player?.uid&&!player.bot&&seen?.uid===player.uid&&seen.online===false);
+  return '<div class="waiting-player waiting-player-'+positions[i]+' '+(player?'occupied':'empty')+(player?.bot?' bot':'')+(away?' away':'')+'"><span class="waiting-player-name">'+safe((player&&seatName(room,key,me))||'Lugar disponible')+'</span>'+(away?'<span class="waiting-player-away">Reconectando…</span>':'')+'<div class="waiting-player-cards" aria-hidden="true">'+(player?[-1,0,1].map(n=>'<span class="opponent-card-back" style="--fan-index:'+n+'"></span>').join(''):'<span class="waiting-empty-place">+</span>')+'</div>'+(!player&&botButtons?'<button type="button" class="waiting-bot-button" data-add-bot="'+key+'">Usar bot</button>':'')+'</div>';
  }).join('');
 }

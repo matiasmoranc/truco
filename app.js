@@ -7,8 +7,8 @@ import { installActivity } from './activity.js?v=20261010-adminstats32';
 import { installCredits } from './credits.js?v=20261025-claim1';
 import { installAccount } from './account.js?v=20261110-noemail1';
 import { initializeGameAuth } from './auth-init.js?v=20261016-android-google';
-import {installTeamTable,TEAM_SEATS,playerTeam,positionDealerDeck,renderTeamLobbySeats,renderWaitingSeats} from './team-table-ui.js?v=20261111-fix1';
-import {installTablePeople} from './table-people.js?v=20261106-social3';
+import {installTeamTable,TEAM_SEATS,playerTeam,positionDealerDeck,renderTeamLobbySeats,renderWaitingSeats} from './team-table-ui.js?v=20261112-sala1';
+import {installTablePeople} from './table-people.js?v=20261112-sala1';
 import {createLiveTables,LiveError} from './live-tables.js?v=20261025-close1';
 import {installMatchPhoto} from './share-photo.js?v=20261027-photo2';
 import {installProfiles,SOUND_MESSAGES} from './profile-level.js?v=20261111-fix1';
@@ -1291,7 +1291,7 @@ function watchRoom() {
     state.room = incoming;
     if(incoming.status==='complete'||state.persistedRoomCreatedAt!==incoming.createdAt)rememberRoomSeat();
     syncRoomPresence();
-    if(state.room.status==='closed'||roomExpired(state.room)){if(roomExpired(state.room))closeExpiredRoom(state.roomCode);if(state.unsubscribe){state.unsubscribe();state.unsubscribe=null;}if(keepFinishedResult(state.room))return;const reason=state.room.closeReason;returnToLobby(state.cancelingWaitingRoom===state.roomCode||reason==='waiting-canceled'?'':reason==='match-left'?'La mesa terminó. Volviste al lobby.':reason==='draw-timeout'?'Se acabó el tiempo para elegir carta. La partida no comenzó.':['draw-left','draw-cancel'].includes(reason)?'Un participante salió del sorteo. La partida no comenzó.':'La mesa cerró por inactividad.');return;}
+    if(state.room.status==='closed'||roomExpired(state.room)){if(roomExpired(state.room))closeExpiredRoom(state.roomCode);if(state.unsubscribe){state.unsubscribe();state.unsubscribe=null;}if(keepFinishedResult(state.room))return;const reason=state.room.closeReason;returnToLobby(state.cancelingWaitingRoom===state.roomCode||reason==='waiting-canceled'?'':reason==='creator-left'?(state.playerId==='player1'?'':'Quien creó la sala se fue, así que la sala se cerró.'):reason==='waiting-expired'?'La sala se cerró porque pasaron 10 minutos sin completarse.':reason==='match-left'?'La mesa terminó. Volviste al lobby.':reason==='draw-timeout'?'Se acabó el tiempo para elegir carta. La partida no comenzó.':['draw-left','draw-cancel'].includes(reason)?'Un participante salió del sorteo. La partida no comenzó.':'La mesa cerró por inactividad.');return;}
     if(isCoordinator()&&state.room.status==='started'&&!state.room.resolvingTrick&&state.room.trickCards?.length===2&&(state.room.tricks||[]).length>0)recoverLegacyTrick(state.room);
     if(isCoordinator()&&state.room.status==='complete'&&!state.room.endReveal&&(Object.keys(state.room.flors||{}).length||state.room.envidoAudit)){
       const key=`${state.roomCode}:${state.room.handNumber}`;
@@ -1366,6 +1366,36 @@ function watchPrivateHand() {
     syncPrivateHand();if(state.room?.status!=='waiting')renderGame();
   },error=>{if(state.privateHandKey!==subscriptionKey)return;console.error('[truco:hand] subscription failed',error);toast(firebaseError(error),true);});
 }
+// Waiting-room chat (2 vs 2, online tables): a see-through panel that opens and closes over the room.
+// It also says who comes in and who leaves. The server keeps it in room.lobbyChat.
+const waitingChat={key:null,open:false,seen:new Set(),unread:0,sending:false};
+function waitingChatAvailable(){const r=state.room;return !!(r?.managedCredits&&r.mode==='2v2'&&r.status==='waiting'&&state.playerId&&r.players?.[state.playerId]?.uid===state.uid);}
+function renderWaitingChat(){
+  const on=waitingChatAvailable(),toggle=$('waiting-chat-toggle'),panel=$('waiting-chat');
+  toggle.classList.toggle('hidden',!on);if(!on){panel.classList.add('hidden');return;}
+  const key=state.roomCode+':'+(state.room.creditMatch?.id||'');
+  if(waitingChat.key!==key){Object.assign(waitingChat,{key,open:false,seen:new Set(Object.keys(state.room.lobbyChat||{})),unread:0,sending:false});$('waiting-chat-input').value='';$('waiting-chat-error').classList.add('hidden');}
+  const lines=Object.entries(state.room.lobbyChat||{}).filter(([,x])=>x&&typeof x.text==='string'&&Number.isFinite(x.at)).sort((x,y)=>x[1].at-y[1].at||x[0].localeCompare(y[0]));
+  for(const [id,x] of lines)if(!waitingChat.seen.has(id)){waitingChat.seen.add(id);if(!waitingChat.open&&x.sender!==state.playerId)waitingChat.unread++;}
+  const log=$('waiting-chat-log'),near=log.scrollHeight-log.scrollTop-log.clientHeight<24;
+  log.replaceChildren(...(lines.length?lines.map(([,x])=>{const row=document.createElement('p');
+    if(x.system){row.className='waiting-chat-line system';row.textContent=x.text;return row;}
+    row.className='waiting-chat-line'+(x.sender===state.playerId?' mine':'');const who=document.createElement('strong');who.textContent=(x.sender===state.playerId?'Vos':x.name||state.room.players?.[x.sender]?.name||'Jugador')+':';row.append(who,' '+x.text);return row;}):[Object.assign(document.createElement('p'),{className:'waiting-chat-line system',textContent:'Saludá mientras entran los demás 👋'})]));
+  if(near||waitingChat.open)log.scrollTop=log.scrollHeight;
+  panel.classList.toggle('hidden',!waitingChat.open);toggle.setAttribute('aria-expanded',String(waitingChat.open));toggle.classList.toggle('open',waitingChat.open);
+  $('waiting-chat-unread').textContent=waitingChat.unread>9?'9+':String(waitingChat.unread);$('waiting-chat-unread').classList.toggle('hidden',!waitingChat.unread||waitingChat.open);
+  $('waiting-chat-input').disabled=waitingChat.sending;
+}
+async function sendWaitingChat(event){
+  event.preventDefault();if(!waitingChatAvailable()||waitingChat.sending)return;
+  const input=$('waiting-chat-input'),text=input.value.trim(),error=$('waiting-chat-error');if(!text)return;
+  const reason=chatModeration?.blockedChatReason(text);
+  if(reason){error.textContent=reason==='threat'?'No se puede enviar una amenaza. Mantené el respeto en la mesa.':'No se pudo enviar el mensaje porque contiene lenguaje ofensivo. Mantené el respeto en la mesa.';error.classList.remove('hidden');return;}
+  waitingChat.sending=true;error.classList.add('hidden');renderWaitingChat();
+  try{await creditCommand({kind:'chat',text});input.value='';}
+  catch(e){error.textContent=e?.message||'No se pudo enviar el mensaje.';error.classList.remove('hidden');}
+  finally{waitingChat.sending=false;renderWaitingChat();if(waitingChat.open)input.focus();}
+}
 function renderWaiting() {
   if (!state.room) return;
   updateInvitation();
@@ -1378,6 +1408,7 @@ function renderWaiting() {
   if($('seats').dataset.html!==seatsHtml){$('seats').innerHTML=seatsHtml;$('seats').dataset.html=seatsHtml;}
   if(ready&&isCoordinator()&&!state.room.managedCredits)startGame().catch(error=>toast(firebaseError(error),true));
   $('game-room-code').textContent = 'MESA ABIERTA';
+  renderWaitingChat();
 }
 function shuffleDeck() {
   const suits = [{name:'oro',symbol:'♦',red:true},{name:'copa',symbol:'♥',red:true},{name:'espada',symbol:'♠',red:false},{name:'basto',symbol:'♣',red:false}];
@@ -3859,6 +3890,8 @@ $('open-room-list').addEventListener('click',(event)=>{const button=event.target
 $('back-home').addEventListener('click',()=>{showView('welcome-view');openLobby();});
 $('fold-hand').addEventListener('click',event=>runLiveAction(event.currentTarget,foldHand));
 $('enter-room').addEventListener('click',enterRoom);
+$('waiting-chat-toggle').addEventListener('click',()=>{waitingChat.open=!waitingChat.open;if(waitingChat.open)waitingChat.unread=0;renderWaitingChat();if(waitingChat.open)$('waiting-chat-input').focus();});
+$('waiting-chat-form').addEventListener('submit',sendWaitingChat);
 $('leave-room').addEventListener('click',async()=>{if(state.pendingCreate&&state.pendingCreate===state.roomCode){state.cancelAfterCreate=state.roomCode;return;}if(state.room?.managedCredits){const waiting=state.room.status==='waiting';if(waiting)state.cancelingWaitingRoom=state.roomCode;try{await creditCommand({kind:'cancel'});if(waiting&&state.cancelingWaitingRoom)returnToLobby();}catch{state.cancelingWaitingRoom=null;return;}return;}stopRoomPresence();stopBot();state.roomWatchVersion=(state.roomWatchVersion||0)+1;state.navigationEpoch=(state.navigationEpoch||0)+1;forgetRoomSeat();if(state.unsubscribe)state.unsubscribe();if(state.privateUnsubscribe)state.privateUnsubscribe();state.privateUnsubscribe=null;state.privateHandKey=null;state.room=null;state.localGame=false;showView('welcome-view');openLobby();});
 $('game-home').addEventListener('click',()=>{
   if(!state.room){returnToLobby();return;}

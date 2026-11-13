@@ -17,6 +17,10 @@ function envido(h,m){const values=h.map(c=>value(c,m)),pieces=h.filter(c=>piece(
  if(pieces.length===1){const i=h.indexOf(pieces[0]);best=Math.max(best,values[i]+Math.max(0,...values.filter((_,j)=>j!==i)));}
  for(let i=0;i<h.length;i++)for(let j=i+1;j<h.length;j++)if(!piece(h[i],m)&&!piece(h[j],m)&&h[i].suit===h[j].suit)best=Math.max(best,20+values[i]+values[j]);
  return best;}
+// The cards that make the envido count, as in the 1v1 game: one card, a piece and another card, or two of a suit.
+function envidoCards(h,m){if(!h?.length)return [];const target=envido(h,m),options=h.map(c=>({cards:[c],value:value(c,m)}));
+ for(let i=0;i<h.length;i++)for(let j=i+1;j<h.length;j++){const x=h[i],y=h[j];if(piece(x,m)||piece(y,m))options.push({cards:[x,y],value:value(x,m)+value(y,m)});else if(x.suit===y.suit)options.push({cards:[x,y],value:20+value(x,m)+value(y,m)});}
+ return options.find(o=>o.value===target)?.cards||h;}
 function settledTricks(tricks,mano){const a=tricks[0]?.winner,b=tricks[1]?.winner;if(tricks.length<2)return null;if(a&&(!b||a===b))return a;if(!a&&b)return b;if(tricks.length<3)return null;return tricks[2].winner||a||team(mano);}
 function newTeamSession(code,players,targetPoints,creditMatch,now=Date.now()){
  const s={code,hands:{},originals:{},truth:{},drawPool:deck(),room:{mode:'2v2',managedCredits:true,creditMatch,deviceMode:'two',status:'drawing',createdAt:now,matchNumber:creditMatch.matchNumber||1,targetPoints,table:players.player1,players,teams:{player1:['player1','player3'],player2:['player2','player4']},scores:{player1:0,player2:0},handNumber:0,trickNo:1,playedCount:0,tricks:[],trickCards:[],feed:[],trucoLevel:1,flors:{},timeoutCounts:{},openingDraw:{cards:{},endsAt:now+60000}}};createTeamReferee(s,{now}).start();return s;
@@ -52,7 +56,7 @@ function createTeamReferee(s,{now=Date.now(),deckFactory=deck}={}){
  // Short lines for the points history: "1 punto por envido no querido", "3 puntos por retruco".
  const pts=n=>Number(n)===1?'1 punto':n+' puntos',trucoName=l=>({1:'truco',2:'truco',3:'retruco',4:'vale cuatro'})[l]||'truco',envidoName=k=>({envido:'envido',real:'real envido',falta:'falta envido'})[k]||'envido';
  function award(t,n,detail){r.scores[t]=Math.min(r.targetPoints,r.scores[t]+n);if(r.scores[t]>=r.targetPoints&&!r.firstToTarget)r.firstToTarget=t;r.handScoreEntries??=[];r.handScoreEntries.push({player:t,points:n,detail});feed(detail);}
- function evidence(){const groups=[];for(const p of r.florWinner?[r.florWinner]:Object.keys(r.flors||{}))groups.push({player:p,name:r.players[p].name,cards:s.originals[p],label:'FLOR'+(r.florCompared?' · '+florValue(s.originals[p],r.muestra):'')});if(r.envidoAudit){const p=r.envidoAudit.winner;groups.push({player:p,name:r.players[p].name,cards:s.originals[p],label:r.envidoAudit.value+' TANTOS'});}return groups;}
+ function evidence(){const groups=[];for(const p of r.florWinner?[r.florWinner]:Object.keys(r.flors||{}))groups.push({player:p,name:r.players[p].name,cards:s.originals[p],label:'FLOR'+(r.florCompared?' · '+florValue(s.originals[p],r.muestra):'')});if(r.envidoAudit){const p=r.envidoAudit.winner;groups.push({player:p,name:r.players[p].name,cards:envidoCards(s.originals[p],r.muestra),label:r.envidoAudit.value+' TANTOS'});}return groups;}
  function finish(winner,points,reason=''){
   if(r.status!=='started')return;
   if(r.envidoAudit&&!r.envidoAudit.settled){
@@ -189,4 +193,4 @@ const beatsLead=(b,p,n)=>{const lead=leadSeat(b);return !lead||n>b.reveals[lead]
   if(r.status!=='started'||r.resolvingTrick||r.pendingNextHand)throw new Error('Esperá a que termine la pausa.');if(!active(p))throw new Error('Te fuiste al mazo en esta mano.');if(c.kind==='team-signal')signal(p,c.value);else if(c.kind==='play')play(p,c.cardId);else if(c.kind==='call')call(p,c.value);else if(c.kind==='fold')fold(p);else if(c.kind==='declare')declare(p,c.value,c.good===true);else throw new Error('Acción inválida.');return advance();}
  return {action,advance,start:()=>{deal('player4');r.openingDraw=null;delete s.drawPool;clock();return s;}};
 }
-module.exports={SEATS,team,nextSeat,ordered,piece,strength,flower,florValue,envido,settledTricks,newTeamSession,createTeamReferee};
+module.exports={SEATS,team,nextSeat,ordered,piece,strength,flower,florValue,envido,envidoCards,settledTricks,newTeamSession,createTeamReferee};

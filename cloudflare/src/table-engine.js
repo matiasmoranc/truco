@@ -13,6 +13,7 @@ export {CodeTakenError,slimMatch} from './ledger-ops.js';
 
 export const WAIT_MS=600000;
 export const DISCONNECT_MS=45000;
+export const WAITING_DROP_MS=30000;
 // A bot answers after a short pause, so people can follow the table; after
 // another bot's move it waits longer, so a run of bot plays stays readable.
 export const BOT_DELAY_MS=2000;
@@ -161,7 +162,9 @@ export function createTableEngine({code,bank,clock=()=>Date.now()}){
    if(!m)return null;
    const now=clock(),times=[];
    if(m.house&&m.status==='settled'&&m.session?.room?.rematch?.status==='pending'&&m.session.room.rematch.requester!==m.house)times.push(now+1000);
-   if(m.status==='waiting')times.push(m.createdAt+waitFor(m));
+   if(m.status==='waiting'){times.push(m.createdAt+waitFor(m));
+    // Someone who drops out of the waiting room loses the seat (the creator closes it) after WAITING_DROP_MS.
+    for(const p of Object.values(presence))if(p?.online===false&&Number.isFinite(p.disconnectedAt))times.push(p.disconnectedAt+WAITING_DROP_MS);}
    const r=m.session?.room;
    if(m.status==='reserved'&&r){
     times.push(r.resolutionEndsAt,r.pendingNextHand?.endsAt,r.status==='revealing'?r.endReveal?.endsAt:null,r.openingDraw?.resolveAt,r.openingDraw?.endsAt);
