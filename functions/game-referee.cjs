@@ -207,9 +207,10 @@ function revealEnvido(good=false,declaredNumber=null) {
     const winner=good||number===Number(bet.reveals?.[first])?first:second;
     changes={pendingBet:bet.suspendedBet||null,envidoClosed:true,envidoAudit:{reveals,declarationOrder:[first,second].filter(p=>reveals[p]!=null),winner,stake:bet.stake,called:bet.called||'envido',calls:bet.calls||[bet.called||'envido'],handNumber:room.handNumber},feed:topFeed(room,good?`${room.players[player].name}: son buenas.`:`${room.players[player].name} canta ${number} ${number===Number(bet.reveals?.[first])?'son iguales':'son mejores'}.`)};
   }
-  // Falta envido, or an envido whose points reach the target: the hand stops. The last call stays
+  // An envido (falta envido included) whose points reach the target: the hand stops. The last call stays
   // 3 seconds and then the cards are shown: the points go to the winner, or to the rival if they lied.
-  const decides=player===second&&(bet.called==='falta'||(Number(room.scores?.[changes.envidoAudit?.winner])||0)+(Number(bet.stake)||0)>=targetPoints(room));
+  // A falta envido won by the side that is behind does not end the match, so the hand goes on.
+  const decides=player===second&&(Number(room.scores?.[changes.envidoAudit?.winner])||0)+(Number(bet.stake)||0)>=targetPoints(room);
   if(decides){changes={...changes,pendingBet:null,turn:null,turnClock:null,pendingNextHand:{id:'envido:'+crypto.randomUUID(),winner:changes.envidoAudit.winner,foldPoints:0,endsAt:gameTime()+3000,message:'Se verifican los tantos del envido.'}};}
   if(state.localGame){queueLearningAction(good?'good':'declare',bet);const notice=makeCallNotice(changes.feed?.[0]?.text);if(notice)changes.callNotice=notice;Object.assign(room,changes);renderGame();if(decides)scheduleLocalNextHand(room);}else throw new Error('Server state required.');
 }
@@ -417,6 +418,21 @@ function localAnswerAction(answer){
 }
 function localAction(action){
   if(state.learning?.paused)return;
+  if(action==='auto-flor'){
+    // The first player from the mano who holds a flower has it sung for them as the hand starts,
+    // so no envido can be called over it. Returns whether it was sung now.
+    const room=state.room,mano=room?.mano||'player1';
+    // In Aprender the player practises singing the flower: there it stays manual.
+    if(state.learning||state.singingAutoFlor||room?.status!=='started'||room.resolvingTrick||room.pendingNextHand||Object.keys(room.flors||{}).length||room.florSettled)return false;
+    const holder=[mano,otherPlayer(mano)].find(player=>localHand(player).length===3&&roomHasFlor(room,localHand(player)));
+    if(!holder)return false;
+    const current=state.playerId,hand=state.hand,acting=state.botActing;
+    state.singingAutoFlor=true;state.botActing=true;state.playerId=holder;state.hand=[...localHand(holder)];
+    try{localAction('flor');}finally{state.playerId=current;state.hand=hand;state.botActing=acting;state.singingAutoFlor=false;}
+    renderGame();return true;
+  }
+  // A hand dealt outside localDealAfterHand sings it before its first move.
+  if(localAction('auto-flor'))return;
   if(action==='reveal')localAnswerAction('yes');
   else if(action==='flor'){
     const room=state.room,player=state.playerId;if(localHand(player).length!==3||room.flors?.[player]!=null||!roomHasFlor(room,localHand(player))){toast('No tenés flor.');return;}
@@ -437,6 +453,7 @@ function localAction(action){
 }
 function localPlay(card,launchOrigin=null) {
   if(state.learning?.paused)return;
+  if(localAction('auto-flor'))return;
   if(state.room?.turnClock?.key===turnClockKey()&&turnClockRemaining(state.room.turnClock).expired){renderTurnTimer();return;}
   const player=state.playerId;
   const pause=pauseMessage();if(pause){renderRoundPauseTimer();shakeTurnBadge();return;}
@@ -490,7 +507,7 @@ function localDealAfterHand(){
   state.localTruth={player1:handEnvido(state.localHands.player1,deck[6]),player2:handEnvido(state.localHands.player2,deck[6])};
   Object.assign(room,{status:'started',resolutionEndsAt:null,resolvingTrick:false,endReveal:null,mano,dealer:otherPlayer(mano),turn:mano,handNumber:room.handNumber+1,tricks:[],trickCards:[],trickNo:1,muestra:deck[6],deckCount:33,playedCount:0,trucoLevel:1,pendingBet:null,lastTrucoCaller:null,flors:{},florCompared:false,florSettled:false,florDeferred:null,envidoClosed:false,callNotice:null});
   state.hand=[...state.localHands[state.playerId]];
-  localFeed(`${room.players[room.dealer].name} reparte. Empieza ${room.players[mano].name}.`);renderGame();
+  localFeed(`${room.players[room.dealer].name} reparte. Empieza ${room.players[mano].name}.`);localAction('auto-flor');renderGame();
 }
 function canFoldHand(room,player){
   if(room?.mode==='2v2')return room.status==='started'&&!!room.players?.[player]&&!room.folded?.[player]&&!room.resolvingTrick&&!room.pendingNextHand;

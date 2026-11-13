@@ -55,8 +55,15 @@ export class Lobby extends DurableObject{
   return new Response(null,{status:101,webSocket:pair[0]});
  }
  async alarm(){
+  try{await this.dropStaleRooms();}catch(error){console.error('stale rooms',error);}
   try{await this.keepHouseTables();}catch(error){console.error('house tables',error);}
   await this.ctx.storage.setAlarm(Date.now()+HOUSE_TICK_MS);
+ }
+ // A waiting table lasts 10 minutes (a house table 20): anything listed well past that is gone.
+ async dropStaleRooms(){
+  const now=Date.now(),stale=Object.entries(this.rooms).filter(([,r])=>Number.isFinite(r?.createdAt)&&now-r.createdAt>=(isHouseUid(r.players?.player1?.uid)?20:10)*60000+3*60000).map(([code])=>code);
+  if(!stale.length)return;for(const code of stale)delete this.rooms[code];await this.ctx.storage.put('rooms',this.rooms);
+  for(const ws of this.ctx.getWebSockets())if(ws.deserializeAttachment()?.uid)for(const code of stale)send(ws,{t:'lobby-update',code,room:null});
  }
  async keepHouseTables(){
   const now=Date.now(),house=this.house;

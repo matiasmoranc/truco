@@ -31,11 +31,11 @@ test('2v2 waiting room: a disconnected guest loses the seat, a disconnected crea
  const seatOf=(l,uid)=>Object.keys(l.matches.t2.players).find(s=>l.matches.t2.players[s].uid===uid);
  let l=room2v2();const b=seatOf(l,'b');
  const away=(seat,uid,at)=>({[seat]:{uid,matchNumber:1,online:false,disconnectedAt:at}});
- // 20 s offline (times in ms): still seated. 30 s: the seat is freed.
- assert.ok(seatOf(op(l,'a',{kind:'tick'},120000,{presence:away(b,'b',100000)}),'b'));
- l=op(l,'a',{kind:'tick'},131000,{presence:away(b,'b',100000)});
+ // 100 s offline (times in ms): still seated. 2 minutes: the seat is freed.
+ assert.ok(seatOf(op(l,'a',{kind:'tick'},200000,{presence:away(b,'b',100000)}),'b'));
+ l=op(l,'a',{kind:'tick'},221000,{presence:away(b,'b',100000)});
  assert.equal(seatOf(l,'b'),undefined);assert.match(lines(l).at(-1),/Beto se desconectó/);assert.equal(l.wallets.b.locked,0);
- const closed=op(room2v2(),'c',{kind:'tick'},140000,{presence:away('player1','a',100000)});
+ const closed=op(room2v2(),'c',{kind:'tick'},230000,{presence:away('player1','a',100000)});
  assert.equal(publicTable(closed.matches.t2).closeReason,'creator-left');
 });
 
@@ -51,8 +51,8 @@ test('1v1 waiting room: a creator disconnected for a while closes it',()=>{
  const l=createTable(wallets(),{code:'SALAB',id:'t1',uid:'a',name:'Ana',stake:2,targetPoints:20,now:0});
  const tick=(at,presence)=>tableOperation(l,{code:'SALAB',uid:'a',command:{kind:'tick'},now:at,presence});
  const away={player1:{uid:'a',matchNumber:1,online:false,disconnectedAt:100000}};
- assert.equal(tick(120000,away).matches.t1.status,'waiting');
- const closed=tick(131000,away);
+ assert.equal(tick(200000,away).matches.t1.status,'waiting');
+ const closed=tick(221000,away);
  assert.equal(closed.matches.t1.status,'refunded');assert.equal(publicTable(closed.matches.t1).closeReason,'creator-left');
  assert.equal(closed.wallets.a.locked,0);
 });

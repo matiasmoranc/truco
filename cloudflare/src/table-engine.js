@@ -13,7 +13,8 @@ export {CodeTakenError,slimMatch} from './ledger-ops.js';
 
 export const WAIT_MS=600000;
 export const DISCONNECT_MS=45000;
-export const WAITING_DROP_MS=30000;
+// A player out of the waiting room for this long loses the seat (the creator, the room).
+export const WAITING_DROP_MS=120000;
 // A bot answers after a short pause, so people can follow the table; after
 // another bot's move it waits longer, so a run of bot plays stays readable.
 export const BOT_DELAY_MS=2000;
@@ -71,6 +72,7 @@ export function createTableEngine({code,bank,clock=()=>Date.now()}){
 
  // Cheap in-memory run; escalates to the bank only if credits would move.
  async function operate(args,{forceLedger=false}={}){
+  if(args.presence&&m){const live={};for(const [seat,p] of Object.entries(presence))if(p&&m.players?.[seat]?.uid===p.uid&&p.matchNumber===m.matchNumber)live[seat]=p;presence=live;args={...args,presence:live};}
   const op=(ledger,now)=>tableOperation(ledger,{...args,code,now});
   if(!m)throw new Error('La mesa ya no está disponible.');
   if(!forceLedger){
@@ -137,6 +139,11 @@ export function createTableEngine({code,bank,clock=()=>Date.now()}){
    if(!m)throw new Error('La mesa ya no está disponible.');
    await accounting('admin',{actor,action:'close-table',requestId,reason});
   },
+  // Presence of a seat whose player left (or of a previous match) is dropped, so it never drives timers.
+  prunePresence(){
+   if(!m)return;const next={};for(const [seat,p] of Object.entries(presence))if(p&&m.players?.[seat]?.uid===p.uid&&p.matchNumber===m.matchNumber)next[seat]=p;
+   if(Object.keys(next).length!==Object.keys(presence).length)presence=next;
+  },
   // Returns true when the visible presence changed.
   setOnline(uid,online){
    const player=findPlayer(m,uid);if(!player)return false;
@@ -148,6 +155,7 @@ export function createTableEngine({code,bank,clock=()=>Date.now()}){
   },
   publicRoom(){
    if(!m)return null;
+   this.prunePresence();
    const room=publicTable(m);
    if(Object.keys(presence).length)room.connectionPresence=presence;
    return room;
@@ -155,11 +163,13 @@ export function createTableEngine({code,bank,clock=()=>Date.now()}){
   handFor(uid){const player=findPlayer(m,uid);return player?privateTableHand(m,player):null;},
   lobbyEntry(){
    if(!m||m.status!=='waiting'||m.closedAt)return null;
-   const room=publicTable(m);return room.status==='waiting'?room:null;
+   // The lobby only needs the table, not its waiting-room chat (that stays among the seated players).
+   const room=publicTable(m);if(room.status!=='waiting')return null;delete room.lobbyChat;delete room.revision;return room;
   },
   isFinished(){return !m||!!m.closedAt||m.status==='refunded'||m.session?.room?.status==='closed';},
   nextDeadline(){
    if(!m)return null;
+   this.prunePresence();
    const now=clock(),times=[];
    if(m.house&&m.status==='settled'&&m.session?.room?.rematch?.status==='pending'&&m.session.room.rematch.requester!==m.house)times.push(now+1000);
    if(m.status==='waiting'){times.push(m.createdAt+waitFor(m));

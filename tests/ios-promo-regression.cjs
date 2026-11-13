@@ -9,11 +9,12 @@ test('The App Store notice is only for iPhone browsers, not the app, iPad or And
  assert.equal(iphoneWeb({userAgent:'Mozilla/5.0 (iPad; CPU OS 18_0 like Mac OS X)'},false),false);
  assert.equal(iphoneWeb({userAgent:'Mozilla/5.0 (Linux; Android 14; Pixel 8)'},false),false);
 });
-test('Once closed, the notice comes back after five more visits; reloads in the same session do not count',async()=>{
+test('The notice waits for the second visit; once closed, it comes back after five more visits; reloads in the same session do not count',async()=>{
  const {promoVisit}=await load();
  const storage=memory();let session=memory();
- assert.equal(promoVisit(storage,session).show,true);
+ assert.equal(promoVisit(storage,session).show,false);
  assert.equal(promoVisit(storage,session).visits,1);
+ assert.equal(promoVisit(storage,memory()).show,true);
  storage.setItem('truco-ios-app',JSON.stringify({visits:1,closedAt:1}));
  const shown=[];for(let i=0;i<5;i++){session=memory();shown.push(promoVisit(storage,session).show);}
  assert.deepEqual(shown,[false,false,false,false,true]);
@@ -25,5 +26,6 @@ test('Android browsers get the Google Play notice, with its own visits; the app 
  assert.equal(androidWeb(android,true),false);assert.equal(storeFor({userAgent:'Mozilla/5.0 (Windows NT 10.0)'},false),null);
  assert.equal(STORES.android.url,'https://play.google.com/store/apps/details?id=com.matiasmoranc.truco');
  const storage=memory();storage.setItem(STORES.ios.key,JSON.stringify({visits:3,closedAt:3}));
+ assert.equal(promoVisit(storage,memory(),STORES.android.key).show,false);
  assert.equal(promoVisit(storage,memory(),STORES.android.key).show,true);
 });

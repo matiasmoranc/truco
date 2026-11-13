@@ -67,7 +67,12 @@ function legacyTableActive(room,now){
  if(room.matchResult?.winner||Number.isFinite(target)&&target>0&&Object.values(room.scores||{}).some(score=>Number(score)>=target))return false;
  // A stale legacy status is not proof that a game is still being played.
  const activity=[room.createdAt,room.updatedAt,room.lastActivityAt,room.turnClock?.startedAt,room.resolutionEndsAt,room.pendingNextHand?.endsAt,room.endReveal?.endsAt,...Object.values(room.feed||{}).map(entry=>entry?.time||entry?.at),...Object.values(room.connectionPresence||{}).flatMap(entry=>[entry.connectedAt,entry.disconnectedAt,entry.lastSeenAt])].map(Number).filter(value=>Number.isFinite(value)&&value>0);
- if(activity.length&&now-Math.max(...activity)>=3600000)return false;
+ // Legacy rooms were written by clients, so a forged room could claim someone else's
+ // uid. Without any timestamp, or with one far in the future, it cannot be a real
+ // game and must not block that person's account deletion. Legacy rooms are closed
+ // to client writes, so real timestamps can only age out.
+ if(!activity.length||Math.max(...activity)>now+300000)return false;
+ if(now-Math.max(...activity)>=3600000)return false;
  if(room.status==='waiting'&&!(room.players?.player1&&room.players?.player2)&&Number.isFinite(room.createdAt)&&now-room.createdAt>=600000)return false;
  return true;
 }

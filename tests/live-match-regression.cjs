@@ -123,7 +123,8 @@ for(const mode of ['1v1','2v2'])test(mode+' complete game keeps credits outside 
   now+=waiting?10000:1;
   const player=answer?r.pendingBet.responder:waiting?'player1':r.turn;
   // Holding a flower the player goes to the deck, which sings it first.
-  const command=waiting?{kind:'tick'}:answer?{kind:'call',value:'no'}:owesFlor(m.session,player)?{kind:'fold'}:{kind:'play',cardId:m.session.hands[player][0].id};
+  // A sung flor (sung automatically for the first holder) is answered by a flower holder: they sing theirs.
+  const command=waiting?{kind:'tick'}:answer?{kind:'call',value:r.pendingBet.type==='flor'?'yes':'no'}:owesFlor(m.session,player)?{kind:'fold'}:{kind:'play',cardId:m.session.hands[player][0].id};
   const p={code:'ABCDE',uid:m.players[player].uid,command,requestId:'step'+n,expectedMatchId:'m',now};
   const updated=liveUpdate(m,p);
   if(updated){l.matches.m=updated;assert.deepEqual(l.wallets,wallets);}

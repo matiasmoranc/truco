@@ -371,3 +371,17 @@ test('The house answers a truco called after it played its last card',async()=>{
  }
  assert.ok(checked);
 });
+
+test('2v2 waiting room: the chat never reaches the lobby and a freed seat never drives the timer',async()=>{
+ const {engine,advance,now}=setup();
+ await engine.create({uid:'a',name:'Ana'},{id:'w1',stake:2,targetPoints:20,mode:'2v2',secret:null});
+ advance(100);await engine.join({uid:'b',name:'Beto'},{});
+ engine.setOnline('a',true);engine.setOnline('b',true);
+ await engine.act('b',{command:{kind:'chat',text:'hola'},requestId:'c1'});
+ assert.ok(Object.values(engine.publicRoom().lobbyChat).some(x=>x.text==='hola'));
+ assert.equal(engine.lobbyEntry().lobbyChat,undefined);
+ // Beto drops and loses the seat after two minutes; his old presence is forgotten.
+ engine.setOnline('b',false);advance(121000);await engine.tick();
+ assert.equal(Object.values(engine.publicRoom().players).some(p=>p?.uid==='b'),false);
+ assert.ok(engine.nextDeadline()-now()>1000,'no 50 ms timer from a freed seat');
+});

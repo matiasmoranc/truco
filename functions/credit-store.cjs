@@ -34,7 +34,16 @@ function createCreditStore({db,secret,fetchImpl=(...args)=>fetch(...args),baseUr
   async readLedger(){return await isActive()?bankLedger():(await db.ref('creditEconomy').get()).val()||{};},
   async wallet(uid){return await isActive()?(await call('wallet?uid='+encodeURIComponent(uid))).wallet??null:(await db.ref('creditEconomy/wallets/'+uid).get()).val();},
   patchBank,
-  // The whole database plus credits, for account deletion. With the bank active
+  // Changes only the credit ledger, wherever it lives (account deletion). update
+  // returns the new ledger, or undefined to leave it as it is. Before the switch an
+  // unloaded (null) ledger is never replaced: empty reports that case.
+  async patchLedger(update){
+   if(await isActive())return patchBank(update);
+   let empty=false;
+   const result=await loadedTransaction(db.ref('creditEconomy'),current=>{empty=current===null;return empty?undefined:update(current);});
+   return {committed:result.committed,value:result.snapshot.val(),empty};
+  },
+  // The whole database plus credits (kept for older callers). With the bank active
   // the credit part is written to the bank after the database part commits;
   // deletion steps are idempotent and the deletion job retries a failed write.
   async readRoot(){

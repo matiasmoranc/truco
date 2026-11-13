@@ -7,7 +7,7 @@ test('Self deletion accepts own UID, including administrators, and locks writes'
 });
 test('Reserved credits and active tables prevent account deletion',()=>{
  const r=root();r.creditEconomy.wallets.u.locked=1;assert.throws(()=>prepareSelfDeletion(r,{uid:'u',requestId:'req',now:1000}),/créditos/);
- r.creditEconomy.wallets.u.locked=0;r.rooms.old.public.status='started';assert.throws(()=>prepareSelfDeletion(r,{uid:'u',requestId:'req',now:1000}),/activa/);
+ r.creditEconomy.wallets.u.locked=0;r.rooms.old.public.status='started';r.rooms.old.public.createdAt=900;assert.throws(()=>prepareSelfDeletion(r,{uid:'u',requestId:'req',now:1000}),/activa/);
 });
 test('Deletion removes personal records and preserves opponents and anonymized results',()=>{
  const r=prepareSelfDeletion(root(),{uid:'u',requestId:'req',now:1000});
@@ -38,5 +38,5 @@ test('Administrator privacy deletion never allows deleting administrators or byp
  const reserved=root();reserved.creditEconomy.wallets.u.locked=1;assert.throws(()=>prepareAdminPrivacyDeletion(reserved,request),/créditos/);
  assert.throws(()=>prepareAdminPrivacyDeletion(root(),{...request,confirmName:'Other'}),/nombre/);
  assert.throws(()=>prepareAdminPrivacyDeletion(root(),{...request,requestId:undefined}),/solicitud/);
- const owner=root();owner.rooms.owner={public:{table:{uid:'u'},status:'started',players:{player1:{uid:'r'}}}};assert.throws(()=>prepareAdminPrivacyDeletion(owner,request),/mesa activa/);
+ const owner=root();owner.rooms.owner={public:{table:{uid:'u'},status:'started',createdAt:900,players:{player1:{uid:'r'}}}};assert.throws(()=>prepareAdminPrivacyDeletion(owner,request),/mesa activa/);
 });

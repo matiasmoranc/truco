@@ -190,13 +190,10 @@ async function adminIdentity(request){
  try{requireAdmin(request.auth,role.val()===true&&!user.disabled);}catch{throw new HttpsError('permission-denied','Tu cuenta no tiene acceso de administrador.');}
  await rateLimit(uid,60,'admin');return uid;
 }
-const {prepareSelfDeletion,prepareAdminPrivacyDeletion,erasePlayerData}=require('./self-deletion.cjs');
+const {prepareSelfDeletion,prepareAdminPrivacyDeletion,prepareDeletion,completeDeletion,loadPrepareState}=require('./self-deletion.cjs');
+// Deletion reads and writes only this player's branches (never the whole database).
 async function completeSelfDeletion(uid,job){
- let failure;
- const result=await creditStore.rootTransaction(root=>{
-  try{const next=erasePlayerData(root,{uid,anonymousId:job.anonymousId,now:Date.now()});next.userAccess[uid].deletionRequestId=job.requestId;return next;}catch(e){failure=e;return undefined;}
- });
- if(!result.committed)throw failure||new Error('No se pudieron limpiar los datos.');
+ await completeDeletion({db,creditStore,uid,job,now:Date.now()});
  try{await getAuth().deleteUser(uid);}catch(e){if(e.code!=='auth/user-not-found')throw e;}
  await db.ref('accountDeletionJobs/'+uid).remove();
 }
@@ -204,25 +201,27 @@ exports.deleteMyAccount=onCall({...options,timeoutSeconds:120},async request=>{
  const uid=request.auth?.uid,data=request.data||{};
  if(!uid||!['google.com','apple.com','password'].includes(request.auth.token?.firebase?.sign_in_provider))throw new HttpsError('unauthenticated','Iniciá sesión con tu cuenta.');
  if(!['check','delete'].includes(data.action))throw new HttpsError('invalid-argument','Acción inválida.');
+ await rateLimit(uid,6,'account-deletion');
  const existing=(await db.ref('accountDeletionJobs/'+uid).get()).val();
  if(existing){await completeSelfDeletion(uid,existing);return {ok:true};}
  const requestId=crypto.randomUUID();
  if(data.action==='check'){
-  try{prepareSelfDeletion(await creditStore.readRoot(),{uid,requestId,now:Date.now()});}catch(e){throw new HttpsError('failed-precondition',e.message);}
+  try{const [state,ledger]=await Promise.all([loadPrepareState(db,uid),creditStore.readLedger()]);prepareSelfDeletion({...state,creditEconomy:ledger},{uid,requestId,now:Date.now()});}catch(e){throw new HttpsError('failed-precondition',e.message);}
   return {ok:true};
  }
  if(!Number.isFinite(Number(request.auth.token.auth_time))||Date.now()/1000-Number(request.auth.token.auth_time)>300)throw new HttpsError('unauthenticated','Verificá tu identidad nuevamente.');
  const job={anonymousId:'deleted_'+crypto.randomUUID(),requestId,at:Date.now()};
- let failure;
- const prepared=await creditStore.rootTransaction(root=>{
-  try{const next=prepareSelfDeletion(root,{uid,requestId,now:job.at});next.accountDeletionJobs??={};next.accountDeletionJobs[uid]=job;return next;}catch(e){failure=e.message;return undefined;}
- });
- if(!prepared.committed)throw new HttpsError('failed-precondition',failure||'No se pudo preparar la eliminación.');
- try{await completeSelfDeletion(uid,job);}catch(e){console.error('Account deletion pending',e.code||'internal');throw new HttpsError('internal','Tu eliminación está en proceso. La completaremos automáticamente.');}
+ try{
+  await prepareDeletion({db,creditStore,uid,requestId,prepare:root=>prepareSelfDeletion(root,{uid,requestId,now:job.at}),
+   extraUpdates:state=>({['accountDeletionJobs/'+uid]:{...job,...(state.profiles?.[uid]?.name?{name:state.profiles[uid].name}:{})}})});
+ }catch(e){throw new HttpsError('failed-precondition',e.message||'No se pudo preparar la eliminación.');}
+ try{await completeSelfDeletion(uid,job);}catch(e){console.error('Account deletion pending',e.code||e.message||'internal');throw new HttpsError('internal','Tu eliminación está en proceso. La completaremos automáticamente.');}
  return {ok:true};
 });
 exports.finishAccountDeletions=onSchedule({schedule:'every 5 minutes',region:'us-central1',timeoutSeconds:120,maxInstances:1,secrets:[liveInternalSecret]},async()=>{
- for(const [uid,job] of Object.entries((await db.ref('accountDeletionJobs').get()).val()||{}))await completeSelfDeletion(uid,job);
+ for(const [uid,job] of Object.entries((await db.ref('accountDeletionJobs').get()).val()||{})){
+  try{await completeSelfDeletion(uid,job);}catch(e){console.error('Account deletion retry failed',{uid,error:e.message});}
+ }
 });
 exports.adminConsole=onCall({...options,secrets:[liveInternalSecret]},async request=>{
  const actor=await adminIdentity(request),data=request.data||{},action=data.action;
@@ -289,14 +288,12 @@ exports.adminConsole=onCall({...options,secrets:[liveInternalSecret]},async requ
   return {ok:true,moved:moved.length};
  }
  if(action==='delete'){
-  let failure;
+  if(!validKey(data.uid)||!validKey(data.requestId))throw new HttpsError('invalid-argument','Usuario o solicitud inválidos.');
+  let failure,next;
   const anonymousId='deleted_'+crypto.randomUUID();
-  const prepared=await creditStore.rootTransaction(root=>{
-   failure=null;if(!root)return undefined;
-   try{return prepareAdminPrivacyDeletion(root,{...data,actor,anonymousId,now:Date.now()});}catch(e){failure=e.message;return undefined;}
-  });
-  if(!prepared.committed)throw new HttpsError('failed-precondition',failure||'No se pudo preparar la eliminación.');
-  const next=prepared.snapshot.val();
+  try{next=await prepareDeletion({db,creditStore,uid:data.uid,requestId:data.requestId,prepare:root=>prepareAdminPrivacyDeletion(root,{...data,actor,anonymousId,now:Date.now()})});}
+  catch(e){failure=e.message;}
+  if(!next)throw new HttpsError('failed-precondition',failure||'No se pudo preparar la eliminación.');
   const job=next.accountDeletionJobs?.[data.uid];
   if(!job&&next.userAccess?.[data.uid]?.deletionRequestId===data.requestId)return {ok:true};
   try{await completeSelfDeletion(data.uid,job);}catch(e){console.error('Admin account deletion pending',e.code||'internal');throw new HttpsError('internal','La eliminación está en proceso. Se completará automáticamente.');}
@@ -394,21 +391,25 @@ exports.adminConsole=onCall({...options,secrets:[liveInternalSecret]},async requ
  }
  if(action==='rename'){
   if(!validKey(data.uid)||!validKey(data.requestId)||typeof data.name!=='string'||!/^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9._-]{1,18}$/.test(data.name)||typeof data.reason!=='string'||data.reason.trim().length<3||data.reason.length>200)throw new HttpsError('invalid-argument','Nombre o motivo inválido.');
-  if((await db.ref('userAccess/'+data.uid).get()).val()?.deleting)throw new HttpsError('failed-precondition','La cuenta está siendo eliminada.');await getAuth().getUser(data.uid);let failure;
-  await db.ref().get();
-  const r=await db.ref().transaction(root=>{
-   failure=null;if(!root)return undefined;
-   const receipt=root.adminUserAudit?.[data.requestId];
-   if(receipt){if(receipt.actor!==actor||receipt.uid!==data.uid||receipt.after!==data.name)failure='Solicitud reutilizada.';return failure?undefined:root;}
-   const key=data.name.toLowerCase().replaceAll('.','%2E'),owner=root.usernames?.[key];
-   if(owner&&owner!==data.uid){failure='Ese nombre ya está en uso.';return undefined;}
-   if(root.userAccess?.[data.uid]?.deleting||root.userAccess?.[data.uid]?.deletedAt){failure='La cuenta está siendo eliminada.';return undefined;}
-   const old=root.profiles?.[data.uid]?.name;
-   root.profiles??={};root.profiles[data.uid]={name:data.name};root.usernames??={};root.usernames[key]=data.uid;
-   if(old){const oldKey=old.toLowerCase().replaceAll('.','%2E');if(oldKey!==key&&root.usernames[oldKey]===data.uid)delete root.usernames[oldKey];}
-   root.adminUserAudit??={};root.adminUserAudit[data.requestId]={actor,uid:data.uid,action:'rename',before:old||null,after:data.name,reason:data.reason,at:Date.now()};return root;
-  });
-  if(!r.committed)throw new HttpsError('failed-precondition',failure||'No se pudo cambiar el nombre.');return {ok:true};
+  await getAuth().getUser(data.uid);
+  // Only the paths involved are read and written (never the whole database).
+  const receipt=(await db.ref('adminUserAudit/'+data.requestId).get()).val();
+  if(receipt){if(receipt.actor!==actor||receipt.uid!==data.uid||receipt.after!==data.name)throw new HttpsError('failed-precondition','Solicitud reutilizada.');return {ok:true};}
+  const access=(await db.ref('userAccess/'+data.uid).get()).val();
+  if(access?.deleting||access?.deletedAt)throw new HttpsError('failed-precondition','La cuenta está siendo eliminada.');
+  const key=data.name.toLowerCase().replaceAll('.','%2E');
+  // The new name is claimed atomically; another owner keeps it.
+  const claim=await loadedTransaction(db.ref('usernames/'+key),owner=>owner&&owner!==data.uid?undefined:data.uid);
+  if(!claim.committed)throw new HttpsError('failed-precondition','Ese nombre ya está en uso.');
+  const old=(await db.ref('profiles/'+data.uid+'/name').get()).val(),updates={['profiles/'+data.uid+'/name']:data.name};
+  if(typeof old==='string'&&old){const oldKey=old.toLowerCase().replaceAll('.','%2E');if(oldKey!==key&&(await db.ref('usernames/'+oldKey).get()).val()===data.uid)updates['usernames/'+oldKey]=null;}
+  updates['adminUserAudit/'+data.requestId]={actor,uid:data.uid,action:'rename',before:old||null,after:data.name,reason:data.reason,at:Date.now()};
+  // If the account started being deleted meanwhile, or the write fails, the claimed name is given back.
+  const release=()=>db.ref('usernames/'+key).transaction(owner=>owner===data.uid&&key!==(typeof old==='string'?old.toLowerCase().replaceAll('.','%2E'):'')?null:undefined).catch(()=>{});
+  const still=(await db.ref('userAccess/'+data.uid).get()).val();
+  if(still?.deleting||still?.deletedAt){await release();throw new HttpsError('failed-precondition','La cuenta está siendo eliminada.');}
+  try{await db.ref().update(updates);}catch(error){await release();throw error;}
+  return {ok:true};
  }
  if(action==='level'){
   if(!validKey(data.uid)||!validKey(data.requestId))throw new HttpsError('invalid-argument','Usuario inválido.');
@@ -593,8 +594,13 @@ const {CHAT_LOG_DAYS,chatDay,chatLogRecord,chatLogList}=require('./chat-log.cjs'
 // Tables kept in the database (older app versions) write chat there; a typed message is copied for the admin panel.
 exports.chatLogCopy=onValueCreated({ref:'/rooms/{code}/public/chatMessages/{id}',region:'us-central1',maxInstances:2},async event=>{
  const message=event.data.val(),code=event.params.code;if(!message||typeof message.sender!=='string')return;
+ // Clients can no longer write legacy rooms; still, only a real seat's message is logged,
+ // under that seat's uid, and never with a date outside the log's window.
+ if(!['player1','player2','player3','player4'].includes(message.sender))return;
  const room=(await db.ref('rooms/'+code+'/public').get()).val()||{},seat=room.players?.[message.sender]||{};
- const record=chatLogRecord({at:Number.isFinite(message.at)?message.at:Date.now(),code,uid:seat.uid,name:seat.name,text:message.text,mode:room.mode,id:event.params.id});
+ if(!validKey(seat.uid))return;
+ const now=Date.now(),at=Number.isFinite(message.at)&&message.at<=now+60000&&message.at>now-86400000?message.at:now;
+ const record=chatLogRecord({at,code,uid:seat.uid,name:seat.name,text:message.text,mode:room.mode,id:event.params.id});
  if(record)await db.ref(record.path).set(record.value);
 });
 exports.newPlayerAlert=onValueCreated({ref:'/profiles/{uid}/name',region:'us-central1',maxInstances:2},async event=>{

@@ -86,7 +86,7 @@ function tableOperation(ledger,{code,uid,command,requestId,expectedMatchId,prese
   if(command.reason==='draw-cancel'&&m.session?.room.status==='drawing'){m.session.room.status='closed';m.session.room.closeReason='draw-cancel';return finishAccounting(next,m,now);}
   fail('La partida está en juego. Podés irte al mazo.');
  }
- if(m.status==='waiting'){const host=presence?.player1;if(now-m.createdAt>=waitFor(m))cancelWaiting(next,m,now);else if(!m.house&&host?.uid===m.player1&&host.online===false&&Number.isFinite(host.disconnectedAt)&&now-host.disconnectedAt>=30000)cancelWaiting(next,m,now,'creator-left');return next;}
+ if(m.status==='waiting'){const host=presence?.player1;if(now-m.createdAt>=waitFor(m))cancelWaiting(next,m,now);else if(!m.house&&host?.uid===m.player1&&host.online===false&&Number.isFinite(host.disconnectedAt)&&now-host.disconnectedAt>=120000)cancelWaiting(next,m,now,'creator-left');return next;}
  if(!m.session)fail('La mesa está cerrada.');
  if(command.kind==='chat'||command.kind==='mute'){
   const room=m.session.room;

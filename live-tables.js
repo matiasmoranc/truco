@@ -6,7 +6,7 @@ export const LIVE_SERVER_URL=['localhost','127.0.0.1'].includes(globalThis.locat
   ?globalThis.location.origin+'/live'
   :'https://truco-live.mati-moran-castro.workers.dev';
 
-const CALL_TIMEOUT_MS=15000,PING_MS=25000,MAX_BACKOFF_MS=5000;
+const CALL_TIMEOUT_MS=15000,PING_MS=25000,MAX_BACKOFF_MS=5000,AUTH_TIMEOUT_MS=12000;
 
 export class LiveError extends Error{constructor(message,code){super(message);this.code=code||null;}}
 
@@ -25,12 +25,17 @@ class Channel{
       try{token=await this.token();}catch(error){console.error('[truco:live] token',error);ws.close();return;}
       if(this.ws!==ws)return;
       const id=String(++this.seq);
-      this.pending.set(id,{resolve:()=>{this.authed=true;this.backoff=250;this.setConnected(true);},reject:error=>{console.error('[truco:live] auth',error);}});
+      // If the server rejects the session or never answers, close: onclose reconnects with a fresh token.
+      const authTimer=setTimeout(()=>{if(this.ws===ws&&!this.authed){console.error('[truco:live] auth timeout');ws.close();}},AUTH_TIMEOUT_MS);
+      this.pending.set(id,{timer:authTimer,resolve:()=>{this.authed=true;this.backoff=250;this.setConnected(true);},reject:error=>{console.error('[truco:live] auth',error);if(this.ws===ws)ws.close();}});
       ws.send(JSON.stringify({t:'auth',id,token}));this.authSent=true;
       for(const message of this.outbox.splice(0))ws.send(message);
-      clearInterval(this.pinger);this.pinger=setInterval(()=>{if(ws.readyState===1)ws.send('ping');},PING_MS);
+      // Pings expect a pong; a socket that stopped answering (half dead after sleep) is replaced.
+      this.lastPong=Date.now();clearInterval(this.pinger);
+      this.pinger=setInterval(()=>{if(ws.readyState!==1)return;if(Date.now()-this.lastPong>2*PING_MS+5000){console.error('[truco:live] no pong');ws.close();return;}ws.send('ping');},PING_MS);
     };
     ws.onmessage=event=>{
+      this.lastPong=Date.now();
       if(event.data==='pong')return;
       let message;try{message=JSON.parse(event.data);}catch{return;}
       if(message.t==='res'){
@@ -52,14 +57,18 @@ class Channel{
   }
   // Called when the device comes back online or the app returns to the foreground.
   wake(){
-    if(this.closed||(this.ws&&this.ws.readyState<=1))return;
+    if(this.closed)return;
+    // Back from the background: an open socket gets a ping; if no answer comes soon, it is replaced.
+    if(this.ws?.readyState===1){const ws=this.ws,since=Date.now();try{ws.send('ping');}catch{}setTimeout(()=>{if(this.ws===ws&&ws.readyState===1&&this.lastPong<since)ws.close();},5000);return;}
+    if(this.ws&&this.ws.readyState===0)return;
     clearTimeout(this.retry);this.backoff=250;this.connect();
   }
   setConnected(value){if(this.connected===value)return;this.connected=value;for(const listener of this.statusListeners)listener(value);}
   call(t,data={}){
     const id=String(++this.seq),message=JSON.stringify({...data,t,id});
     return new Promise((resolve,reject)=>{
-      const timer=setTimeout(()=>{this.pending.delete(id);reject(new LiveError('El servidor no respondió. Volvé a intentar.','timeout'));},CALL_TIMEOUT_MS);
+      // A call that timed out leaves the queue too, so it can't reach the server after the player saw the error.
+      const timer=setTimeout(()=>{this.pending.delete(id);const queued=this.outbox.indexOf(message);if(queued>=0)this.outbox.splice(queued,1);reject(new LiveError('El servidor no respondió. Volvé a intentar.','timeout'));},CALL_TIMEOUT_MS);
       this.pending.set(id,{resolve,reject,timer});
       // Sent right behind auth on the same socket: the server handles messages in order.
       if(this.ws?.readyState===1&&this.authSent)this.ws.send(message);else this.outbox.push(message);

@@ -38,7 +38,20 @@
       "*.log",
       "artifacts/**",
       "work/**",
-      "outputs/**"
+      "outputs/**",
+      "codemagic.yaml",
+      "logs-*",
+      "maqueta-*",
+      "marketing/**",
+      ".mobile-web/**",
+      "assets/README.md",
+      "assets/tatu-original.jpeg",
+      "assets/tatu-sprite.webp",
+      "assets/tatu-sprite-user.webp",
+      "assets/tatu-dorso-user.webp",
+      "assets/guia-truco.png",
+      "assets/truco-uruguayo-v2.png",
+      "assets/lobby-desktop-tatu.webp"
     ]
   },
   "functions": {

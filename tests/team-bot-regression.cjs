@@ -7,7 +7,7 @@ const people=Object.fromEntries(['player1','player2','player3','player4'].map(p=
 // A fresh hand where the bot on turn got `value` from its partner; envido and flor are already settled.
 function signaled(value){
  const s=newTeamSession('ABCDE',people,30,{id:'m1',stake:1,pot:4,matchNumber:1},1000),r=s.room,p=r.turn;
- Object.assign(r,{envidoClosed:true,flors:{[p]:true}});
+ Object.assign(r,{envidoClosed:true,flors:{[p]:true},florSettled:true,pendingBet:null});
  r.teamSignal={id:'n1',from:'player3',to:p,text:'',value,handNumber:r.handNumber,trickNo:r.trickNo,time:1000};
  return {s,r,p,sorted:[...s.hands[p]].sort((a,b)=>strength(a,r.muestra)-strength(b,r.muestra))};
 }
@@ -81,7 +81,7 @@ test('A timed-out flor declaration uses the flor points, and says son buenas whe
 
 test('Only the pie bot sings envido; the first of its team just plays',()=>{
  const s=newTeamSession('ABCDE',people,30,{id:'m5',stake:1,pot:4,matchNumber:1},1000),r=s.room;
- Object.assign(r,{mano:'player1',turn:'player1',trickNo:1,envidoClosed:false,playedBy:{},flors:{},trickCards:[]});
+ Object.assign(r,{mano:'player1',turn:'player1',trickNo:1,envidoClosed:false,playedBy:{},flors:{},trickCards:[],pendingBet:null,trucoLevel:1});
  s.truth={player1:36,player2:0,player3:36,player4:0};
  for(const q of ['player1','player2','player3','player4'])r.flors[q]=true;
  assert.ok(!botCommands(s,'player1',()=>0.99).some(c=>c.kind==='call'&&['envido','real'].includes(c.value)));

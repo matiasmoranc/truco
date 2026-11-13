@@ -71,7 +71,7 @@ test('Expired waiting and finished legacy rooms do not block deletion and are cl
  assert.equal(root.rooms.old.public.status,'waiting');
 });
 test('A real legacy game remains protected and can be explicitly closed by its code',()=>{
- const root=deletionRoot();root.rooms={LIVE:{public:{status:'started',players:{player1:{uid:'a'},player2:{uid:'b'}}}}};
+ const root=deletionRoot();root.rooms={LIVE:{public:{status:'started',createdAt:50,players:{player1:{uid:'a'},player2:{uid:'b'}}}}};
  assert.equal(legacyTableActive(root.rooms.LIVE.public,100),true);
  assert.throws(()=>prepareUserDeletion(root,deletion),/LIVE/);
  const command={...args,code:'LIVE'};const closed=closeLegacyTable(root,command);

@@ -11,6 +11,8 @@ import chatLog from '../../functions/chat-log.cjs';
 
 const {passwordHash}=tableService;
 const CLEANUP_MS=30*60*1000;
+// A finished game left open (no rematch, nobody closed it) is removed after this long.
+const SETTLED_CLEANUP_MS=2*60*60*1000;
 const ACTIONS_PER_MINUTE=120,SEATINGS_PER_MINUTE=15;
 const send=(ws,message)=>{try{ws.send(JSON.stringify(message));}catch{}};
 
@@ -127,6 +129,8 @@ export class TableRoom extends DurableObject{
     const people=Object.values(this.engine.match.players||{}).filter(p=>p&&!p.bot);
     for(let a=0;a<people.length;a++)for(let b=a+1;b<people.length;b++)if(await usersBlockEachOther(this.db,people[a].uid,people[b].uid))throw new Error('No pueden iniciar una revancha porque hay jugadores bloqueados.');
    }
+   // A blocked account can still leave, but not play or chat.
+   if(!['cancel','abandon','tick'].includes(command.kind)&&await this.isBlocked(uid))throw new Error('Tu cuenta está bloqueada.');
    await this.engine.act(uid,{command,requestId,expectedMatchId});
    if(command.kind==='chat')this.logChat(uid,command.text,requestId);
    await this.commit();return this.result(uid);
@@ -146,6 +150,12 @@ export class TableRoom extends DurableObject{
  // Entry receipt: the caller gets its private hand with the room, so the table renders without another round trip.
  result(uid){const m=this.engine.match;return {code:this.code,room:this.engine.publicRoom(),privateHand:this.engine.handFor(uid),player1:m?.player1||null,player2:m?.player2||null};}
 
+ // Whether an administrator blocked the account (cached a minute; a failed read never blocks anyone).
+ async isBlocked(uid){
+  const cached=this.blockedCache?.get(uid);if(cached&&Date.now()-cached.at<60000)return cached.blocked;
+  let blocked=false;try{blocked=(await this.db.get('userAccess/'+uid+'/blocked'))===true;}catch{return cached?.blocked||false;}
+  (this.blockedCache??=new Map()).set(uid,{blocked,at:Date.now()});return blocked;
+ }
  identity(uid){
   const cached=this.identities.get(uid);
   if(cached&&Date.now()-cached.at<60000)return cached.promise;
@@ -170,11 +180,12 @@ export class TableRoom extends DurableObject{
  async commit(){
   for(const ws of this.sockets()){const uid=ws.deserializeAttachment()?.uid;if(uid)this.sendState(ws,uid);}
   const entry=JSON.stringify(this.engine.lobbyEntry());
-  const lobbyChanged=entry!==this.lastLobby;this.lastLobby=entry;
+  const previousLobby=this.lastLobby,lobbyChanged=entry!==previousLobby;this.lastLobby=entry;
   const m=this.engine.match,award=m?.status==='settled'&&m.id!==this.awarded?m:null;if(award)this.awarded=m.id;
   await this.ctx.storage.put('state',{code:this.code,lastLobby:this.lastLobby,awarded:this.awarded||null,...this.engine.snapshot()});
   if(award)this.ctx.waitUntil(this.awardLevels(award).catch(error=>console.error('level award failed',this.code,error)));
-  if(lobbyChanged)this.ctx.waitUntil(lobbyStub(this.env).fetch('https://lobby/update',{method:'POST',body:JSON.stringify({code:this.code,room:JSON.parse(entry)})}).catch(error=>console.error('lobby update failed',error)));
+  // If the lobby did not get it, the next commit tries again (lastLobby goes back to what the lobby has).
+  if(lobbyChanged)this.ctx.waitUntil(lobbyStub(this.env).fetch('https://lobby/update',{method:'POST',body:JSON.stringify({code:this.code,room:JSON.parse(entry)})}).then(r=>{if(!r.ok)throw new Error('status '+r.status);}).catch(error=>{console.error('lobby update failed',error);if(this.lastLobby===entry)this.lastLobby=previousLobby;}));
   await this.arm();
  }
  // A finished game adds level points to each winning person (once per game, see levelAwards/{id}).
@@ -190,21 +201,28 @@ export class TableRoom extends DurableObject{
  async arm(){
   let at=this.engine.nextDeadline();
   if(this.engine.isFinished())at=Math.min(at??Infinity,Date.now()+CLEANUP_MS);
+  // A settled game nobody closed is cleaned up later too (after the rematch window).
+  const settledAt=this.engine.match?.status==='settled'?this.engine.match.settledAt:null;
+  if(Number.isFinite(settledAt))at=Math.min(at??Infinity,Math.max(Date.now()+60000,settledAt+SETTLED_CLEANUP_MS));
+  // After failed timer steps, wait longer each time instead of retrying every 50 ms.
+  if(this.tickFailures)at=Math.max(at??0,Date.now()+Math.min(60000,1000*2**Math.min(this.tickFailures,6)));
   if(at!=null&&Number.isFinite(at))await this.ctx.storage.setAlarm(at);else await this.ctx.storage.deleteAlarm();
  }
 
  async alarm(){
   await this.serial(async()=>{
    if(!this.engine)return;
-   if(this.engine.isFinished()&&!this.sockets().some(ws=>ws.deserializeAttachment()?.uid)){
-    const closedAt=this.engine.match?.closedAt||this.engine.match?.settledAt||this.engine.match?.refundedAt||0;
+   const m=this.engine.match,staleSettled=m?.status==='settled'&&Number.isFinite(m.settledAt)&&Date.now()-m.settledAt>=SETTLED_CLEANUP_MS;
+   if((this.engine.isFinished()||staleSettled)&&!this.sockets().some(ws=>ws.deserializeAttachment()?.uid)){
+    const closedAt=staleSettled?0:m?.closedAt||m?.settledAt||m?.refundedAt||0;
     if(Date.now()-closedAt>=CLEANUP_MS){
-     if(this.lastLobby!=='null')await lobbyStub(this.env).fetch('https://lobby/update',{method:'POST',body:JSON.stringify({code:this.code,room:null})}).catch(()=>{});
+     // Always tell the lobby, even if the last notice may have been lost.
+     await lobbyStub(this.env).fetch('https://lobby/update',{method:'POST',body:JSON.stringify({code:this.code,room:null})}).catch(()=>{});
      await this.ctx.storage.deleteAll();this.engine.load(null);this.lastLobby='null';return;
     }
    }
    const before=JSON.stringify(this.engine.snapshot());
-   try{await this.engine.tick();}catch(error){console.error('tick failed',this.code,error);}
+   try{await this.engine.tick();this.tickFailures=0;}catch(error){this.tickFailures=(this.tickFailures||0)+1;console.error('tick failed',this.code,this.tickFailures,error);}
    if(JSON.stringify(this.engine.snapshot())!==before)await this.commit();else await this.arm();
   });
  }

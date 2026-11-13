@@ -18,8 +18,8 @@ function account(ledger,m,now){const r=m.session?.room;if(!r)return ledger;if(!m
  m.status='settled';m.winners=winners;m.winner=winners[0]??null;m.settledAt=now;m.revision++;
  }return ledger;}
 // Waiting room: who comes and goes is written in its chat, so everyone sees it.
-const WAITING_DROP_MS=30000;
-function lobbyLine(m,line,now){m.lobbyChat??={};m.lobbyChat['s'+now+'-'+Object.keys(m.lobbyChat).length]={...line,at:now};const keys=Object.keys(m.lobbyChat);if(keys.length>60)delete m.lobbyChat[keys[0]];}
+const WAITING_DROP_MS=120000;
+function lobbyLine(m,line,now){m.lobbyChat??={};m.lobbySeq=(m.lobbySeq||0)+1;m.lobbyChat['s'+now+'-'+m.lobbySeq]={...line,at:now};const keys=Object.keys(m.lobbyChat);if(keys.length>60)delete m.lobbyChat[keys[0]];}
 // A player who is not the creator leaves the waiting room: only their seat is freed and their stake returned.
 function leaveSeat(ledger,m,seat,now,text='salió de la sala'){
  const person=m.players[seat];if(!person)return ledger;
@@ -46,8 +46,8 @@ function operation(ledger,m,{uid,command:c,requestId,expectedMatchId,presence,no
   if(!m.players[p])return ledger;
   if(c.kind==='add-bot')return addBot(ledger,m,{by:p,seat:c.seat,now});
   if(c.kind==='chat'){
-   if(typeof c.text!=='string'||!c.text.trim()||c.text.length>40||blockedChatReason(c.text))fail('El mensaje no se puede enviar.');
-   if(requestId){if(m.requests[requestId])return ledger;m.requests[requestId]=true;}
+   if(typeof c.text!=='string'||!c.text.trim()||c.text.trim().length>40||blockedChatReason(c.text))fail('El mensaje no se puede enviar.');
+   if(requestId){if(m.requests[requestId])return ledger;m.requests[requestId]=true;const ids=Object.keys(m.requests);for(const id of ids.slice(0,Math.max(0,ids.length-100)))delete m.requests[id];}
    lobbyLine(m,{sender:p,name:m.players[p].name||'',text:c.text.trim()},now);m.revision++;return ledger;
   }
   if(c.kind!=='tick')fail('Esperando a los cuatro jugadores.');return ledger;

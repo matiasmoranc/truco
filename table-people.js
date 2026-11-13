@@ -102,7 +102,7 @@ export function installTablePeople({$,document,getState,profiles,friends,signedI
    const pic=el('button','end-person-avatar');pic.type='button';pic.innerHTML=profiles.avatarHtml(profileFor(q),'player-avatar');pic.setAttribute('aria-label','Ver el perfil de '+(p.name||'Jugador'));pic.onclick=()=>showCard(q);
    const who=el('div','end-person-who');who.append(el('strong','',p.name||'Jugador'));
    const level=levelText(profileFor(q));
-   who.append(el('small','',relation==='incoming'?(p.name||'Te')+' te invitó a ser amigos':level));
+   who.append(el('small','',relation==='incoming'?(p.name||'Alguien')+' te invitó a ser amigos':level));
    row.append(pic,who);const action=friendAction(q,{compact:true});if(action)row.append(action);
    return row;
   });
@@ -121,20 +121,23 @@ export function installTablePeople({$,document,getState,profiles,friends,signedI
    if(!mine&&r.mode==='2v2')item.append(el('strong','',r.players?.[m.sender]?.name||'Jugador'));
    item.append(el('span','',m.text));return item;
   }):[el('p','end-chat-empty','¿Buena partida? Escribile algo.')]));
-  if(near||items.length)history.scrollTop=history.scrollHeight;
-  const note=info.unavailable;
+  // Scrolls to the end when a message arrives, or if the player was already reading the end.
+  if(near||String(items.length)!==history.dataset.count)history.scrollTop=history.scrollHeight;history.dataset.count=String(items.length);
+  const note=info.unavailable||endChatError;
   $('end-chat-note').textContent=note||'';$('end-chat-note').hidden=!note;
   for(const node of [$('end-chat-input'),$('end-chat-send'),...box.querySelectorAll('[data-end-quick]')])node.disabled=!!note||info.sending;
  }
+ // The last error stays on screen until the next send (a redraw used to hide it at once).
+ let endChatError='';
  async function sendEnd(text){
-  text=String(text||'').trim();if(!text)return;
-  const error=await chat.send(text);
-  if(error){$('end-chat-note').textContent=error;$('end-chat-note').hidden=false;}
-  renderEndChat();
+  text=String(text||'').trim();if(!text)return '';
+  endChatError='';const error=await chat.send(text);
+  endChatError=error||'';renderEndChat();return endChatError;
  }
- $('end-chat-form')?.addEventListener('submit',event=>{event.preventDefault();const input=$('end-chat-input'),text=input.value;input.value='';void sendEnd(text);});
+ // The text leaves the box at once; if it could not be sent, it comes back so it can be fixed or retried.
+ $('end-chat-form')?.addEventListener('submit',async event=>{event.preventDefault();const input=$('end-chat-input'),text=input.value;input.value='';if(await sendEnd(text)&&!input.value)input.value=text;});
  for(const b of document.querySelectorAll('[data-end-quick]'))b.addEventListener('click',()=>sendEnd(b.dataset.endQuick));
  function renderEnd(){if(!endVisible())return;renderEndPeople();renderEndChat();}
- function refresh(){renderSeats();decorateTeamSeats();renderEnd();if(card&&card.open){/* the friend state of the open card may have changed */}}
+ function refresh(){renderSeats();decorateTeamSeats();renderEnd();}
  return {renderSeats,decorateTeamSeats,renderEnd,refresh,showCard,endVisible};
 }
