@@ -11,9 +11,13 @@ const send=(ws,message)=>{try{ws.send(JSON.stringify(message));}catch{}};
 
 // Open 1 vs 1 tables hosted by house players, so there is always someone to play.
 // Each one waits 20 minutes and closes; the lobby opens new ones with
-// other names, keeping between 2 and 4 open, each one 20 minutes, staggered apart.
-const HOUSE_NAMES=['Nacho_Pereira','Facu.Rodriguez','ElGordoMartinez','Santi_Fernandez','Gonza_Silva22','Juanma.Sosa','PepeCabrera','Rodri_Acosta','Mati.Olivera','ChinoNunez','Andres_Viera','Bruno.Correa94','Lu_Gonzalez','Caro.Suarez','Vale_Rodriguez'];
-const HOUSE_MIN=2,HOUSE_MAX=4,HOUSE_TICK_MS=60000,HOUSE_TARGET_MS=30*60000;
+// other names, keeping between 10 and 14 open, each one 20 minutes, staggered apart.
+const HOUSE_NAMES=['Nacho_Pereira','Facu.Rodriguez','ElGordoMartinez','Santi_Fernandez','Gonza_Silva22','Juanma.Sosa','PepeCabrera','Rodri_Acosta','Mati.Olivera','ChinoNunez','Andres_Viera','Bruno.Correa94','Lu_Gonzalez','Caro.Suarez','Vale_Rodriguez',
+ 'Diego.Pintos','Fede_Cardozo','Lucho.Ramos','Seba_Techera','Pablo.Benitez','Nico_Olivera88','Tincho.Silva','Rafa_Dominguez','Marce.Lopez','Gaby_Ferreira','Ceci.Alvarez','Sofi_Martinez','JuanPa.Rocha','NegroCabrera','Agus.Morales'];
+const HOUSE_MIN=10,HOUSE_MAX=14,HOUSE_TICK_MS=60000,HOUSE_TARGET_MS=30*60000;
+// One new table per minute at most: tables still open and close at different times, and with
+// 20 minutes each this keeps up to 20 open, enough for 10 to 14.
+const HOUSE_GAP_MS=50000;
 const CODE_ALPHABET='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const randomCode=()=>Array.from(crypto.getRandomValues(new Uint32Array(5)),n=>CODE_ALPHABET[n%CODE_ALPHABET.length]).join('');
 const pick=weights=>{let r=Math.random()*weights.reduce((n,[,w])=>n+w,0);for(const [value,w] of weights){if((r-=w)<0)return value;}return weights[0][0];};
@@ -70,8 +74,8 @@ export class Lobby extends DurableObject{
   if(!house.target||now-house.targetAt>=HOUSE_TARGET_MS){house.target=HOUSE_MIN+Math.floor(Math.random()*(HOUSE_MAX-HOUSE_MIN+1));house.targetAt=now;}
   const open=Object.values(this.rooms).filter(r=>r?.status==='waiting'&&isHouseUid(r.players?.player1?.uid));
   const missing=house.target-open.length;if(missing<=0){await this.ctx.storage.put('house',house);return;}
-  // With some open, at most one new table every 4 minutes, so they close at different times.
-  if(open.length&&now-(house.lastAt||0)<4*60000){await this.ctx.storage.put('house',house);return;}
+  // With some open, at most one new table a minute, so they close at different times.
+  if(open.length&&now-(house.lastAt||0)<HOUSE_GAP_MS){await this.ctx.storage.put('house',house);return;}
   for(let i=0;i<1;i++){
    const busy=new Set(open.map(r=>r.players.player1.name));
    // Names not at a table now, the least recently used first.

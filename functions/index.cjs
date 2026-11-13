@@ -363,7 +363,9 @@ exports.adminConsole=onCall({...options,secrets:[liveInternalSecret]},async requ
    if(current)tables.push({...entry,status:m.status==='waiting'?'Esperando rival':'En juego'});
    else archivedTables.push({...entry,status:m.status==='settled'?'Terminada':m.status==='refunded'?'Créditos devueltos':m.closedAt?'Cerrada':m.status==='waiting'?'Vencida':'Finalizando'});
   }
-  return {tables,archivedTables,events:tableEvents(ledger,now),movements:ledger.walletMovements||{},alerts:reservationAlerts(ledger,now),reports:Object.entries(reports).map(([id,r])=>({id,...r})).sort((a,b)=>b.at-a.at),
+  // Per day, last 30 days: tables created by players and games finished between players or against the house.
+  const daily=require('./table-stats.cjs').tableDailyStats(ledger,{now,dayOf:at=>uruguayDate(at).day});
+  return {daily,tables,archivedTables,events:tableEvents(ledger,now),movements:ledger.walletMovements||{},alerts:reservationAlerts(ledger,now),reports:Object.entries(reports).map(([id,r])=>({id,...r})).sort((a,b)=>b.at-a.at),
    audit:[...Object.values(ledger.adminAudit||{}),...Object.values(userAudit)].sort((a,b)=>b.at-a.at).slice(0,100)};
  }
  if(action==='close-table'&&!validKey(data.code))throw new HttpsError('invalid-argument','Mesa inválida.');

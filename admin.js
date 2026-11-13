@@ -134,7 +134,7 @@ async function refresh(more=false,preservePages=false){
   if(more)pagesLoaded++;else if(!preservePages)pagesLoaded=1;
   users=more?[...users,...result.users]:result.users;pageToken=result.pageToken;renderUsers();void loadAvatars(preservePages?users.filter(u=>!avatars.has(u.uid)):result.users);
   const data=(await call({action:'tables'})).data;if(generation!==epoch)return;
-  tableData=data;renderUsers();renderTables();renderTableStats();
+  tableData=data;renderUsers();renderTables();renderTableStats();renderTableDaily(data.daily);
   $('reservation-alerts').replaceChildren();
   for(const a of data.alerts||[]){const card=node('article','','card');card.append(node('h3','Partida anterior sin cerrar: '+(users.find(u=>u.uid===a.uid)?.name||a.uid)),node('p','No puede crear mesas hasta liberarla. '+a.reason));if(a.repairable)card.append(button('Liberar',async()=>{try{await call({action:'repair-reservation',uid:a.uid});await refresh();}catch(e){say(errorText(e));}}));$('reservation-alerts').append(card);}
   $('reports-list').replaceChildren();
@@ -166,6 +166,15 @@ function tablePeriod(){
 function tableItems(kind,{from,to}){
  const e=tableData.events||{created:[],finished:[]},list=kind==='created'?e.created:e.finished.filter(x=>kind==='house'?x.house:!x.house);
  return list.filter(x=>x.day>=from&&x.day<=to);
+}
+// Three 30-day charts drawn like "Jugadores únicos · últimos 30 días" on the summary.
+function renderTableDaily(daily){
+ const charts=[['table-created-chart','created','mesas creadas'],['table-players-chart','vsPlayers','partidas entre jugadores'],['table-house-chart','vsHouse','partidas contra la casa']];
+ for(const [id,key,unit] of charts){
+  const target=$(id);if(!target)continue;
+  if(!daily?.days){target.replaceChildren(node('p','Este juego todavía no guarda estos datos.','empty'));continue;}
+  columns(target,daily.days.map(day=>{const n=daily[key]?.[day]||0;return {label:shortDay(day),value:n,tooltip:shortDay(day)+' · '+n+' '+unit};}),{labelEvery:3});
+ }
 }
 function renderTableStats(){
  const period=tablePeriod(),box=$('table-stats');box.replaceChildren();
