@@ -42,23 +42,23 @@ test('House tables: no wallet for the host, a win pays twice the stake, a loss k
  const idle=T.tableOperation(T.createTable(base,{code:'BCDEF',id:'m2',uid:houseUid('Lu_Gonzalez'),name:'Lu_Gonzalez',stake:1,targetPoints:10,house:true,now:1}),{code:'BCDEF',uid:houseUid('Lu_Gonzalez'),command:{kind:'tick'},now:1300000});
  assert.equal(idle.matches.m2.status,'refunded');assert.deepEqual(idle.wallets,base.wallets);
 });
-test('A house table waits 20 minutes for a rival and says so to the lobby',()=>{
+test('A house table waits 10 minutes for a rival and says so to the lobby',()=>{
  const base={wallets:{u2:{balance:5,locked:0}},matches:{},tables:{}};
  const l=T.createTable(base,{code:'CDEFG',id:'m3',uid:houseUid('Caro.Suarez'),name:'Caro.Suarez',stake:1,targetPoints:20,house:true,now:0});
- assert.equal(T.publicTable(l.matches.m3).waitLimit,20*60000);
- assert.equal(T.tableOperation(l,{code:'CDEFG',uid:houseUid('Caro.Suarez'),command:{kind:'tick'},now:15*60000}).matches.m3.status,'waiting');
- assert.equal(T.joinTable(l,{code:'CDEFG',uid:'u2',name:'Pinar',now:19*60000}).matches.m3.status,'reserved');
- assert.throws(()=>T.joinTable(l,{code:'CDEFG',uid:'u2',name:'Pinar',now:20*60000}),/no está disponible/);
+ assert.equal(T.publicTable(l.matches.m3).waitLimit,10*60000);
+ assert.equal(T.tableOperation(l,{code:'CDEFG',uid:houseUid('Caro.Suarez'),command:{kind:'tick'},now:8*60000}).matches.m3.status,'waiting');
+ assert.equal(T.joinTable(l,{code:'CDEFG',uid:'u2',name:'Pinar',now:9*60000}).matches.m3.status,'reserved');
+ assert.throws(()=>T.joinTable(l,{code:'CDEFG',uid:'u2',name:'Pinar',now:10*60000}),/no está disponible/);
 });
 
-test('The lobby keeps 10 to 14 house tables with 30 different house players, and real tables are listed first',()=>{
+test('The lobby keeps 6 to 8 house tables with 30 different house players, and real tables are listed first',()=>{
  const fs=require('node:fs'),path=require('node:path');
  const lobby=fs.readFileSync(path.join(__dirname,'..','cloudflare','src','lobby.js'),'utf8');
  const names=JSON.parse(lobby.match(/HOUSE_NAMES=(\[[^\]]*\])/)[1].replace(/'/g,'"'));
  assert.equal(names.length,30);assert.equal(new Set(names.map(n=>n.toLowerCase())).size,30);
  for(const name of names)assert.match(name,/^[A-Za-z0-9._-]{3,18}$/);
- assert.match(lobby,/HOUSE_MIN=10,HOUSE_MAX=14\b/);
- // One new table a minute at most can keep up to 20 open with 20 minutes each.
+ assert.match(lobby,/HOUSE_MIN=6,HOUSE_MAX=8\b/);
+ // One new table a minute at most can keep up to 10 open with 10 minutes each.
  assert.ok(Number(lobby.match(/HOUSE_GAP_MS=(\d+)/)[1])<60000);
  const app=fs.readFileSync(path.join(__dirname,'..','app.js'),'utf8');
  assert.match(app,/\.sort\(\(a,b\) => houseTable\(a\[1\]\.public\)-houseTable\(b\[1\]\.public\)/);

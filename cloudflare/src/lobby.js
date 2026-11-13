@@ -10,13 +10,13 @@ const {isHouseUid,houseUid}=botSeat;
 const send=(ws,message)=>{try{ws.send(JSON.stringify(message));}catch{}};
 
 // Open 1 vs 1 tables hosted by house players, so there is always someone to play.
-// Each one waits 20 minutes and closes; the lobby opens new ones with
-// other names, keeping between 10 and 14 open, each one 20 minutes, staggered apart.
+// Each one waits 10 minutes and closes; the lobby opens new ones with
+// other names, keeping between 6 and 8 open, each one 10 minutes, staggered apart.
 const HOUSE_NAMES=['Nacho_Pereira','Facu.Rodriguez','ElGordoMartinez','Santi_Fernandez','Gonza_Silva22','Juanma.Sosa','PepeCabrera','Rodri_Acosta','Mati.Olivera','ChinoNunez','Andres_Viera','Bruno.Correa94','Lu_Gonzalez','Caro.Suarez','Vale_Rodriguez',
  'Diego.Pintos','Fede_Cardozo','Lucho.Ramos','Seba_Techera','Pablo.Benitez','Nico_Olivera88','Tincho.Silva','Rafa_Dominguez','Marce.Lopez','Gaby_Ferreira','Ceci.Alvarez','Sofi_Martinez','JuanPa.Rocha','NegroCabrera','Agus.Morales'];
-const HOUSE_MIN=10,HOUSE_MAX=14,HOUSE_TICK_MS=60000,HOUSE_TARGET_MS=30*60000;
+const HOUSE_MIN=6,HOUSE_MAX=8,HOUSE_TICK_MS=60000,HOUSE_TARGET_MS=30*60000;
 // One new table per minute at most: tables still open and close at different times, and with
-// 20 minutes each this keeps up to 20 open, enough for 10 to 14.
+// 10 minutes each this keeps up to 10 open, enough for 6 to 8.
 const HOUSE_GAP_MS=50000;
 const CODE_ALPHABET='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const randomCode=()=>Array.from(crypto.getRandomValues(new Uint32Array(5)),n=>CODE_ALPHABET[n%CODE_ALPHABET.length]).join('');
@@ -65,7 +65,7 @@ export class Lobby extends DurableObject{
  }
  // A waiting table lasts 10 minutes (a house table 20): anything listed well past that is gone.
  async dropStaleRooms(){
-  const now=Date.now(),stale=Object.entries(this.rooms).filter(([,r])=>Number.isFinite(r?.createdAt)&&now-r.createdAt>=(isHouseUid(r.players?.player1?.uid)?20:10)*60000+3*60000).map(([code])=>code);
+  const now=Date.now(),stale=Object.entries(this.rooms).filter(([,r])=>Number.isFinite(r?.createdAt)&&now-r.createdAt>=10*60000+3*60000).map(([code])=>code);
   if(!stale.length)return;for(const code of stale)delete this.rooms[code];await this.ctx.storage.put('rooms',this.rooms);
   for(const ws of this.ctx.getWebSockets())if(ws.deserializeAttachment()?.uid)for(const code of stale)send(ws,{t:'lobby-update',code,room:null});
  }

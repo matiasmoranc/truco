@@ -5,7 +5,7 @@ const {settleVerifiedMatch,refundCanceledMatch,reserveStakes}=require('./credit-
 const {blockedChatReason}=require('./chat-moderation.cjs');
 const WAIT_MS=600000;
 // A house table (opened by the lobby) waits longer for someone to sit down.
-const HOUSE_WAIT_MS=20*60000;
+const HOUSE_WAIT_MS=10*60000;
 const waitFor=m=>m?.house?HOUSE_WAIT_MS:WAIT_MS;
 const teams=require('./team-table-service.cjs');
 const {isHouseUid}=require('./bot-seat.cjs');
