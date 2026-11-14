@@ -98,9 +98,8 @@ function envidoRaiseKinds(bet){
   const calls=bet.calls?.length?bet.calls:[bet.called||'envido'];
   if(calls.includes('falta'))return [];
   const kinds=[];
-  if(!calls.includes('real')&&calls.filter(call=>call==='envido').length<2)kinds.push('envido');
-  if(!calls.includes('real'))kinds.push('real');
-  kinds.push('falta');
+  if(!calls.includes('real'))kinds.push('envido');
+  kinds.push('real','falta');
   return kinds;
 }
 function ptsText(n){return Number(n)===1?'1 punto':n+' puntos';}

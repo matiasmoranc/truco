@@ -50,8 +50,9 @@ function createTeamReferee(s,{now=Date.now(),deckFactory=deck}={}){
  function resume(bet){r.pendingBet=bet||null;if(bet&&!active(bet.responder))bet.responder=responder(opponent(bet.callerTeam),bet.type==='flor',null,bet.type);}
  const rest=()=>Math.max(1,r.targetPoints-Math.max(...Object.values(r.scores)));
  // The envido never plays for more than the leader still needs to win the match.
- // The envido calls left: two envidos at most, real envido once (no envido after it), falta once and nothing after it.
- const envidoRaiseKinds=b=>{const calls=b.calls?.length?b.calls:[b.called||'envido'];if(b.revealMode||calls.includes('falta'))return [];return [...(!calls.includes('real')&&calls.filter(c=>c==='envido').length<2?['envido']:[]),...(!calls.includes('real')?['real']:[]),'falta'];};
+ // The envido calls left: any number of raises without going down a level (envidos until someone says real envido,
+ // then only real envidos), falta once and nothing after it.
+ const envidoRaiseKinds=b=>{const calls=b.calls?.length?b.calls:[b.called||'envido'];if(b.revealMode||calls.includes('falta'))return [];return [...(!calls.includes('real')?['envido']:[]),'real','falta'];};
  const envidoStake=(kind,base=0)=>kind==='falta'?rest():Math.min(base+(kind==='real'?3:2),rest());
  // Short lines for the points history: "1 punto por envido no querido", "3 puntos por retruco".
  const pts=n=>Number(n)===1?'1 punto':n+' puntos',trucoName=l=>({1:'truco',2:'truco',3:'retruco',4:'vale cuatro'})[l]||'truco',envidoName=k=>({envido:'envido',real:'real envido',falta:'falta envido'})[k]||'envido';

@@ -246,15 +246,18 @@ test('2v2: the last of a trick going to the deck with a raise to answer closes t
  createTeamReferee(s,{now:now+=3000}).advance();
  assert.equal(s.room.trickNo,2);assert.equal(s.room.pendingBet.responder,'player2');
 });
-test('2v2: envido rules — no envido after an accepted truco, two envidos at most, nothing after real but falta',()=>{
+test('2v2: envido rules — no envido after an accepted truco, raises never go down a level, nothing after falta',()=>{
  const hands={player1:[card('♠',4),card('♥',5),card('♣',6)],player2:[card('♣',4),card('♥',7),card('♠',12)],player3:[card('♠',5),card('♣',5),card('♥',12)],player4:[card('♠',3),card('♥',3),card('♣',3)]};
  const s=seatSession(hands);let now=1000;const act2=(p,c)=>createTeamReferee(s,{now:now+=10}).action(p,c);
  act2('player1',{kind:'call',value:'envido'});
  const r1=s.room.pendingBet.responder;act2(r1,{kind:'call',value:'raise-envido'});
- const r2=s.room.pendingBet.responder;assert.throws(()=>act2(r2,{kind:'call',value:'raise-envido'}));
- act2(r2,{kind:'call',value:'raise-real'});assert.equal(s.room.pendingBet.stake,7);
- const r3=s.room.pendingBet.responder;assert.throws(()=>act2(r3,{kind:'call',value:'raise-real'}));
- act2(r3,{kind:'call',value:'no'});assert.equal(s.room.scores[team(r2)],4);
+ const r2=s.room.pendingBet.responder;act2(r2,{kind:'call',value:'raise-envido'});assert.equal(s.room.pendingBet.stake,6);
+ const r3=s.room.pendingBet.responder;act2(r3,{kind:'call',value:'raise-real'});assert.equal(s.room.pendingBet.stake,9);
+ const r4=s.room.pendingBet.responder;assert.throws(()=>act2(r4,{kind:'call',value:'raise-envido'}));
+ act2(r4,{kind:'call',value:'raise-real'});assert.deepEqual(s.room.pendingBet.calls,['envido','envido','envido','real','real']);
+ const r5=s.room.pendingBet.responder;act2(r5,{kind:'call',value:'raise-falta'});
+ const r6=s.room.pendingBet.responder;assert.throws(()=>act2(r6,{kind:'call',value:'raise-real'}));
+ act2(r6,{kind:'call',value:'no'});assert.equal(s.room.scores[team(r5)],Math.min(12,s.room.targetPoints-1));
  const t=seatSession(hands);now=1000;const act3=(p,c)=>createTeamReferee(t,{now:now+=10}).action(p,c);
  act3('player1',{kind:'call',value:'truco'});act3(t.room.pendingBet.responder,{kind:'call',value:'yes'});
  assert.throws(()=>act3('player1',{kind:'call',value:'envido'}));

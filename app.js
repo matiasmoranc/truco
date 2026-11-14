@@ -1817,16 +1817,16 @@ function scheduleLocalNextHand(room){
   },Math.max(0,pending.endsAt-gameTime()));
 }
 
-// The envido calls left in this hand: two envidos at most, real envido once (and no envido after it),
-// falta envido once and nothing after it. Declining pays what was accepted before (1 if nothing).
+// The envido calls left in this hand: envido can be raised any number of times without going down a level:
+// envidos while nobody has said real envido, then only real envidos, falta envido once and nothing after it.
+// Declining pays what was accepted before (1 if nothing).
 function envidoRaiseKinds(bet){
   if(bet?.type!=='envido'||bet.revealMode)return [];
   const calls=bet.calls?.length?bet.calls:[bet.called||'envido'];
   if(calls.includes('falta'))return [];
   const kinds=[];
-  if(!calls.includes('real')&&calls.filter(call=>call==='envido').length<2)kinds.push('envido');
-  if(!calls.includes('real'))kinds.push('real');
-  kinds.push('falta');
+  if(!calls.includes('real'))kinds.push('envido');
+  kinds.push('real','falta');
   return kinds;
 }
 function canRaiseEnvido(bet){return envidoRaiseKinds(bet).length>0;}
