@@ -7,7 +7,7 @@ import { installActivity } from './activity.js?v=20261010-adminstats32';
 import { installCredits } from './credits.js?v=20261025-claim1';
 import { installAccount } from './account.js?v=20261110-noemail1';
 import { initializeGameAuth } from './auth-init.js?v=20261016-android-google';
-import {installTeamTable,TEAM_SEATS,playerTeam,positionDealerDeck,renderTeamLobbySeats,renderWaitingSeats} from './team-table-ui.js?v=20261112-sala1';
+import {installTeamTable,TEAM_SEATS,playerTeam,positionDealerDeck,renderTeamLobbySeats,renderWaitingSeats} from './team-table-ui.js?v=20261113-envido1';
 import {installTablePeople} from './table-people.js?v=20261112-qa1';
 import {createLiveTables,LiveError} from './live-tables.js?v=20261112-qa1';
 import {installMatchPhoto} from './share-photo.js?v=20261027-photo2';
@@ -1817,17 +1817,21 @@ function scheduleLocalNextHand(room){
   },Math.max(0,pending.endsAt-gameTime()));
 }
 
-// The envido calls left in this hand: envido can be raised any number of times without going down a level:
-// envidos while nobody has said real envido, then only real envidos, falta envido once and nothing after it.
-// Declining pays what was accepted before (1 if nothing).
-function envidoRaiseKinds(bet){
+// Declining an envido pays what was accepted before (1 if nothing).
+// Raises never go down: any number of envidos, then any number of real envidos, then the falta (nothing after it).
+// When the leader needs a single point, only the falta envido is offered.
+function envidoRaiseKinds(bet,room=state.room){
   if(bet?.type!=='envido'||bet.revealMode)return [];
   const calls=bet.calls?.length?bet.calls:[bet.called||'envido'];
   if(calls.includes('falta'))return [];
-  const kinds=[];
-  if(!calls.includes('real'))kinds.push('envido');
-  kinds.push('real','falta');
-  return kinds;
+  if(room&&faltanParaGanar(room)===1)return ['falta'];
+  return calls.includes('real')?['real','falta']:['envido','real','falta'];
+}
+// The envido calls offered to start one: all three, or only the falta when the leader needs a single point.
+function envidoCallKinds(room=state.room){return room&&faltanParaGanar(room)===1?['falta']:['envido','real','falta'];}
+function envidoCallButtons(room,short=false){
+  const labels=short?{envido:'ENVIDO',real:'REAL',falta:'FALTA'}:{envido:'ENVIDO',real:'REAL ENVIDO',falta:'FALTA ENVIDO'};
+  return envidoCallKinds(room).map(kind=>'<button class="pass-button" data-action="'+kind+'"><strong>'+labels[kind]+'</strong></button>').join('');
 }
 function canRaiseEnvido(bet){return envidoRaiseKinds(bet).length>0;}
 function envidoRaiseButtons(bet){
@@ -2750,10 +2754,10 @@ function renderGame() {
   if(mustDeclareFlor){buttons.push('<button class="call-button" data-action="flor"><strong>FLOR</strong></button>');}
   else if(pending?.revealMode){buttons.push('<span class="action-wait">'+(pending.revealTurn===state.playerId?'Deslizá para elegir tus tantos':'Esperando los tantos del rival…')+'</span>');}
   else if(pending?.type==='flor'){if(pending.responder===state.playerId)buttons.push(...florAnswers(pending,roomHasFlor(room,state.hand)).map(([action,label])=>`<button class="${action==='yes'?'call-button':'pass-button'}" data-action="${action}">${label}</button>`));else buttons.push('<span class="action-wait">ESPERANDO RESPUESTA…</span>');}
-  else if(pending){if(pending.responder===state.playerId){if(['envido','truco'].includes(pending.type)&&state.hand.length===3&&roomHasFlor(room,state.hand)&&!room.flors?.[state.playerId])buttons.push('<button class="call-button" data-action="flor"><strong>FLOR</strong></button>');if(pending.type==='truco'&&canEnvido)buttons.push('<button class="pass-button" data-action="envido"><strong>ENVIDO</strong></button><button class="pass-button" data-action="real"><strong>REAL ENVIDO</strong></button><button class="pass-button" data-action="falta"><strong>FALTA ENVIDO</strong></button>');if(canRaiseEnvido(pending)&&!Object.keys(room.flors||{}).length){buttons.push('<div class="envido-action-grid"><div class="envido-action-row envido-raises">'+envidoRaiseButtons(pending)+'</div><div class="envido-action-row envido-answer"><button class="call-button" data-action="yes">QUIERO</button><button class="pass-button" data-action="no">NO QUIERO</button></div></div>');}else{buttons.push(`${pending.type==='flor'?florAnswers(pending,roomHasFlor(room,state.hand)).map(([action,label])=>`<button class="${action==='yes'?'call-button':'pass-button'}" data-action="${action}">${label}</button>`).join(''):'<button class="call-button" data-action="yes">QUIERO</button><button class="pass-button" data-action="no">NO QUIERO</button>'}`);}if(pending.type==='truco'&&pending.stake<4)buttons.push(`<button class="pass-button" data-action="raise">${pending.stake===2?'RETRUCO':'VALE 4'}</button>`);}else buttons.push('<span class="action-wait">ESPERANDO RESPUESTA…</span>');}
+  else if(pending){if(pending.responder===state.playerId){if(['envido','truco'].includes(pending.type)&&state.hand.length===3&&roomHasFlor(room,state.hand)&&!room.flors?.[state.playerId])buttons.push('<button class="call-button" data-action="flor"><strong>FLOR</strong></button>');if(pending.type==='truco'&&canEnvido)buttons.push(envidoCallButtons(room));if(canRaiseEnvido(pending)&&!Object.keys(room.flors||{}).length){buttons.push('<div class="envido-action-grid"><div class="envido-action-row envido-raises">'+envidoRaiseButtons(pending)+'</div><div class="envido-action-row envido-answer"><button class="call-button" data-action="yes">QUIERO</button><button class="pass-button" data-action="no">NO QUIERO</button></div></div>');}else{buttons.push(`${pending.type==='flor'?florAnswers(pending,roomHasFlor(room,state.hand)).map(([action,label])=>`<button class="${action==='yes'?'call-button':'pass-button'}" data-action="${action}">${label}</button>`).join(''):'<button class="call-button" data-action="yes">QUIERO</button><button class="pass-button" data-action="no">NO QUIERO</button>'}`);}if(pending.type==='truco'&&pending.stake<4)buttons.push(`<button class="pass-button" data-action="raise">${pending.stake===2?'RETRUCO':'VALE 4'}</button>`);}else buttons.push('<span class="action-wait">ESPERANDO RESPUESTA…</span>');}
   else {
     if(state.hand.length===3&&roomHasFlor(room,state.hand)&&!room.flors?.[state.playerId])buttons.push('<button class="call-button" data-action="flor"><strong>FLOR</strong></button>');
-    if(canEnvido)buttons.push('<button class="pass-button" data-action="envido"><strong>ENVIDO</strong></button><button class="pass-button" data-action="real"><strong>REAL</strong></button><button class="pass-button" data-action="falta"><strong>FALTA</strong></button>');
+    if(canEnvido)buttons.push(envidoCallButtons(room,true));
     if(room.status==='started'&&state.hand.length&&!room.resolvingTrick&&!room.pendingNextHand){
     const level=Number(room.trucoLevel)||1;if(level<4&&(level===1||room.lastTrucoCaller!==state.playerId))buttons.push(`<button class="call-button" data-action="${level===1?'truco':level===2?'retruco':'vale4'}"><strong>${level===1?'TRUCO':level===2?'RETRUCO':'VALE 4'}</strong></button>`);
     }else if(!buttons.length)buttons.push('<span class="action-wait">ESPERÁ TU TURNO</span>');

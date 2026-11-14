@@ -246,21 +246,28 @@ test('Running out of time with an envido open pays what going to the deck pays, 
  assert.ok(lines.includes('2 puntos por real envido no querido'),lines.join(' | '));
 });
 
-test('Envido rules: any number of raises without going down a level, only real envidos after real, nothing after falta',()=>{
- const s=fixture();const tryCall=(now,player,value)=>{try{createReferee(s,{now}).action(player,{kind:'call',value});}catch{}};
+test('Envido rules: any number of envidos, then only real envidos, then the falta; never going down',()=>{
+ const s=fixture();
  createReferee(s,{now:200}).action('player1',{kind:'call',value:'envido'});
  createReferee(s,{now:300}).action('player2',{kind:'call',value:'raise-envido'});
  createReferee(s,{now:400}).action('player1',{kind:'call',value:'raise-envido'});
- assert.deepEqual(s.room.pendingBet.calls,['envido','envido','envido']);
+ assert.deepEqual(s.room.pendingBet.calls,['envido','envido','envido']);assert.equal(s.room.pendingBet.stake,6);
  createReferee(s,{now:500}).action('player2',{kind:'call',value:'raise-real'});
- const before=s.room.pendingBet.calls.length;
- tryCall(600,'player1','raise-envido');
- assert.equal(s.room.pendingBet.calls.length,before,'no envido after real envido');
- createReferee(s,{now:700}).action('player1',{kind:'call',value:'raise-real'});
- assert.deepEqual(s.room.pendingBet.calls,['envido','envido','envido','real','real']);
- createReferee(s,{now:800}).action('player2',{kind:'call',value:'raise-falta'});
- tryCall(900,'player1','raise-real');tryCall(900,'player1','raise-envido');
- assert.equal(s.room.pendingBet.calls.length,6,'nothing after falta');
+ assert.equal(s.room.pendingBet.stake,9);
+ // After a real envido only real envidos (or the falta) follow: an envido is ignored.
+ createReferee(s,{now:600}).action('player1',{kind:'call',value:'raise-envido'});
+ assert.equal(s.room.pendingBet.calls.length,4);
+ createReferee(s,{now:650}).action('player1',{kind:'call',value:'raise-real'});
+ assert.deepEqual(s.room.pendingBet.calls,['envido','envido','envido','real','real']);assert.equal(s.room.pendingBet.stake,10,'never more than what the leader needs (10 points)');
+ createReferee(s,{now:700}).action('player2',{kind:'call',value:'no'});
+ assert.equal(s.room.scores.player1,9,'no quiero pays the last accepted value');
+ // One point from winning: only the falta envido can raise.
+ const one=fixture();one.room.scores={player1:9,player2:3};
+ createReferee(one,{now:200}).action('player1',{kind:'call',value:'envido'});
+ for(const kind of ['envido','real'])createReferee(one,{now:300}).action('player2',{kind:'call',value:'raise-'+kind});
+ assert.equal(one.room.pendingBet.calls.length,1);
+ createReferee(one,{now:400}).action('player2',{kind:'call',value:'raise-falta'});
+ assert.deepEqual(one.room.pendingBet.calls,['envido','falta']);
  for(const [calls,declined] of [[['envido'],1],[['envido','envido'],2],[['envido','real'],2],[['real'],1]]){
   const t=fixture();
   createReferee(t,{now:200}).action('player1',{kind:'call',value:calls[0]});

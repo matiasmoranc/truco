@@ -93,14 +93,12 @@ function sideScore(room,player,points,detail,extra){
   const scores=capScores(room,{...room.scores,[player]:(Number(room.scores?.[player])||0)+points});
   return {...(extra||{}),scores,handScoreEntries:[...(room.handScoreEntries||[]),{player,points:scores[player]-(Number(room.scores?.[player])||0),detail}]};
 }
-function envidoRaiseKinds(bet){
+function envidoRaiseKinds(bet,room=state.room){
   if(bet?.type!=='envido'||bet.revealMode)return [];
   const calls=bet.calls?.length?bet.calls:[bet.called||'envido'];
   if(calls.includes('falta'))return [];
-  const kinds=[];
-  if(!calls.includes('real'))kinds.push('envido');
-  kinds.push('real','falta');
-  return kinds;
+  if(room&&faltanParaGanar(room)===1)return ['falta'];
+  return calls.includes('real')?['real','falta']:['envido','real','falta'];
 }
 function ptsText(n){return Number(n)===1?'1 punto':n+' puntos';}
 function trucoName(level){return {1:'truco',2:'truco',3:'retruco',4:'vale cuatro'}[Number(level)]||'truco';}
