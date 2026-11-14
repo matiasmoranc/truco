@@ -236,7 +236,10 @@ exports.adminConsole=onCall({...options,secrets:[liveInternalSecret]},async requ
   const days=Math.min(CHAT_LOG_DAYS,Math.max(1,Math.floor(Number(data.days)||7)));
   const from=chatDay(Date.now()-(days-1)*86400000);
   const stored=(await db.ref('chatLog').orderByKey().startAt(from).get()).val()||{};
-  return {days,messages:chatLogList(stored)};
+  const messages=chatLogList(stored);
+  // Grouped by table, with everyone who sat there (the credit ledger knows each game's players).
+  const ledger=messages.length?await creditStore.readLedger():null;
+  return {days,messages,groups:require('./chat-log.cjs').chatLogGroups(messages,ledger?.matches)};
  }
  if(action==='metrics'){
   const registeredUids=[],signups=[];let token;

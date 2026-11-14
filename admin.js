@@ -573,24 +573,32 @@ function peopleList(){
 }
 function writeTo(u){showTab('messages');$('message-to').value=u.name||'';$('message-text').focus();}
 // Typed table chat (quick messages are not stored), newest first, grouped by day.
-let chatLog=[],chatRequest=0;
+let chatLog=[],chatGroups=[],chatRequest=0;
 async function loadChat(){
  const request=++chatRequest;$('chat-summary').textContent='Cargando…';
- try{const data=(await call({action:'chat-log',days:Number($('chat-days').value)})).data;if(request!==chatRequest)return;chatLog=data.messages||[];renderChat();}
- catch(e){if(request===chatRequest){chatLog=[];$('chat-list').replaceChildren();$('chat-summary').textContent='No se pudo cargar el chat'+(GAME==='ar'?' (este juego todavía no lo guarda).':'.');}}
+ try{const data=(await call({action:'chat-log',days:Number($('chat-days').value)})).data;if(request!==chatRequest)return;chatLog=data.messages||[];chatGroups=data.groups||[];renderChat();}
+ catch(e){if(request===chatRequest){chatLog=[];chatGroups=[];$('chat-list').replaceChildren();$('chat-summary').textContent='No se pudo cargar el chat'+(GAME==='ar'?' (este juego todavía no lo guarda).':'.');}}
 }
+// One card per table: its players (also the ones who never wrote) and its chat, in order.
 function renderChat(){
- const query=$('chat-search').value.trim().toLocaleLowerCase(),list=chatLog.filter(m=>!query||[m.name,m.code,m.text].some(v=>String(v||'').toLocaleLowerCase().includes(query)));
- const people=new Set(list.map(m=>m.uid)).size;
- $('chat-summary').textContent=list.length?list.length+(list.length===1?' mensaje':' mensajes')+' de '+people+(people===1?' jugador':' jugadores')+(query?' que coinciden con la búsqueda':''):(query?'Ningún mensaje coincide con la búsqueda.':'Todavía no hay mensajes escritos en este período.');
- const box=$('chat-list');box.replaceChildren();let day='';
- for(const m of list){
-  const when=new Date(m.at),label=when.toLocaleDateString('es-UY',{timeZone:ZONE,weekday:'long',day:'numeric',month:'long'});
-  if(label!==day){day=label;box.append(node('h3',label,'chat-day'));}
-  const row=node('div','','chat-row'),head=node('div','','chat-row-head'),who=node('button',m.name||'Sin nombre','chat-who');
-  who.type='button';who.title='Ver a este jugador en Usuarios';who.onclick=()=>{$('search').value=m.name||m.uid;showTab('users');renderUsers();};
-  head.append(node('time',when.toLocaleTimeString('es-UY',{timeZone:ZONE,hour:'2-digit',minute:'2-digit'})),who,node('small','Mesa '+(m.code||'?')+(m.mode==='2v2'?' · 2 vs 2':'')));
-  row.append(head,node('p',m.text,'chat-text'));box.append(row);
+ const query=$('chat-search').value.trim().toLocaleLowerCase(),has=v=>String(v||'').toLocaleLowerCase().includes(query);
+ const all=chatGroups.length?chatGroups:chatLog.length?[{key:'all',code:'',mode:'',players:[],messages:[...chatLog].reverse(),lastAt:chatLog[0].at,games:1}]:[];
+ const groups=all.filter(g=>!query||has(g.code)||g.players.some(p=>has(p.name))||g.messages.some(m=>has(m.name)||has(m.text)));
+ const total=groups.reduce((n,g)=>n+g.messages.length,0);
+ $('chat-summary').textContent=groups.length?groups.length+(groups.length===1?' mesa':' mesas')+' · '+total+(total===1?' mensaje':' mensajes')+(query?' que coinciden con la búsqueda':''):(query?'Ninguna mesa coincide con la búsqueda.':'Todavía no hay mensajes escritos en este período.');
+ const time=at=>new Date(at).toLocaleTimeString('es-UY',{timeZone:ZONE,hour:'2-digit',minute:'2-digit'});
+ const date=at=>new Date(at).toLocaleDateString('es-UY',{timeZone:ZONE,weekday:'short',day:'numeric',month:'short'});
+ const toUser=(name,uid)=>{$('search').value=name||uid;showTab('users');renderUsers();};
+ const box=$('chat-list');box.replaceChildren();
+ for(const g of groups){
+  const card=node('article','','chat-table'),head=node('div','','chat-table-head');
+  const first=g.messages[0]?.at,last=g.lastAt;
+  head.append(node('strong',g.code?'Mesa '+g.code:'Mensajes'),node('span',(g.mode==='2v2'?'2 vs 2':g.mode==='1v1'?'1 vs 1':'')+(g.games>1?' · '+g.games+' partidas':'')),node('small',date(first)+' · '+time(first)+(last!==first?' a '+time(last):'')));
+  const people=node('div','','chat-table-people');
+  for(const p of g.players){const chip=node('button',(p.name||'Sin nombre')+(p.bot?' (bot)':''),'chat-person'+(p.wrote?' wrote':'')+(p.bot?' bot':''));chip.type='button';chip.title=p.wrote?'Escribió en esta mesa':'No escribió';if(p.bot)chip.disabled=true;else chip.onclick=()=>toUser(p.name,p.uid);people.append(chip);}
+  const log=node('div','','chat-table-log');
+  for(const m of g.messages){const row=node('div','','chat-line'),who=node('button',m.name||'Sin nombre','chat-who');who.type='button';who.onclick=()=>toUser(m.name,m.uid);row.append(node('time',time(m.at)),who,node('span',m.text,'chat-text'));log.append(row);}
+  card.append(head,people,log);box.append(card);
  }
 }
 $('chat-days').addEventListener('change',loadChat);

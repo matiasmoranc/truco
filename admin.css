@@ -243,3 +243,17 @@ textarea:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 .chat-who{background:none;border:0;padding:0;min-height:0;color:var(--gold);font-weight:700;font-size:14px;cursor:pointer}.chat-who:hover{text-decoration:underline}
 .chat-row-head small{margin-left:auto}
 .chat-text{margin:6px 0 0;font-size:15px;overflow-wrap:anywhere;white-space:pre-wrap}
+
+/* Chat by table: a card per table with its players and its messages. */
+.chat-table{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:grid;gap:10px;min-width:0}
+.chat-table-head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.chat-table-head strong{font-size:15px}.chat-table-head span{color:var(--muted);font-size:13px}.chat-table-head small{margin-left:auto;color:var(--muted);font-size:12px}
+.chat-table-people{display:flex;flex-wrap:wrap;gap:6px}
+.chat-person{background:#ffffff0d;border:1px solid var(--line-2);color:var(--muted);border-radius:999px;padding:3px 10px;font-size:12.5px;min-height:0;cursor:pointer}
+.chat-person.wrote{color:var(--gold);border-color:#e8c98366;font-weight:700}
+.chat-person.bot{cursor:default;opacity:.7}
+.chat-table-log{display:grid;gap:5px;border-top:1px solid var(--line);padding-top:8px}
+.chat-line{display:grid;grid-template-columns:auto auto 1fr;gap:8px;align-items:baseline;font-size:14px}
+.chat-line time{color:var(--muted);font-size:12px;font-variant-numeric:tabular-nums}
+.chat-line .chat-who{font-size:13.5px}
+.chat-line .chat-text{margin:0;overflow-wrap:anywhere;white-space:pre-wrap;font-size:14.5px}
