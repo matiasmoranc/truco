@@ -8,16 +8,35 @@ import { AppUpdate, AppUpdateAvailability, AppUpdateResultCode } from '@capaweso
 import { FirebaseMessaging } from '@capacitor-firebase/messaging';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
+import { TextToSpeech, QueueStrategy } from '@capacitor-community/text-to-speech';
 import { rewardedAds } from './no-ads.js';
 
 // App Store id, needed on iPhone to look up and open the listing.
 const APP_STORE_ID = '6821732363';
+
+// Android's web view has no speech synthesis: the calls ("¡Truco!", "Envido"…) use the phone's own voice.
+// iPhone keeps the web voice, which works there.
+let voiceLang = null;
+async function androidVoiceLang() {
+  if (voiceLang) return voiceLang;
+  for (const lang of ['es-UY', 'es-AR', 'es-419', 'es-US', 'es-ES']) {
+    try { if ((await TextToSpeech.isLanguageSupported({ lang })).supported) return (voiceLang = lang); } catch { /* Try the next one. */ }
+  }
+  return (voiceLang = 'es-ES');
+}
+const nativeVoice = Capacitor.getPlatform() === 'android' ? {
+  async speak(text) {
+    try { await TextToSpeech.speak({ text, lang: await androidVoiceLang(), rate: 0.95, pitch: 0.75, volume: 1, queueStrategy: QueueStrategy.Flush }); } catch (error) { console.warn('[truco:voice] native', error); }
+  },
+  stop() { TextToSpeech.stop().catch(() => {}); }
+} : null;
 
 // The same Firebase JS session drives database rules and callable Functions.
 globalThis.trucoNative = {
   isNative: Capacitor.isNativePlatform(),
   platform: Capacitor.getPlatform(),
   rewardedAds,
+  nativeVoice,
   publicUrl: 'https://trucouruguayo.uy/',
   // The match photo goes to the phone's share sheet (Instagram, WhatsApp…) from a cache file.
   async shareImage(base64, name) {

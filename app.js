@@ -477,8 +477,11 @@ let voiceUnlocked=false;
 let activeVoiceUtterance=null;
 // The sound messages play unless the player turned the voice off on purpose (the voice itself starts off).
 const chatSoundsMuted=()=>{try{return localStorage.getItem('truco-call-sound')==='off';}catch{return false;}};
+// The Android app speaks the calls with the phone's own voice (its web view has no speech synthesis).
+const nativeVoice=()=>globalThis.trucoNative?.nativeVoice||null;
 function unlockVoice(){
   if(!chatSoundsMuted())unlockChatSounds();
+  if(soundEnabled&&nativeVoice()){voiceUnlocked=true;return;}
   if(voiceUnlocked||!soundEnabled||!('speechSynthesis' in window))return;
   // Start a silent synthesis session directly inside the user's gesture on iOS.
   try{
@@ -642,7 +645,9 @@ function renderRoundPauseTimer(){
 }
 
 function speakCall(text){
-  if(!soundEnabled||!voiceUnlocked||!('speechSynthesis' in window))return;
+  if(!text||!soundEnabled||!voiceUnlocked)return;
+  if(nativeVoice()){nativeVoice().speak(text);return;}
+  if(!('speechSynthesis' in window))return;
   window.speechSynthesis.cancel();
   const utterance=new SpeechSynthesisUtterance(text);
   utterance.lang='es-UY';utterance.rate=.88;utterance.pitch=.55;
@@ -3986,7 +3991,7 @@ $('player-sound-toggle').addEventListener('click',()=>{
   soundEnabled=!soundEnabled;
   if(soundEnabled)unlockVoice();
   localStorage.setItem('truco-call-sound',soundEnabled?'on':'off');
-  if(!soundEnabled)window.speechSynthesis?.cancel();
+  if(!soundEnabled){window.speechSynthesis?.cancel();nativeVoice()?.stop();}
   renderCallNotice();
 });
 document.addEventListener('click',event=>{if(event.isTrusted)unlockVoice();},{capture:true});

@@ -28,6 +28,7 @@
   },
   "homepage": "https://github.com/matiasmoranc/truco#readme",
   "dependencies": {
+    "@capacitor-community/text-to-speech": "8.0.2",
     "@capacitor-firebase/authentication": "8.5.2",
     "@capacitor-firebase/messaging": "8.5.2",
     "@capacitor/android": "8.5.3",
