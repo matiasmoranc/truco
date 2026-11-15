@@ -1379,9 +1379,9 @@ const waitingChat={key:null,open:false,seen:new Set(),unread:0,sending:false};
 function waitingChatAvailable(){const r=state.room;return !!(r?.managedCredits&&r.mode==='2v2'&&r.status==='waiting'&&state.playerId&&r.players?.[state.playerId]?.uid===state.uid);}
 function renderWaitingChat(){
   const on=waitingChatAvailable(),toggle=$('waiting-chat-toggle'),panel=$('waiting-chat');
-  toggle.classList.toggle('hidden',!on);if(!on){panel.classList.add('hidden');return;}
+  toggle.classList.toggle('hidden',!on);if(!on){panel.classList.add('hidden');$('waiting-view').classList.remove('chat-open');return;}
   const key=state.roomCode+':'+(state.room.creditMatch?.id||'');
-  if(waitingChat.key!==key){Object.assign(waitingChat,{key,open:false,seen:new Set(Object.keys(state.room.lobbyChat||{})),unread:0,sending:false});$('waiting-chat-input').value='';$('waiting-chat-error').classList.add('hidden');}
+  if(waitingChat.key!==key){Object.assign(waitingChat,{key,open:true,seen:new Set(Object.keys(state.room.lobbyChat||{})),unread:0,sending:false});$('waiting-chat-input').value='';$('waiting-chat-error').classList.add('hidden');}
   const lines=Object.entries(state.room.lobbyChat||{}).filter(([,x])=>x&&typeof x.text==='string'&&Number.isFinite(x.at)).sort((x,y)=>x[1].at-y[1].at||x[0].localeCompare(y[0]));
   for(const [id,x] of lines)if(!waitingChat.seen.has(id)){waitingChat.seen.add(id);if(!waitingChat.open&&x.sender!==state.playerId)waitingChat.unread++;}
   const log=$('waiting-chat-log'),near=log.scrollHeight-log.scrollTop-log.clientHeight<24;
@@ -1389,7 +1389,7 @@ function renderWaitingChat(){
     if(x.system){row.className='waiting-chat-line system';row.textContent=x.text;return row;}
     row.className='waiting-chat-line'+(x.sender===state.playerId?' mine':'');const who=document.createElement('strong');who.textContent=(x.sender===state.playerId?'Vos':x.name||state.room.players?.[x.sender]?.name||'Jugador')+':';row.append(who,' '+x.text);return row;}):[Object.assign(document.createElement('p'),{className:'waiting-chat-line system',textContent:'Saludá mientras entran los demás 👋'})]));
   if(near||waitingChat.open)log.scrollTop=log.scrollHeight;
-  panel.classList.toggle('hidden',!waitingChat.open);toggle.setAttribute('aria-expanded',String(waitingChat.open));toggle.classList.toggle('open',waitingChat.open);
+  panel.classList.toggle('hidden',!waitingChat.open);$('waiting-view').classList.toggle('chat-open',on&&waitingChat.open);toggle.setAttribute('aria-expanded',String(waitingChat.open));toggle.classList.toggle('open',waitingChat.open);
   $('waiting-chat-unread').textContent=waitingChat.unread>9?'9+':String(waitingChat.unread);$('waiting-chat-unread').classList.toggle('hidden',!waitingChat.unread||waitingChat.open);
   $('waiting-chat-input').disabled=waitingChat.sending;
 }
@@ -3923,6 +3923,7 @@ $('fold-hand').addEventListener('click',event=>runLiveAction(event.currentTarget
 $('enter-room').addEventListener('click',enterRoom);
 $('waiting-chat-toggle').addEventListener('click',()=>{waitingChat.open=!waitingChat.open;if(waitingChat.open)waitingChat.unread=0;renderWaitingChat();if(waitingChat.open)$('waiting-chat-input').focus();});
 $('waiting-chat-form').addEventListener('submit',sendWaitingChat);
+$('waiting-chat-close').addEventListener('click',()=>{waitingChat.open=false;renderWaitingChat();});
 $('leave-room').addEventListener('click',async()=>{if(state.pendingCreate&&state.pendingCreate===state.roomCode){state.cancelAfterCreate=state.roomCode;return;}if(state.room?.managedCredits){const waiting=state.room.status==='waiting';if(waiting)state.cancelingWaitingRoom=state.roomCode;try{await creditCommand({kind:'cancel'});if(waiting&&state.cancelingWaitingRoom)returnToLobby();}catch(error){state.cancelingWaitingRoom=null;if(waiting&&/No pertenec/.test(error?.message||''))returnToLobby();return;}return;}stopRoomPresence();stopBot();state.roomWatchVersion=(state.roomWatchVersion||0)+1;state.navigationEpoch=(state.navigationEpoch||0)+1;forgetRoomSeat();if(state.unsubscribe)state.unsubscribe();if(state.privateUnsubscribe)state.privateUnsubscribe();state.privateUnsubscribe=null;state.privateHandKey=null;state.room=null;state.localGame=false;showView('welcome-view');openLobby();});
 $('game-home').addEventListener('click',()=>{
   if(!state.room){returnToLobby();return;}

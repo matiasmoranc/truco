@@ -2364,8 +2364,8 @@ input,textarea,[contenteditable=""],[contenteditable="true"]{-webkit-user-select
 .friend-row.is-off{opacity:.65}
 .friend-avatar{position:relative;flex:none;display:inline-flex}
 .friend-avatar .player-avatar{width:42px;height:42px}
-.live-dot{position:absolute;left:-2px;bottom:-1px;width:13px;height:13px;border-radius:50%;background:#4dd99b;border:2.5px solid #0f3529;z-index:2}
-.live-dot.busy{background:#f2b552}
+.friend-avatar .live-dot{position:absolute;left:-2px;bottom:-1px;width:13px;height:13px;margin:0;border-radius:50%;background:#4dd99b;border:2.5px solid #0f3529;box-shadow:none;z-index:2}
+.friend-avatar .live-dot.busy{background:#f2b552}
 .friend-level{margin-left:6px;padding:2px 7px;border-radius:99px;background:#e8c98322;color:#e8c983;font-size:11px;font-weight:900}
 .friend-who small.is-online{color:#9ff0c8}.friend-who small.is-playing{color:#f6d08e}
 .friend-button.icon-only{min-width:40px;padding:8px 0;font-size:18px;line-height:1}
@@ -2623,3 +2623,12 @@ input,textarea,[contenteditable=""],[contenteditable="true"]{-webkit-user-select
 
 .waiting-player.away .waiting-player-cards{opacity:.35}
 .waiting-player-away{display:block;font-size:12px;font-style:italic;color:#e9c98f}
+
+/* The waiting room fits the screen: no page scroll; long chats scroll inside their box. */
+#waiting-view.active{height:100vh;height:100dvh;min-height:0;overflow:hidden}
+#waiting-view .waiting-content{flex:1;min-height:0;display:flex;flex-direction:column;margin:0 auto}
+#waiting-view .waiting-table{flex:1;min-height:260px;height:auto;max-height:620px}
+#waiting-view.chat-open .waiting-content{padding-bottom:calc(230px + env(safe-area-inset-bottom))}
+.waiting-chat{padding-top:30px}
+.waiting-chat-log{max-height:min(18vh,140px)}
+.waiting-chat-close{position:absolute;top:4px;right:8px;width:26px;height:26px;padding:0;border:0;border-radius:50%;background:rgba(10,30,22,.7);color:var(--ink);font-size:18px;line-height:26px;text-align:center;cursor:pointer}
