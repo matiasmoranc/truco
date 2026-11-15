@@ -83,9 +83,8 @@ function createTeamReferee(s,{now=Date.now(),deckFactory=deck}={}){
   const cards=deckFactory();r.dealer=dealer;r.mano=nextSeat(dealer);r.handNumber++;r.status='started';r.turn=r.mano;
   s.hands=Object.fromEntries(SEATS.map((p,i)=>[p,cards.slice(i*3,i*3+3)]));s.originals=structuredClone(s.hands);r.muestra=cards[12];s.truth=Object.fromEntries(SEATS.map(p=>[p,envido(s.hands[p],r.muestra)]));
   Object.assign(r,{deckCount:27,trickNo:1,playedCount:0,tricks:[],trickCards:[],folded:{},playedBy:{},trucoLevel:1,lastTrucoTeam:null,pendingBet:null,pendingNextHand:null,resolvingTrick:false,resolutionEndsAt:null,flors:{},florClosed:false,florSettled:false,florDeferred:null,florWinner:null,florCompared:false,envidoClosed:false,envidoAudit:null,endReveal:null,handScoreEntries:[],resolvedTrickWinner:null});r.callNotice=null;r.teamSignal=null;feed('Nueva mano. Empieza '+r.players[r.mano].name+'.');
-  // The first player from the mano who holds a flower has it sung for them right away, as if they
-  // had pressed FLOR: no envido can be called over it. Everything after that is as usual.
-  const first=ordered(r.mano).find(canSing);if(first){flor(first);singBotFlors();}
+  // A flower is sung for its holder when their turn comes, as if they had pressed FLOR (never on another player's turn).
+  autoFlor();
  }
  function clock(){const p=r.pendingBet?.revealMode?r.pendingBet.revealTurn:r.pendingBet?.responder||r.turn;const key=r.status==='started'&&!r.resolvingTrick&&!r.pendingNextHand&&p?`${r.handNumber}:${r.trickNo}:${r.playedCount}:${p}:${r.pendingBet?.id||''}:${r.pendingBet?.revealTurn||''}`:null;if(!key)r.turnClock=null;else if(r.turnClock?.key!==key)r.turnClock={key,player:p,startedAt:now};}
  // Going to the deck with an unsung flower sings it first (it may score, or the rivals answer it).
@@ -110,7 +109,7 @@ function createTeamReferee(s,{now=Date.now(),deckFactory=deck}={}){
   r.tricks.push({winner,leader:leaders[0].playerId,cards:structuredClone(cards)});r.resolvedTrickWinner=winner?leaders[0].playerId:cards[0].playerId;r.resolvingTrick=true;r.resolutionEndsAt=now+2800;r.turn=null;
  }
  function play(p,id){if(r.pendingBet||r.turn!==p||!active(p))throw new Error('No te corresponde jugar.');if(owesFlor(p))throw new Error('Tenés flor. Cantala antes de tirar una carta.');const c=s.hands[p].find(c=>c.id===id);if(!c)throw new Error('Esa carta no está en tu mano.');s.hands[p]=s.hands[p].filter(c=>c.id!==id);r.playedBy[p]=(r.playedBy[p]||0)+1;r.playedCount++;r.trickCards.push({playerId:p,name:r.players[p].name,card:c});if(Object.keys(r.flors||{}).length)r.florClosed=true;r.turn=nextActive(p);completeTrick();}
- function flor(p){if(r.florClosed)throw new Error('Ya se jugó una carta después de la flor: no se puede cantar.');if(!flower(s.originals[p]||[],r.muestra)||r.flors[p]!=null||(r.playedBy?.[p]||0)>0)throw new Error('No podés cantar flor.');
+ function flor(p){if(r.flors?.[p]!=null&&!r.florClosed&&!(r.playedBy?.[p]>0))return;if(r.florClosed)throw new Error('Ya se jugó una carta después de la flor: no se puede cantar.');if(!flower(s.originals[p]||[],r.muestra)||r.flors[p]!=null||(r.playedBy?.[p]||0)>0)throw new Error('No podés cantar flor.');
   const pending=r.pendingBet,suspended=pending?.type==='truco'?pending:pending?.suspendedBet||null;
   // A sung flor annuls the envido: a pending one is dropped (only the truco under it stays) and an accepted one is not paid.
   if(pending?.type==='envido'||r.envidoAudit&&!r.envidoAudit.settled){r.envidoAudit=null;feed('La flor anula el envido.');}
@@ -121,6 +120,8 @@ function createTeamReferee(s,{now=Date.now(),deckFactory=deck}={}){
   if(!members(opponent(team(p))).some(holdsFlor)){r.callNotice.duration=3000;r.florWinner=p;award(team(p),3,'3 puntos por flor');r.florSettled=true;resume(suspended);checkWin();return;}
   r.pendingBet={id:crypto.randomUUID(),type:'flor',caller:p,callerTeam:team(p),responder:responder(opponent(team(p)),true),stake:3,accepted:0,called:'flor',suspendedBet:suspended};
  }
+ // The player whose turn it is (to play, or to answer a call) sings their flower now; the first flor opens it, the rest answer as usual.
+ function autoFlor(){if(r.status!=='started'||r.resolvingTrick||r.pendingNextHand||Object.keys(r.flors||{}).length||r.florSettled)return;const b=r.pendingBet;if(b?.revealMode||b?.type==='flor')return;const p=b?b.responder:r.turn;if(p&&canSing(p)){flor(p);singBotFlors();}}
  // Bots holding a flower sing it the moment another flor is sung, before any card.
  function singBotFlors(){for(const q of ordered(r.mano||'player1')){if(r.status!=='started')return;if(String(r.players?.[q]?.uid||'').startsWith('bot:')&&canSing(q))flor(q);}}
  function call(p,v,timedOut=false){const b=r.pendingBet;
@@ -195,12 +196,13 @@ const beatsLead=(b,p,n)=>{const lead=leadSeat(b);return !lead||n>b.reveals[lead]
  }
  // When the time runs out: the real envido or flor points, or "son buenas" if they do not beat the best one.
  function autoDeclare(p){const b=r.pendingBet,n=b.type==='flor'?florValue(s.originals[p],r.muestra):s.truth[p];declare(p,n,!beatsLead(b,p,n));}
- function advance(){
+ function advance(sing=true){
   if(r.status==='drawing'){deal('player4');r.openingDraw=null;delete s.drawPool;}
   if(r.status==='started'&&r.resolvingTrick&&now>=r.resolutionEndsAt){const w=settledTricks(r.tricks,r.mano);r.resolvingTrick=false;r.resolutionEndsAt=null;if(w)finish(w,r.trucoLevel);else{r.trickCards=[];r.trickNo++;r.callNotice=null;r.teamSignal=null;r.turn=active(r.resolvedTrickWinner)?r.resolvedTrickWinner:nextActive(r.resolvedTrickWinner);}}
   if(r.status==='started'&&r.pendingNextHand&&now>=r.pendingNextHand.endsAt){const b=r.pendingNextHand;finish(b.winner,b.foldPoints,b.reason||'');}
   if(r.status==='complete'&&r.endReveal&&!r.endReveal.done&&now>=r.endReveal.endsAt)r.endReveal.done=true;
   if(r.status==='revealing'&&now>=r.endReveal.endsAt)deal(nextSeat(r.dealer));
+  if(sing)autoFlor();
   if(r.status==='started'&&r.turnClock&&now-r.turnClock.startedAt>=45000){const p=r.turnClock.player;r.timeoutCounts[p]=(r.timeoutCounts[p]||0)+1;if(r.timeoutCounts[p]>=3){finish(opponent(team(p)),r.targetPoints,'Inactividad.');r.endReveal.done=true;}else if(owesFlor(p)&&!r.pendingBet?.revealMode)fold(p);else if(r.pendingBet?.responder===p&&!r.pendingBet.revealMode)call(p,'no',true);else if(r.pendingBet?.revealMode)autoDeclare(p);else fold(p);}
   clock();return s;
  }
@@ -212,7 +214,7 @@ const beatsLead=(b,p,n)=>{const lead=leadSeat(b);return !lead||n>b.reveals[lead]
   if(value==='grita'&&(r.trucoLevel>=4||r.lastTrucoTeam===team(p)))throw new Error('Tu equipo no tiene la palabra para gritar.');
   r.teamSignal={id:crypto.randomUUID(),from:p,to:r.turn,text:labels[value],value,handNumber:r.handNumber,trickNo:r.trickNo,time:now};
  }
- function action(p,c){if(!SEATS.includes(p))throw new Error('Jugador inválido.');const handBefore=r.handNumber;advance();if(c.kind!=='draw'&&handBefore!=null&&r.handNumber!==handBefore)throw new Error('Se terminó el tiempo de esa mano.');if(c.kind==='draw'){if(r.status!=='drawing'||r.openingDraw.cards[p])throw new Error('El sorteo cambió.');r.openingDraw.cards[p]=s.drawPool.shift();if(SEATS.every(q=>r.openingDraw.cards[q]))r.openingDraw.resolveAt=now+2000;return advance();}
+ function action(p,c){if(!SEATS.includes(p))throw new Error('Jugador inválido.');const handBefore=r.handNumber;advance(false);if(c.kind!=='draw'&&handBefore!=null&&r.handNumber!==handBefore)throw new Error('Se terminó el tiempo de esa mano.');if(c.kind==='draw'){if(r.status!=='drawing'||r.openingDraw.cards[p])throw new Error('El sorteo cambió.');r.openingDraw.cards[p]=s.drawPool.shift();if(SEATS.every(q=>r.openingDraw.cards[q]))r.openingDraw.resolveAt=now+2000;return advance();}
   if(r.status!=='started'||r.resolvingTrick||r.pendingNextHand)throw new Error('Esperá a que termine la pausa.');if(!active(p))throw new Error('Te fuiste al mazo en esta mano.');if(c.kind==='team-signal')signal(p,c.value);else if(c.kind==='play')play(p,c.cardId);else if(c.kind==='call')call(p,c.value);else if(c.kind==='fold')fold(p);else if(c.kind==='declare')declare(p,c.value,c.good===true);else throw new Error('Acción inválida.');return advance();}
  return {action,advance,start:()=>{deal('player4');r.openingDraw=null;delete s.drawPool;clock();return s;}};
 }

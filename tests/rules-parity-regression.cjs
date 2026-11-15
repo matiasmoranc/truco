@@ -30,13 +30,15 @@ function table(hands,{scores,target=30}={}){
  return {s,r:s.room,at};
 }
 
-test('1v1: the pie holding the only flor has it sung as the hand is dealt, so no envido can be called',()=>{
- const {r,at}=duel([PLAIN[0],FLOR]);
- assert.equal(r.mano,'player1');assert.ok(r.flors.player2>0);assert.equal(r.scores.player2,3);
- assert.equal(r.florSettled,true);assert.equal(r.envidoClosed,true);assert.equal(r.pendingBet,null);assert.equal(r.turn,'player1');
+test('1v1: the pie holding the only flor has it sung when their turn comes, never on the rival turn',()=>{
+ const {r,s,at}=duel([PLAIN[0],FLOR]);
+ assert.equal(r.mano,'player1');assert.deepEqual(r.flors,{});assert.equal(r.turn,'player1');
+ at(200).action('player1',{kind:'play',cardId:s.hands.player1[0].id});
+ assert.ok(r.flors.player2>0);assert.equal(r.scores.player2,3);assert.equal(r.florSettled,true);assert.equal(r.envidoClosed,true);
  assert.equal(r.callNotice.from,'player2');assert.equal(r.callNotice.spoken.toLowerCase(),'flor');
- assert.match(r.feed[0].text,/3 puntos por flor/);
- assert.throws(()=>at(200).action('player1',{kind:'call',value:'envido'}),/envido/i);
+ // An envido from the mano reaches the holder, whose turn it is to answer: the flor is sung over it.
+ const other=duel([PLAIN[0],FLOR]);other.at(200).action('player1',{kind:'call',value:'envido'});
+ assert.ok(other.r.flors.player2>0);assert.equal(other.r.envidoClosed,true);assert.notEqual(other.r.pendingBet?.type,'envido');
 });
 test('1v1: with two flowers only the first from the mano is sung; the other answers as before',()=>{
  const {r,s,at}=duel([FLOR,FLOR2]);
@@ -59,18 +61,22 @@ test('1v1: a falta envido won by the side behind lets the hand go on and pays th
  assert.deepEqual(r.lastHandScore.totals,{player1:11,player2:0});
 });
 
-test('2v2: the first holder from the mano gets the flor sung automatically, for any seat',()=>{
- const {r,at}=table([PLAIN[0],PLAIN[1],FLOR,PLAIN[3]]);
- assert.equal(r.flors.player3,true);assert.equal(r.scores.player1,3);assert.equal(r.florSettled,true);assert.equal(r.envidoClosed,true);
- assert.equal(r.callNotice.from,'player3');assert.equal(r.callNotice.text,'Flor');assert.equal(r.pendingBet,null);assert.equal(r.turn,'player1');
- assert.throws(()=>at(200).action('player1',{kind:'call',value:'envido'}),/envido/i);
+test('2v2: a flower is sung for its holder only when their turn comes, for any seat',()=>{
+ const {r,s,at}=table([PLAIN[0],PLAIN[1],FLOR,PLAIN[3]]);
+ assert.deepEqual(r.flors,{});assert.equal(r.turn,'player1');
+ at(200).action('player1',{kind:'play',cardId:s.hands.player1[0].id});assert.deepEqual(r.flors,{});
+ at(300).action('player2',{kind:'play',cardId:s.hands.player2[0].id});
+ assert.equal(r.flors.player3,true);assert.equal(r.scores.player1,3);assert.equal(r.florSettled,true);
+ assert.equal(r.callNotice.from,'player3');assert.equal(r.callNotice.text,'Flor');assert.equal(r.turn,'player3');
 });
-test('2v2: with flowers on both teams only the first from the mano is sung; the rival holder answers and cannot back down',()=>{
- const {r,at}=table([PLAIN[0],FLOR,FLOR2,PLAIN[3]]);
+test('2v2: with flowers on both teams the first holder to play sings; the rival holder answers and cannot back down',()=>{
+ const {r,s,at}=table([PLAIN[0],FLOR,FLOR2,PLAIN[3]]);
+ assert.deepEqual(r.flors,{});
+ at(200).action('player1',{kind:'play',cardId:s.hands.player1[0].id});
  assert.equal(r.flors.player2,true);assert.equal(r.flors.player3,undefined);
  assert.equal(r.pendingBet.type,'flor');assert.equal(r.pendingBet.responder,'player3');
  // As in 1v1 there is no "con flor me achico": someone holding a flower sings it or raises.
- assert.throws(()=>at(200).action('player3',{kind:'call',value:'no'}),/flor/i);
+ assert.throws(()=>at(250).action('player3',{kind:'call',value:'no'}),/flor/i);
  at(300).action('player3',{kind:'call',value:'yes'});assert.equal(r.flors.player3,true);assert.equal(r.florDeferred,3);assert.equal(r.pendingBet,null);
 });
 test('2v2: a sung flor annuls an envido already accepted, which is never paid',()=>{

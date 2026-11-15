@@ -188,7 +188,7 @@ test('1v1: the mano flor is sung automatically and the pie with flor answers it 
 });
 test('1v1: going to the deck with a flor sings it, scores it and then gives up the hand',()=>{const s=florFixture();createReferee(s,{now:200}).action('player1',{kind:'fold'});assert.equal(s.room.callNotice.spoken,'Flor y me voy al mazo');assert.ok(s.room.flors.player1>0);createReferee(s,{now:3500}).advance();assert.equal(s.room.scores.player1,3);assert.equal(s.room.scores.player2,1);});
 test('1v1: going to the deck with a flor against a rival flor gives the rival the flor and the hand',()=>{const s=florFixture(true);createReferee(s,{now:200}).action('player1',{kind:'fold'});createReferee(s,{now:3500}).advance();assert.equal(s.room.scores.player1,0);assert.equal(s.room.scores.player2,4);});
-test('1v1: running out of time with a flor sings it before losing the hand',()=>{const s=florFixture();createReferee(s,{now:200}).advance();createReferee(s,{now:46000}).advance();assert.equal(s.room.scores.player1,3);assert.equal(s.room.scores.player2,1);assert.equal(s.room.callNotice?.spoken,'Flor y me voy al mazo');});
+test('1v1: a flower is sung on its holder turn, and running out of time after it still loses the hand',()=>{const s=florFixture();createReferee(s,{now:200}).advance();assert.ok(s.room.flors.player1>0);assert.equal(s.room.scores.player1,3);createReferee(s,{now:46000}).advance();assert.equal(s.room.scores.player1,3);assert.equal(s.room.scores.player2,1);});
 
 test('A raise accepts the call it answers: going to the deck then gives that value',()=>{
  const s=fixture();
@@ -291,4 +291,15 @@ test('Once a truco is accepted there is no envido; an unanswered truco still all
  createReferee(u,{now:200}).action('player1',{kind:'call',value:'truco'});
  createReferee(u,{now:300}).action('player2',{kind:'call',value:'raise'});
  assert.throws(()=>createReferee(u,{now:400}).action('player1',{kind:'call',value:'envido'}));
+});
+
+test('A name ending in "no" does not turn QUIERO into NO QUIERO (the call is read after the name)',()=>{
+ const s=fixture();s.room.players.player2.name='Nonono';
+ createReferee(s,{now:200}).action('player1',{kind:'call',value:'falta'});
+ createReferee(s,{now:300}).action('player2',{kind:'call',value:'yes'});
+ assert.equal(s.room.callNotice.spoken,'Quiero');assert.equal(s.room.pendingBet.revealMode,true);
+ const d=fixture();d.room.players.player2.name='Nonono';
+ createReferee(d,{now:200}).action('player1',{kind:'call',value:'falta'});
+ createReferee(d,{now:300}).action('player2',{kind:'call',value:'no'});
+ assert.equal(d.room.callNotice.spoken,'No quiero');assert.equal(d.room.pendingBet,null);
 });

@@ -2632,3 +2632,20 @@ input,textarea,[contenteditable=""],[contenteditable="true"]{-webkit-user-select
 .waiting-chat{padding-top:30px}
 .waiting-chat-log{max-height:min(18vh,140px)}
 .waiting-chat-close{position:absolute;top:4px;right:8px;width:26px;height:26px;padding:0;border:0;border-radius:50%;background:rgba(10,30,22,.7);color:var(--ink);font-size:18px;line-height:26px;text-align:center;cursor:pointer}
+
+/* Waiting room, compact: both invites on one row, small empty seats, and the chat below the table (not over it). */
+#waiting-view .invite-row{display:flex;gap:8px}
+#waiting-view .invite-row .invite-friend,#waiting-view .invite-row .invite-whatsapp{flex:1 1 0;min-width:0;min-height:42px;margin:0;padding:8px 10px;font-size:14.5px;gap:8px;white-space:nowrap}
+#waiting-view .invite-row .invite-friend-icon{width:20px;height:20px}
+#waiting-view .invite-row .whatsapp-brand-icon{width:22px;height:22px}
+#waiting-view .waiting-content{padding:12px 14px 6px}
+#waiting-view .waiting-table{margin-top:6px;min-height:230px}
+#waiting-view .waiting-player.empty .waiting-player-name{display:none}
+#waiting-view .waiting-empty-place{width:54px;height:62px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:22px;line-height:1}
+#waiting-view .waiting-empty-place::after{content:'Libre';font-size:10.5px;letter-spacing:.04em;color:#d8b875cc}
+#waiting-view .waiting-bot-button{margin-top:6px;padding:5px 10px;min-height:30px;font-size:11.5px}
+#waiting-view .waiting-player-cards{height:74px;margin-top:8px}
+#waiting-view .waiting-player-cards .opponent-card-back{width:42px;height:61px}
+#waiting-view .waiting-chat{position:relative;left:auto;right:auto;bottom:auto;flex:none;width:calc(100% - 24px);max-width:520px;margin:0 auto calc(10px + env(safe-area-inset-bottom));background:rgba(0,0,0,.2)}
+#waiting-view.chat-open .waiting-content{padding-bottom:6px}
+#waiting-view .waiting-chat-toggle.open{display:none}

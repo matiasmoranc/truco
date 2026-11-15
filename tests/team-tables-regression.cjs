@@ -7,7 +7,9 @@ const base=()=>({wallets:Object.fromEntries(['a','b','c','d','e'].map(uid=>[uid,
 const make=()=>createTable(base(),{code:'ABCDE',id:'m1',uid:'a',name:'A',mode:'2v2',stake:2,targetPoints:10,now:100});
 const join=(l,uid,now=200)=>joinTable(l,{code:'ABCDE',uid,name:uid.toUpperCase(),now});
 const full=()=>['b','c','d'].reduce((l,uid)=>join(l,uid),make());
-const act=(l,uid,command,now=1000,requestId='r'+now+uid+command.kind)=>tableOperation(l,{code:'ABCDE',uid,command,now,requestId,expectedMatchId:l.tables.ABCDE});
+// A flower is sung by itself when its holder's turn comes: a test asking to sing one already sung goes on.
+const sungAlready=(l,uid,command)=>{if(command?.kind!=='call'||command.value!=='flor')return false;const r=l.matches?.m1?.session?.room,p=Object.keys(r?.players||{}).find(q=>r.players[q]?.uid===uid);return !!(p&&r.flors?.[p]!=null);};
+const act=(l,uid,command,now=1000,requestId='r'+now+uid+command.kind)=>sungAlready(l,uid,command)?l:tableOperation(l,{code:'ABCDE',uid,command,now,requestId,expectedMatchId:l.tables.ABCDE});
 function databaseRoundTrip(value){if(value===null)return undefined;if(Array.isArray(value)){if(!value.length)return undefined;return value.map(databaseRoundTrip);}if(value&&typeof value==='object'){const entries=Object.entries(value).map(([k,v])=>[k,databaseRoundTrip(v)]).filter(([,v])=>v!==undefined);return entries.length?Object.fromEntries(entries):undefined;}return value;}
 // Each flower holder declares in turn from the mano: their real points if they beat the best so far, else son buenas.
 function declareFlowers(l,now){for(let i=0;i<4;i++){const s=l.matches.m1.session,b=s.room.pendingBet;if(!b?.revealMode||b.type!=='flor')break;const p=b.revealTurn,v=florValue(s.originals[p],s.room.muestra),best=Math.max(-1,...Object.values(b.reveals||{}));l=act(l,s.room.players[p].uid,v>best?{kind:'declare',value:v}:{kind:'declare',good:true},now+i);}return l;}
@@ -15,15 +17,17 @@ const card=(suit,rank)=>({id:({'♦':'oro','♥':'copa','♠':'espada','♣':'ba
 function started(){const l=full(),s=l.matches.m1.session;Object.assign(s.room,{status:'started',mano:'player1',dealer:'player4',turn:'player1',handNumber:1,muestra:card('♦',6),playedBy:{},folded:{},envidoClosed:true,
  // The random first hand may have sung a flor automatically: these cards start from a clean hand.
  scores:{player1:0,player2:0},flors:{},florClosed:false,florSettled:false,florDeferred:null,florWinner:null,florCompared:false,pendingBet:null,callNotice:null,handScoreEntries:[],firstToTarget:null,envidoAudit:null,trucoLevel:1,lastTrucoTeam:null,tricks:[],trickCards:[],playedCount:0,feed:[]});s.hands={player1:[card('♠',1),card('♥',4),card('♣',6)],player2:[card('♣',1),card('♠',4),card('♥',6)],player3:[card('♣',3),card('♥',1),card('♠',6)],player4:[card('♠',3),card('♣',4),card('♥',7)]};s.originals=structuredClone(s.hands);s.truth={player1:6,player2:6,player3:6,player4:7};s.room.pendingNextHand=undefined;return l;}
-test('An unsung flower blocks every card until it is sung, and going to the deck sings it first',()=>{
+test('A flower is sung by itself on its holder turn, and going to the deck off turn sings it first',()=>{
  let l=started(),s=l.matches.m1.session;
  s.room.envidoClosed=false;
  s.hands.player1=[card('♦',2),card('♠',7),card('♠',1)];
  s.originals.player1=structuredClone(s.hands.player1);
- assert.throws(()=>act(l,'a',{kind:'play',cardId:'espada-7'},1000),/Tenés flor/);
- l=act(l,'a',{kind:'fold'},1001);
- const r=l.matches.m1.session.room;
- assert.equal(r.flors.player1,true);assert.equal(r.folded.player1,true);assert.equal(r.scores.player1,3);
+ l=act(l,'a',{kind:'play',cardId:'espada-7'},1000);
+ let r=l.matches.m1.session.room;assert.equal(r.flors.player1,true);assert.equal(r.scores.player1,3);assert.equal(r.trickCards.length,1);
+ l=started();s=l.matches.m1.session;s.room.envidoClosed=false;
+ s.hands.player2=[card('♣',4),card('♣',5),card('♣',7)];s.originals.player2=structuredClone(s.hands.player2);
+ l=act(l,'b',{kind:'fold'},1001);r=l.matches.m1.session.room;
+ assert.equal(r.flors.player2,true);assert.equal(r.folded.player2,true);assert.equal(r.scores.player2,3);
  assert.equal(r.callNotice.text,'Flor y me voy al mazo');assert.equal(r.envidoClosed,true);
 });
 test('2v2 reserves each participant once, starts only with four and hides private hands',()=>{let l=make();l=join(l,'b');l=join(l,'c');assert.equal(l.matches.m1.status,'waiting');assert.equal(publicTable(l.matches.m1).mode,'2v2');assert.equal(publicTable(l.matches.m1).creditMatch.pot,8);assert.deepEqual(reservationAlerts(l,500),[]);assert.deepEqual(join(l,'b'),l);l=join(l,'d');assert.equal(l.matches.m1.status,'reserved');for(const uid of ['a','b','c','d'])assert.deepEqual(l.wallets[uid],{balance:8,locked:2});const pub=publicTable(l.matches.m1);assert.equal(pub.originals,undefined);assert.equal(pub.hands,undefined);assert.throws(()=>join(l,'e'));assert.equal(base().wallets.e.balance,10);validateAccounting(base(),recordHistory(base(),l,500));});
@@ -151,12 +155,12 @@ test('La mia es flor in 2v2 keeps playing and the higher flower takes 3 points w
  const groups=room.endReveal.groups;assert.equal(groups.length,1);assert.equal(groups[0].player,best);assert.match(groups[0].label,/FLOR · /);
  assert.ok(room.handScoreEntries.some(e=>e.player===team(best)&&e.points===3&&e.detail==='3 puntos por flor'));
 });
-test('A raise against a sung flor is answered by the player who sang it, even if not the pie, and only the winning flor is shown',()=>{
+test('A raise against a sung flor is answered by the player who sang it, and only the winning flor is shown',()=>{
  let l=started(),s=l.matches.m1.session;
  s.hands.player1=[card('♣',1),card('♣',4),card('♣',6)];s.hands.player2=[card('♥',1),card('♥',4),card('♥',6)];s.originals=structuredClone(s.hands);
- l=act(l,'b',{kind:'call',value:'flor'},1000);assert.equal(l.matches.m1.session.room.pendingBet.responder,'player1');
- l=act(l,'a',{kind:'call',value:'raise-conflor'},1001);assert.equal(l.matches.m1.session.room.pendingBet.responder,'player2');
- l=act(l,'b',{kind:'call',value:'yes'},1002);l=declareFlowers(l,1003);
+ l=act(l,'a',{kind:'tick'},1000);assert.equal(l.matches.m1.session.room.flors.player1,true);assert.equal(l.matches.m1.session.room.pendingBet.responder,'player2');
+ l=act(l,'b',{kind:'call',value:'raise-conflor'},1001);assert.equal(l.matches.m1.session.room.pendingBet.responder,'player1');
+ l=act(l,'a',{kind:'call',value:'yes'},1002);l=declareFlowers(l,1003);
  const room=l.matches.m1.session.room;assert.ok(room.florWinner);
  l=act(l,'b',{kind:'fold'},1100);l=act(l,'d',{kind:'fold'},1101);l=act(l,'a',{kind:'tick'},4500);
  const flowers=l.matches.m1.session.room.endReveal.groups.filter(g=>/FLOR/.test(g.label));
@@ -168,16 +172,14 @@ test('Gritá is only accepted while the team has the word to call truco',()=>{
  s.room.lastTrucoTeam='player2';l=act(l,'c',{kind:'team-signal',value:'grita'},1001);
  assert.equal(l.matches.m1.session.room.teamSignal.value,'grita');
 });
-test('Running out of time holding a flor sings it and goes to the deck instead of trapping the table',()=>{
+test('A flower holder who must answer an envido has the flor sung for them, so the table never gets stuck',()=>{
  const players=Object.fromEntries(SEATS.map(p=>[p,{uid:p,name:p}]));let s,responder;
  do{s=newTeamSession('ABCDE',players,30,{id:'m',stake:0,pot:0},100);createTeamReferee(s,{now:100}).start();responder=SEATS.find(p=>team(p)!==team(s.room.mano)&&flower(s.hands[p],s.room.muestra));}while(!responder);
- // A dealt hand sings the first flor at once; this one comes back to a hand saved before that rule.
  const r=s.room;Object.assign(r,{flors:{},florSettled:false,florClosed:false,florWinner:null,envidoClosed:false,scores:{player1:0,player2:0},handScoreEntries:[]});
  r.pendingBet={id:'b',type:'envido',called:'envido',caller:r.mano,callerTeam:team(r.mano),responder,stake:2,accepted:0};
- createTeamReferee(s,{now:200}).advance();assert.equal(r.turnClock.player,responder);
- assert.doesNotThrow(()=>createTeamReferee(s,{now:45300}).advance());
- assert.ok(!r.pendingBet||r.pendingBet.type==='flor');assert.equal(r.flors[responder],true);assert.equal(r.folded[responder],true);
- assert.equal(r.timeoutCounts[responder],1);assert.equal(r.status,'started');
+ createTeamReferee(s,{now:200}).advance();
+ assert.equal(r.flors[responder],true);assert.ok(!r.pendingBet||r.pendingBet.type!=='envido');
+ assert.doesNotThrow(()=>createTeamReferee(s,{now:45300}).advance());assert.equal(r.status,'started');
 });
 test('In 2 vs 2 no envido plays for more than the leading team still needs to win',()=>{
  const players=Object.fromEntries(SEATS.map(p=>[p,{uid:p,name:p}]));
@@ -191,15 +193,12 @@ test('In 2 vs 2 no envido plays for more than the leading team still needs to wi
  for(const kind of ['envido','real','falta'])assert.equal(stakeFor([2,29],[kind]),1);
  assert.equal(stakeFor([4,0],['falta']),26);assert.equal(stakeFor([26,0],['envido','real']),4);assert.equal(stakeFor([0,0],['envido','real']),5);
 });
-test('An envido goes to the rival who holds an unsung flor, who can only sing it, and the flor cancels the envido',()=>{
+test('An envido reaching a rival who holds an unsung flor has the flor sung for them, and the flor cancels the envido',()=>{
  let l=started(),s=l.matches.m1.session;s.room.envidoClosed=false;
  s.hands.player2=[card('♣',4),card('♣',5),card('♣',7)];s.originals.player2=structuredClone(s.hands.player2);
  l=act(l,'a',{kind:'call',value:'envido'},1000);
- let r=l.matches.m1.session.room;assert.equal(r.pendingBet.type,'envido');assert.equal(r.pendingBet.responder,'player2');
- assert.throws(()=>act(l,'d',{kind:'call',value:'yes'},1001),/responder/);
- assert.throws(()=>act(l,'b',{kind:'call',value:'yes'},1002),/Tenés flor/);
- l=act(l,'b',{kind:'call',value:'flor'},1003);r=l.matches.m1.session.room;
- assert.equal(r.pendingBet?.type||null,null);assert.equal(r.scores.player2,3);assert.equal(r.envidoClosed,true);
+ const r=l.matches.m1.session.room;
+ assert.equal(r.flors.player2,true);assert.equal(r.pendingBet?.type||null,null);assert.equal(r.scores.player2,3);assert.equal(r.envidoClosed,true);
 });
 
 test('2v2: a raise accepts the call it answers, and the lines say plainly why the points went',()=>{

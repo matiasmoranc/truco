@@ -593,7 +593,9 @@ function callNoticeHtml(notice,room=state.room,compact=false){
 }
 function makeCallNotice(text,bet=state.room?.pendingBet){
   text=callNoticeText(text);
-  const spoken=spokenCall(text);
+  // The call is read after the speaker's name: a name like "Nonono" must not turn "quiere" into "no quiere".
+  const speaker=state.room?.players?.[state.playerId]?.name||'';
+  const spoken=spokenCall(speaker&&text.startsWith(speaker)?text.slice(speaker.length):text);
   if(!spoken||!['player1','player2'].includes(state.playerId))return null;
   return {...(spoken==='Me voy al mazo'?{kind:'fold'}:{}),id:crypto.randomUUID(),from:state.playerId,to:state.playerId==='player1'?'player2':'player1',text:spoken==='Tiene'||spoken==='Me voy al mazo'?text.split('.')[0]+'.':/\bcanta \d+ (tantos|son mejores|son iguales)\b/i.test(text)?spoken:text,spoken,selfVerb:ownCallVerb(spoken,bet),time:Date.now(),handNumber:state.room?.handNumber||1};
 }
@@ -3271,6 +3273,8 @@ function scheduleBot(){
   rememberBotCards(room,state.botMemory);
   if(state.botActing||state.learning?.paused){clearTimeout(state.botTimer);state.botTimer=null;return;}
   if(room.resolvingTrick||room.pendingNextHand||room.status==='revealing'){clearTimeout(state.botTimer);state.botTimer=null;return;}
+  // Whoever's turn it is sings their flower now (the human too, before they act).
+  if(room.status==='started'&&localAction('auto-flor'))return;
   const ready=room.status==='drawing'?!room.openingDraw?.cards?.player2:
     room.status==='complete'?room.rematch?.status==='pending'&&room.rematch.requester==='player1':
     room.status==='started'&&(room.pendingBet?(room.pendingBet.revealMode?room.pendingBet.revealTurn==='player2':room.pendingBet.responder==='player2'):room.turn==='player2');
@@ -3402,13 +3406,15 @@ function localAnswerAction(answer){
 function localAction(action){
   if(state.learning?.paused)return;
   if(action==='auto-flor'){
-    // The first player from the mano who holds a flower has it sung for them as the hand starts,
-    // so no envido can be called over it. Returns whether it was sung now.
-    const room=state.room,mano=room?.mano||'player1';
+    // A flower is sung for its holder when their turn comes (to play, or to answer a call),
+    // never on the rival's turn. The first one sung opens the flor; the other holder answers it.
+    // Returns whether it was sung now.
+    const room=state.room;
     // In Aprender the player practises singing the flower: there it stays manual.
     if(state.learning||state.singingAutoFlor||room?.status!=='started'||room.resolvingTrick||room.pendingNextHand||Object.keys(room.flors||{}).length||room.florSettled)return false;
-    const holder=[mano,otherPlayer(mano)].find(player=>localHand(player).length===3&&roomHasFlor(room,localHand(player)));
-    if(!holder)return false;
+    const bet=room.pendingBet;if(bet?.revealMode||bet?.type==='flor')return false;
+    const holder=bet?bet.responder:room.turn;
+    if(!holder||localHand(holder).length!==3||!roomHasFlor(room,localHand(holder)))return false;
     const current=state.playerId,hand=state.hand,acting=state.botActing;
     state.singingAutoFlor=true;state.botActing=true;state.playerId=holder;state.hand=[...localHand(holder)];
     try{localAction('flor');}finally{state.playerId=current;state.hand=hand;state.botActing=acting;state.singingAutoFlor=false;}
@@ -3418,7 +3424,8 @@ function localAction(action){
   if(localAction('auto-flor'))return;
   if(action==='reveal')localAnswerAction('yes');
   else if(action==='flor'){
-    const room=state.room,player=state.playerId;if(localHand(player).length!==3||room.flors?.[player]!=null||!roomHasFlor(room,localHand(player))){toast('No tenés flor.');return;}
+    // Already sung for them (it is automatic on their turn): pressing FLOR again changes nothing.
+    const room=state.room,player=state.playerId;if(room.flors?.[player]!=null&&!state.singingAutoFlor){renderGame();return;}if(localHand(player).length!==3||room.flors?.[player]!=null||!roomHasFlor(room,localHand(player))){toast('No tenés flor.');return;}
     const overEnvido=room.pendingBet?.type==='envido'&&room.pendingBet.responder===player;
     const other=otherPlayer(player);room.flors={...(room.flors||{}),[player]:florValue(localHand(player),room.muestra)};room.envidoClosed=true;
     const suspendedBet=room.pendingBet?.type==='truco'?room.pendingBet:(room.pendingBet?.suspendedBet||null);

@@ -144,7 +144,9 @@ function ownCallVerb(main,bet){
 }
 function makeCallNotice(text,bet=state.room?.pendingBet){
   text=callNoticeText(text);
-  const spoken=spokenCall(text);
+  // The call is read after the speaker's name: a name like "Nonono" must not turn "quiere" into "no quiere".
+  const speaker=state.room?.players?.[state.playerId]?.name||'';
+  const spoken=spokenCall(speaker&&text.startsWith(speaker)?text.slice(speaker.length):text);
   if(!spoken||!['player1','player2'].includes(state.playerId))return null;
   return {...(spoken==='Me voy al mazo'?{kind:'fold'}:{}),id:crypto.randomUUID(),from:state.playerId,to:state.playerId==='player1'?'player2':'player1',text:spoken==='Tiene'||spoken==='Me voy al mazo'?text.split('.')[0]+'.':/\bcanta \d+ (tantos|son mejores|son iguales)\b/i.test(text)?spoken:text,spoken,selfVerb:ownCallVerb(spoken,bet),time:Date.now(),handNumber:state.room?.handNumber||1};
 }
@@ -416,13 +418,15 @@ function localAnswerAction(answer){
 function localAction(action){
   if(state.learning?.paused)return;
   if(action==='auto-flor'){
-    // The first player from the mano who holds a flower has it sung for them as the hand starts,
-    // so no envido can be called over it. Returns whether it was sung now.
-    const room=state.room,mano=room?.mano||'player1';
+    // A flower is sung for its holder when their turn comes (to play, or to answer a call),
+    // never on the rival's turn. The first one sung opens the flor; the other holder answers it.
+    // Returns whether it was sung now.
+    const room=state.room;
     // In Aprender the player practises singing the flower: there it stays manual.
     if(state.learning||state.singingAutoFlor||room?.status!=='started'||room.resolvingTrick||room.pendingNextHand||Object.keys(room.flors||{}).length||room.florSettled)return false;
-    const holder=[mano,otherPlayer(mano)].find(player=>localHand(player).length===3&&roomHasFlor(room,localHand(player)));
-    if(!holder)return false;
+    const bet=room.pendingBet;if(bet?.revealMode||bet?.type==='flor')return false;
+    const holder=bet?bet.responder:room.turn;
+    if(!holder||localHand(holder).length!==3||!roomHasFlor(room,localHand(holder)))return false;
     const current=state.playerId,hand=state.hand,acting=state.botActing;
     state.singingAutoFlor=true;state.botActing=true;state.playerId=holder;state.hand=[...localHand(holder)];
     try{localAction('flor');}finally{state.playerId=current;state.hand=hand;state.botActing=acting;state.singingAutoFlor=false;}
@@ -432,7 +436,8 @@ function localAction(action){
   if(localAction('auto-flor'))return;
   if(action==='reveal')localAnswerAction('yes');
   else if(action==='flor'){
-    const room=state.room,player=state.playerId;if(localHand(player).length!==3||room.flors?.[player]!=null||!roomHasFlor(room,localHand(player))){toast('No tenés flor.');return;}
+    // Already sung for them (it is automatic on their turn): pressing FLOR again changes nothing.
+    const room=state.room,player=state.playerId;if(room.flors?.[player]!=null&&!state.singingAutoFlor){renderGame();return;}if(localHand(player).length!==3||room.flors?.[player]!=null||!roomHasFlor(room,localHand(player))){toast('No tenés flor.');return;}
     const overEnvido=room.pendingBet?.type==='envido'&&room.pendingBet.responder===player;
     const other=otherPlayer(player);room.flors={...(room.flors||{}),[player]:florValue(localHand(player),room.muestra)};room.envidoClosed=true;
     const suspendedBet=room.pendingBet?.type==='truco'?room.pendingBet:(room.pendingBet?.suspendedBet||null);
@@ -579,7 +584,7 @@ function turnTimeoutChanges(room){
 }
 function save(){session.hands=state.localHands;session.originals=state.localOriginalHands;session.truth=state.localTruth;return session;}
 function clock(){const key=turnClockKey();if(!key){state.room.turnClock=null;return;}if(state.room.turnClock?.key!==key)state.room.turnClock={key,startedAt:now};}
-function advance(){const room=state.room;
+function advance(sing=true){const room=state.room;
  if(room.status==='drawing')start();
 
  if(room.resolvingTrick&&now>=room.resolutionEndsAt){
@@ -590,12 +595,14 @@ function advance(){const room=state.room;
  if(room.status==='revealing'&&now>=room.endReveal.endsAt)localDealAfterHand();
  if(room.status==='complete'&&!room.endReveal){const groups=buildEndEvidence(room,state.localOriginalHands);if(groups.length)localShowEvidence(groups);else room.endReveal={done:true};}
  if(room.status==='started'&&room.turnClock&&turnClockRemaining(room.turnClock,now).expired){const changes=turnTimeoutChanges(room);Object.assign(room,changes);if(room.status==='timed-out'){localFeed(room.turnTimeout.message);localFinishHand(room.turnTimeout.winner,(room.trucoLevel||1)+(Number(room.turnTimeout.florPoints)||0),'timeout');}}
+ // The flower of whoever's turn it now is gets sung (only on their own turn).
+ if(sing&&room.status==='started')localAction('auto-flor');
  clock();return save();
 }
 function action(player,command){
  // A command answers the hand the player saw: if the clock ran out first and a new hand was dealt, it is refused.
  const handBefore=state.room.handNumber;
- state.playerId=player;state.hand=localHand(player);advance();const room=state.room;
+ state.playerId=player;state.hand=localHand(player);advance(false);const room=state.room;
  if(command?.kind!=='draw'&&handBefore!=null&&room.handNumber!==handBefore)throw new Error('Se terminó el tiempo de esa mano.');
  if(!['player1','player2'].includes(player))throw new Error('Invalid player.');
  if(command.kind==='draw'){

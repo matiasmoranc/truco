@@ -1,6 +1,6 @@
 function save(){session.hands=state.localHands;session.originals=state.localOriginalHands;session.truth=state.localTruth;return session;}
 function clock(){const key=turnClockKey();if(!key){state.room.turnClock=null;return;}if(state.room.turnClock?.key!==key)state.room.turnClock={key,startedAt:now};}
-function advance(){const room=state.room;
+function advance(sing=true){const room=state.room;
  if(room.status==='drawing')start();
 
  if(room.resolvingTrick&&now>=room.resolutionEndsAt){
@@ -11,12 +11,14 @@ function advance(){const room=state.room;
  if(room.status==='revealing'&&now>=room.endReveal.endsAt)localDealAfterHand();
  if(room.status==='complete'&&!room.endReveal){const groups=buildEndEvidence(room,state.localOriginalHands);if(groups.length)localShowEvidence(groups);else room.endReveal={done:true};}
  if(room.status==='started'&&room.turnClock&&turnClockRemaining(room.turnClock,now).expired){const changes=turnTimeoutChanges(room);Object.assign(room,changes);if(room.status==='timed-out'){localFeed(room.turnTimeout.message);localFinishHand(room.turnTimeout.winner,(room.trucoLevel||1)+(Number(room.turnTimeout.florPoints)||0),'timeout');}}
+ // The flower of whoever's turn it now is gets sung (only on their own turn).
+ if(sing&&room.status==='started')localAction('auto-flor');
  clock();return save();
 }
 function action(player,command){
  // A command answers the hand the player saw: if the clock ran out first and a new hand was dealt, it is refused.
  const handBefore=state.room.handNumber;
- state.playerId=player;state.hand=localHand(player);advance();const room=state.room;
+ state.playerId=player;state.hand=localHand(player);advance(false);const room=state.room;
  if(command?.kind!=='draw'&&handBefore!=null&&room.handNumber!==handBefore)throw new Error('Se terminó el tiempo de esa mano.');
  if(!['player1','player2'].includes(player))throw new Error('Invalid player.');
  if(command.kind==='draw'){
