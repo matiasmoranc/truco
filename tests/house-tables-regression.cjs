@@ -56,7 +56,8 @@ test('The lobby keeps 6 to 8 house tables with 30 different house players, and r
  const lobby=fs.readFileSync(path.join(__dirname,'..','cloudflare','src','lobby.js'),'utf8');
  const names=JSON.parse(lobby.match(/HOUSE_NAMES=(\[[^\]]*\])/)[1].replace(/'/g,'"'));
  assert.equal(names.length,30);assert.equal(new Set(names.map(n=>n.toLowerCase())).size,30);
- for(const name of names)assert.match(name,/^[A-Za-z0-9._-]{3,18}$/);
+ // House players say they are bots ("Bot Juan"); real names cannot have spaces, so nobody can take them.
+ for(const name of names)assert.match(name,/^Bot [A-Za-zÁÉÍÓÚáéíóúñ]{2,12}$/);
  assert.match(lobby,/HOUSE_MIN=6,HOUSE_MAX=8\b/);
  // One new table a minute at most can keep up to 10 open with 10 minutes each.
  assert.ok(Number(lobby.match(/HOUSE_GAP_MS=(\d+)/)[1])<60000);

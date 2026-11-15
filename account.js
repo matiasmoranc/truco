@@ -20,7 +20,8 @@ export function installAccount({ api, services, getState, rememberName, document
     el('account-status').textContent=text;
   };
   const registered=user=>!!user&&!user.isAnonymous&&user.providerData?.some(provider=>['google.com','apple.com','password'].includes(provider.providerId));
-  const validName=value=>typeof value==='string'&&/^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9._-]{1,18}$/.test(value);
+  // Names like "Bot_Juan" are left to the house bots (theirs are "Bot Juan").
+  const validName=value=>typeof value==='string'&&/^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9._-]{1,18}$/.test(value)&&!/^bot[._-]/i.test(value);
   const nameKey=name=>name.toLowerCase().replaceAll('.', '%2E');
   const cleanName=value=>typeof value==='string'?value.trim().slice(0,18):'';
   function cachedName(uid) {
@@ -238,7 +239,7 @@ export function installAccount({ api, services, getState, rememberName, document
     if(!registered(user)){message('Iniciá sesión para guardar tu nombre.');return;}
     const name=input.value.normalize('NFC');
     if(!name){message('Escribí tu nombre de usuario.');input.focus();return;}
-    if(!validName(name)){message('Usá de 1 a 18 letras, números, guion (-), guion bajo (_) o punto (.). Sin espacios.');input.focus();return;}
+    if(!validName(name)){message(/^bot[._-]/i.test(name)?'Los nombres que empiezan con "Bot" son para los bots de la casa.':'Usá de 1 a 18 letras, números, guion (-), guion bajo (_) o punto (.). Sin espacios.');input.focus();return;}
     const key=nameKey(name);
     let savingStage='index';
     try{

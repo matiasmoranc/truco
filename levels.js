@@ -15,7 +15,8 @@ export const winPoints=(winnerLevel,rivalLevel)=>rivalLevel>winnerLevel?POINTS_H
 // Total points (tenths) needed to reach a level.
 export function pointsToReach(level){let total=0;for(let l=1;l<level;l++)total+=pointsForLevel(l);return total;}
 // A house player's icon: one its level has unlocked, picked from its name.
-export function houseIcon(name){const level=houseLevel(name),open=ICONS.filter(i=>i.level<=level);let h=7;for(const ch of String(name||''))h=(h*17+ch.charCodeAt(0))>>>0;return open[h%open.length].id;}
+// House players are bots: they all show the robot (players cannot pick it).
+export function houseIcon(){return 'robot';}
 // House players (the lobby's open tables) have a fixed level from their name, 1 to 5.
 export function houseLevel(name){let h=0;for(const ch of String(name||''))h=(h*31+ch.charCodeAt(0))>>>0;return 1+h%5;}
 

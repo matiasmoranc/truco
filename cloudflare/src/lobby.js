@@ -12,8 +12,8 @@ const send=(ws,message)=>{try{ws.send(JSON.stringify(message));}catch{}};
 // Open 1 vs 1 tables hosted by house players, so there is always someone to play.
 // Each one waits 10 minutes and closes; the lobby opens new ones with
 // other names, keeping between 6 and 8 open, each one 10 minutes, staggered apart.
-const HOUSE_NAMES=['Nacho_Pereira','Facu.Rodriguez','ElGordoMartinez','Santi_Fernandez','Gonza_Silva22','Juanma.Sosa','PepeCabrera','Rodri_Acosta','Mati.Olivera','ChinoNunez','Andres_Viera','Bruno.Correa94','Lu_Gonzalez','Caro.Suarez','Vale_Rodriguez',
- 'Diego.Pintos','Fede_Cardozo','Lucho.Ramos','Seba_Techera','Pablo.Benitez','Nico_Olivera88','Tincho.Silva','Rafa_Dominguez','Marce.Lopez','Gaby_Ferreira','Ceci.Alvarez','Sofi_Martinez','JuanPa.Rocha','NegroCabrera','Agus.Morales'];
+// House players are bots and their names say so: "Bot Juan". Real names cannot have spaces.
+const HOUSE_NAMES=['Bot Juan','Bot Pepe','Bot Nacho','Bot Facu','Bot Santi','Bot Gonza','Bot Rodri','Bot Mati','Bot Chino','Bot Bruno','Bot Lucho','Bot Seba','Bot Pablo','Bot Tincho','Bot Rafa','Bot Marce','Bot Gaby','Bot Diego','Bot Fede','Bot Andrés','Bot Lu','Bot Caro','Bot Vale','Bot Ceci','Bot Sofi','Bot Agus','Bot Negro','Bot Pocho','Bot Tito','Bot Coco'];
 const HOUSE_MIN=6,HOUSE_MAX=8,HOUSE_TICK_MS=60000,HOUSE_TARGET_MS=30*60000;
 // One new table per minute at most: tables still open and close at different times, and with
 // 10 minutes each this keeps up to 10 open, enough for 6 to 8.

@@ -2,11 +2,11 @@
 // were, the level details with what each level unlocks, the icon or photo of every
 // player with its badge on the edge, and the "you went up a level" celebration.
 // Levels are written only by the table server; a player writes only its own avatar.
-import {levelFor,badgeFor,ICONS,PHOTO_LEVEL,unlocks,BADGES,houseLevel,houseIcon,pointsToReach,SOUND_MESSAGES} from './levels.js?v=20261103-viral1';
+import {levelFor,badgeFor,ICONS,PHOTO_LEVEL,unlocks,BADGES,houseLevel,houseIcon,pointsToReach,SOUND_MESSAGES} from './levels.js?v=20261115-bots1';
 
 // Profile icons and badges: pictures in assets/profile. The "gaucho" id is kept for
 // players who already chose it; it now shows the coat of arms of Uruguay.
-const ICON_FILE={persona:'persona',mate:'mate',espada:'espada',bandera:'bandera',gaucho:'escudo',termo:'termo'};
+const ICON_FILE={robot:'robot',persona:'persona',mate:'mate',espada:'espada',bandera:'bandera',gaucho:'escudo',termo:'termo'};
 const iconImg=id=>`<img class="avatar-icon" src="assets/profile/${ICON_FILE[id]||'persona'}.webp" alt="">`;
 const badgeImg=id=>`<img src="assets/profile/insignia-${id}.webp" alt="">`;
 const escapeAttr=s=>String(s).replace(/[&"<>]/g,c=>({'&':'&amp;','"':'&quot;','<':'&lt;','>':'&gt;'}[c]));
