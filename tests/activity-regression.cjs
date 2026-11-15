@@ -28,3 +28,13 @@ test('Admin activity filters return sorted unique IDs for current Uruguay day an
  assert.deepEqual(activityUserIds({scope:'today',metrics:{},now}),[]);
  assert.throws(()=>activityUserIds({scope:'invalid',metrics,now}));
 });
+
+test('Admin knows the device each player used last, also from activity before it was stored',()=>{
+ const {activityUpdates,lastPlatforms}=require('../functions/activity-service.cjs');
+ const now=Date.UTC(2026,10,14,20);
+ const u=activityUpdates({uid:'u1',sessionId:'s1',visible:true,platform:'app-android',now});
+ require('node:assert/strict').deepEqual(u['lastPlatform/u1'],{platform:'app-android',at:now});
+ require('node:assert/strict').equal(activityUpdates({uid:'u1',sessionId:'s1',visible:false,platform:'app-ios',now})['lastPlatform/u1'],undefined);
+ const found=lastPlatforms({stored:{u1:{platform:'app-android',at:now}},days:{'2026-11-10':{u2:{'web-desktop':true}},'2026-11-12':{u1:{'web-ios':true},u2:{'app-ios':true}}},uids:['u1','u2','u3']});
+ require('node:assert/strict').deepEqual(found,{u1:{platform:'app-android',at:now},u2:{platform:'app-ios',at:null,day:'2026-11-12'}});
+});

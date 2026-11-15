@@ -345,9 +345,14 @@ exports.adminConsole=onCall({...options,secrets:[liveInternalSecret]},async requ
    page={users:result.users,pageToken:offset+100<ids.length?String(offset+100):null};
   }else page=await getAuth().listUsers(100,data.pageToken||undefined);
   const ledger=await creditStore.readLedger(),finished=finishedTables(ledger),wins=pastWins(ledger),played=lastPlayed(ledger);
+  // The device each one played on last (app or web, iPhone, Android or computer).
+  const uids=page.users.map(u=>u.uid),now=Date.now();
+  const [storedPlatforms,...recentDays]=await Promise.all([db.ref('adminMetrics/lastPlatform').get(),...Array.from({length:30},(_,i)=>db.ref('adminMetrics/days/'+uruguayDate(now-i*86400000).day+'/platforms').get())]);
+  const dayPlatforms=Object.fromEntries(recentDays.map((s,i)=>[uruguayDate(now-i*86400000).day,s.val()||{}]));
+  const devices=require('./activity-service.cjs').lastPlatforms({stored:storedPlatforms.val()||{},days:dayPlatforms,uids});
   const users=await Promise.all(page.users.filter(u=>!u.providerData.every(p=>!['google.com','apple.com','password'].includes(p.providerId))).map(async u=>{
    const [profile,wallet,points]=await Promise.all([db.ref('profiles/'+u.uid).get(),Promise.resolve({val:()=>ledger.wallets?.[u.uid]??null}),db.ref('levels/'+u.uid+'/points').get()]);
-   return {uid:u.uid,email:u.email||'',name:profile.val()?.name||'',disabled:u.disabled,createdAt:u.metadata.creationTime,balance:wallet.val()?.balance??0,locked:wallet.val()?.locked??0,points:Number(points.val())||0,finished:finished[u.uid]||0,wins:wins[u.uid]||0,lastPlayedAt:played[u.uid]||null,lastSeenAt:u.metadata.lastRefreshTime||u.metadata.lastSignInTime||null};
+   return {uid:u.uid,email:u.email||'',name:profile.val()?.name||'',disabled:u.disabled,createdAt:u.metadata.creationTime,balance:wallet.val()?.balance??0,locked:wallet.val()?.locked??0,points:Number(points.val())||0,finished:finished[u.uid]||0,wins:wins[u.uid]||0,lastPlayedAt:played[u.uid]||null,lastSeenAt:u.metadata.lastRefreshTime||u.metadata.lastSignInTime||null,device:devices[u.uid]||null};
   }));
   return {users,pageToken:page.pageToken||null};
  }

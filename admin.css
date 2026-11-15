@@ -257,3 +257,8 @@ textarea:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 .chat-line time{color:var(--muted);font-size:12px;font-variant-numeric:tabular-nums}
 .chat-line .chat-who{font-size:13.5px}
 .chat-line .chat-text{margin:0;overflow-wrap:anywhere;white-space:pre-wrap;font-size:14.5px}
+
+/* Last device a player used, next to the name. */
+.device-badge{font-style:normal;font-size:11px;font-weight:700;border-radius:999px;padding:1px 7px;margin-left:6px;border:1px solid var(--line-2);color:var(--muted);white-space:nowrap}
+.device-badge.app-android{color:#8fdc9a;border-color:#8fdc9a55}
+.device-badge.app-ios{color:#9cc8ff;border-color:#9cc8ff55}

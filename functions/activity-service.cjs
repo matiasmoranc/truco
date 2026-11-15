@@ -23,7 +23,18 @@ function activityUpdates({uid,sessionId,visible,now,platform}){
  const result={['presence/'+uid+'/'+sessionId]:visible?{at:now}:null};
  if(visible){result['days/'+day+'/users/'+uid]=true;result['days/'+day+'/hours/'+hour+'/'+uid]=true;}
  // Older clients send no platform; their activity still counts without it.
- if(visible&&PLATFORMS.includes(platform))result['days/'+day+'/platforms/'+uid+'/'+platform]=true;
+ if(visible&&PLATFORMS.includes(platform)){result['days/'+day+'/platforms/'+uid+'/'+platform]=true;result['lastPlatform/'+uid]={platform,at:now};}
+ return result;
+}
+// The device each player used last: the stored one, or else the latest day that recorded one
+// (activity from before lastPlatform existed; with several devices that day, any of them).
+function lastPlatforms({stored,days,uids}){
+ const result={};
+ for(const uid of uids){const s=stored?.[uid];if(s&&PLATFORMS.includes(s.platform))result[uid]={platform:s.platform,at:Number(s.at)||null};}
+ for(const [day,platforms] of Object.entries(days||{}).sort(([a],[b])=>b.localeCompare(a)))for(const uid of uids){
+  if(result[uid])continue;const found=Object.keys(platforms?.[uid]||{}).find(p=>PLATFORMS.includes(p));
+  if(found)result[uid]={platform:found,at:null,day};
+ }
  return result;
 }
 function activityUserIds({scope,metrics,now}){
@@ -43,4 +54,4 @@ function activitySummary({metrics,registeredUids,now,concurrentKey='all'}){
  const days=Object.entries(metrics.days||{}).sort(([a],[b])=>b.localeCompare(a)).map(([day,data])=>({day,users:Object.keys(data.users||{}).length,hours:Array.from({length:24},(_,h)=>({hour:h,users:Object.keys(data.hours?.[String(h).padStart(2,'0')]||{}).length})),concurrent:data.concurrent?.[concurrentKey]||null}));
  return {total:registered.size,active:online.length,online,todayUsers:days.find(d=>d.day===today)?.users||0,today,days,startedAt:metrics.startedAt||null,updatedAt:now};
 }
-module.exports={onlineUids,higherPeak,PLATFORMS,requestPlatform,activityUserIds,ACTIVE_MS,uruguayDate,activityUpdates,activitySummary};
+module.exports={lastPlatforms,onlineUids,higherPeak,PLATFORMS,requestPlatform,activityUserIds,ACTIVE_MS,uruguayDate,activityUpdates,activitySummary};
