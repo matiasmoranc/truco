@@ -122,6 +122,18 @@ function renderUsers(){
  if(!$('user-list').children.length)$('user-list').append(node('p','No hay usuarios para mostrar.','empty'));
  $('more').hidden=!pageToken;
 }
+// Sorting or filtering only makes sense over everyone: the pages still missing are loaded first.
+async function loadAllUsers(){
+ if(busy||!pageToken)return;busy=true;const generation=epoch;$('more').disabled=true;say('Cargando todos los usuarios para ordenar…');
+ try{
+  while(pageToken){
+   const page=(await call({action:'users',scope:userScope,pageToken})).data;if(generation!==epoch)return;
+   users=[...users,...page.users.filter(u=>!users.some(o=>o.uid===u.uid))];pageToken=page.pageToken;pagesLoaded++;renderUsers();void loadAvatars(page.users);
+  }
+  say('');
+ }catch(e){if(generation===epoch)say(errorText(e));}
+ finally{busy=false;if(generation===epoch){$('more').disabled=false;renderUsers();}}
+}
 async function refresh(more=false,preservePages=false){
  if(busy)return;busy=true;const generation=epoch;$('more').disabled=true;$('user-scope').disabled=true;for(const b of document.querySelectorAll('[data-scope]'))b.disabled=true;say('Cargando…');
  try{
@@ -261,7 +273,7 @@ $('table-order').addEventListener('change',renderTables);
 $('table-state').addEventListener('change',renderTables);
 $('search').addEventListener('input',renderUsers);
 // Tapping a column header orders by it; tapping it again flips the order.
-for(const button of document.querySelectorAll('[data-sort]'))button.onclick=()=>{const key=button.dataset.sort;sortBy=sortBy.key===key?{key,dir:-sortBy.dir}:{key,dir:key==='name'?1:-1};renderUsers();};$('photo-filter').onchange=$('level-filter').onchange=renderUsers;$('more').onclick=()=>refresh(true);
+for(const button of document.querySelectorAll('[data-sort]'))button.onclick=()=>{const key=button.dataset.sort;sortBy=sortBy.key===key?{key,dir:-sortBy.dir}:{key,dir:key==='name'?1:-1};renderUsers();void loadAllUsers();};$('photo-filter').onchange=$('level-filter').onchange=()=>{renderUsers();void loadAllUsers();};$('more').onclick=()=>refresh(true);
 function showTab(name){for(const section of Object.keys(TAB_TITLES))$(section).hidden=section!==name;for(const tab of document.querySelectorAll('[data-tab]'))tab.classList.toggle('active',tab.dataset.tab===name);$('page-title').textContent=TAB_TITLES[name];if(name==='usage')refreshUsage();if(name==='chat')loadChat();}
 $('refresh').onclick=()=>{refresh(false,true);if(!$('usage').hidden)refreshUsage();if(!$('chat').hidden)loadChat();};
 for(const b of document.querySelectorAll('[data-tab]'))b.onclick=()=>showTab(b.dataset.tab);
