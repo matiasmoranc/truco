@@ -120,6 +120,8 @@ export function createTableEngine({code,bank,clock=()=>Date.now()}){
    const forceLedger=['rematch','cancel','abandon'].includes(command.kind);
    await operate({uid,command,requestId:command.kind==='tick'?null:requestId,expectedMatchId,presence},{forceLedger});
    if(!['tick','chat','mute'].includes(command.kind))lastMoveByBot=false;
+   // A bot that just took a seat ("Buscar gente en línea") is always present.
+   if(command.kind==='add-bot'&&m?.house){const host=m.players[m.house];presence={...presence,[m.house]:{uid:host.uid,matchNumber:m.matchNumber,online:true}};}
    scheduleBot();
   },
   async tick(){

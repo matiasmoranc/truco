@@ -1236,8 +1236,7 @@ function renderLobby(rooms) {
   // Tables with credits come from older app versions: they are no longer listed.
   const open = Object.entries(rooms).filter(([, value]) => value?.public?.status === 'waiting' && !(Number(value.public.creditMatch?.stake)>0) && !roomExpired(value.public) && (value.public.mode==='2v2'?Object.keys(value.public.players||{}).length<4:(!value.public.players?.player1 || !value.public.players?.player2))).sort((a,b) => houseTable(a[1].public)-houseTable(b[1].public) || (b[1].public.createdAt || 0) - (a[1].public.createdAt || 0));
   const list=$('open-room-list'),paint=html=>{if(list.dataset.html===html)return false;list.innerHTML=html;list.dataset.html=html;return true;};
-  if (!open.length) { if(paint('<div class="empty-lobby"><svg class="empty-table-icon" viewBox="0 0 64 64" aria-hidden="true"><ellipse cx="32" cy="29" rx="18" ry="12"/><path d="M32 41v14M23 55h18M25 15V9c0-7 14-7 14 0v6M9 25v16q0 7 9 7l-2 9M55 25v16q0 7-9 7l2 9"/></svg><strong>No hay mesas abiertas todavía</strong></div>'))setupSuitIcons(list); return; }
-  paint(open.map(([code, value]) => {
+  const card=([code, value]) => {
     const room = value.public, players = room.players || {}, seats = [['player1','Jugador 1',players.player1],['player2','Jugador 2',players.player2]];
     const title = room.table?.name || players.player1?.name || players.player2?.name || 'Mesa abierta';
     const available = seats.filter(([, , person]) => !person);
@@ -1249,13 +1248,19 @@ function renderLobby(rooms) {
     const owner=room.table?.uid||room.players?.player1?.uid,ownerProfile=profiles.profileOf(owner,room.table?.name||room.players?.player1?.name),ownerLevel=ownerProfile?profiles.levelOf(ownerProfile.points).level:'—';
     const coins='<svg class="credit-coin-icon" viewBox="-2 -2 52 54" aria-hidden="true"><g transform="rotate(-9 21 35)"><path d="M6 35v7a15 6 0 0 0 30 0v-7"/><ellipse cx="21" cy="35" rx="15" ry="6"/></g><g transform="rotate(9 27 23)"><path d="M12 23v7a15 6 0 0 0 30 0v-7"/><ellipse cx="27" cy="23" rx="15" ry="6"/></g><g transform="rotate(-12 20 12)"><path d="M5 12v7a15 6 0 0 0 30 0v-7"/><ellipse cx="20" cy="12" rx="15" ry="6"/></g></svg>';
     const lock='<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="'+(privateTable?'M8 10V6a4 4 0 0 1 8 0v4':'M8 10V6a4 4 0 0 1 8 0')+'"/><path d="M12 14v3"/></svg>';
-    return `<article class="lobby-card compact-room has-team-seats"><div class="compact-room-owner">${profiles.avatarHtml(ownerProfile||{},'player-avatar room-avatar')}<h3>${escapeHtml(title)}</h3></div><div class="compact-room-stat"><strong>${targetPoints(room)}</strong><span>puntos</span></div><div class="compact-room-stat level-stat"><span>nivel</span><strong>${ownerLevel}</strong></div><div class="compact-room-privacy ${privateTable?'is-private':'is-public'}" role="img" aria-label="${privateTable?'Mesa privada':'Mesa pública'}" title="${privateTable?'Mesa privada':'Mesa pública'}">${lock}</div><div class="lobby-join-options">${actions.map(([key,label])=>`<button class="button lobby-player-button" data-room="${escapeHtml(code)}" data-seat="${key}" ${room.managedCredits&&Number(room.creditMatch?.stake)>0&&!roomSeatForUid(room,state.uid)&&((credits.wallet()?.balance??0)<room.creditMatch.stake||(credits.wallet()?.locked??0)>0)?'disabled':''}>${label}</button>`).join('')}</div>${teamSeats}</article>`;
-  }).join(''));
+    return `<article class="lobby-card compact-room has-team-seats${houseTable(room)?' bot-room':''}"><div class="compact-room-owner">${profiles.avatarHtml(ownerProfile||{},'player-avatar room-avatar')}<h3>${escapeHtml(title)}</h3></div><div class="compact-room-stat"><strong>${targetPoints(room)}</strong><span>puntos</span></div><div class="compact-room-stat level-stat"><span>nivel</span><strong>${ownerLevel}</strong></div><div class="compact-room-privacy ${privateTable?'is-private':'is-public'}" role="img" aria-label="${privateTable?'Mesa privada':'Mesa pública'}" title="${privateTable?'Mesa privada':'Mesa pública'}">${lock}</div><div class="lobby-join-options">${actions.map(([key,label])=>`<button class="button lobby-player-button" data-room="${escapeHtml(code)}" data-seat="${key}" ${room.managedCredits&&Number(room.creditMatch?.stake)>0&&!roomSeatForUid(room,state.uid)&&((credits.wallet()?.balance??0)<room.creditMatch.stake||(credits.wallet()?.locked??0)>0)?'disabled':''}>${label}</button>`).join('')}</div>${teamSeats}</article>`;
+  };
+  const people=open.filter(([,value])=>!houseTable(value.public)),house=open.filter(([,value])=>houseTable(value.public));
+  // Without tables from people: one short line, and a button that opens one and looks for someone.
+  paint(people.length?people.map(card).join(''):'<div class="lobby-empty-row"><span>No hay mesas<br>creadas ahora</span><button type="button" class="search-people-button" data-search-people><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6"/><path d="m20 20-4.5-4.5"/></svg>Buscar gente en línea</button></div>');
+  const botList=$('bot-room-list'),botHtml=house.map(card).join('');
+  if(botList.dataset.html!==botHtml){botList.innerHTML=botHtml;botList.dataset.html=botHtml;}
+  $('bot-tables').classList.toggle('hidden',!house.length);
   syncLobbyJoinFeedback();
 }
 function syncLobbyJoinFeedback(){
   const intent=state.joinIntent;
-  for(const button of document.querySelectorAll('#open-room-list [data-room]')){
+  for(const button of document.querySelectorAll('#open-room-list [data-room],#bot-room-list [data-room]')){
     if(intent){
       if(button.dataset.joinWasDisabled==null)button.dataset.joinWasDisabled=String(button.disabled);
       button.disabled=true;
@@ -1412,6 +1417,85 @@ async function sendWaitingChat(event){
   catch(e){error.textContent=e?.message||'No se pudo enviar el mensaje.';error.classList.remove('hidden');}
   finally{waitingChat.sending=false;renderWaitingChat();if(waitingChat.open)input.focus();}
 }
+// "Buscar gente en línea": opens a public table (1 vs 1, 20 points) and waits for someone, showing it in
+// the lobby. While alone the creator can change the points or the kind of table; after 60 seconds a bot
+// takes the empty seats, unless they turned that off.
+const SEARCH_BOT_MS=60000;
+async function searchPeople({mode='1v1',points=20,botOff=false}={}){
+  if(!account.isReady()){$('guest-signin-open')?.click();return;}
+  if(state.enteringRoom||state.roomCode)return;
+  $('play-bot').checked=false;$('table-mode').value=mode;$('target-points').value=String(points);$('table-visibility').value='public';
+  state.joining=false;state.selectedRoom=null;
+  state.search={mode,points,botAt:Date.now()+SEARCH_BOT_MS,botOff,botSent:false,busy:false,code:null};
+  await enterRoom();
+  if(state.search&&state.roomCode)state.search.code=state.roomCode;else state.search=null;
+  renderSearchPanel();
+}
+function searchActive(){
+  const r=state.room;
+  return !!(state.search?.code&&state.search.code===state.roomCode&&r?.managedCredits&&r.status==='waiting'&&state.playerId==='player1');
+}
+function renderSearchPanel(){
+  clearTimeout(state.searchTimer);state.searchTimer=null;
+  const on=searchActive(),panel=$('search-panel');
+  panel.classList.toggle('hidden',!on);$('waiting-view').classList.toggle('searching',on);
+  if(!on)return;
+  const r=state.room,search=state.search,alone=roomSeats(r).filter(p=>r.players?.[p]).length===1,locked=!alone||search.busy;
+  for(const b of panel.querySelectorAll('[data-search-mode]')){b.classList.toggle('on',b.dataset.searchMode===(r.mode||'1v1'));b.disabled=locked;}
+  for(const b of panel.querySelectorAll('[data-search-points]')){b.classList.toggle('on',Number(b.dataset.searchPoints)===targetPoints(r));b.disabled=locked;}
+  const left=Math.max(0,Math.ceil((search.botAt-Date.now())/1000));
+  $('search-bot').classList.toggle('off',search.botOff);
+  if(search.botOff){
+    $('search-bot-text').textContent='No se va a asignar un bot: la mesa espera a que entre alguien.';
+    $('search-bot-toggle').textContent='Activar bot';$('search-bot-seconds').textContent='';$('search-bot').style.setProperty('--left','0');
+  }else{
+    $('search-bot-text').innerHTML='Se asignará un <b>bot</b> a la partida en 60 segundos si no se une nadie';
+    $('search-bot-toggle').textContent='No quiero bot';$('search-bot-seconds').textContent=String(left);
+    $('search-bot').style.setProperty('--left',String(left/(SEARCH_BOT_MS/1000)));
+    if(left<=0&&!search.botSent){void fillWithBots();return;}
+  }
+  state.searchTimer=setTimeout(renderSearchPanel,500);
+}
+async function fillWithBots(){
+  const search=state.search;if(!search||search.botSent||!searchActive())return;
+  search.botSent=true;
+  try{
+    // A table created a moment ago gets its match id when the server confirms it.
+    for(let i=0;i<50&&!state.room?.creditMatch?.id;i++)await new Promise(resolve=>setTimeout(resolve,100));
+    if(!searchActive())return;
+    if(state.room.mode==='2v2'){for(const seat of roomSeats(state.room).filter(p=>!state.room.players?.[p]))await creditCommand({kind:'add-bot',seat});}
+    else await creditCommand({kind:'add-bot'});
+  }catch(error){
+    // Try again a little later (for example, a moment without connection).
+    search.botSent=false;search.botAt=Date.now()+15000;console.warn('[truco:search] bot',error);
+    if(searchActive())renderSearchPanel();
+  }
+}
+$('search-points').addEventListener('click',async event=>{
+  const button=event.target.closest('[data-search-points]');if(!button||button.disabled||!searchActive())return;
+  const value=Number(button.dataset.searchPoints);if(value===targetPoints(state.room))return;
+  state.search.busy=true;renderSearchPanel();
+  try{await creditCommand({kind:'set-points',value});state.search.points=value;}
+  catch(error){toast(error.message||'No pudimos cambiar los puntos.',true);}
+  finally{if(state.search){state.search.busy=false;renderSearchPanel();}}
+});
+// Another kind of table is another table: this one closes and a new one opens with the same points.
+$('search-mode').addEventListener('click',async event=>{
+  const button=event.target.closest('[data-search-mode]');if(!button||button.disabled||!searchActive())return;
+  const mode=button.dataset.searchMode;if(mode===(state.room.mode||'1v1'))return;
+  const points=targetPoints(state.room),botOff=state.search.botOff;
+  state.search.busy=true;renderSearchPanel();
+  state.cancelingWaitingRoom=state.roomCode;
+  try{await creditCommand({kind:'cancel'});}
+  catch(error){state.cancelingWaitingRoom=null;if(state.search){state.search.busy=false;renderSearchPanel();}toast(error.message||'No pudimos cambiar la mesa.',true);return;}
+  returnToLobby();
+  await searchPeople({mode,points,botOff});
+});
+$('search-bot-toggle').addEventListener('click',()=>{
+  const search=state.search;if(!search||!searchActive())return;
+  search.botOff=!search.botOff;if(!search.botOff){search.botAt=Date.now()+SEARCH_BOT_MS;search.botSent=false;}
+  renderSearchPanel();
+});
 function renderWaiting() {
   if (!state.room) return;
   // Out of the room for too long, the seat was freed: back to the lobby, saying why.
@@ -1427,6 +1511,7 @@ function renderWaiting() {
   if(ready&&isCoordinator()&&!state.room.managedCredits)startGame().catch(error=>toast(firebaseError(error),true));
   $('game-room-code').textContent = 'MESA ABIERTA';
   renderWaitingChat();
+  renderSearchPanel();
 }
 function shuffleDeck() {
   const suits = [{name:'oro',symbol:'♦',red:true},{name:'copa',symbol:'♥',red:true},{name:'espada',symbol:'♠',red:false},{name:'basto',symbol:'♣',red:false}];
@@ -3930,7 +4015,7 @@ $('score-details').addEventListener('click',event=>{if(event.target===$('score-d
 $('play-bot').addEventListener('change',updateBotSetup);
 $('points-picker-trigger').addEventListener('click',()=>{const menu=$('points-picker-menu'),opening=menu.classList.contains('hidden');menu.classList.toggle('hidden',!opening);$('points-picker-trigger').setAttribute('aria-expanded',String(opening));});
 $('create-room').addEventListener('click',()=>{warmGameConnection();configureSetup();});
-$('open-room-list').addEventListener('click',(event)=>{const button=event.target.closest('[data-room][data-seat]');if(button)joinOpenRoom(button.dataset.room,button.dataset.seat,button.dataset.team);});
+for(const list of ['open-room-list','bot-room-list'])$(list).addEventListener('click',(event)=>{if(event.target.closest('[data-search-people]')){void searchPeople();return;}const button=event.target.closest('[data-room][data-seat]');if(button)joinOpenRoom(button.dataset.room,button.dataset.seat,button.dataset.team);});
 
 $('back-home').addEventListener('click',()=>{showView('welcome-view');openLobby();});
 $('fold-hand').addEventListener('click',event=>runLiveAction(event.currentTarget,foldHand));

@@ -8,7 +8,9 @@ const WAIT_MS=600000;
 const HOUSE_WAIT_MS=10*60000;
 const waitFor=m=>m?.house?HOUSE_WAIT_MS:WAIT_MS;
 const teams=require('./team-table-service.cjs');
-const {isHouseUid}=require('./bot-seat.cjs');
+const {isHouseUid,houseUid}=require('./bot-seat.cjs');
+// The bot that sits down when nobody else joins a table ("Buscar gente en línea").
+const BOT_NAMES=['Bot Juan','Bot Pepe','Bot Nacho','Bot Caro','Bot Lucho','Bot Vale','Bot Seba','Bot Sofi'];
 function fail(message){throw new Error(message);}
 function validCode(code){if(typeof code!=='string'||!/^[A-Z2-9]{5}$/.test(code))fail('Mesa inválida.');return code;}
 function passwordHash(password){if(typeof password!=='string'||password.trim().length<4||password.length>64)fail('La clave debe tener entre 4 y 64 caracteres.');const salt=crypto.randomBytes(16).toString('hex');return {salt,hash:crypto.scryptSync(password,salt,32).toString('hex')};}
@@ -85,6 +87,15 @@ function tableOperation(ledger,{code,uid,command,requestId,expectedMatchId,prese
   if(m.status==='settled'||m.status==='refunded'){m.closedAt=now;if(m.session){m.session.room.status='closed';m.session.room.closeReason??='match-left';}m.revision++;return next;}
   if(command.reason==='draw-cancel'&&m.session?.room.status==='drawing'){m.session.room.status='closed';m.session.room.closeReason='draw-cancel';return finishAccounting(next,m,now);}
   fail('La partida está en juego. Podés irte al mazo.');
+ }
+ // While waiting, the creator may change the points of the table, or have a bot take the other seat.
+ if(m.status==='waiting'&&command.kind==='set-points'){if(player!=='player1')fail('Solo quien creó la mesa puede cambiar los puntos.');if(![10,20,30,40,50,60].includes(command.value))fail('Puntaje inválido.');if(m.targetPoints!==command.value){m.targetPoints=command.value;m.revision++;}return next;}
+ if(m.status==='waiting'&&command.kind==='add-bot'){
+  if(player!=='player1'||m.house)fail('Solo quien creó la mesa puede sumar un bot.');
+  if(now-m.createdAt>=waitFor(m))fail('La mesa ya no está disponible.');
+  const name=BOT_NAMES[crypto.randomInt(BOT_NAMES.length)],uid=houseUid(name);
+  m.player2=uid;m.players.player2={uid,name,online:true};m.house='player2';m.status='reserved';
+  m.session=newSession(code,m.players,m.targetPoints,{id:m.id,stake:m.stake,pot:m.stake*2,hasPassword:!!m.secret,matchNumber:1},now);m.revision++;if(requestId)m.requests[requestId]=true;return next;
  }
  if(m.status==='waiting'){const host=presence?.player1;if(now-m.createdAt>=waitFor(m))cancelWaiting(next,m,now);else if(!m.house&&host?.uid===m.player1&&host.online===false&&Number.isFinite(host.disconnectedAt)&&now-host.disconnectedAt>=120000)cancelWaiting(next,m,now,'creator-left');return next;}
  if(!m.session)fail('La mesa está cerrada.');

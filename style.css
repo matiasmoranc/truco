@@ -2649,3 +2649,40 @@ input,textarea,[contenteditable=""],[contenteditable="true"]{-webkit-user-select
 #waiting-view .waiting-chat{position:relative;left:auto;right:auto;bottom:auto;flex:none;width:calc(100% - 24px);max-width:520px;margin:0 auto calc(10px + env(safe-area-inset-bottom));background:rgba(0,0,0,.2)}
 #waiting-view.chat-open .waiting-content{padding-bottom:6px}
 #waiting-view .waiting-chat-toggle.open{display:none}
+
+/* Lobby: no tables from people → one short line with a button that looks for someone. */
+.lobby-empty-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;border:1px dashed #d8b87555;border-radius:14px;background:#00000014}
+.lobby-empty-row span{color:#cdd8cf;font-size:14.5px;line-height:1.25}
+.search-people-button{display:flex;align-items:center;gap:6px;min-height:38px;padding:0 12px;border-radius:10px;border:1px solid #e8c98366;background:#e8c98314;color:#ead39b;font:inherit;font-weight:700;font-size:14px;white-space:nowrap;cursor:pointer}
+.search-people-button svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}
+.bot-tables{margin-top:18px}
+/* Waiting room after "Buscar gente en línea": the search, the table settings and the bot countdown. */
+.search-panel{display:grid;gap:9px;margin-bottom:8px}
+.search-status{display:flex;align-items:center;gap:12px;padding:9px 12px;border-radius:14px;background:#00000026;border:1px solid #d8b87533}
+.search-status strong{display:block;color:#f0edda;font-size:15.5px}.search-status small{color:#aebbb2;font-size:12.5px}
+.search-dots::after{content:'…';display:inline-block;animation:search-dots 1.4s steps(4) infinite;overflow:hidden;vertical-align:bottom;width:1.1em}
+@keyframes search-dots{0%{width:0}100%{width:1.1em}}
+.search-radar{position:relative;width:40px;height:40px;flex:none}
+.search-radar i{position:absolute;inset:0;border-radius:50%;border:2px solid #76c38b;opacity:0;animation:search-ping 2s infinite}
+.search-radar i:nth-child(2){animation-delay:.66s}.search-radar i:nth-child(3){animation-delay:1.33s}
+.search-radar b{position:absolute;inset:13px;border-radius:50%;background:#76c38b;box-shadow:0 0 12px #76c38b}
+@keyframes search-ping{0%{transform:scale(.3);opacity:.9}100%{transform:scale(1.15);opacity:0}}
+.search-settings{display:flex;gap:8px}
+.search-col{flex:1;min-width:0}
+.search-label{display:block;margin:0 0 4px 2px;color:#aebbb2;font-size:11px;letter-spacing:.06em;text-transform:uppercase}
+.search-seg{display:flex;border:1px solid #e8c98355;border-radius:11px;overflow:hidden}
+.search-seg button{flex:1;min-width:0;height:36px;border:0;background:transparent;color:#d9d4bf;font:inherit;font-weight:700;font-size:13.5px;cursor:pointer}
+.search-seg button.on{background:#e8c983;color:#103b2d}
+.search-seg button:disabled:not(.on){opacity:.45;cursor:default}
+.search-bot{display:flex;align-items:center;gap:11px;padding:8px 11px;border-radius:14px;background:#e8c98314;border:1px solid #e8c98355;--left:1}
+.search-ring{position:relative;width:42px;height:42px;flex:none}
+.search-ring svg{width:42px;height:42px;transform:rotate(-90deg);fill:none;stroke-width:4}
+.search-ring circle{stroke:#ffffff22}.search-ring .search-ring-fill{stroke:#e8c983;stroke-linecap:round;stroke-dasharray:119.4;stroke-dashoffset:calc(119.4px * (1 - var(--left)));transition:stroke-dashoffset .4s linear}
+.search-ring span{position:absolute;inset:0;display:grid;place-items:center;color:#ead39b;font-weight:800;font-size:14px}
+.search-bot p{margin:0;flex:1;color:#e9e4d0;font-size:13px;line-height:1.3}
+.search-bot button{min-height:34px;padding:0 10px;border-radius:10px;border:1px solid #f0b4a8aa;background:transparent;color:#f6c9bf;font:inherit;font-weight:700;font-size:12.5px;white-space:nowrap;cursor:pointer}
+.search-bot.off{background:#00000020;border-color:#ffffff22}.search-bot.off button{border-color:#e8c98388;color:#ead39b}
+/* The empty seat looks for someone: a radar over the table. */
+#waiting-view.searching .waiting-player.empty .waiting-player-name{display:block;border-style:dashed;color:#cfe8d6;background:#76c38b14}
+#waiting-view.searching .waiting-table::before,#waiting-view.searching .waiting-table::after{content:'';position:absolute;left:50%;top:48%;width:130px;height:130px;margin:-65px 0 0 -65px;border-radius:50%;border:2px solid #76c38b;opacity:0;animation:search-ping 2.4s infinite;pointer-events:none}
+#waiting-view.searching .waiting-table::after{animation-delay:1.2s}

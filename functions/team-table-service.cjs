@@ -45,6 +45,7 @@ function operation(ledger,m,{uid,command:c,requestId,expectedMatchId,presence,no
   if(c.kind==='cancel'||c.kind==='abandon'){if(p==='player1')return refund(ledger,m,now,'creator-left');if(m.players[p])leaveSeat(ledger,m,p,now);return ledger;}
   if(!m.players[p])return ledger;
   if(c.kind==='add-bot')return addBot(ledger,m,{by:p,seat:c.seat,now});
+  if(c.kind==='set-points'){if(p!=='player1')fail('Solo quien creó la mesa puede cambiar los puntos.');if(![10,20,30,40,50,60].includes(c.value))fail('Puntaje inválido.');if(m.targetPoints!==c.value){m.targetPoints=c.value;m.revision++;}return ledger;}
   if(c.kind==='chat'){
    if(typeof c.text!=='string'||!c.text.trim()||c.text.trim().length>40||blockedChatReason(c.text))fail('El mensaje no se puede enviar.');
    if(requestId){if(m.requests[requestId])return ledger;m.requests[requestId]=true;const ids=Object.keys(m.requests);for(const id of ids.slice(0,Math.max(0,ids.length-100)))delete m.requests[id];}
