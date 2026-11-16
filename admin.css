@@ -70,9 +70,10 @@ section{display:grid;gap:16px}
 .bar-chart{display:flex;align-items:stretch;gap:3px;height:170px;padding-top:18px;position:relative}
 .bar-chart.tall{height:250px}
 .bar-col{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;min-width:0;position:relative}
-.bar-col .stack{width:min(100%,34px);display:flex;flex-direction:column-reverse;border-radius:4px 4px 0 0;overflow:hidden;background:transparent}
+.bar-col .plot{flex:1;width:100%;position:relative}
+.bar-col .stack{position:absolute;bottom:0;left:50%;transform:translateX(-50%);min-height:2px;width:min(100%,34px);display:flex;flex-direction:column-reverse;border-radius:4px 4px 0 0;overflow:hidden;background:transparent}
 .bar-col .seg{width:100%}.bar-chart:not(.stacked) .seg{background:var(--gold)}
-.bar-col .val{font-size:10px;color:var(--muted);margin-bottom:3px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.bar-col .val{position:absolute;left:50%;transform:translateX(-50%);font-size:10px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
 .bar-col .lbl{font-size:10px;color:var(--muted);margin-top:6px;height:12px;white-space:nowrap}
 .bar-col:hover .stack{filter:brightness(1.18)}
 .bar-chart::after{content:'';position:absolute;left:0;right:0;bottom:18px;border-top:1px solid var(--line)}

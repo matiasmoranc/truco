@@ -306,10 +306,13 @@ function columns(target,items,{labelEvery=1,showValues=true}={}){
  if(totals.every(total=>!total)){target.append(node('p','Todavía no hay datos para este período.','empty'));return;}
  items.forEach((item,i)=>{
   const col=node('div','','bar-col');col.title=item.tooltip||item.label+': '+totals[i];clickable(col,item.onClick);
-  if(showValues)col.append(node('span',totals[i]?number(totals[i]):'','val'));
-  const stack=node('div','','stack');stack.style.height=(totals[i]/maximum*100)+'%';
-  for(const s of item.segments||[{value:item.value}]){if(!s.value)continue;const seg=node('div','','seg');seg.style.height=(s.value/(totals[i]||1)*100)+'%';if(s.key)seg.style.background='var(--'+s.key+')';stack.append(seg);}
-  col.append(stack,node('span',i%labelEvery===0?item.label:'','lbl'));target.append(col);
+  // The bar lives in its own area, so its height is exactly its share of the tallest one; any value above
+  // zero shows at least as a thin line.
+  const plot=node('div','','plot'),share=(totals[i]/maximum*100).toFixed(2)+'%';
+  const stack=node('div','','stack');stack.style.height=share;
+  if(showValues&&totals[i]){const val=node('span',number(totals[i]),'val');val.style.bottom='calc('+share+' + 3px)';plot.append(val);}
+  for(const s of item.segments||[{value:item.value}]){if(!s.value)continue;const seg=node('div','','seg');seg.style.flex=s.value+' 1 0';if(s.key)seg.style.background='var(--'+s.key+')';stack.append(seg);}
+  plot.append(stack);col.append(plot,node('span',i%labelEvery===0?item.label:'','lbl'));target.append(col);
  });
 }
 // Anything that opens more detail behaves like a button (mouse, touch and keyboard).
@@ -327,7 +330,7 @@ function bars(target,rows){
  for(const r of rows){
   const row=node('div','','pbar'),name=node('span',r.label);clickable(row,r.onClick);
   if(r.color){const swatch=node('i','','swatch');swatch.style.background=r.color;name.prepend(swatch);}
-  const track=node('div','','track'),fill=node('div','','fill');fill.style.width=(r.value/maximum*100)+'%';fill.style.background=r.color||'var(--gold)';track.append(fill);
+  const track=node('div','','track'),fill=node('div','','fill');fill.style.width=(r.value/maximum*100)+'%';if(r.value)fill.style.minWidth='3px';fill.style.background=r.color||'var(--gold)';track.append(fill);
   const value=node('strong',number(r.value));value.append(node('small',Math.round(r.value/total*100)+'%'));
   row.append(name,track,value);target.append(row);
  }
