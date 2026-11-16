@@ -1203,12 +1203,13 @@ async function openLobby() {
     if(navigationEpoch!==(state.navigationEpoch||0))return;
     showView('welcome-view');
     warmGameConnection();
-    $('open-room-list').innerHTML = '<p class="muted">Buscando mesas abiertas…</p>';
+    // The list remembers what it last drew: a placeholder must clear that, or the same tables would never come back.
+    $('open-room-list').innerHTML = '<p class="muted">Buscando mesas abiertas…</p>';delete $('open-room-list').dataset.html;
     if (state.lobbyUnsubscribe) state.lobbyUnsubscribe();
     state.lobbyUnsubscribe = liveTables().watchLobby((rooms) => {state.lobbyRooms=rooms||{};renderLobby(state.lobbyRooms);});
   } catch (error) {
     console.error(error);
-    $('open-room-list').innerHTML = '<p class="muted">No pudimos cargar las mesas. Revisá la conexión y las reglas de Firebase.</p>';
+    $('open-room-list').innerHTML = '<p class="muted">No pudimos cargar las mesas. Revisá la conexión y las reglas de Firebase.</p>';delete $('open-room-list').dataset.html;
     toast(firebaseError(error));
   }
 }
