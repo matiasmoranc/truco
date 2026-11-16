@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="es"><head><meta charset="utf-8">
-  <meta name="robots" content="noindex, nofollow"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Administración · Truco Uruguayo</title><link rel="stylesheet" href="admin.css?v=28"></head>
+  <meta name="robots" content="noindex, nofollow"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Administración · Truco Uruguayo</title><link rel="stylesheet" href="admin.css?v=29"></head>
 <body>
 <section id="access" class="access"><div class="access-card"><img src="assets/truco-v3.png" alt=""><small class="game-name">TRUCO URUGUAYO</small><h1>Administración</h1><select class="game-picker" aria-label="Juego"><option value="uy">Truco Uruguayo</option><option value="ar">Truco Argentino</option></select><p id="identity"></p><p id="access-status">Verificando sesión…</p><button id="login" class="primary" hidden>Continuar con Google</button><button id="switch-account" hidden>Usar otra cuenta</button><a href="./">Volver al juego</a></div></section>
 <div id="console" class="shell" hidden>
@@ -115,6 +115,7 @@
    <div id="message-threads" class="thread-list"></div>
   </section>
   <section id="retention" hidden>
+   <article class="panel share-panel"><div class="panel-head"><h2>Registrados que entraron</h2><div class="share-controls"><div class="segmented" id="share-kind"><button type="button" data-kind="day" class="active">Día</button><button type="button" data-kind="week">Semana</button><button type="button" data-kind="month">Mes</button></div><label>Entraron<select id="share-min"><option value="1" selected>1 vez o más</option><option value="2">2 veces o más</option><option value="3">3 veces o más</option><option value="4">4 veces o más</option><option value="5">5 veces o más</option><option value="10">10 veces o más</option><option value="20">20 veces o más</option></select></label></div></div><p id="share-status" class="note"></p><div id="share-chart" class="bar-chart"></div><p id="share-summary" class="share-summary"></p><div id="share-times" class="platform-bars"></div><p class="note">Porcentaje sobre los jugadores que ya tenían cuenta al terminar cada período (sin las cuentas de prueba). Cada vez es una visita con la cuenta iniciada. Tocá una barra para ver ese período.</p></article>
    <div class="toolbar"><label>Período<select id="retention-days"><option value="1">Hoy</option><option value="7">Últimos 7 días</option><option value="30" selected>Últimos 30 días</option><option value="90">Últimos 90 días</option></select></label></div>
    <p id="retention-status" class="note"></p>
    <div id="retention-kpis" class="kpis compact"></div>
@@ -141,4 +142,4 @@
  </main>
 </div>
 <dialog id="edit"><form id="edit-form"><div class="dialog-head"><h2 id="edit-title"></h2><button type="button" id="close" aria-label="Cerrar">×</button></div><p id="edit-description"></p><label id="value-label">Nuevo valor<input id="value" required></label><div id="level-fields" class="level-fields" hidden><label>Nivel<input id="level-value" type="number" min="1" max="200" step="1"></label><label>Puntos totales<input id="points-value" type="number" min="0" max="1000000" step="0.1"></label><small id="level-preview"></small></div><label id="delete-label" hidden>Escribí el nombre exacto para confirmar<input id="delete-confirm" autocomplete="off"></label><label>Motivo<input id="reason" required minlength="3" maxlength="200" placeholder="Por qué realizás este cambio"></label><p id="edit-error" role="alert"></p><div class="dialog-actions"><button id="cancel" type="button">Cancelar</button><button id="save" class="primary" type="submit">Confirmar cambio</button></div></form></dialog>
-<script type="module" src="admin.js?v=44"></script></body></html>
+<script type="module" src="admin.js?v=45"></script></body></html>

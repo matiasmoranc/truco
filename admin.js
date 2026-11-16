@@ -274,7 +274,7 @@ $('table-state').addEventListener('change',renderTables);
 $('search').addEventListener('input',renderUsers);
 // Tapping a column header orders by it; tapping it again flips the order.
 for(const button of document.querySelectorAll('[data-sort]'))button.onclick=()=>{const key=button.dataset.sort;sortBy=sortBy.key===key?{key,dir:-sortBy.dir}:{key,dir:key==='name'?1:-1};renderUsers();void loadAllUsers();};$('photo-filter').onchange=$('level-filter').onchange=()=>{renderUsers();void loadAllUsers();};$('more').onclick=()=>refresh(true);
-function showTab(name){for(const section of Object.keys(TAB_TITLES))$(section).hidden=section!==name;for(const tab of document.querySelectorAll('[data-tab]'))tab.classList.toggle('active',tab.dataset.tab===name);$('page-title').textContent=TAB_TITLES[name];if(name==='usage')refreshUsage();if(name==='chat')loadChat();if(name==='retention')loadRetention();if(name==='users')loadDevices();}
+function showTab(name){for(const section of Object.keys(TAB_TITLES))$(section).hidden=section!==name;for(const tab of document.querySelectorAll('[data-tab]'))tab.classList.toggle('active',tab.dataset.tab===name);$('page-title').textContent=TAB_TITLES[name];if(name==='usage')refreshUsage();if(name==='chat')loadChat();if(name==='retention'){loadRetention();if(!shareView.data)loadShare();}if(name==='users')loadDevices();}
 $('refresh').onclick=()=>{refresh(false,true);if(!$('usage').hidden)refreshUsage();if(!$('chat').hidden)loadChat();};
 for(const b of document.querySelectorAll('[data-tab]'))b.onclick=()=>showTab(b.dataset.tab);
 async function showUsers(scope){if(busy)return;userScope=scope;pagesLoaded=1;pageToken=null;users=[];$('search').value='';$('user-scope').value=scope;renderUsers();showTab('users');await refresh();}
@@ -310,7 +310,8 @@ function columns(target,items,{labelEvery=1,showValues=true}={}){
   // zero shows at least as a thin line.
   const plot=node('div','','plot'),share=(totals[i]/maximum*100).toFixed(2)+'%';
   const stack=node('div','','stack');stack.style.height=share;
-  if(showValues&&totals[i]){const val=node('span',number(totals[i]),'val');val.style.bottom='calc('+share+' + 3px)';plot.append(val);}
+  if(item.selected)col.classList.add('selected');
+  if(showValues&&totals[i]){const val=node('span',item.text??number(totals[i]),'val');val.style.bottom='calc('+share+' + 3px)';plot.append(val);}
   for(const s of item.segments||[{value:item.value}]){if(!s.value)continue;const seg=node('div','','seg');seg.style.flex=s.value+' 1 0';if(s.key)seg.style.background='var(--'+s.key+')';stack.append(seg);}
   plot.append(stack);col.append(plot,node('span',i%labelEvery===0?item.label:'','lbl'));target.append(col);
  });
@@ -322,9 +323,9 @@ function clickable(el,onClick){
  el.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();onClick();}};
  return el;
 }
-function bars(target,rows){
+function bars(target,rows,{total:whole=null}={}){
  target.replaceChildren();
- const total=rows.reduce((sum,r)=>sum+r.value,0);
+ const total=whole??rows.reduce((sum,r)=>sum+r.value,0);
  if(!total){target.append(node('p','Todavía no hay visitas registradas.','empty'));return;}
  const maximum=Math.max(...rows.map(r=>r.value));
  for(const r of rows){
@@ -639,6 +640,53 @@ function renderRetention({from,to,time,returns}){
  $('retention-cohorts').replaceChildren(weekRows.length?simpleTable(['Entraron por primera vez','Nuevos','Al día siguiente','En la semana','En el mes'],weekRows):node('p','Todavía no hay jugadores nuevos en este período.','empty'));
 }
 $('retention-days').addEventListener('change',loadRetention);
+// Registered players who came in: share per day, week or month, out of the players who had an
+// account by the end of each period, and how many times they came in.
+const shareView={kind:'day',data:null,index:null,request:0};
+const sharePct=(part,whole)=>whole?(Math.round(part*1000/whole)/10).toLocaleString('es-UY')+'%':'—';
+const MONTHS=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+function shareLabel(p,kind,long=false){
+ if(kind==='month'){const name=MONTHS[Number(p.from.slice(5,7))-1];return long?name+' '+p.from.slice(0,4):name.slice(0,3);}
+ if(kind==='week')return long?'semana del '+shortDay(p.from)+' al '+shortDay(p.to):shortDay(p.from);
+ if(!long)return shortDay(p.from);
+ const today=shareView.data?.today,yesterday=today&&new Date(Date.parse(today+'T12:00:00Z')-86400000).toISOString().slice(0,10);
+ return (p.from===today?'hoy, ':p.from===yesterday?'ayer, ':'')+longDay(p.from);
+}
+const shareActive=(p,min)=>Object.entries(p.histogram||{}).reduce((sum,[times,n])=>Number(times)>=min?sum+n:sum,0);
+async function loadShare(){
+ const request=++shareView.request;$('share-status').textContent='Cargando…';
+ try{
+  const data=(await call({action:'activity-share',kind:shareView.kind})).data;if(request!==shareView.request)return;
+  shareView.data=data;const last=data.periods.length-1;shareView.index=data.periods[last]?.current&&last>0?last-1:last;
+  $('share-status').textContent='';renderShare();
+ }catch(e){if(request===shareView.request)$('share-status').textContent='No se pudo cargar'+(GAME==='ar'?' (este juego todavía no lo mide).':': '+errorText(e));}
+}
+function renderShare(){
+ const data=shareView.data;if(!data)return;
+ const min=Number($('share-min').value)||1,kind=data.kind,periods=data.periods;
+ columns($('share-chart'),periods.map((p,i)=>{
+  const active=shareActive(p,min),value=p.registered?Math.round(active*1000/p.registered)/10:0;
+  return {label:shareLabel(p,kind),value,text:sharePct(active,p.registered),selected:i===shareView.index,
+   tooltip:shareLabel(p,kind,true)+(p.current?' (en curso)':'')+(p.partial?' (datos incompletos)':'')+'\n'+number(active)+' de '+number(p.registered)+' registrados · '+sharePct(active,p.registered),
+   onClick:()=>{shareView.index=i;renderShare();}};
+ }),{labelEvery:periods.length>14?3:1});
+ const p=periods[shareView.index];if(!p)return;
+ const active=shareActive(p,min);
+ $('share-summary').textContent=shareLabel(p,kind,true).replace(/^./,c=>c.toUpperCase())+(p.current?' (en curso)':'')+': '+number(active)+' de '+number(p.registered)+' registrados entraron '+$('share-min').selectedOptions[0].textContent+' · '+sharePct(active,p.registered)+(p.partial?' · datos incompletos: el jugador de cada visita se registra desde el 24/10/2026.':'');
+ const h=p.histogram||{},count=(a,b=Infinity)=>Object.entries(h).reduce((sum,[t,n])=>Number(t)>=a&&Number(t)<=b?sum+n:sum,0);
+ const entered=count(1);
+ bars($('share-times'),[
+  {label:'No entraron',value:p.registered-entered,color:'#ffffff33'},
+  {label:'1 vez',value:count(1,1)},{label:'2 veces',value:count(2,2)},{label:'3 veces',value:count(3,3)},{label:'4 veces',value:count(4,4)},
+  {label:'5 a 9 veces',value:count(5,9)},{label:'10 a 19 veces',value:count(10,19)},{label:'20 o más',value:count(20)}
+ ],{total:p.registered});
+}
+for(const button of $('share-kind').querySelectorAll('[data-kind]'))button.addEventListener('click',()=>{
+ if(shareView.kind===button.dataset.kind)return;shareView.kind=button.dataset.kind;
+ for(const b of $('share-kind').querySelectorAll('[data-kind]'))b.classList.toggle('active',b===button);
+ loadShare();
+});
+$('share-min').addEventListener('change',renderShare);
 let chatLog=[],chatGroups=[],chatRequest=0;
 async function loadChat(){
  const request=++chatRequest;$('chat-summary').textContent='Cargando…';

@@ -251,6 +251,17 @@ exports.adminConsole=onCall({...options,secrets:[liveInternalSecret]},async requ
   return {from,to,time:sessionSummary(sessions.val()||{},from,to),
    returns:retentionSummary(Object.fromEntries(Object.entries(all).map(([d,v])=>[d,{users:v?.users||{}}])),{today:to,exclude:new Set(Object.keys(tests.val()||{})),from})};
  }
+ if(action==='activity-share'){
+  // Share of the registered players (as of each period's end) who came in, and how many times.
+  const {activityShare}=require('./activity-share.cjs');
+  const signups=[];let token;
+  do{const page=await getAuth().listUsers(1000,token);for(const u of page.users)if(u.providerData.some(p=>['google.com','apple.com','password'].includes(p.providerId)))signups.push({uid:u.uid,at:Date.parse(u.metadata.creationTime)||0});token=page.pageToken;}while(token);
+  const now=Date.now(),today=uruguayDate(now).day,from=uruguayDate(now-(VISIT_DAYS-1)*86400000).day;
+  const [log,tests]=await Promise.all([db.ref('adminMetrics/visitLog').orderByKey().startAt(from).get(),db.ref('adminConfig/testUsers').get()]);
+  // The player of each visit is recorded since 2026-10-24.
+  const stored=log.val()||{},firstDay=[Object.keys(stored).sort()[0]||today,'2026-10-24'].sort().at(-1);
+  return activityShare({kind:data.kind,signups,log:stored,today,exclude:new Set(Object.keys(tests.val()||{})),firstDay});
+ }
  if(action==='chat-log'){
   const days=Math.min(CHAT_LOG_DAYS,Math.max(1,Math.floor(Number(data.days)||7)));
   const from=chatDay(Date.now()-(days-1)*86400000);
