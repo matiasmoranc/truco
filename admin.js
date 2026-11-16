@@ -47,7 +47,7 @@ async function setTestUser(u,test){
 const number=value=>new Intl.NumberFormat('es-UY').format(Number(value)||0);
 const PLATFORM_LABELS={'app-ios':'App iPhone','app-android':'App Android','web-ios':'Web iPhone','web-android':'Web Android','web-desktop':'Web computadora'};
 const PAGE_LABELS={juego:'Juego',anotador:'Anotador',aprender:'Aprender a jugar',otra:'Reglas y otras'};
-const TAB_TITLES={metrics:'Resumen',visits:'Visitas',usage:'Anotador y Aprender',users:'Usuarios',tables:'Mesas y partidas',reports:'Problemas reportados',messages:'Mensajes a jugadores',chat:'Chat de las mesas',audit:'Historial de cambios'};
+const TAB_TITLES={metrics:'Resumen',visits:'Visitas',usage:'Anotador y Aprender',retention:'Retención',users:'Usuarios',tables:'Mesas y partidas',reports:'Problemas reportados',messages:'Mensajes a jugadores',chat:'Chat de las mesas',audit:'Historial de cambios'};
 function errorText(e){return e.code==='functions/not-found'?'Falta publicar las funciones de administración en Firebase.':e.message||'No se pudo completar el cambio.';}
 const AUDIT_LABELS={level:'Cambio de nivel y puntos',rename:'Cambio de nombre',block:'Bloqueo',delete:'Eliminación de cuenta',credits:'Créditos','close-table':'Cierre de mesa','close-legacy-table':'Cierre de mesa','repair-reservation':'Reparación de reserva'};
 // The device a player used last, as the panel names it.
@@ -274,7 +274,7 @@ $('table-state').addEventListener('change',renderTables);
 $('search').addEventListener('input',renderUsers);
 // Tapping a column header orders by it; tapping it again flips the order.
 for(const button of document.querySelectorAll('[data-sort]'))button.onclick=()=>{const key=button.dataset.sort;sortBy=sortBy.key===key?{key,dir:-sortBy.dir}:{key,dir:key==='name'?1:-1};renderUsers();void loadAllUsers();};$('photo-filter').onchange=$('level-filter').onchange=()=>{renderUsers();void loadAllUsers();};$('more').onclick=()=>refresh(true);
-function showTab(name){for(const section of Object.keys(TAB_TITLES))$(section).hidden=section!==name;for(const tab of document.querySelectorAll('[data-tab]'))tab.classList.toggle('active',tab.dataset.tab===name);$('page-title').textContent=TAB_TITLES[name];if(name==='usage')refreshUsage();if(name==='chat')loadChat();}
+function showTab(name){for(const section of Object.keys(TAB_TITLES))$(section).hidden=section!==name;for(const tab of document.querySelectorAll('[data-tab]'))tab.classList.toggle('active',tab.dataset.tab===name);$('page-title').textContent=TAB_TITLES[name];if(name==='usage')refreshUsage();if(name==='chat')loadChat();if(name==='retention')loadRetention();}
 $('refresh').onclick=()=>{refresh(false,true);if(!$('usage').hidden)refreshUsage();if(!$('chat').hidden)loadChat();};
 for(const b of document.querySelectorAll('[data-tab]'))b.onclick=()=>showTab(b.dataset.tab);
 async function showUsers(scope){if(busy)return;userScope=scope;pagesLoaded=1;pageToken=null;users=[];$('search').value='';$('user-scope').value=scope;renderUsers();showTab('users');await refresh();}
@@ -588,6 +588,43 @@ function peopleList(){
 }
 function writeTo(u){showTab('messages');$('message-to').value=u.name||'';$('message-text').focus();}
 // Typed table chat (quick messages are not stored), newest first, grouped by day.
+// Retention: how long each visit lasts, where the time goes, and whether players come back.
+const AREA_NAMES={inicio:'Pantalla de inicio',lobby:'Lobby',sala:'Sala de espera',partida:'Partida en vivo',bot:'Contra el bot',aprender:'Aprender',anotador:'Anotador',otra:'Otras páginas'};
+const PLATFORM_NAMES={'app-android':'App Android','app-ios':'App iPhone','web-android':'Web Android','web-ios':'Web iPhone','web-desktop':'Web computadora'};
+const duration=s=>{s=Math.round(Number(s)||0);if(s<60)return s+' s';const m=Math.floor(s/60);if(m<60)return m+' min'+(s%60?' '+(s%60)+' s':'');return Math.floor(m/60)+' h '+(m%60)+' min';};
+const share=(n,d)=>d?Math.round(n/d*100)+'%':'—';
+let retentionRequest=0;
+async function loadRetention(){
+ const request=++retentionRequest;$('retention-status').textContent='Cargando…';
+ try{const data=(await call({action:'retention',days:Number($('retention-days').value)})).data;if(request!==retentionRequest)return;renderRetention(data);}
+ catch(e){if(request===retentionRequest)$('retention-status').textContent='No se pudo cargar'+(GAME==='ar'?' (este juego todavía no lo mide).':': '+errorText(e));}
+}
+function renderRetention({from,to,time,returns}){
+ $('retention-status').textContent=(from===to?'Período: '+longDay(from):'Período: del '+longDay(from)+' al '+longDay(to))+(time.sessions?'':' · Todavía no hay visitas medidas en este período.');
+ const kpis=$('retention-kpis');kpis.replaceChildren();
+ const kpi=(label,value,note)=>{const k=node('div','','kpi');k.append(node('small',label),node('strong',value),node('span',note||'','delta'));kpis.append(k);};
+ const quick=time.buckets.find(b=>b.id==='lt1')?.count||0,t=returns.totals||{};
+ kpi('Visitas',number(time.sessions),'Cada vez que abren la app o la página');
+ kpi('Tiempo promedio',duration(time.average),'Por visita');
+ kpi('Tiempo total',duration(time.seconds),'Sumando todas las visitas');
+ kpi('Se van en menos de 1 min',share(quick,time.sessions),number(quick)+' visitas');
+ kpi('Vuelven al día siguiente',share(t.d1?.back,t.d1?.size),t.d1?.size?'De '+number(t.d1.size)+' jugadores nuevos':'Todavía sin datos');
+ kpi('Vuelven en la semana',share(t.d7?.back,t.d7?.size),t.d7?.size?'De '+number(t.d7.size)+' jugadores nuevos':'Todavía sin datos');
+ kpi('Vuelven en el mes',share(t.d30?.back,t.d30?.size),t.d30?.size?'De '+number(t.d30.size)+' jugadores nuevos':'Todavía sin datos');
+ columns($('retention-daily'),time.days.map(day=>{const d=time.daily[day]||{};return {label:shortDay(day),value:Math.round((d.average||0)/6)/10,tooltip:shortDay(day)+' · '+duration(d.average)+' promedio · '+number(d.sessions)+' visitas'};}),{labelEvery:time.days.length>14?3:1});
+ bars($('retention-buckets'),time.buckets.map(b=>({label:b.label,value:b.count,color:b.id==='lt1'?'var(--red)':undefined})));
+ bars($('retention-areas'),Object.entries(time.areas).sort((a,b)=>b[1]-a[1]).map(([area,secs])=>({label:AREA_NAMES[area]||area,value:Math.round(secs/60)})));
+ const rows=(entries,names)=>entries.sort((a,b)=>b[1].n-a[1].n).map(([key,v])=>[names[key]||key,number(v.n),duration(v.n?v.t/v.n:0)]);
+ $('retention-platforms').replaceChildren(time.sessions?simpleTable(['Dispositivo','Visitas','Tiempo promedio'],rows(Object.entries(time.platforms),PLATFORM_NAMES)):node('p','Todavía no hay visitas medidas.','empty'));
+ $('retention-accounts').replaceChildren(time.sessions?simpleTable(['','Visitas','Tiempo promedio'],rows(Object.entries(time.accounts).filter(([,v])=>v.n),{signed:'Con cuenta',guest:'Sin cuenta'})):node('p','Todavía no hay visitas medidas.','empty'));
+ // Cohorts by week (Monday) of the first day.
+ const weeks=new Map();
+ for(const c of returns.cohorts||[]){const d=new Date(c.day+'T12:00:00Z'),monday=new Date(d.getTime()-((d.getUTCDay()+6)%7)*86400000).toISOString().slice(0,10);const w=weeks.get(monday)||{size:0,d1:[0,0],d7:[0,0],d30:[0,0]};w.size+=c.size;for(const k of ['d1','d7','d30'])if(c[k]!=null){w[k][0]+=c[k];w[k][1]+=c.size;}weeks.set(monday,w);}
+ const cell=([back,size])=>size?share(back,size)+' ('+back+' de '+size+')':'—';
+ const weekRows=[...weeks].sort((a,b)=>b[0].localeCompare(a[0])).map(([monday,w])=>['Semana del '+shortDay(monday),number(w.size),cell(w.d1),cell(w.d7),cell(w.d30)]);
+ $('retention-cohorts').replaceChildren(weekRows.length?simpleTable(['Entraron por primera vez','Nuevos','Al día siguiente','En la semana','En el mes'],weekRows):node('p','Todavía no hay jugadores nuevos en este período.','empty'));
+}
+$('retention-days').addEventListener('change',loadRetention);
 let chatLog=[],chatGroups=[],chatRequest=0;
 async function loadChat(){
  const request=++chatRequest;$('chat-summary').textContent='Cargando…';

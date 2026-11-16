@@ -232,6 +232,15 @@ exports.adminConsole=onCall({...options,secrets:[liveInternalSecret]},async requ
   for(const m of Object.values(ledger.matches||{}).filter(m=>Object.values(m.players||{}).some(p=>p.uid===data.uid)&&ledger.tables?.[m.code]===m.id))await publish(ledger,m.code);
   return {ok:true};
  }
+ if(action==='retention'){
+  // Time spent per visit (the last 1 to 90 days) and whether signed-in players come back.
+  const {sessionSummary,retentionSummary,SESSION_DAYS}=require('./session-service.cjs');
+  const now=Date.now(),days=Math.min(SESSION_DAYS,Math.max(1,Number(data.days)||30)),to=uruguayDate(now).day,from=uruguayDate(now-(days-1)*86400000).day;
+  const [sessions,activity,tests]=await Promise.all([db.ref('sessionLog').orderByKey().startAt(from).endAt(to).get(),db.ref('adminMetrics/days').orderByKey().get(),db.ref('adminConfig/testUsers').get()]);
+  const all=activity.val()||{};
+  return {from,to,time:sessionSummary(sessions.val()||{},from,to),
+   returns:retentionSummary(Object.fromEntries(Object.entries(all).map(([d,v])=>[d,{users:v?.users||{}}])),{today:to,exclude:new Set(Object.keys(tests.val()||{})),from})};
+ }
  if(action==='chat-log'){
   const days=Math.min(CHAT_LOG_DAYS,Math.max(1,Math.floor(Number(data.days)||7)));
   const from=chatDay(Date.now()-(days-1)*86400000);
@@ -555,10 +564,26 @@ exports.siteUsage=onCall({region:'us-central1',maxInstances:3,timeoutSeconds:10,
  await db.ref(test?'adminMetrics/usageTest':'adminMetrics/usage').update(updates);
  return {ok:true};
 });
+// Time spent: a tick at start and every 30 seconds while the page is on screen.
+const sessionLimits=new Map();
+exports.siteSession=onCall({region:'us-central1',maxInstances:3,timeoutSeconds:10,cors:true},async request=>{
+ const now=Date.now(),ip=String(request.rawRequest?.ip||'');
+ const recent=(sessionLimits.get(ip)||[]).filter(at=>now-at<60000);
+ if(recent.length>=30)throw new HttpsError('resource-exhausted','Demasiados registros.');
+ recent.push(now);sessionLimits.set(ip,recent);
+ if(sessionLimits.size>5000)for(const [key,list] of sessionLimits)if(list.every(at=>now-at>=60000))sessionLimits.delete(key);
+ const data=request.data||{};let updates;
+ try{updates=require('./session-service.cjs').sessionUpdates({...data,now,increment:ServerValue.increment});}catch(e){throw new HttpsError('invalid-argument',e.message);}
+ const test=data.test===true||inRanges(ip,await googleAddresses(now));
+ await db.ref(test?'sessionLogTest':'sessionLog').update(updates);
+ return {ok:true};
+});
 exports.activityCleanup=onSchedule({schedule:'every day 04:00',timeZone:'America/Montevideo',region:'us-central1',maxInstances:1},async()=>{
  const now=Date.now();
  // Table invitations and their answers older than a day are not useful anymore.
  for(const root of ['tableInvites','tableInviteReplies']){const all=(await db.ref(root).get()).val()||{},gone={};for(const [uid,list] of Object.entries(all))for(const [id,v] of Object.entries(list||{}))if(!(now-(v?.at||0)<86400000))gone[root+'/'+uid+'/'+id]=null;if(Object.keys(gone).length)await db.ref().update(gone);}
+ // Session times are kept for SESSION_DAYS.
+ {const {SESSION_DAYS}=require('./session-service.cjs'),cut=uruguayDate(now-(SESSION_DAYS-1)*86400000).day;for(const root of ['sessionLog','sessionLogTest']){const old=(await db.ref(root).orderByKey().endBefore(cut).get()).val()||{},gone={};for(const day of Object.keys(old))gone[root+'/'+day]=null;if(Object.keys(gone).length)await db.ref().update(gone);}}
  // Chat copies are kept for CHAT_LOG_DAYS.
  {const old=(await db.ref('chatLog').orderByKey().endBefore(chatDay(now-(CHAT_LOG_DAYS-1)*86400000)).get()).val()||{},gone={};for(const day of Object.keys(old))gone['chatLog/'+day]=null;if(Object.keys(gone).length)await db.ref().update(gone);}
  await db.ref('adminMetrics').transaction(metrics=>{

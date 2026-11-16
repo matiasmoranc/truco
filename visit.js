@@ -4,6 +4,7 @@ const ENDPOINT='https://us-central1-truco-6553d.cloudfunctions.net/siteVisit';
 const DAY_KEY='truco-visit-day',TEST_KEY='truco-test-device',GUEST_DAY_KEY='truco-guest-day';
 const GUEST_ENDPOINT='https://us-central1-truco-6553d.cloudfunctions.net/guestVisit';
 const USAGE_ENDPOINT='https://us-central1-truco-6553d.cloudfunctions.net/siteUsage';
+const SESSION_ENDPOINT='https://us-central1-truco-6553d.cloudfunctions.net/siteSession';
 const JOURNEY_KEY='truco-journey',USAGE_DAY_KEY='truco-usage-day',JOURNEY_PAGES=['anotador','aprender'];
 
 // Static pages inside the app have no trucoNative, but the native bridge still
@@ -48,11 +49,29 @@ export function recordVisit({fetch=globalThis.fetch,nav=globalThis.navigator,loc
  const day=uruguayDay(),known=storedDay()!==null,first=storedDay()!==day;storeDay(day);
  const data={platform:visitPlatform(nav),page:visitPage(location?.pathname),first,ref:visitReferrer(location),...(testDevice()?{test:true}:{})};
  usageContext={fetch,platform:data.platform};
+ startSessionClock({fetch,platform:data.platform,page:data.page});
  if(!known&&JOURNEY_PAGES.includes(data.page))startJourney({page:data.page,ref:data.ref,day});
  if(data.page==='juego')journeyStep('game');
  if(readStored(JOURNEY_KEY)?.day!==day&&readStored(JOURNEY_KEY))journeyStep('returned');
  return visitRequest=fetch(ENDPOINT,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({data}),keepalive:true})
   .then(response=>response?.json?.()).then(body=>{const r=body?.result;if(r?.id&&r?.day)pendingVisit={visitId:r.id,visitDay:r.day};}).catch(()=>null);
+}
+// Time spent: one session per page load (or app launch). It says it started, then sends
+// 30 seconds each time the page has been on screen that long (hidden time does not count).
+// The game tells which part is open (lobby, waiting room, match…) and whether someone signed in.
+const SESSION_AREAS=['inicio','lobby','sala','partida','bot','aprender','anotador','otra'];
+export function startSessionClock({fetch=globalThis.fetch,platform,page,doc=globalThis.document,now=()=>Date.now(),every=5000}={}){
+ if(typeof fetch!=='function'||!doc)return null;
+ const sid=now().toString(36)+'-'+Math.random().toString(36).slice(2,10);
+ const area=()=>{let a=null;try{a=globalThis.trucoArea?.();}catch{/* The game is still loading. */}return SESSION_AREAS.includes(a)?a:page==='juego'?'inicio':SESSION_AREAS.includes(page)?page:'otra';};
+ const signed=()=>{try{return !!globalThis.trucoSignedIn?.();}catch{return false;}};
+ const tick=seconds=>fetch(SESSION_ENDPOINT,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({data:{sid,platform,page,area:area(),signed:signed(),seconds,...(testDevice()?{test:true}:{})}}),keepalive:true})?.catch?.(()=>null);
+ tick(0);
+ let last=now(),onScreen=0;
+ const check=()=>{const t=now(),visible=doc.visibilityState!=='hidden';if(visible)onScreen+=Math.min(t-last,every*3);last=t;while(onScreen>=30000){onScreen-=30000;tick(30);}};
+ doc.addEventListener?.('visibilitychange',check);
+ const timer=setInterval(check,every);timer?.unref?.();
+ return {sid,check,stop:()=>clearInterval(timer)};
 }
 // The visit that opened this page, handed once to the first signal after signing in.
 // In the app the session comes back before the visit is answered, so the first signal

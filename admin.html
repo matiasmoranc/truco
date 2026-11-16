@@ -15,6 +15,7 @@
    <button data-tab="tables"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M8 5v14M16 5v14"/></svg>Mesas</button>
    <button data-tab="reports"><svg viewBox="0 0 24 24"><path d="M12 3 2 20h20L12 3Zm0 6v5m0 3v.01"/></svg>Reportes<span id="reports-count" class="badge" hidden></span></button>
    <button data-tab="messages"><svg viewBox="0 0 24 24"><path d="M4 5h16v11H8l-4 4V5Z"/></svg>Mensajes<span id="messages-count" class="badge" hidden></span></button>
+   <button data-tab="retention"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></svg>Retención</button>
    <button data-tab="chat"><svg viewBox="0 0 24 24"><path d="M3 6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H9l-5 4V6Z"/><path d="M8 9h8M8 13h5"/></svg>Chat</button>
    <button data-tab="audit"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Historial</button>
   </nav>
@@ -112,6 +113,22 @@
    <h2 class="section-title">Conversaciones</h2>
    <div id="message-threads" class="thread-list"></div>
   </section>
+  <section id="retention" hidden>
+   <div class="toolbar"><label>Período<select id="retention-days"><option value="1">Hoy</option><option value="7">Últimos 7 días</option><option value="30" selected>Últimos 30 días</option><option value="90">Últimos 90 días</option></select></label></div>
+   <p id="retention-status" class="note"></p>
+   <div id="retention-kpis" class="kpis compact"></div>
+   <article class="panel"><div class="panel-head"><h2>Tiempo promedio por visita · minutos por día</h2></div><div id="retention-daily" class="bar-chart"></div></article>
+   <div class="panels">
+    <article class="panel"><div class="panel-head"><h2>Cuánto duran las visitas</h2></div><div id="retention-buckets" class="platform-bars"></div></article>
+    <article class="panel"><div class="panel-head"><h2>Dónde pasan el tiempo · minutos</h2></div><div id="retention-areas" class="platform-bars"></div></article>
+   </div>
+   <div class="panels">
+    <article class="panel"><div class="panel-head"><h2>Por dispositivo</h2></div><div id="retention-platforms"></div></article>
+    <article class="panel"><div class="panel-head"><h2>Con cuenta y sin cuenta</h2></div><div id="retention-accounts"></div></article>
+   </div>
+   <article class="panel"><div class="panel-head"><h2>Vuelven a jugar · jugadores con cuenta, por semana en que entraron por primera vez</h2></div><div id="retention-cohorts"></div></article>
+   <p class="note">Una visita es cada vez que se abre la página o la app. Cuenta solo el tiempo con la pantalla a la vista. En las apps se empieza a medir con la próxima versión; hasta entonces son visitas de la web. "Vuelven" toma a los jugadores con cuenta desde el primer día que usaron el juego.</p>
+  </section>
   <section id="chat" hidden>
    <div class="toolbar"><label>Período<select id="chat-days"><option value="1">Hoy</option><option value="7" selected>Últimos 7 días</option><option value="30">Últimos 30 días</option></select></label><label class="chat-search">Buscar<input id="chat-search" type="search" placeholder="Jugador, mesa o texto" autocomplete="off"></label></div>
    <p id="chat-summary" class="note"></p>
@@ -123,4 +140,4 @@
  </main>
 </div>
 <dialog id="edit"><form id="edit-form"><div class="dialog-head"><h2 id="edit-title"></h2><button type="button" id="close" aria-label="Cerrar">×</button></div><p id="edit-description"></p><label id="value-label">Nuevo valor<input id="value" required></label><div id="level-fields" class="level-fields" hidden><label>Nivel<input id="level-value" type="number" min="1" max="200" step="1"></label><label>Puntos totales<input id="points-value" type="number" min="0" max="1000000" step="0.1"></label><small id="level-preview"></small></div><label id="delete-label" hidden>Escribí el nombre exacto para confirmar<input id="delete-confirm" autocomplete="off"></label><label>Motivo<input id="reason" required minlength="3" maxlength="200" placeholder="Por qué realizás este cambio"></label><p id="edit-error" role="alert"></p><div class="dialog-actions"><button id="cancel" type="button">Cancelar</button><button id="save" class="primary" type="submit">Confirmar cambio</button></div></form></dialog>
-<script type="module" src="admin.js?v=41"></script></body></html>
+<script type="module" src="admin.js?v=42"></script></body></html>

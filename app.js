@@ -1,5 +1,5 @@
 import './chat-moderation.js?v=20261013-moderation1';
-import { visitPlatform,takeVisit,markTestDevice,markGuestVisit,trackUsage,journeyStep } from './visit.js?v=20261108-usage2';
+import { visitPlatform,takeVisit,markTestDevice,markGuestVisit,trackUsage,journeyStep } from './visit.js?v=20261115-time1';
 import { installFriends } from './friends.js?v=20261111-fix1';
 import { installPlayerPanel } from './player-panel.js?v=20261013-blocklist1';
 import { installScorer,renderCompactTally } from './scorer.js?v=20261101-usage1';
@@ -479,6 +479,13 @@ let activeVoiceUtterance=null;
 const chatSoundsMuted=()=>{try{return localStorage.getItem('truco-call-sound')==='off';}catch{return false;}};
 // The Android app speaks the calls with the phone's own voice (its web view has no speech synthesis).
 const nativeVoice=()=>globalThis.trucoNative?.nativeVoice||null;
+// For the time-spent statistics: which part of the game is open, and whether someone signed in.
+globalThis.trucoSignedIn=()=>!!state.uid;
+globalThis.trucoArea=()=>{
+  const view=document.querySelector('.view.active')?.id;
+  if(view==='game-view')return state.learning?'aprender':state.localGame?'bot':'partida';
+  return {'welcome-view':'inicio','setup-view':'lobby','friends-view':'lobby','invite-view':'lobby','waiting-view':'sala','learn-view':'aprender','scorer-view':'anotador'}[view]||'otra';
+};
 function unlockVoice(){
   if(!chatSoundsMuted())unlockChatSounds();
   if(soundEnabled&&nativeVoice()){voiceUnlocked=true;return;}
