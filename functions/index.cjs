@@ -232,6 +232,16 @@ exports.adminConsole=onCall({...options,secrets:[liveInternalSecret]},async requ
   for(const m of Object.values(ledger.matches||{}).filter(m=>Object.values(m.players||{}).some(p=>p.uid===data.uid)&&ledger.tables?.[m.code]===m.id))await publish(ledger,m.code);
   return {ok:true};
  }
+ if(action==='devices'){
+  // Where players play: each player active in the last days counted once, by the device they used last.
+  const days=[7,30,90].includes(Number(data.days))?Number(data.days):30,now=Date.now(),from=uruguayDate(now-(days-1)*86400000).day;
+  const [recent,stored,tests]=await Promise.all([db.ref('adminMetrics/days').orderByKey().startAt(from).get(),db.ref('adminMetrics/lastPlatform').get(),db.ref('adminConfig/testUsers').get()]);
+  const list=recent.val()||{},testSet=new Set(Object.keys(tests.val()||{}));
+  const uids=[...new Set(Object.values(list).flatMap(d=>Object.keys(d?.users||{})))].filter(uid=>!testSet.has(uid));
+  const found=require('./activity-service.cjs').lastPlatforms({stored:stored.val()||{},days:Object.fromEntries(Object.entries(list).map(([d,v])=>[d,v?.platforms||{}])),uids});
+  const counts={};for(const uid of uids){const p=found[uid]?.platform||'unknown';counts[p]=(counts[p]||0)+1;}
+  return {days,players:uids.length,counts};
+ }
  if(action==='retention'){
   // Time spent per visit (the last 1 to 90 days) and whether signed-in players come back.
   const {sessionSummary,retentionSummary,SESSION_DAYS}=require('./session-service.cjs');

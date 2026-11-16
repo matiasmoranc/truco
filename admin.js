@@ -274,7 +274,7 @@ $('table-state').addEventListener('change',renderTables);
 $('search').addEventListener('input',renderUsers);
 // Tapping a column header orders by it; tapping it again flips the order.
 for(const button of document.querySelectorAll('[data-sort]'))button.onclick=()=>{const key=button.dataset.sort;sortBy=sortBy.key===key?{key,dir:-sortBy.dir}:{key,dir:key==='name'?1:-1};renderUsers();void loadAllUsers();};$('photo-filter').onchange=$('level-filter').onchange=()=>{renderUsers();void loadAllUsers();};$('more').onclick=()=>refresh(true);
-function showTab(name){for(const section of Object.keys(TAB_TITLES))$(section).hidden=section!==name;for(const tab of document.querySelectorAll('[data-tab]'))tab.classList.toggle('active',tab.dataset.tab===name);$('page-title').textContent=TAB_TITLES[name];if(name==='usage')refreshUsage();if(name==='chat')loadChat();if(name==='retention')loadRetention();}
+function showTab(name){for(const section of Object.keys(TAB_TITLES))$(section).hidden=section!==name;for(const tab of document.querySelectorAll('[data-tab]'))tab.classList.toggle('active',tab.dataset.tab===name);$('page-title').textContent=TAB_TITLES[name];if(name==='usage')refreshUsage();if(name==='chat')loadChat();if(name==='retention')loadRetention();if(name==='users')loadDevices();}
 $('refresh').onclick=()=>{refresh(false,true);if(!$('usage').hidden)refreshUsage();if(!$('chat').hidden)loadChat();};
 for(const b of document.querySelectorAll('[data-tab]'))b.onclick=()=>showTab(b.dataset.tab);
 async function showUsers(scope){if(busy)return;userScope=scope;pagesLoaded=1;pageToken=null;users=[];$('search').value='';$('user-scope').value=scope;renderUsers();showTab('users');await refresh();}
@@ -588,6 +588,17 @@ function peopleList(){
 }
 function writeTo(u){showTab('messages');$('message-to').value=u.name||'';$('message-text').focus();}
 // Typed table chat (quick messages are not stored), newest first, grouped by day.
+// Where players play: players active in the period, each counted once by the device they used last.
+let devicesRequest=0;
+async function loadDevices(){
+ const request=++devicesRequest;$('devices-note').textContent='Cargando…';
+ try{const data=(await call({action:'devices',days:Number($('devices-days').value)})).data;if(request!==devicesRequest)return;
+  bars($('devices-chart'),Object.entries(PLATFORM_LABELS).map(([key,label])=>({label,value:data.counts[key]||0,color:'var(--'+key+')'})));
+  const unknown=data.counts.unknown||0;
+  $('devices-note').textContent=number(data.players)+' jugadores con cuenta jugaron en este período'+(unknown?' · '+number(unknown)+' sin dispositivo registrado todavía':'')+'.';
+ }catch(e){if(request===devicesRequest)$('devices-note').textContent='No se pudo cargar'+(GAME==='ar'?' (este juego todavía no lo mide).':': '+errorText(e));}
+}
+$('devices-days').addEventListener('change',loadDevices);
 // Retention: how long each visit lasts, where the time goes, and whether players come back.
 const AREA_NAMES={inicio:'Pantalla de inicio',lobby:'Lobby',sala:'Sala de espera',partida:'Partida en vivo',bot:'Contra el bot',aprender:'Aprender',anotador:'Anotador',otra:'Otras páginas'};
 const PLATFORM_NAMES={'app-android':'App Android','app-ios':'App iPhone','web-android':'Web Android','web-ios':'Web iPhone','web-desktop':'Web computadora'};
