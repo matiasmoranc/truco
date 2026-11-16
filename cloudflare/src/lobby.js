@@ -17,7 +17,8 @@ const HOUSE_NAMES=['Bot Juan','Bot Pepe','Bot Nacho','Bot Facu','Bot Santi','Bot
 // Besides the bots, 2 or 3 of the open house tables are hosted by house players with everyday names
 // (and the usual profile icons), rotating so they are not always the same ones.
 const HOUSE_PEOPLE=['Nacho_Pereira','Facu.Rodriguez','ElGordoMartinez','Santi_Fernandez','Gonza_Silva22','Juanma.Sosa','PepeCabrera','Rodri_Acosta','Mati.Olivera','ChinoNunez','Andres_Viera','Bruno.Correa94','Lu_Gonzalez','Caro.Suarez','Vale_Rodriguez','Diego.Pintos','Fede_Cardozo','Lucho.Ramos','Seba_Techera','Pablo.Benitez','Nico_Olivera88','Tincho.Silva','Rafa_Dominguez','Marce.Lopez','Gaby_Ferreira','Ceci.Alvarez','Sofi_Martinez','JuanPa.Rocha','NegroCabrera','Agus.Morales'];
-const HOUSE_PEOPLE_MIN=2,HOUSE_PEOPLE_MAX=3;
+// Off for now (2026-11-15): only bots, to test whether players create tables. To turn it back on: 2 and 3.
+const HOUSE_PEOPLE_MIN=0,HOUSE_PEOPLE_MAX=0;
 const isBotName=name=>String(name||'').startsWith('Bot ');
 const HOUSE_MIN=6,HOUSE_MAX=8,HOUSE_TICK_MS=60000,HOUSE_TARGET_MS=30*60000;
 // One new table per minute at most: tables still open and close at different times, and with
@@ -77,7 +78,7 @@ export class Lobby extends DurableObject{
  async keepHouseTables(){
   const now=Date.now(),house=this.house;
   if(!house.target||now-house.targetAt>=HOUSE_TARGET_MS){house.target=HOUSE_MIN+Math.floor(Math.random()*(HOUSE_MAX-HOUSE_MIN+1));house.people=HOUSE_PEOPLE_MIN+Math.floor(Math.random()*(HOUSE_PEOPLE_MAX-HOUSE_PEOPLE_MIN+1));house.targetAt=now;}
-  house.people??=HOUSE_PEOPLE_MIN;
+  house.people=Math.min(house.people??HOUSE_PEOPLE_MIN,HOUSE_PEOPLE_MAX);
   const open=Object.values(this.rooms).filter(r=>r?.status==='waiting'&&isHouseUid(r.players?.player1?.uid));
   const missing=house.target-open.length;if(missing<=0){await this.ctx.storage.put('house',house);return;}
   // With some open, at most one new table a minute, so they close at different times.
