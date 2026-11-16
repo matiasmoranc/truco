@@ -14,6 +14,11 @@ const send=(ws,message)=>{try{ws.send(JSON.stringify(message));}catch{}};
 // other names, keeping between 6 and 8 open, each one 10 minutes, staggered apart.
 // House players are bots and their names say so: "Bot Juan". Real names cannot have spaces.
 const HOUSE_NAMES=['Bot Juan','Bot Pepe','Bot Nacho','Bot Facu','Bot Santi','Bot Gonza','Bot Rodri','Bot Mati','Bot Chino','Bot Bruno','Bot Lucho','Bot Seba','Bot Pablo','Bot Tincho','Bot Rafa','Bot Marce','Bot Gaby','Bot Diego','Bot Fede','Bot Andrés','Bot Lu','Bot Caro','Bot Vale','Bot Ceci','Bot Sofi','Bot Agus','Bot Negro','Bot Pocho','Bot Tito','Bot Coco'];
+// Besides the bots, 2 or 3 of the open house tables are hosted by house players with everyday names
+// (and the usual profile icons), rotating so they are not always the same ones.
+const HOUSE_PEOPLE=['Nacho_Pereira','Facu.Rodriguez','ElGordoMartinez','Santi_Fernandez','Gonza_Silva22','Juanma.Sosa','PepeCabrera','Rodri_Acosta','Mati.Olivera','ChinoNunez','Andres_Viera','Bruno.Correa94','Lu_Gonzalez','Caro.Suarez','Vale_Rodriguez','Diego.Pintos','Fede_Cardozo','Lucho.Ramos','Seba_Techera','Pablo.Benitez','Nico_Olivera88','Tincho.Silva','Rafa_Dominguez','Marce.Lopez','Gaby_Ferreira','Ceci.Alvarez','Sofi_Martinez','JuanPa.Rocha','NegroCabrera','Agus.Morales'];
+const HOUSE_PEOPLE_MIN=2,HOUSE_PEOPLE_MAX=3;
+const isBotName=name=>String(name||'').startsWith('Bot ');
 const HOUSE_MIN=6,HOUSE_MAX=8,HOUSE_TICK_MS=60000,HOUSE_TARGET_MS=30*60000;
 // One new table per minute at most: tables still open and close at different times, and with
 // 10 minutes each this keeps up to 10 open, enough for 6 to 8.
@@ -71,7 +76,8 @@ export class Lobby extends DurableObject{
  }
  async keepHouseTables(){
   const now=Date.now(),house=this.house;
-  if(!house.target||now-house.targetAt>=HOUSE_TARGET_MS){house.target=HOUSE_MIN+Math.floor(Math.random()*(HOUSE_MAX-HOUSE_MIN+1));house.targetAt=now;}
+  if(!house.target||now-house.targetAt>=HOUSE_TARGET_MS){house.target=HOUSE_MIN+Math.floor(Math.random()*(HOUSE_MAX-HOUSE_MIN+1));house.people=HOUSE_PEOPLE_MIN+Math.floor(Math.random()*(HOUSE_PEOPLE_MAX-HOUSE_PEOPLE_MIN+1));house.targetAt=now;}
+  house.people??=HOUSE_PEOPLE_MIN;
   const open=Object.values(this.rooms).filter(r=>r?.status==='waiting'&&isHouseUid(r.players?.player1?.uid));
   const missing=house.target-open.length;if(missing<=0){await this.ctx.storage.put('house',house);return;}
   // With some open, at most one new table a minute, so they close at different times.
@@ -79,12 +85,14 @@ export class Lobby extends DurableObject{
   for(let i=0;i<1;i++){
    const busy=new Set(open.map(r=>r.players.player1.name));
    // Names not at a table now, the least recently used first.
-   const free=HOUSE_NAMES.filter(n=>!busy.has(n)).sort((a,b)=>house.recent.indexOf(a)-house.recent.indexOf(b));
+   // Everyday names until 2 or 3 of the open tables have one; the rest are bots.
+   const pool=open.filter(r=>!isBotName(r.players.player1.name)).length<house.people?HOUSE_PEOPLE:HOUSE_NAMES;
+   const free=pool.filter(n=>!busy.has(n)).sort((a,b)=>house.recent.indexOf(a)-house.recent.indexOf(b));
    const name=free.filter(n=>!house.recent.includes(n))[0]||free[Math.floor(Math.random()*Math.min(free.length,4))];if(!name)break;
    for(let attempt=0;attempt<3;attempt++){
     const code=randomCode();
     const response=await tableStub(this.env,code).fetch(new Request('https://table/house-create',{method:'POST',headers:{'x-table-code':code,'x-internal-secret':this.env.INTERNAL_SECRET},body:JSON.stringify({uid:houseUid(name),name,stake:0,targetPoints:housePoints()})}));
-    if(response.ok){house.lastAt=now;house.recent=[...house.recent.filter(n=>n!==name),name].slice(-HOUSE_NAMES.length);open.push({players:{player1:{name}}});break;}
+    if(response.ok){house.lastAt=now;house.recent=[...house.recent.filter(n=>n!==name),name].slice(-(HOUSE_NAMES.length+HOUSE_PEOPLE.length));open.push({players:{player1:{name}}});break;}
     const body=await response.json().catch(()=>({}));if(body.code!=='code-taken'){console.error('house table failed',body.error);break;}
    }
   }

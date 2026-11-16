@@ -29,11 +29,12 @@ test('The own photo opens at level 6, 15 points, in the game and in the database
  const rules=JSON.parse(fs.readFileSync(path.join(__dirname,'../firebase.database.rules.json'),'utf8'));
  assert.match(rules.rules.avatars.$uid.photo['.validate'],/val\(\) >= 150$/);
 });
-test('House players stay between levels 1 and 5 and all show the robot, which players cannot pick',async()=>{
+test('House players stay between levels 1 and 5; bots show the robot (players cannot pick it), the others an icon their level has',async()=>{
  const L=await load();
- for(const name of ['Bot Juan','Bot Pepe','Bot Andrés','x','']){
+ for(const name of ['Bot Juan','Bot Pepe','Bot Andrés']){const level=L.houseLevel(name);assert.ok(level>=1&&level<=5);assert.equal(L.houseIcon(name),'robot');}
+ for(const name of ['Nacho_Pereira','Santi_Fernandez','Caro.Suarez','x','']){
   const level=L.houseLevel(name);assert.ok(level>=1&&level<=5,name+' '+level);
-  assert.equal(L.houseIcon(name),'robot');
+  assert.ok(L.ICONS.some(i=>i.id===L.houseIcon(name)&&i.level<=level));
  }
  assert.ok(!L.ICONS.some(i=>i.id==='robot'));
  assert.ok(require('node:fs').existsSync(require('node:path').join(__dirname,'..','assets','profile','robot.webp')));

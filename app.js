@@ -11,7 +11,7 @@ import {installTeamTable,TEAM_SEATS,playerTeam,positionDealerDeck,renderTeamLobb
 import {installTablePeople} from './table-people.js?v=20261112-qa1';
 import {createLiveTables,LiveError} from './live-tables.js?v=20261112-qa1';
 import {installMatchPhoto} from './share-photo.js?v=20261027-photo2';
-import {installProfiles,SOUND_MESSAGES} from './profile-level.js?v=20261115-bots1';
+import {installProfiles,SOUND_MESSAGES} from './profile-level.js?v=20261115-people1';
 import {installIosPromo} from './ios-promo.js?v=20261112-qa1';
 import {CARD_SIGNS,signFaceSvg} from './card-signs.js?v=20261109-signs3';
 const FIREBASE_VERSION = '12.4.0';
