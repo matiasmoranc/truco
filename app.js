@@ -1423,7 +1423,7 @@ async function sendWaitingChat(event){
 const SEARCH_BOT_MS=60000;
 async function searchPeople({mode='1v1',points=20,botOff=false}={}){
   if(!account.isReady()){$('guest-signin-open')?.click();return;}
-  if(state.enteringRoom||state.roomCode)return;
+  if(state.enteringRoom||state.roomCode){console.warn('[truco:search] busy',{entering:!!state.enteringRoom,code:state.roomCode});return;}
   $('play-bot').checked=false;$('table-mode').value=mode;$('target-points').value=String(points);$('table-visibility').value='public';
   state.joining=false;state.selectedRoom=null;
   state.search={mode,points,botAt:Date.now()+SEARCH_BOT_MS,botOff,botSent:false,busy:false,code:null};
@@ -1485,10 +1485,14 @@ $('search-mode').addEventListener('click',async event=>{
   const mode=button.dataset.searchMode;if(mode===(state.room.mode||'1v1'))return;
   const points=targetPoints(state.room),botOff=state.search.botOff;
   state.search.busy=true;renderSearchPanel();
-  state.cancelingWaitingRoom=state.roomCode;
+  const code=state.roomCode;state.cancelingWaitingRoom=code;
   try{await creditCommand({kind:'cancel'});}
-  catch(error){state.cancelingWaitingRoom=null;if(state.search){state.search.busy=false;renderSearchPanel();}toast(error.message||'No pudimos cambiar la mesa.',true);return;}
-  returnToLobby();
+  catch(error){
+    // The table may already be closed (the answer arrives after it): that is what we wanted.
+    if(state.roomCode===code&&state.room?.status==='waiting'){state.cancelingWaitingRoom=null;if(state.search){state.search.busy=false;renderSearchPanel();}toast(error.message||'No pudimos cambiar la mesa.',true);return;}
+  }
+  if(state.roomCode===code)returnToLobby();
+  console.info('[truco:search] new table',{mode,points});
   await searchPeople({mode,points,botOff});
 });
 $('search-bot-toggle').addEventListener('click',()=>{

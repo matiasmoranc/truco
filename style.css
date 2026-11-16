@@ -2686,3 +2686,5 @@ input,textarea,[contenteditable=""],[contenteditable="true"]{-webkit-user-select
 #waiting-view.searching .waiting-player.empty .waiting-player-name{display:block;border-style:dashed;color:#cfe8d6;background:#76c38b14}
 #waiting-view.searching .waiting-table::before,#waiting-view.searching .waiting-table::after{content:'';position:absolute;left:50%;top:48%;width:130px;height:130px;margin:-65px 0 0 -65px;border-radius:50%;border:2px solid #76c38b;opacity:0;animation:search-ping 2.4s infinite;pointer-events:none}
 #waiting-view.searching .waiting-table::after{animation-delay:1.2s}
+#waiting-view.searching .waiting-player.empty .waiting-player-name{font-size:0}
+#waiting-view.searching .waiting-player.empty .waiting-player-name::after{content:'Buscando rival…';font-size:12.5px}
