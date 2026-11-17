@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="es"><head><meta charset="utf-8">
-  <meta name="robots" content="noindex, nofollow"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Administración · Truco Uruguayo</title><link rel="stylesheet" href="admin.css?v=31"></head>
+  <meta name="robots" content="noindex, nofollow"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Administración · Truco Uruguayo</title><link rel="stylesheet" href="admin.css?v=32"></head>
 <body>
 <section id="access" class="access"><div class="access-card"><img src="assets/truco-v3.png" alt=""><small class="game-name">TRUCO URUGUAYO</small><h1>Administración</h1><select class="game-picker" aria-label="Juego"><option value="uy">Truco Uruguayo</option><option value="ar">Truco Argentino</option></select><p id="identity"></p><p id="access-status">Verificando sesión…</p><button id="login" class="primary" hidden>Continuar con Google</button><button id="switch-account" hidden>Usar otra cuenta</button><a href="./">Volver al juego</a></div></section>
 <div id="console" class="shell" hidden>
@@ -97,6 +97,10 @@
    <div class="toolbar"><label>Período<select id="table-range"><option value="today">Hoy</option><option value="yesterday">Ayer</option><option value="7" selected>Últimos 7 días</option><option value="14">Últimos 14 días</option><option value="30">Últimos 30 días</option><option value="90">Últimos 90 días</option><option value="custom">Entre fechas…</option></select></label><label class="table-date-field" hidden>Desde<input id="table-from" type="date"></label><label class="table-date-field" hidden>Hasta<input id="table-to" type="date"></label></div>
    <p id="table-period" class="note"></p>
    <div id="table-stats" class="kpis compact"></div>
+   <article class="panel people-panel"><div class="panel-head"><h2>Jugadores en mesas</h2><div class="people-range"><label>Ver<select id="people-range"><option value="7">Últimos 7 días</option><option value="14">Últimos 14 días</option><option value="30" selected>Últimos 30 días</option><option value="90">Últimos 90 días</option><option value="custom">Entre fechas…</option></select></label><label class="people-date" hidden>Desde<input id="people-from" type="date"></label><label class="people-date" hidden>Hasta<input id="people-to" type="date"></label></div></div>
+    <p class="note">Cada persona cuenta una sola vez por día, aunque haya jugado o terminado varias mesas. Contra jugadores y contra la casa; sin usuarios de prueba.</p>
+    <h3 class="people-title">Jugaron una mesa <span id="people-played-note"></span></h3><div id="people-played-chart" class="bar-chart"></div>
+    <h3 class="people-title">Terminaron una mesa <span id="people-finished-note"></span></h3><div id="people-finished-chart" class="bar-chart"></div></article>
    <article class="panel"><div class="panel-head"><h2>Mesas creadas por jugadores · últimos 30 días</h2></div><div id="table-created-chart" class="bar-chart"></div></article>
    <article class="panel"><div class="panel-head"><h2>Partidas terminadas entre jugadores · últimos 30 días</h2></div><div id="table-players-chart" class="bar-chart"></div></article>
    <article class="panel"><div class="panel-head"><h2>Partidas terminadas contra la casa · últimos 30 días</h2></div><div id="table-house-chart" class="bar-chart"></div></article>
@@ -200,4 +204,4 @@
  </main>
 </div>
 <dialog id="edit"><form id="edit-form"><div class="dialog-head"><h2 id="edit-title"></h2><button type="button" id="close" aria-label="Cerrar">×</button></div><p id="edit-description"></p><label id="value-label">Nuevo valor<input id="value" required></label><div id="level-fields" class="level-fields" hidden><label>Nivel<input id="level-value" type="number" min="1" max="200" step="1"></label><label>Puntos totales<input id="points-value" type="number" min="0" max="1000000" step="0.1"></label><small id="level-preview"></small></div><label id="delete-label" hidden>Escribí el nombre exacto para confirmar<input id="delete-confirm" autocomplete="off"></label><label>Motivo<input id="reason" required minlength="3" maxlength="200" placeholder="Por qué realizás este cambio"></label><p id="edit-error" role="alert"></p><div class="dialog-actions"><button id="cancel" type="button">Cancelar</button><button id="save" class="primary" type="submit">Confirmar cambio</button></div></form></dialog>
-<script type="module" src="admin.js?v=49"></script></body></html>
+<script type="module" src="admin.js?v=50"></script></body></html>

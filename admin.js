@@ -149,7 +149,7 @@ async function refresh(more=false,preservePages=false){
   if(more)pagesLoaded++;else if(!preservePages)pagesLoaded=1;
   users=more?[...users,...result.users]:result.users;pageToken=result.pageToken;renderUsers();void loadAvatars(preservePages?users.filter(u=>!avatars.has(u.uid)):result.users);
   const data=(await call({action:'tables'})).data;if(generation!==epoch)return;
-  tableData=data;renderUsers();renderTables();renderTableStats();renderTableDaily(data.daily);
+  tableData=data;renderUsers();renderTables();renderTableStats();renderTableDaily(data.daily);renderPeopleCharts();
   $('reservation-alerts').replaceChildren();
   for(const a of data.alerts||[]){const card=node('article','','card');card.append(node('h3','Partida anterior sin cerrar: '+(users.find(u=>u.uid===a.uid)?.name||a.uid)),node('p','No puede crear mesas hasta liberarla. '+a.reason));if(a.repairable)card.append(button('Liberar',async()=>{try{await call({action:'repair-reservation',uid:a.uid});await refresh();}catch(e){say(errorText(e));}}));$('reservation-alerts').append(card);}
   $('reports-list').replaceChildren();
@@ -191,6 +191,27 @@ function renderTableDaily(daily){
   columns(target,daily.days.map(day=>{const n=daily[key]?.[day]||0;return {label:shortDay(day),value:n,tooltip:shortDay(day)+' · '+n+' '+unit};}),{labelEvery:3});
  }
 }
+// People who played / finished a table per day (each person once a day), for the chosen dates.
+function peoplePeriod(){
+ const today=metrics?.today||new Date(Date.now()-10800000).toISOString().slice(0,10),choice=$('people-range').value,custom=choice==='custom';
+ for(const field of document.querySelectorAll('.people-date'))field.hidden=!custom;
+ for(const id of ['people-from','people-to'])$(id).max=today;
+ let from=addDays(today,-(Number(choice)-1)),to=today;
+ if(custom){if(!$('people-from').value)$('people-from').value=addDays(today,-29);if(!$('people-to').value)$('people-to').value=today;from=$('people-from').value;to=$('people-to').value;if(from>to)[from,to]=[to,from];if(to>today)to=today;}
+ return {from,to};
+}
+function renderPeopleCharts(){
+ const people=tableData?.people;
+ for(const [key,unit] of [['played','jugaron'],['finished','terminaron']]){
+  const target=$('people-'+key+'-chart'),note=$('people-'+key+'-note');if(!target)continue;
+  if(!people){target.replaceChildren(node('p','Este juego todavía no guarda estos datos.','empty'));note.textContent='';continue;}
+  const {from,to}=peoplePeriod(),days=[];for(let d=from;d<=to&&days.length<732;d=addDays(d,1))days.push(d);
+  const values=days.map(d=>people[key]?.[d]||0),max=Math.max(0,...values),avg=values.reduce((s,v)=>s+v,0)/(values.length||1);
+  note.textContent='· promedio '+avg.toFixed(1).replace('.',',')+' por día · máximo '+max;
+  columns(target,days.map((d,i)=>({label:shortDay(d),value:values[i],tooltip:longDay(d)+' · '+values[i]+' '+(values[i]===1?(key==='played'?'jugó':'terminó'):unit)})),{labelEvery:Math.max(1,Math.ceil(days.length/12)),showValues:days.length<=45});
+ }
+}
+for(const id of ['people-range','people-from','people-to'])$(id).addEventListener('change',renderPeopleCharts);
 function renderTableStats(){
  const period=tablePeriod(),box=$('table-stats');box.replaceChildren();
  $('table-period').textContent=period.from===period.to?'Período: '+longDay(period.from):'Período: del '+longDay(period.from)+' al '+longDay(period.to);

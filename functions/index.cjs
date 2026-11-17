@@ -426,7 +426,9 @@ exports.adminConsole=onCall({...options,secrets:[liveInternalSecret]},async requ
   }
   // Per day, last 30 days: tables created by players and games finished between players or against the house.
   const daily=require('./table-stats.cjs').tableDailyStats(ledger,{now,dayOf:at=>uruguayDate(at).day});
-  return {daily,tables,archivedTables,events:tableEvents(ledger,now),movements:ledger.walletMovements||{},alerts:reservationAlerts(ledger,now),reports:Object.entries(reports).map(([id,r])=>({id,...r})).sort((a,b)=>b.at-a.at),
+  // People who played or finished a game, per day, without test users.
+  const people=require('./table-stats.cjs').tablePlayerStats(ledger,{dayOf:at=>uruguayDate(at).day,exclude:new Set(Object.keys((await db.ref('adminConfig/testUsers').get()).val()||{}))});
+  return {daily,people,tables,archivedTables,events:tableEvents(ledger,now),movements:ledger.walletMovements||{},alerts:reservationAlerts(ledger,now),reports:Object.entries(reports).map(([id,r])=>({id,...r})).sort((a,b)=>b.at-a.at),
    audit:[...Object.values(ledger.adminAudit||{}),...Object.values(userAudit)].sort((a,b)=>b.at-a.at).slice(0,100)};
  }
  if(action==='close-table'&&!validKey(data.code))throw new HttpsError('invalid-argument','Mesa inválida.');
