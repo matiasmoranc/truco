@@ -38,3 +38,17 @@ test('Admin knows the device each player used last, also from activity before it
  const found=lastPlatforms({stored:{u1:{platform:'app-android',at:now}},days:{'2026-11-10':{u2:{'web-desktop':true}},'2026-11-12':{u1:{'web-ios':true},u2:{'app-ios':true}}},uids:['u1','u2','u3']});
  require('node:assert/strict').deepEqual(found,{u1:{platform:'app-android',at:now},u2:{platform:'app-ios',at:null,day:'2026-11-12'}});
 });
+
+test('The apps say which version is installed, and the admin keeps it with the last device',()=>{
+ const assert=require('node:assert/strict');const {activityUpdates,lastPlatforms}=require('../functions/activity-service.cjs');
+ const now=Date.UTC(2026,10,17,20);
+ assert.deepEqual(activityUpdates({uid:'u1',sessionId:'s1',visible:true,platform:'app-android',appVersion:'1.0.11',now})['lastPlatform/u1'],{platform:'app-android',at:now,version:'1.0.11'});
+ // The web has no app version, and anything that is not a version number is dropped.
+ assert.deepEqual(activityUpdates({uid:'u1',sessionId:'s1',visible:true,platform:'web-android',appVersion:'1.0.11',now})['lastPlatform/u1'],{platform:'web-android',at:now});
+ for(const appVersion of ['x','1.0.11<b>','1',{v:1},'1.0.0.0.0'])assert.deepEqual(activityUpdates({uid:'u1',sessionId:'s1',visible:true,platform:'app-ios',appVersion,now})['lastPlatform/u1'],{platform:'app-ios',at:now});
+ assert.deepEqual(lastPlatforms({stored:{u1:{platform:'app-ios',at:now,version:'1.0.12'},u2:{platform:'app-android',at:now}},days:{},uids:['u1','u2']}),{u1:{platform:'app-ios',at:now,version:'1.0.12'},u2:{platform:'app-android',at:now}});
+ const fs=require('node:fs'),path=require('node:path'),read=f=>fs.readFileSync(path.join(__dirname,'..',f),'utf8');
+ assert.match(read('functions/index.cjs'),/appVersion:request\.data\?\.appVersion,now\}/);
+ assert.match(read('app.js'),/platform:visitPlatform\(\),\.\.\.\(data\.visible\?await appVersion\(\):null\)/);
+ assert.match(read('mobile/entry.js'),/appVersion: .*App\.getInfo\(\)/);
+});

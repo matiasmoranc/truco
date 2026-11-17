@@ -17,20 +17,22 @@ function requestPlatform({origin='',userAgent=''}={}){
  if(/Android/.test(agent))return 'web-android';
  return 'web-desktop';
 }
-function activityUpdates({uid,sessionId,visible,now,platform}){
+// The installed app version ("1.0.11"), sent by the apps from 1.0.11 on.
+const cleanVersion=v=>typeof v==='string'&&/^\d{1,3}(\.\d{1,3}){1,3}$/.test(v)?v:null;
+function activityUpdates({uid,sessionId,visible,now,platform,appVersion}){
  if(typeof sessionId!=='string'||!/^[A-Za-z0-9_-]{1,80}$/.test(sessionId)||['__proto__','constructor','prototype'].includes(sessionId)||typeof visible!=='boolean')throw new Error('Sesión inválida.');
  const {day,hour}=uruguayDate(now);
  const result={['presence/'+uid+'/'+sessionId]:visible?{at:now}:null};
  if(visible){result['days/'+day+'/users/'+uid]=true;result['days/'+day+'/hours/'+hour+'/'+uid]=true;}
  // Older clients send no platform; their activity still counts without it.
- if(visible&&PLATFORMS.includes(platform)){result['days/'+day+'/platforms/'+uid+'/'+platform]=true;result['lastPlatform/'+uid]={platform,at:now};}
+ if(visible&&PLATFORMS.includes(platform)){result['days/'+day+'/platforms/'+uid+'/'+platform]=true;const version=platform.startsWith('app-')?cleanVersion(appVersion):null;result['lastPlatform/'+uid]={platform,at:now,...(version?{version}:{})};}
  return result;
 }
 // The device each player used last: the stored one, or else the latest day that recorded one
 // (activity from before lastPlatform existed; with several devices that day, any of them).
 function lastPlatforms({stored,days,uids}){
  const result={};
- for(const uid of uids){const s=stored?.[uid];if(s&&PLATFORMS.includes(s.platform))result[uid]={platform:s.platform,at:Number(s.at)||null};}
+ for(const uid of uids){const s=stored?.[uid];if(s&&PLATFORMS.includes(s.platform))result[uid]={platform:s.platform,at:Number(s.at)||null,...(cleanVersion(s.version)?{version:s.version}:{})};}
  for(const [day,platforms] of Object.entries(days||{}).sort(([a],[b])=>b.localeCompare(a)))for(const uid of uids){
   if(result[uid])continue;const found=Object.keys(platforms?.[uid]||{}).find(p=>PLATFORMS.includes(p));
   if(found)result[uid]={platform:found,at:null,day};

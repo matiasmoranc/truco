@@ -1,4 +1,5 @@
 import { Capacitor } from '@capacitor/core';
+import { App } from '@capacitor/app';
 import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
 import * as appSdk from 'firebase/app';
 import * as dbSdk from 'firebase/database';
@@ -16,19 +17,43 @@ const APP_STORE_ID = '6821732363';
 
 // Android's web view has no speech synthesis: the calls ("¡Truco!", "Envido"…) use the phone's own voice.
 // iPhone keeps the web voice, which works there.
+// The phone's speech engine starts a moment after the app and until then answers that it has
+// no language, so the choice is kept only once the engine finds one: an early call must not
+// leave the voice on a language the phone lacks (the engine refuses those and stays quiet).
 let voiceLang = null;
 async function androidVoiceLang() {
   if (voiceLang) return voiceLang;
   for (const lang of ['es-UY', 'es-AR', 'es-419', 'es-US', 'es-ES']) {
     try { if ((await TextToSpeech.isLanguageSupported({ lang })).supported) return (voiceLang = lang); } catch { /* Try the next one. */ }
   }
-  return (voiceLang = 'es-ES');
+  // Any other Spanish the phone has (es-MX…), or else the phone's own language.
+  try {
+    const languages = (await TextToSpeech.getSupportedLanguages()).languages || [];
+    const own = String(navigator.language || '').toLowerCase().split('-')[0];
+    const found = languages.find(l => /^es\b/i.test(l)) || languages.find(l => own && l.toLowerCase().split('-')[0] === own);
+    if (found) return (voiceLang = found);
+  } catch { /* The engine is not ready yet. */ }
+  return null;
 }
+// Engine still starting or language refused: try again a moment later, unless a newer call came.
+const VOICE_RETRY_MS = 700;
+let voiceTurn = 0;
 const nativeVoice = Capacitor.getPlatform() === 'android' ? {
   async speak(text) {
-    try { await TextToSpeech.speak({ text, lang: await androidVoiceLang(), rate: 0.95, pitch: 0.75, volume: 1, queueStrategy: QueueStrategy.Flush }); } catch (error) { console.warn('[truco:voice] native', error); }
+    const turn = ++voiceTurn;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      if (attempt) { await new Promise(done => setTimeout(done, VOICE_RETRY_MS)); if (turn !== voiceTurn) return; }
+      const lang = await androidVoiceLang();
+      if (!lang) continue;
+      try { await TextToSpeech.speak({ text, lang, rate: 0.95, pitch: 0.75, volume: 1, queueStrategy: QueueStrategy.Flush }); return; }
+      catch (error) {
+        if (!/initiali[sz]ed|not supported|not available/i.test(String(error?.message))) { console.warn('[truco:voice] native', error); return; }
+        voiceLang = null;
+      }
+    }
+    console.warn('[truco:voice] the phone has no voice for this language');
   },
-  stop() { TextToSpeech.stop().catch(() => {}); }
+  stop() { voiceTurn++; TextToSpeech.stop().catch(() => {}); }
 } : null;
 
 // The same Firebase JS session drives database rules and callable Functions.
@@ -38,6 +63,8 @@ globalThis.trucoNative = {
   rewardedAds,
   nativeVoice,
   publicUrl: 'https://trucouruguayo.uy/',
+  // The installed version ("1.0.11"), so the admin can tell who has an old app. Null if unknown.
+  appVersion: (() => { let info = null; return () => (info ??= App.getInfo().then(i => i.version || null).catch(() => null)); })(),
   // The match photo goes to the phone's share sheet (Instagram, WhatsApp…) from a cache file.
   async shareImage(base64, name) {
     const { uri } = await Filesystem.writeFile({ path: name, data: base64, directory: Directory.Cache });

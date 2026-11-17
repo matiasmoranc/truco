@@ -785,7 +785,9 @@ async function offerAppUpdate(){
   show();
 }
 setTimeout(()=>{offerAppUpdate().catch(()=>{});},3000);
-const activity=installActivity({send:async data=>{const result=await creditApi('playerActivity',{...data,platform:visitPlatform(),...(data.visible?await takeVisit():null)});if(typeof result?.testDevice==='boolean')markTestDevice(result.testDevice);return result;},getUid:()=>state.uid,document});
+// The apps also say which version is installed (from 1.0.11 on).
+const appVersion=async()=>{try{const version=await globalThis.trucoNative?.appVersion?.();return version?{appVersion:version}:null;}catch{return null;}};
+const activity=installActivity({send:async data=>{const result=await creditApi('playerActivity',{...data,platform:visitPlatform(),...(data.visible?await appVersion():null),...(data.visible?await takeVisit():null)});if(typeof result?.testDevice==='boolean')markTestDevice(result.testDevice);return result;},getUid:()=>state.uid,document});
 // Coming from the scorer page (?anotador): sign in or create the account first, then the
 // scorer opens by itself, full screen.
 let scorerAfterSignIn=new URLSearchParams(location.search).has('anotador');

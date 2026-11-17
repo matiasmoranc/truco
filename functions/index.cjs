@@ -239,8 +239,10 @@ exports.adminConsole=onCall({...options,secrets:[liveInternalSecret]},async requ
   const list=recent.val()||{},testSet=new Set(Object.keys(tests.val()||{}));
   const uids=[...new Set(Object.values(list).flatMap(d=>Object.keys(d?.users||{})))].filter(uid=>!testSet.has(uid));
   const found=require('./activity-service.cjs').lastPlatforms({stored:stored.val()||{},days:Object.fromEntries(Object.entries(list).map(([d,v])=>[d,v?.platforms||{}])),uids});
-  const counts={};for(const uid of uids){const p=found[uid]?.platform||'unknown';counts[p]=(counts[p]||0)+1;}
-  return {days,players:uids.length,counts};
+  const counts={},versions={};for(const uid of uids){const f=found[uid],p=f?.platform||'unknown';counts[p]=(counts[p]||0)+1;
+   // App players by installed version; "old" = an app from before 1.0.11, which does not say it.
+   if(p.startsWith('app-')){const v=f.version||'old';versions[p]??={};versions[p][v]=(versions[p][v]||0)+1;}}
+  return {days,players:uids.length,counts,versions};
  }
  if(action==='retention'){
   // Time spent per visit (the last 1 to 90 days) and whether signed-in players come back.
@@ -499,7 +501,7 @@ async function recordConcurrentPeak(now){
 exports.playerActivity=onCall({...options,maxInstances:3},async request=>{
  const user=await identity(request);await rateLimit(user.uid,10,'activity');
  const now=Date.now();let updates;
- try{updates=activityUpdates({uid:user.uid,sessionId:request.data?.sessionId,visible:request.data?.visible,platform:PLATFORMS.includes(request.data?.platform)?request.data.platform:requestPlatform({origin:request.rawRequest?.headers?.origin,userAgent:request.rawRequest?.headers?.['user-agent']}),now});}catch(e){throw new HttpsError('invalid-argument',e.message);}
+ try{updates=activityUpdates({uid:user.uid,sessionId:request.data?.sessionId,visible:request.data?.visible,platform:PLATFORMS.includes(request.data?.platform)?request.data.platform:requestPlatform({origin:request.rawRequest?.headers?.origin,userAgent:request.rawRequest?.headers?.['user-agent']}),appVersion:request.data?.appVersion,now});}catch(e){throw new HttpsError('invalid-argument',e.message);}
  await db.ref('adminMetrics').update(updates);
  await db.ref('adminMetrics/startedAt').transaction(current=>current||now);
  // The visit that opened this page belongs to this player (only an unclaimed, recent one).
