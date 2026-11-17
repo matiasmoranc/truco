@@ -131,8 +131,12 @@ export class TableRoom extends DurableObject{
    }
    // A blocked account can still leave, but not play or chat.
    if(!['cancel','abandon','tick'].includes(command.kind)&&await this.isBlocked(uid))throw new Error('Tu cuenta está bloqueada.');
+   // A command that changes nothing (mostly a tick from a page that thinks a timer ran out) is
+   // answered without saving: Cloudflare limits rows written per day.
+   const before=JSON.stringify(this.engine.snapshot());
    await this.engine.act(uid,{command,requestId,expectedMatchId});
    if(command.kind==='chat')this.logChat(uid,command.text,requestId);
+   if(JSON.stringify(this.engine.snapshot())===before)return this.result(uid);
    await this.commit();return this.result(uid);
   }
   throw new Error('Mensaje desconocido.');
@@ -206,10 +210,16 @@ export class TableRoom extends DurableObject{
   if(Number.isFinite(settledAt))at=Math.min(at??Infinity,Math.max(Date.now()+60000,settledAt+SETTLED_CLEANUP_MS));
   // After failed timer steps, wait longer each time instead of retrying every 50 ms.
   if(this.tickFailures)at=Math.max(at??0,Date.now()+Math.min(60000,1000*2**Math.min(this.tickFailures,6)));
-  if(at!=null&&Number.isFinite(at))await this.ctx.storage.setAlarm(at);else await this.ctx.storage.deleteAlarm();
+  // The same alarm again is not written again (each set counts as a row written).
+  const next=at!=null&&Number.isFinite(at)?at:null;
+  if(next===this.alarmAt)return;
+  if(next!=null)await this.ctx.storage.setAlarm(next);else await this.ctx.storage.deleteAlarm();
+  this.alarmAt=next;
  }
 
  async alarm(){
+  // A fired alarm is gone: the next arm sets one again.
+  this.alarmAt=undefined;
   await this.serial(async()=>{
    if(!this.engine)return;
    const m=this.engine.match,staleSettled=m?.status==='settled'&&Number.isFinite(m.settledAt)&&Date.now()-m.settledAt>=SETTLED_CLEANUP_MS;

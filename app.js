@@ -4997,9 +4997,19 @@ function managedTickDue(room,now=gameTime()){
   if(['revealing','complete'].includes(room.status)&&room.endReveal&&!room.endReveal.done&&now>=Number(room.endReveal.endsAt))return true;
   if(room.status==='complete'&&!room.endReveal)return true;
   if(room.status==='started'&&room.turnClock&&now-Number(room.turnClock.startedAt)>=45000)return true;
+  // A disconnected rival only matters while the game is on: once it ended there is nothing to forfeit.
+  if(room.status==='complete')return false;
   return Object.entries(room.connectionPresence||{}).some(([seat,p])=>p?.online===false&&p.uid===room.players?.[seat]?.uid&&Number(p.matchNumber)===Number(room.matchNumber||1)&&Number.isFinite(p.disconnectedAt)&&now-p.disconnectedAt>=45000);
 }
-setInterval(()=>{if(state.firebaseConnected===true&&navigator.onLine!==false&&document.visibilityState==='visible'&&managedTickDue(state.room))creditCommand({kind:'tick'}).catch(()=>{});},2000);
+// A tick every 2 seconds while a timer is due; if the table did not change since the last one (the server
+// already handles it, or it is not due there yet), the next waits 15 seconds: each one costs the server.
+let lastTick={key:null,at:0};
+setInterval(()=>{
+  const room=state.room;if(!(state.firebaseConnected===true&&navigator.onLine!==false&&document.visibilityState==='visible'&&managedTickDue(room)))return;
+  const key=[state.roomCode,room.matchNumber,room.revision,room.status].join(':'),now=Date.now();
+  if(key===lastTick.key&&now-lastTick.at<15000)return;
+  lastTick={key,at:now};creditCommand({kind:'tick'}).catch(()=>{});
+},2000);
 
 function updateStakeControl(){
   const wallet=credits.wallet(),maximum=Math.max(0,Math.floor(wallet?.balance||0));
