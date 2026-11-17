@@ -38,6 +38,8 @@ test('1v1: the pie holding the only flor has it sung when their turn comes, neve
  assert.equal(r.callNotice.from,'player2');assert.equal(r.callNotice.spoken.toLowerCase(),'flor');
  // An envido from the mano reaches the holder, whose turn it is to answer: the flor is sung over it.
  const other=duel([PLAIN[0],FLOR]);other.at(200).action('player1',{kind:'call',value:'envido'});
+ // A second later (the envido is seen first).
+ assert.equal(other.r.pendingBet.type,'envido');other.at(1200).advance();
  assert.ok(other.r.flors.player2>0);assert.equal(other.r.envidoClosed,true);assert.notEqual(other.r.pendingBet?.type,'envido');
 });
 test('1v1: with two flowers only the first from the mano is sung; the other answers as before',()=>{

@@ -178,6 +178,9 @@ test('A flower holder who must answer an envido has the flor sung for them, so t
  const r=s.room;Object.assign(r,{flors:{},florSettled:false,florClosed:false,florWinner:null,envidoClosed:false,scores:{player1:0,player2:0},handScoreEntries:[]});
  r.pendingBet={id:'b',type:'envido',called:'envido',caller:r.mano,callerTeam:team(r.mano),responder,stake:2,accepted:0};
  createTeamReferee(s,{now:200}).advance();
+ // It waits a second so the envido is seen first.
+ assert.equal(r.pendingBet.type,'envido');assert.equal(r.flors[responder],undefined);
+ createTeamReferee(s,{now:1200}).advance();
  assert.equal(r.flors[responder],true);assert.ok(!r.pendingBet||r.pendingBet.type!=='envido');
  assert.doesNotThrow(()=>createTeamReferee(s,{now:45300}).advance());assert.equal(r.status,'started');
 });
@@ -197,6 +200,8 @@ test('An envido reaching a rival who holds an unsung flor has the flor sung for 
  let l=started(),s=l.matches.m1.session;s.room.envidoClosed=false;
  s.hands.player2=[card('♣',4),card('♣',5),card('♣',7)];s.originals.player2=structuredClone(s.hands.player2);
  l=act(l,'a',{kind:'call',value:'envido'},1000);
+ assert.equal(l.matches.m1.session.room.pendingBet.type,'envido');
+ l=act(l,'a',{kind:'tick'},2000);
  const r=l.matches.m1.session.room;
  assert.equal(r.flors.player2,true);assert.equal(r.pendingBet?.type||null,null);assert.equal(r.scores.player2,3);assert.equal(r.envidoClosed,true);
 });

@@ -104,10 +104,14 @@ test('A rival flor is sung automatically before any envido: it pays three and th
  const s=fixture();s.hands.player2=[card('♥',1),card('♥',3),card('♥',7)];s.originals=structuredClone(s.hands);
  // These cards were set by hand, so the first command sings it (a dealt hand sings it as it is dealt).
  createReferee(s,{now:200}).action('player1',{kind:'call',value:'envido'});
+ // The flower waits a second, so the envido is seen first; then it is sung over it.
+ assert.equal(s.room.pendingBet.type,'envido');assert.equal(s.room.pendingBet.florAt,1200);assert.equal(s.room.scores.player2,0);
+ createReferee(s,{now:1100}).advance();assert.equal(s.room.pendingBet.type,'envido');
+ createReferee(s,{now:1200}).advance();
  assert.equal(s.room.scores.player2,3);assert.equal(s.room.scores.player1,0);assert.equal(s.room.florSettled,true);assert.equal(s.room.envidoClosed,true);
  assert.equal(s.room.pendingBet,null);assert.equal(s.room.callNotice.from,'player2');assert.match(s.room.callNotice.spoken,/flor/i);
- assert.throws(()=>createReferee(s,{now:300}).action('player1',{kind:'call',value:'envido'}),/envido/i);
- createReferee(s,{now:400}).action('player1',{kind:'call',value:'truco'});assert.equal(s.room.pendingBet.type,'truco');
+ assert.throws(()=>createReferee(s,{now:1300}).action('player1',{kind:'call',value:'envido'}),/envido/i);
+ createReferee(s,{now:1400}).action('player1',{kind:'call',value:'truco'});assert.equal(s.room.pendingBet.type,'truco');
 });
 
 test('Incorrect envido declarations forfeit envido and accepted truco; first fault loses if both err',()=>{

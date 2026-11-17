@@ -3514,13 +3514,19 @@ function localAction(action){
     const bet=room.pendingBet;if(bet?.revealMode||bet?.type==='flor')return false;
     const holder=bet?bet.responder:room.turn;
     if(!holder||localHand(holder).length!==3||!roomHasFlor(room,localHand(holder)))return false;
+    // Answering an envido, the flower waits a second so the caller first sees their own call.
+    if(bet?.type==='envido'&&holder===bet.responder){
+      if(!Number.isFinite(bet.florAt))bet.florAt=Date.now()+1000;
+      const wait=bet.florAt-Date.now();
+      if(wait>0){clearTimeout(state.florTimer);state.florTimer=setTimeout(()=>{if(state.room?.pendingBet?.florAt===bet.florAt){localAction('auto-flor');renderGame();}},wait+20);return true;}
+    }
     const current=state.playerId,hand=state.hand,acting=state.botActing;
     state.singingAutoFlor=true;state.botActing=true;state.playerId=holder;state.hand=[...localHand(holder)];
     try{localAction('flor');}finally{state.playerId=current;state.hand=hand;state.botActing=acting;state.singingAutoFlor=false;}
     renderGame();return true;
   }
-  // A hand dealt outside localDealAfterHand sings it before its first move.
-  if(localAction('auto-flor'))return;
+  // A hand dealt outside localDealAfterHand sings it before its first move (singing it by hand needs no wait).
+  if(action!=='flor'&&localAction('auto-flor'))return;
   if(action==='reveal')localAnswerAction('yes');
   else if(action==='flor'){
     // Already sung for them (it is automatic on their turn): pressing FLOR again changes nothing.

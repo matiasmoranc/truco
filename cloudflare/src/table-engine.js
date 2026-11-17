@@ -179,7 +179,7 @@ export function createTableEngine({code,bank,clock=()=>Date.now()}){
     for(const p of Object.values(presence))if(p?.online===false&&Number.isFinite(p.disconnectedAt))times.push(p.disconnectedAt+WAITING_DROP_MS);}
    const r=m.session?.room;
    if(m.status==='reserved'&&r){
-    times.push(r.resolutionEndsAt,r.pendingNextHand?.endsAt,r.status==='revealing'?r.endReveal?.endsAt:null,r.openingDraw?.resolveAt,r.openingDraw?.endsAt);
+    times.push(r.pendingBet?.florAt,r.resolutionEndsAt,r.pendingNextHand?.endsAt,r.status==='revealing'?r.endReveal?.endsAt:null,r.openingDraw?.resolveAt,r.openingDraw?.endsAt);
     if(r.turnClock?.startedAt)times.push(r.turnClock.startedAt+45000);
     times.push(botDueAt);
     if(botSeat()&&Number.isFinite(r.turnClock?.startedAt))times.push(r.turnClock.startedAt+overdueAfter());

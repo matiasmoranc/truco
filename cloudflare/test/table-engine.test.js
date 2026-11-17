@@ -385,3 +385,11 @@ test('2v2 waiting room: the chat never reaches the lobby and a freed seat never 
  assert.equal(Object.values(engine.publicRoom().players).some(p=>p?.uid==='b'),false);
  assert.ok(engine.nextDeadline()-now()>1000,'no 50 ms timer from a freed seat');
 });
+
+test('A flower waiting to answer an envido wakes the table up on time',async()=>{
+ const {engine,advance}=setup();
+ await engine.create({uid:'a',name:'Mati'},{id:'game1',stake:5,targetPoints:10,mode:'1v1',secret:null});
+ advance(100);await engine.join({uid:'b',name:'Ricky'},{});
+ const room=engine.match.session.room;room.pendingBet={type:'envido',caller:'player1',responder:'player2',stake:2,accepted:0,florAt:1100+700};
+ assert.equal(engine.nextDeadline(),1800);
+});

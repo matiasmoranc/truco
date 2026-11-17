@@ -121,7 +121,10 @@ function createTeamReferee(s,{now=Date.now(),deckFactory=deck}={}){
   r.pendingBet={id:crypto.randomUUID(),type:'flor',caller:p,callerTeam:team(p),responder:responder(opponent(team(p)),true),stake:3,accepted:0,called:'flor',suspendedBet:suspended};
  }
  // The player whose turn it is (to play, or to answer a call) sings their flower now; the first flor opens it, the rest answer as usual.
- function autoFlor(){if(r.status!=='started'||r.resolvingTrick||r.pendingNextHand||Object.keys(r.flors||{}).length||r.florSettled)return;const b=r.pendingBet;if(b?.revealMode||b?.type==='flor')return;const p=b?b.responder:r.turn;if(p&&canSing(p)){flor(p);singBotFlors();}}
+ function autoFlor(){if(r.status!=='started'||r.resolvingTrick||r.pendingNextHand||Object.keys(r.flors||{}).length||r.florSettled)return;const b=r.pendingBet;if(b?.revealMode||b?.type==='flor')return;const p=b?b.responder:r.turn;if(!p||!canSing(p))return;
+  // Answering an envido, the flower waits a second so the caller first sees their own call.
+  if(b?.type==='envido'&&p===b.responder){if(!Number.isFinite(b.florAt))b.florAt=now+1000;if(now<b.florAt)return;}
+  flor(p);singBotFlors();}
  // Bots holding a flower sing it the moment another flor is sung, before any card.
  function singBotFlors(){for(const q of ordered(r.mano||'player1')){if(r.status!=='started')return;if(String(r.players?.[q]?.uid||'').startsWith('bot:')&&canSing(q))flor(q);}}
  function call(p,v,timedOut=false){const b=r.pendingBet;
