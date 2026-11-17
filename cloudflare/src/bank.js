@@ -4,36 +4,17 @@
 import {DurableObject} from 'cloudflare:workers';
 import {createBankCore} from './bank-core.js';
 import {createBankMirror} from './bank-mirror.js';
+import {durableStore} from './bank-store.js';
 import {createDatabase,createDevDatabase,verifyIdToken,playerIdentity} from './firebase.js';
 import {lobbyStub} from './routing.js';
 
 const send=(ws,message)=>{try{ws.send(JSON.stringify(message));}catch{}};
-const CHUNK=128;
 const MIRROR_DELAY_MS=2000,MIRROR_RETRY_MS=30000;
-
-// Durable Object storage behind the core's store interface. Puts and deletes are
-// issued without awaiting in between, so the runtime commits them as one batch.
-function durableStore(storage){
- return {
-  async get(keys){
-   const found=new Map();
-   for(let i=0;i<keys.length;i+=CHUNK)for(const [k,v] of await storage.get(keys.slice(i,i+CHUNK)))found.set(k,v);
-   return found;
-  },
-  async put(entries,removed=[]){
-   const pending=[],list=Object.entries(entries);
-   for(let i=0;i<list.length;i+=CHUNK)pending.push(storage.put(Object.fromEntries(list.slice(i,i+CHUNK))));
-   for(let i=0;i<removed.length;i+=CHUNK)pending.push(storage.delete(removed.slice(i,i+CHUNK)));
-   await Promise.all(pending);
-  },
-  async list(prefix){return storage.list({prefix});}
- };
-}
 
 export class Bank extends DurableObject{
  constructor(ctx,env){
   super(ctx,env);
-  const store=durableStore(ctx.storage);
+  const store=durableStore(ctx.storage);this.store=store;
   this.db=env.DEV_MODE==='1'?createDevDatabase(()=>lobbyStub(env)):createDatabase(env);
   this.mirror=createBankMirror(store,this.db);
   this.core=createBankCore(store,{beforeCommit:(writes,removed)=>this.mirror.beforeCommit(writes,removed)});
@@ -95,7 +76,7 @@ export class Bank extends DurableObject{
     if(url.pathname==='/mirror')return Response.json({pending:await this.mirror.hasPending()});
     // Rehearsals only (the Worker refuses it while the bank is active).
     if(url.pathname==='/reset'&&request.method==='POST'){
-     await this.serial(async()=>{await this.ctx.storage.deleteAll();await this.mirror.queueReset();});
+     await this.serial(async()=>{await this.ctx.storage.deleteAll();this.store.forget();await this.mirror.queueReset();});
      return Response.json({ok:true});
     }
     if(url.pathname==='/import'&&request.method==='POST'){
