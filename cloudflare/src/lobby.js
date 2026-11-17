@@ -20,10 +20,10 @@ const HOUSE_PEOPLE=['Nacho_Pereira','Facu.Rodriguez','ElGordoMartinez','Santi_Fe
 // Off for now (2026-11-15): only bots, to test whether players create tables. To turn it back on: 2 and 3.
 const HOUSE_PEOPLE_MIN=0,HOUSE_PEOPLE_MAX=0;
 const isBotName=name=>String(name||'').startsWith('Bot ');
-const HOUSE_MIN=12,HOUSE_MAX=16,HOUSE_TICK_MS=60000,HOUSE_TARGET_MS=30*60000;
-// One new table per minute at most: tables still open and close at different times, and with
-// 10 minutes each this keeps up to 10 open, enough for 6 to 8.
-const HOUSE_GAP_MS=50000;
+// The lobby checks every 30 seconds and opens one new table at most each time: tables still open and
+// close at different times, and with 10 minutes each this keeps up to 20 open, enough for 12 to 16.
+const HOUSE_MIN=12,HOUSE_MAX=16,HOUSE_TICK_MS=30000,HOUSE_TARGET_MS=30*60000;
+const HOUSE_GAP_MS=25000;
 const CODE_ALPHABET='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const randomCode=()=>Array.from(crypto.getRandomValues(new Uint32Array(5)),n=>CODE_ALPHABET[n%CODE_ALPHABET.length]).join('');
 const pick=weights=>{let r=Math.random()*weights.reduce((n,[,w])=>n+w,0);for(const [value,w] of weights){if((r-=w)<0)return value;}return weights[0][0];};
@@ -81,7 +81,7 @@ export class Lobby extends DurableObject{
   house.people=Math.min(house.people??HOUSE_PEOPLE_MIN,HOUSE_PEOPLE_MAX);
   const open=Object.values(this.rooms).filter(r=>r?.status==='waiting'&&isHouseUid(r.players?.player1?.uid));
   const missing=house.target-open.length;if(missing<=0){await this.ctx.storage.put('house',house);return;}
-  // With some open, at most one new table a minute, so they close at different times.
+  // With some open, at most one new table every 30 seconds, so they close at different times.
   if(open.length&&now-(house.lastAt||0)<HOUSE_GAP_MS){await this.ctx.storage.put('house',house);return;}
   for(let i=0;i<1;i++){
    const busy=new Set(open.map(r=>r.players.player1.name));

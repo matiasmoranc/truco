@@ -63,8 +63,9 @@ test('The lobby keeps 12 to 16 house tables with 30 different house players, and
  const people=JSON.parse(lobby.match(/HOUSE_PEOPLE=(\[[^\]]*\])/)[1].replace(/'/g,'"'));
  assert.equal(new Set(people).size,30);for(const name of people){assert.match(name,/^[A-Za-z0-9._-]{3,18}$/);assert.ok(!/^bot/i.test(name));}
  assert.match(lobby,/HOUSE_PEOPLE_MIN=0,HOUSE_PEOPLE_MAX=0\b/);
- // One new table a minute at most can keep up to 10 open with 10 minutes each.
- assert.ok(Number(lobby.match(/HOUSE_GAP_MS=(\d+)/)[1])<60000);
+ // One new table per check at most; with 10 minutes each, the checks must come often enough to reach 16.
+ const tick=Number(lobby.match(/HOUSE_TICK_MS=(\d+)/)[1]),gap=Number(lobby.match(/HOUSE_GAP_MS=(\d+)/)[1]);
+ assert.ok(gap<tick,'one table per check');assert.ok(600000/tick>=16,'10 minutes of checks reach 16 tables');
  const app=fs.readFileSync(path.join(__dirname,'..','app.js'),'utf8');
  assert.match(app,/\.sort\(\(a,b\) => houseTable\(a\[1\]\.public\)-houseTable\(b\[1\]\.public\)/);
 });
