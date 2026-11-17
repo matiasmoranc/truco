@@ -40,7 +40,10 @@ export function durableStore(storage){
    catch(error){rows=null;throw error;}
    if(rows){for(const [k,v] of list)rows.set(k,copy(v));for(const k of removed)rows.delete(k);}
   },
+  // Part of the ledger (one player's movements) right after a wake-up reads only those
+  // rows: loading every row for it cost the whole ledger each time the bank had slept.
   async list(prefix=''){
+   if(prefix&&!rows&&!loading)return new Map(await storage.list({prefix}));
    const source=await all(),found=new Map();
    for(const k of [...source.keys()].filter(k=>k.startsWith(prefix)).sort())found.set(k,copy(source.get(k)));
    return found;

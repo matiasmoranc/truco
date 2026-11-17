@@ -48,3 +48,13 @@ test('a write that lands while the rows are being read does not leave a stale co
  const reading=store.list('');await store.put({'w:a':{balance:2}});await reading;
  assert.deepEqual((await store.get(['w:a'])).get('w:a'),{balance:2});
 });
+
+test('right after a wake-up, part of the ledger reads only its own rows',async()=>{
+ const storage=fakeStorage({'w:a':{balance:1},'mv:a:1':{at:1},'mv:a:2':{at:2},'mv:b:1':{at:3}}),store=durableStore(storage);
+ assert.deepEqual(Object.fromEntries(await store.list('mv:a:')),{'mv:a:1':{at:1},'mv:a:2':{at:2}});
+ assert.equal(storage.reads.rows,2);
+ // The whole ledger still loads once, and then parts come from memory.
+ await store.list('');const after=storage.reads.rows;
+ assert.deepEqual([...(await store.list('mv:a:')).keys()],['mv:a:1','mv:a:2']);
+ assert.equal(storage.reads.rows,after);
+});
