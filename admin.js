@@ -34,7 +34,7 @@ async function loadAvatars(list){
 function inLevel(u){const [from,to]=($('level-filter').value||'').split('-').map(Number);if(!from)return true;const level=levelFor(u.points||0).level;return level>=from&&level<=to;}
 // Users list order: a column and its direction (1 up, -1 down); newest sign-ups first.
 let sortBy={key:'joined',dir:-1};
-let auth,call,users=[],pageToken=null,selection=null,busy=false,epoch=0,metrics=null,metricsBusy=false,metricsTimer=null,pagesLoaded=1,userScope='all',tableData={tables:[],archivedTables:[]};
+let auth,call,users=[],pageToken=null,selection=null,busy=false,epoch=0,metrics=null,metricsBusy=false,metricsTimer=null,pagesLoaded=1,fillFailedAt=0,userScope='all',tableData={tables:[],archivedTables:[]};
 function say(message){$('status').textContent=message;}
 // Test accounts and test devices stay out of every number unless this switch is off.
 function hideTest(){return $('hide-test').checked;}
@@ -94,7 +94,8 @@ function renderAudiences(base){
   b.append(node('span',a.name(),'audience-name'),node('strong',String(count),'audience-count'),node('small',a.id?share+'%':'usuarios','audience-share'));
   b.onclick=()=>{audience=a.id;renderUsers();};list.append(b);
  }
- $('audience-note').textContent='Calculado sobre '+base.length+' usuarios cargados'+(pageToken?'. Tocá «Cargar más usuarios» para incluir al resto.':'.');
+ $('audience-note').textContent=pageToken?'Cargando el resto de los usuarios para contar a todos… (van '+base.length+')':'Calculado sobre todos los usuarios ('+base.length+').';
+ completeUsers();
 }
 $('audience-games').oninput=$('audience-days').oninput=()=>renderUsers();
 const shortDate=value=>value?new Date(value).toLocaleDateString('es-UY'):'nunca';
@@ -124,16 +125,19 @@ function renderUsers(){
 }
 // Sorting or filtering only makes sense over everyone: the pages still missing are loaded first.
 async function loadAllUsers(){
- if(busy||!pageToken)return;busy=true;const generation=epoch;$('more').disabled=true;say('Cargando todos los usuarios para ordenar…');
+ if(busy||!pageToken)return;busy=true;const generation=epoch;$('more').disabled=true;say('Cargando todos los usuarios…');
  try{
   while(pageToken){
    const page=(await call({action:'users',scope:userScope,pageToken})).data;if(generation!==epoch)return;
-   users=[...users,...page.users.filter(u=>!users.some(o=>o.uid===u.uid))];pageToken=page.pageToken;pagesLoaded++;renderUsers();void loadAvatars(page.users);
+   users=[...users,...page.users.filter(u=>!users.some(o=>o.uid===u.uid))];pageToken=page.pageToken;pagesLoaded++;renderUsers();peopleList();void loadAvatars(page.users);
   }
   say('');
- }catch(e){if(generation===epoch)say(errorText(e));}
+ }catch(e){fillFailedAt=Date.now();if(generation===epoch)say(errorText(e));}
  finally{busy=false;if(generation===epoch){$('more').disabled=false;renderUsers();}}
 }
+// Audiences, the user search and the message recipients need everyone: on Usuarios and Mensajes the
+// missing pages load by themselves.
+function completeUsers(){if(pageToken&&!busy&&Date.now()-fillFailedAt>60000&&(!$('users').hidden||!$('messages').hidden))setTimeout(()=>{void loadAllUsers();},0);}
 async function refresh(more=false,preservePages=false){
  if(busy)return;busy=true;const generation=epoch;$('more').disabled=true;$('user-scope').disabled=true;for(const b of document.querySelectorAll('[data-scope]'))b.disabled=true;say('Cargando…');
  try{
@@ -162,7 +166,7 @@ async function refresh(more=false,preservePages=false){
    if(a.before!==undefined)card.append(node('p',String(a.before)+' → '+String(a.after)));$('audit-list').append(card);
   }await refreshMetrics();await loadMessages();loadTasks();say('');
   $('updated').textContent='Actualizado '+new Intl.DateTimeFormat('es-UY',{timeZone:ZONE,hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date());
- }catch(e){if(generation===epoch)say(errorText(e));}finally{busy=false;$('more').disabled=false;$('user-scope').disabled=false;for(const b of document.querySelectorAll('[data-scope]'))b.disabled=false;}
+ }catch(e){if(generation===epoch)say(errorText(e));}finally{busy=false;$('more').disabled=false;$('user-scope').disabled=false;for(const b of document.querySelectorAll('[data-scope]'))b.disabled=false;completeUsers();}
 }
 // Tables created by players and games finished in the chosen period (Uruguay days);
 // games against the lobby's house players apart. A card opens the list, day by day.
@@ -295,7 +299,7 @@ $('table-state').addEventListener('change',renderTables);
 $('search').addEventListener('input',renderUsers);
 // Tapping a column header orders by it; tapping it again flips the order.
 for(const button of document.querySelectorAll('[data-sort]'))button.onclick=()=>{const key=button.dataset.sort;sortBy=sortBy.key===key?{key,dir:-sortBy.dir}:{key,dir:key==='name'?1:-1};renderUsers();void loadAllUsers();};$('photo-filter').onchange=$('level-filter').onchange=()=>{renderUsers();void loadAllUsers();};$('more').onclick=()=>refresh(true);
-function showTab(name){for(const section of Object.keys(TAB_TITLES))$(section).hidden=section!==name;for(const tab of document.querySelectorAll('[data-tab]'))tab.classList.toggle('active',tab.dataset.tab===name);$('page-title').textContent=TAB_TITLES[name];if(name==='usage')refreshUsage();if(name==='chat')loadChat();if(name==='retention')loadRetention();if(name==='tasks')loadTasks();if(name==='users')loadDevices();}
+function showTab(name){if(name==='users'||name==='messages')setTimeout(completeUsers,0);for(const section of Object.keys(TAB_TITLES))$(section).hidden=section!==name;for(const tab of document.querySelectorAll('[data-tab]'))tab.classList.toggle('active',tab.dataset.tab===name);$('page-title').textContent=TAB_TITLES[name];if(name==='usage')refreshUsage();if(name==='chat')loadChat();if(name==='retention')loadRetention();if(name==='tasks')loadTasks();if(name==='users')loadDevices();}
 $('refresh').onclick=()=>{refresh(false,true);if(!$('usage').hidden)refreshUsage();if(!$('chat').hidden)loadChat();};
 for(const b of document.querySelectorAll('[data-tab]'))b.onclick=()=>showTab(b.dataset.tab);
 async function showUsers(scope){if(busy)return;userScope=scope;pagesLoaded=1;pageToken=null;users=[];$('search').value='';$('user-scope').value=scope;renderUsers();showTab('users');await refresh();}
@@ -1019,7 +1023,7 @@ function renderThreads(){
  }
 }
 $('message-form').onsubmit=async event=>{
- event.preventDefault();const name=$('message-to').value.trim().toLocaleLowerCase('es');
+ event.preventDefault();if(pageToken)await loadAllUsers();const name=$('message-to').value.trim().toLocaleLowerCase('es');
  const matches=users.filter(u=>(u.name||'').toLocaleLowerCase('es')===name);
  if(matches.length!==1){$('message-error').textContent=matches.length?'Hay más de un jugador con ese nombre.':'Elegí un jugador de la lista.';return;}
  $('message-send').disabled=true;$('message-error').textContent='';
