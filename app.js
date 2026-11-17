@@ -569,7 +569,7 @@ function spokenCall(text=''){
   if(/\bresponde:\s*tiene\b/i.test(text))return 'Tiene';
   if(/\bla m[ií]a es flor\b/i.test(text))return 'La mía es flor';
   if(/se fue al mazo/i.test(text))return 'Me voy al mazo';
-  const points=text.match(/\bcanta (\d+) (tantos|son mejores|son iguales)\b/i);
+  const points=text.match(/\bcanta (\d+) (tantos|son mejores|son iguales|de flor)\b/i);
   if(points)return `${points[1]} ${points[2]}`;
   if(/: son buenas\./i.test(text))return 'Son buenas';
   if(!/\b(canta|dice|responde|quiere)\b/i.test(text))return null;
@@ -604,7 +604,7 @@ function makeCallNotice(text,bet=state.room?.pendingBet){
   const speaker=state.room?.players?.[state.playerId]?.name||'';
   const spoken=spokenCall(speaker&&text.startsWith(speaker)?text.slice(speaker.length):text);
   if(!spoken||!['player1','player2'].includes(state.playerId))return null;
-  return {...(spoken==='Me voy al mazo'?{kind:'fold'}:{}),id:crypto.randomUUID(),from:state.playerId,to:state.playerId==='player1'?'player2':'player1',text:spoken==='Tiene'||spoken==='Me voy al mazo'?text.split('.')[0]+'.':/\bcanta \d+ (tantos|son mejores|son iguales)\b/i.test(text)?spoken:text,spoken,selfVerb:ownCallVerb(spoken,bet),time:Date.now(),handNumber:state.room?.handNumber||1};
+  return {...(spoken==='Me voy al mazo'?{kind:'fold'}:{}),id:crypto.randomUUID(),from:state.playerId,to:state.playerId==='player1'?'player2':'player1',text:spoken==='Tiene'||spoken==='Me voy al mazo'?text.split('.')[0]+'.':/\bcanta \d+ (tantos|son mejores|son iguales|de flor)\b/i.test(text)?spoken:text,spoken,selfVerb:ownCallVerb(spoken,bet),time:Date.now(),handNumber:state.room?.handNumber||1};
 }
 
 // Practice gives a little more time to read each result.
