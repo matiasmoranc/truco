@@ -32,6 +32,8 @@ function createCreditStore({db,secret,fetchImpl=(...args)=>fetch(...args),baseUr
  return {
   isActive,
   async readLedger(){return await isActive()?bankLedger():(await db.ref('creditEconomy').get()).val()||{};},
+  // One player's part of the ledger (same shape), without reading the whole bank.
+  async playerLedger(uid){return await isActive()?(await call('player?uid='+encodeURIComponent(uid))).ledger||{}:(await db.ref('creditEconomy').get()).val()||{};},
   async wallet(uid){return await isActive()?(await call('wallet?uid='+encodeURIComponent(uid))).wallet??null:(await db.ref('creditEconomy/wallets/'+uid).get()).val();},
   patchBank,
   // Changes only the credit ledger, wherever it lives (account deletion). update

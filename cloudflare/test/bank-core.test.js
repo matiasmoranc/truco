@@ -40,7 +40,7 @@ test('A table step reads and writes only that table rows and records movements a
  const engine=createTableEngine({code:'ABCDE',bank:core,clock:()=>5000});
  await engine.create({uid:'a',name:'Mati'},{id:'game1',stake:5,targetPoints:10,mode:'1v1'});
  const changed=[...store.rows.keys()].filter(k=>JSON.stringify(before.get(k))!==JSON.stringify(store.rows.get(k)));
- assert.deepEqual(changed.filter(k=>!k.startsWith('mv:')).sort(),['h:game1','m:game1','meta:version','p:a','t:ABCDE','w:a']);
+ assert.deepEqual(changed.filter(k=>!k.startsWith('mv:')).sort(),['h:game1','m:game1','meta:version','p:a','pi:a','t:ABCDE','w:a']);
  const {ledger,version}=await core.exportLedger();
  assert.equal(version,2);assert.deepEqual(ledger.wallets.a,{balance:7,locked:5,lastGrantAt:1});
  const moves=Object.values(ledger.walletMovements.a);assert.equal(moves.length,1);
@@ -114,4 +114,28 @@ test('A row patch survives games at other tables but not edits to the same rows'
  await core.patch(now,pointer);assert.equal((await core.exportLedger()).ledger.tables?.ZZZZZ,undefined);
  const negative=structuredClone((await core.exportLedger()).ledger);const fresh=structuredClone(negative);fresh.wallets.b.balance=-1;
  await assert.rejects(core.patch(negative,fresh),/Saldo inválido/);
+});
+
+// Amigos and Mis estadísticas read one player's part of the bank, never the whole ledger.
+test('One player\'s ledger has the same matches, history and movements as the whole one, also for matches played after the index was built',async()=>{
+ const store=memoryStore(),core=createBankCore(store);
+ const old={...wallets(),matches:{m1:{id:'m1',player1:'a',player2:'b',players:{player1:{uid:'a'},player2:{uid:'b'}},status:'settled',stake:1,startedAt:5,createdAt:5},m2:{id:'m2',players:{player1:{uid:'c'},player2:{uid:'bot:x'}},status:'settled',stake:0,startedAt:6,createdAt:6}},history:{m1:{e1:{changes:[{uid:'a',before:12,after:13}]}}},walletMovements:{a:{x1:{at:5,before:12,after:13}}}};
+ await core.importLedger(old);
+ const mine=uid=>core.playerLedger(uid);
+ const a=await mine('a');
+ assert.deepEqual(Object.keys(a.matches),['m1']);assert.deepEqual(Object.keys(a.history),['m1']);
+ assert.deepEqual(a.walletMovements,{a:{x1:{at:5,before:12,after:13}}});assert.equal(a.wallets.a.balance,12);
+ assert.deepEqual(Object.keys((await mine('c')).matches),['m2']);
+ assert.deepEqual((await mine('bot:x')).matches,{});
+ await playScript(core);
+ const whole=(await core.exportLedger()).ledger;
+ for(const uid of ['a','b']){
+  const part=await mine(uid),expected=Object.keys(whole.matches).filter(id=>Object.values(whole.matches[id].players||{}).some(p=>p.uid===uid)||[whole.matches[id].player1,whole.matches[id].player2].includes(uid)).sort();
+  assert.deepEqual(Object.keys(part.matches).sort(),expected);
+  assert.ok(expected.length>=2);
+  assert.deepEqual(part.walletMovements[uid],whole.walletMovements[uid]);
+  for(const id of expected)assert.deepEqual(part.matches[id],whole.matches[id]);
+ }
+ // The index rows stay out of the exported ledger.
+ assert.ok(!JSON.stringify(Object.keys(whole)).includes('pi'));
 });

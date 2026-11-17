@@ -29,7 +29,7 @@ const {closeLiveTable}=require('./live-server.cjs');
 const rewardIdentity=async request=>{if(await creditStore.isActive())throw new HttpsError('failed-precondition','Las recompensas no están disponibles.');return identity(request);};
 Object.assign(exports,require('./ad-rewards.cjs').createRewardFunctions({db,identity:rewardIdentity,rateLimit,options}));
 // Friends and table invitations with push notifications.
-Object.assign(exports,require('./social.cjs').createSocialFunctions({db,identity,rateLimit,options,readLedger:()=>creditStore.readLedger(),usersBlockEachOther}));
+Object.assign(exports,require('./social.cjs').createSocialFunctions({db,identity,rateLimit,options,readLedger:()=>creditStore.readLedger(),playerLedger:uid=>creditStore.playerLedger(uid),usersBlockEachOther}));
 async function identity(request){
  const auth=request.auth,provider=auth?.token?.firebase?.sign_in_provider;
  if(!auth||!['google.com','apple.com','password'].includes(provider))throw new HttpsError('unauthenticated','Iniciá sesión con tu cuenta.');
@@ -627,13 +627,13 @@ exports.activityCleanup=onSchedule({schedule:'every day 04:00',timeZone:'America
 exports.playerConsole=onCall(options,async request=>{
  const user=await identity(request);await rateLimit(user.uid,20,'player-console');
  const data=request.data||{};
- if(data.action==='history')return personalHistory(await creditStore.readLedger(),user.uid);
+ if(data.action==='history')return personalHistory(await creditStore.playerLedger(user.uid),user.uid);
  if(data.action==='report'){
   if(typeof data.message!=='string'||data.message.trim().length<5||data.message.length>1000||!validKey(data.requestId))throw new HttpsError('invalid-argument','Escribí un mensaje de entre 5 y 1000 caracteres.');
   let match=null;
   if(data.matchId){
    if(!validKey(data.matchId))throw new HttpsError('invalid-argument','Partida inválida.');
-   match=(await creditStore.readLedger()).matches?.[data.matchId]??null;
+   match=(await creditStore.playerLedger(user.uid)).matches?.[data.matchId]??null;
    if(!match||!Object.values(match.players||{}).some(p=>p.uid===user.uid))throw new HttpsError('permission-denied','No pertenecés a esa partida.');
   }
   if(data.localId&&!validKey(data.localId))throw new HttpsError('invalid-argument','Identificador inválido.');

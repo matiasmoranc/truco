@@ -10,6 +10,11 @@ export const CREDIT_DAY_MS=86400000,URUGUAY_OFFSET_MS=10800000,DAILY_CREDITS=5;
 // Branches stored row by row; anything else in an imported ledger is kept whole.
 const ROWS={wallets:'w:',matches:'m:',tables:'t:',history:'h:',peaks:'p:',adminAudit:'aa:'};
 const MOVEMENTS='mv:',BLOB='b:',VERSION='meta:version';
+// Which matches each person played (ids), so one player's history is read without
+// reading the whole ledger. Not part of the ledger: not exported nor backed up.
+const PLAYER_INDEX='pi:',INDEX_READY='meta:playerIndex';
+const matchUids=m=>[...new Set([m?.player1,m?.player2,...Object.values(m?.players||{}).map(p=>p?.uid)])]
+ .filter(uid=>typeof uid==='string'&&uid&&!uid.startsWith('bot:')&&!uid.startsWith('house_'));
 
 // Accounting rows that may never be removed (same branches as validateAccounting).
 const PROTECTED=[ROWS.wallets,ROWS.matches,ROWS.history,ROWS.peaks,ROWS.adminAudit,MOVEMENTS];
@@ -46,8 +51,27 @@ export function rowPath(key){
 // put; the Durable Object uses it to queue the backup copy with every change.
 export function createBankCore(store,{newId=()=>crypto.randomUUID(),beforeCommit=null}={}){
  async function commit(writes,removed=[]){
+  await indexMatches(writes);
   const extra=beforeCommit?await beforeCommit(writes,removed):null;
   await store.put(extra?{...writes,...extra}:writes,removed);
+ }
+ // New matches join the index of each person in them, in the same write.
+ async function indexMatches(writes){
+  const added={};
+  for(const [key,m] of Object.entries(writes))if(key.startsWith(ROWS.matches)&&m)for(const uid of matchUids(m))(added[uid]??=new Set()).add(key.slice(ROWS.matches.length));
+  const uids=Object.keys(added);if(!uids.length)return;
+  const current=await store.get(uids.map(uid=>PLAYER_INDEX+uid));
+  for(const uid of uids){
+   const ids=current.get(PLAYER_INDEX+uid)||[],fresh=[...added[uid]].filter(id=>!ids.includes(id));
+   if(fresh.length)writes[PLAYER_INDEX+uid]=[...ids,...fresh];
+  }
+ }
+ // The first time, the index is built from every match already stored.
+ async function ensureIndex(){
+  if((await store.get([INDEX_READY])).get(INDEX_READY))return;
+  const index={};
+  for(const [key,m] of await store.list(ROWS.matches))for(const uid of matchUids(m))(index[PLAYER_INDEX+uid]??=[]).push(key.slice(ROWS.matches.length));
+  await store.put({...index,[INDEX_READY]:true});
  }
  // Movement and peak rows, as the creditWalletHistory function used to write them.
  function walletTrail(writes,uid,before,after,at,peak){
@@ -91,6 +115,16 @@ export function createBankCore(store,{newId=()=>crypto.randomUUID(),beforeCommit
    }
    await bump(writes);await commit(writes);
    return {full:result.full,closedBy:null,wallets};
+  },
+  // One player's part of the ledger, in the same shape as the whole one: their
+  // wallet, peak, movements, and the matches they played with their history.
+  async playerLedger(uid){
+   await ensureIndex();
+   const ids=(await store.get([PLAYER_INDEX+uid])).get(PLAYER_INDEX+uid)||[];
+   const rows=await loadRows({wallets:[uid],peaks:[uid],matches:ids,history:ids});
+   const movements={};
+   for(const [key,value] of await store.list(MOVEMENTS+uid+':'))movements[key.slice(MOVEMENTS.length+uid.length+1)]=value;
+   return {...rows,walletMovements:Object.keys(movements).length?{[uid]:movements}:{}};
   },
   async wallet(uid){return (await store.get([ROWS.wallets+uid])).get(ROWS.wallets+uid)??null;},
   async claim(uid,now){

@@ -67,6 +67,7 @@ export class Bank extends DurableObject{
   if(url.hostname==='bank'){
    try{
     if(url.pathname==='/export')return Response.json(await this.serial(()=>this.core.exportLedger()));
+    if(url.pathname==='/player')return Response.json({ledger:await this.serial(()=>this.core.playerLedger(String(url.searchParams.get('uid')||'')))});
     if(url.pathname==='/wallet')return Response.json({wallet:await this.core.wallet(url.searchParams.get('uid'))});
     if(url.pathname==='/patch'&&request.method==='POST'){
      const {base,next}=await request.json();

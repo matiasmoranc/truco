@@ -35,7 +35,7 @@ function adminAlerter(db){
   }catch(error){console.error('admin alert',error);return 0;}
  };
 }
-function createSocialFunctions({db,identity,rateLimit,options,readLedger,usersBlockEachOther}){
+function createSocialFunctions({db,identity,rateLimit,options,readLedger,playerLedger=()=>readLedger(),usersBlockEachOther}){
  const val=async path=>(await db.ref(path).get()).val();
  const names=async uids=>{const list=await Promise.all(uids.map(uid=>val('profiles/'+uid+'/name')));return Object.fromEntries(uids.map((uid,i)=>[uid,list[i]||'']));};
  const lists=async uid=>{const [friends,incoming,outgoing]=await Promise.all(['friends','friendRequests','friendRequestsSent'].map(k=>val(k+'/'+uid)));return {friends:friends||{},incoming:incoming||{},outgoing:outgoing||{}};};
@@ -66,7 +66,7 @@ function createSocialFunctions({db,identity,rateLimit,options,readLedger,usersBl
     return {results:uids.filter((uid,i)=>!blocked[i]&&named[uid]).map(uid=>({uid,name:named[uid],relation:S.relation(user.uid,uid,mine)}))};
    }
    case 'recent':{
-    const [ledger,mine]=await Promise.all([readLedger(),lists(user.uid)]);
+    const [ledger,mine]=await Promise.all([playerLedger(user.uid),lists(user.uid)]);
     const recent=S.recentOpponents(ledger,user.uid);
     const named=await names(recent.map(r=>r.uid));
     return {results:recent.filter(r=>named[r.uid]).map(r=>({...r,name:named[r.uid]||r.name,relation:S.relation(user.uid,r.uid,mine)}))};

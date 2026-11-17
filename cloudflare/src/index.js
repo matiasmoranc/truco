@@ -27,7 +27,7 @@ export default {
    return tableStub(env,table[1]).fetch(forwarded);
   }
   // Cloud Functions reading or editing the whole credit ledger in the bank.
-  const bank=/^\/internal\/bank\/(status|export|wallet|patch|import|reset|mirror)$/.exec(url.pathname);
+  const bank=/^\/internal\/bank\/(status|export|player|wallet|patch|import|reset|mirror)$/.exec(url.pathname);
   if(bank){
    if(!env.INTERNAL_SECRET||request.headers.get('x-internal-secret')!==env.INTERNAL_SECRET)return new Response('No autorizado.',{status:401});
    if(bank[1]==='status')return Response.json({active:env.CREDITS_BACKEND==='bank'});
