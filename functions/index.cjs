@@ -225,6 +225,19 @@ exports.finishAccountDeletions=onSchedule({schedule:'every 5 minutes',region:'us
 });
 exports.adminConsole=onCall({...options,secrets:[liveInternalSecret]},async request=>{
  const actor=await adminIdentity(request),data=request.data||{},action=data.action;
+ if(action==='tasks'||action==='task-change'){
+  // The admin's own task list (adminTasks): read all, or change one task and answer with the new list.
+  const {applyTask,taskList,validId}=require('./admin-tasks.cjs');
+  if(action==='task-change'){
+   const op=data.op||{},id=op.kind==='create'?crypto.randomUUID().replace(/-/g,'').slice(0,20):op.id;
+   if(!validId(id))throw new HttpsError('invalid-argument','Tarea inválida.');
+   const token=request.auth.token||{},who={uid:actor,name:String(token.name||String(token.email||'').split('@')[0]||'Admin').slice(0,40)};
+   let failure=null;
+   const result=await require('./loaded-transaction.cjs').loadedTransaction(db.ref('adminTasks/'+id),current=>{failure=null;try{return applyTask(current,op,{now:Date.now(),who});}catch(error){failure=error.message;return;}});
+   if(failure||!result.committed)throw new HttpsError('failed-precondition',failure||'No se pudo guardar la tarea.');
+  }
+  return {tasks:taskList((await db.ref('adminTasks').get()).val())};
+ }
  if(action==='repair-reservation'){
   if(!validKey(data.uid))throw new HttpsError('invalid-argument','Usuario inválido.');
   const repairId=crypto.randomUUID();

@@ -47,7 +47,7 @@ async function setTestUser(u,test){
 const number=value=>new Intl.NumberFormat('es-UY').format(Number(value)||0);
 const PLATFORM_LABELS={'app-ios':'App iPhone','app-android':'App Android','web-ios':'Web iPhone','web-android':'Web Android','web-desktop':'Web computadora'};
 const PAGE_LABELS={juego:'Juego',anotador:'Anotador',aprender:'Aprender a jugar',otra:'Reglas y otras'};
-const TAB_TITLES={metrics:'Resumen',visits:'Visitas',usage:'Anotador y Aprender',retention:'Retención',users:'Usuarios',tables:'Mesas y partidas',reports:'Problemas reportados',messages:'Mensajes a jugadores',chat:'Chat de las mesas',audit:'Historial de cambios'};
+const TAB_TITLES={metrics:'Resumen',tasks:'Tareas',visits:'Visitas',usage:'Anotador y Aprender',retention:'Retención',users:'Usuarios',tables:'Mesas y partidas',reports:'Problemas reportados',messages:'Mensajes a jugadores',chat:'Chat de las mesas',audit:'Historial de cambios'};
 function errorText(e){return e.code==='functions/not-found'?'Falta publicar las funciones de administración en Firebase.':e.message||'No se pudo completar el cambio.';}
 const AUDIT_LABELS={level:'Cambio de nivel y puntos',rename:'Cambio de nombre',block:'Bloqueo',delete:'Eliminación de cuenta',credits:'Créditos','close-table':'Cierre de mesa','close-legacy-table':'Cierre de mesa','repair-reservation':'Reparación de reserva'};
 // The device a player used last, as the panel names it.
@@ -160,7 +160,7 @@ async function refresh(more=false,preservePages=false){
   $('audit-list').replaceChildren();for(const a of data.audit){
    const card=node('article','','card');card.append(node('h3',AUDIT_LABELS[a.action]||a.action),node('p',a.reason),node('p',a.uid||a.code||''),node('small',new Date(a.at).toLocaleString('es-UY')),node('small','Administrador: '+a.actor));
    if(a.before!==undefined)card.append(node('p',String(a.before)+' → '+String(a.after)));$('audit-list').append(card);
-  }await refreshMetrics();await loadMessages();say('');
+  }await refreshMetrics();await loadMessages();loadTasks();say('');
   $('updated').textContent='Actualizado '+new Intl.DateTimeFormat('es-UY',{timeZone:ZONE,hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date());
  }catch(e){if(generation===epoch)say(errorText(e));}finally{busy=false;$('more').disabled=false;$('user-scope').disabled=false;for(const b of document.querySelectorAll('[data-scope]'))b.disabled=false;}
 }
@@ -274,7 +274,7 @@ $('table-state').addEventListener('change',renderTables);
 $('search').addEventListener('input',renderUsers);
 // Tapping a column header orders by it; tapping it again flips the order.
 for(const button of document.querySelectorAll('[data-sort]'))button.onclick=()=>{const key=button.dataset.sort;sortBy=sortBy.key===key?{key,dir:-sortBy.dir}:{key,dir:key==='name'?1:-1};renderUsers();void loadAllUsers();};$('photo-filter').onchange=$('level-filter').onchange=()=>{renderUsers();void loadAllUsers();};$('more').onclick=()=>refresh(true);
-function showTab(name){for(const section of Object.keys(TAB_TITLES))$(section).hidden=section!==name;for(const tab of document.querySelectorAll('[data-tab]'))tab.classList.toggle('active',tab.dataset.tab===name);$('page-title').textContent=TAB_TITLES[name];if(name==='usage')refreshUsage();if(name==='chat')loadChat();if(name==='retention')loadRetention();if(name==='users')loadDevices();}
+function showTab(name){for(const section of Object.keys(TAB_TITLES))$(section).hidden=section!==name;for(const tab of document.querySelectorAll('[data-tab]'))tab.classList.toggle('active',tab.dataset.tab===name);$('page-title').textContent=TAB_TITLES[name];if(name==='usage')refreshUsage();if(name==='chat')loadChat();if(name==='retention')loadRetention();if(name==='tasks')loadTasks();if(name==='users')loadDevices();}
 $('refresh').onclick=()=>{refresh(false,true);if(!$('usage').hidden)refreshUsage();if(!$('chat').hidden)loadChat();};
 for(const b of document.querySelectorAll('[data-tab]'))b.onclick=()=>showTab(b.dataset.tab);
 async function showUsers(scope){if(busy)return;userScope=scope;pagesLoaded=1;pageToken=null;users=[];$('search').value='';$('user-scope').value=scope;renderUsers();showTab('users');await refresh();}
@@ -606,6 +606,155 @@ async function loadDevices(){
  }catch(e){if(request===devicesRequest)$('devices-note').textContent='No se pudo cargar'+(GAME==='ar'?' (este juego todavía no lo mide).':': '+errorText(e));}
 }
 $('devices-days').addEventListener('change',loadDevices);
+// Tasks: what to check or do later, with a date, a status, a priority, an area and comments.
+const TASK_STATUS={pendiente:'Pendiente','en-curso':'En curso',esperando:'Esperando',hecha:'Hecha',descartada:'Descartada'};
+const TASK_PRIORITY={alta:'Alta',media:'Media',baja:'Baja'};
+const TASK_AREAS={juego:'Juego',apps:'Apps',servidor:'Servidor y Cloudflare',admin:'Admin',marketing:'Marketing y videos',tiendas:'Tiendas',otros:'Otros'};
+const PRIORITY_ORDER={alta:0,media:1,baja:2};
+let tasks=[],tasksRequest=0;const openTasks=new Set();
+const taskOpen=t=>!['hecha','descartada'].includes(t.status);
+const taskToday=()=>new Intl.DateTimeFormat('en-CA',{timeZone:ZONE,year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+const taskDays=(a,b)=>Math.round((Date.parse(b+'T12:00:00Z')-Date.parse(a+'T12:00:00Z'))/86400000);
+const taskPlus=(d,n)=>new Date(Date.parse(d+'T12:00:00Z')+n*86400000).toISOString().slice(0,10);
+const taskDay=d=>new Intl.DateTimeFormat('es-UY',{weekday:'short',day:'numeric',month:'short',timeZone:'UTC'}).format(new Date(d+'T12:00:00Z'));
+const taskWhen=at=>new Date(at).toLocaleString('es-UY',{timeZone:ZONE,day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
+// "Venció hace 2 días", "Vence hoy", "Mañana", "En 4 días · mar 25 nov".
+function dueLabel(t){
+ if(!t.due)return null;
+ const d=taskDays(taskToday(),t.due),open=taskOpen(t);
+ if(!open)return {text:taskDay(t.due),cls:''};
+ if(d<0)return {text:'Venció hace '+(-d)+(d===-1?' día':' días'),cls:'overdue'};
+ if(d===0)return {text:'Vence hoy',cls:'today'};
+ if(d===1)return {text:'Mañana · '+taskDay(t.due),cls:'soon'};
+ if(d<7)return {text:'En '+d+' días · '+taskDay(t.due),cls:'soon'};
+ return {text:taskDay(t.due),cls:''};
+}
+async function loadTasks(){
+ const request=++tasksRequest;if(!tasks.length)$('task-status').textContent='Cargando…';
+ try{const data=(await call({action:'tasks'})).data;if(request!==tasksRequest)return;tasks=data.tasks||[];renderTasks();}
+ catch(e){if(request===tasksRequest)$('task-status').textContent='No se pudieron cargar las tareas: '+errorText(e);}
+}
+// One change, then the list as the server has it.
+async function changeTask(op){
+ const data=(await call({action:'task-change',op})).data;tasks=data.tasks||[];renderTasks();
+}
+function taskCounts(){
+ const today=taskToday(),open=tasks.filter(taskOpen),due=t=>t.due?taskDays(today,t.due):null;
+ return {open:open.length,overdue:open.filter(t=>due(t)<0).length,today:open.filter(t=>due(t)===0).length,
+  week:open.filter(t=>t.due&&due(t)>=0&&due(t)<7).length,done:tasks.filter(t=>t.status==='hecha'&&Date.now()-(t.doneAt||0)<30*86400000).length};
+}
+function renderTasks(){
+ const c=taskCounts(),urgent=c.overdue+c.today;
+ $('tasks-count').hidden=!urgent;$('tasks-count').textContent=urgent||'';
+ if($('tasks').hidden)return;
+ const kpis=$('tasks-kpis');kpis.replaceChildren();
+ for(const [label,value,filter,note,cls] of [['Abiertas',c.open,'open','Pendientes, en curso o esperando'],['Vencidas',c.overdue,'overdue','Ya pasó su fecha',c.overdue?'bad':''],['Para hoy',c.today,'week','Vencen hoy',c.today?'warn':''],['Próximos 7 días',c.week,'week','Con fecha esta semana'],['Hechas',c.done,'hecha','En los últimos 30 días']]){
+  const k=node('button','','kpi metric-link'+(cls?' '+cls:''));k.type='button';k.append(node('small',label),node('strong',number(value)),node('span',note,'delta'));
+  k.classList.toggle('selected',$('task-filter').value===filter&&label!=='Para hoy');
+  k.onclick=()=>{$('task-filter').value=filter;renderTasks();};kpis.append(k);
+ }
+ const filter=$('task-filter').value,area=$('task-area-filter').value,order=$('task-order').value,query=$('task-search').value.trim().toLocaleLowerCase();
+ const today=taskToday(),has=v=>String(v||'').toLocaleLowerCase().includes(query);
+ const shown=tasks.filter(t=>{
+  if(area&&t.area!==area)return false;
+  if(query&&!(has(t.title)||has(t.notes)||t.comments.some(x=>has(x.text))))return false;
+  const d=t.due?taskDays(today,t.due):null;
+  if(filter==='open')return taskOpen(t);
+  if(filter==='overdue')return taskOpen(t)&&d!=null&&d<0;
+  if(filter==='week')return taskOpen(t)&&d!=null&&d<7;
+  if(filter==='all')return true;
+  return t.status===filter;
+ });
+ const byDue=(a,b)=>(a.due||'9999').localeCompare(b.due||'9999')||PRIORITY_ORDER[a.priority]-PRIORITY_ORDER[b.priority]||a.createdAt-b.createdAt;
+ const byPriority=(a,b)=>PRIORITY_ORDER[a.priority]-PRIORITY_ORDER[b.priority]||byDue(a,b);
+ const list=$('task-list');list.replaceChildren();
+ $('task-status').textContent=tasks.length?shown.length+(shown.length===1?' tarea':' tareas')+(query||area||filter!=='all'?' con estos filtros':'')+'.':'Todavía no hay tareas. Escribí la primera arriba.';
+ if(!shown.length){if(tasks.length)list.append(node('p','No hay tareas con estos filtros.','empty'));return;}
+ const groups=[];
+ if(order==='date'){
+  const open=shown.filter(taskOpen),closed=shown.filter(t=>!taskOpen(t)),d=t=>taskDays(today,t.due);
+  groups.push(['Vencidas',open.filter(t=>t.due&&d(t)<0).sort(byDue),'overdue'],['Hoy',open.filter(t=>t.due&&d(t)===0).sort(byDue),'today'],
+   ['Próximos 7 días',open.filter(t=>t.due&&d(t)>0&&d(t)<7).sort(byDue)],['Más adelante',open.filter(t=>t.due&&d(t)>=7).sort(byDue)],
+   ['Sin fecha',open.filter(t=>!t.due).sort(byPriority)],['Hechas y descartadas',closed.sort((a,b)=>(b.doneAt||b.updatedAt)-(a.doneAt||a.updatedAt))]);
+ }else groups.push(['',shown.sort(order==='priority'?byPriority:(a,b)=>b.updatedAt-a.updatedAt)]);
+ for(const [title,items,cls] of groups){
+  if(!items.length)continue;
+  if(title){const h=node('h3','','task-group'+(cls?' '+cls:''));h.append(node('span',title),node('small',String(items.length)));list.append(h);}
+  for(const t of items)list.append(taskCard(t));
+ }
+}
+function taskCard(t){
+ const card=node('article','','task prio-'+t.priority+' status-'+t.status+(openTasks.has(t.id)?' open':''));
+ const row=node('div','','task-row');
+ const check=node('button','','task-check');check.type='button';check.title=t.status==='hecha'?'Volver a pendiente':'Marcar como hecha';check.setAttribute('aria-label',check.title);
+ check.innerHTML='<svg viewBox="0 0 24 24"><path d="m6 12 4 4 8-8"/></svg>';check.onkeydown=e=>e.stopPropagation();
+ check.onclick=async e=>{e.stopPropagation();check.disabled=true;try{await changeTask({kind:'update',id:t.id,fields:{status:t.status==='hecha'?'pendiente':'hecha'}});}catch(err){check.disabled=false;say(errorText(err));}};
+ const main=node('div','','task-main');main.append(node('strong',t.title,'task-title'));
+ const meta=node('div','','task-meta');
+ meta.append(node('span',TASK_STATUS[t.status],'task-pill s-'+t.status),node('span',TASK_PRIORITY[t.priority],'task-prio p-'+t.priority),node('span',TASK_AREAS[t.area]||t.area,'task-chip'));
+ const due=dueLabel(t);if(due)meta.append(node('span',due.text,'task-due '+due.cls));
+ const said=t.comments.filter(x=>x.kind!=='status').length;if(said)meta.append(node('span','💬 '+said,'task-chip'));
+ main.append(meta);
+ const arrow=node('span','','task-arrow');arrow.innerHTML='<svg viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg>';
+ row.append(check,main,arrow);clickable(row,()=>{if(openTasks.has(t.id))openTasks.delete(t.id);else openTasks.add(t.id);renderTasks();});
+ card.append(row);
+ if(openTasks.has(t.id))card.append(taskDetail(t));
+ return card;
+}
+function taskDetail(t){
+ const box=node('div','','task-detail'),error=node('p','','task-error');error.hidden=true;
+ const fail=e=>{error.textContent=errorText(e);error.hidden=false;};
+ const field=(label,input)=>{const l=node('label',label);l.append(input);return l;};
+ const select=(options,value)=>{const s=document.createElement('select');for(const [v,l] of Object.entries(options)){const o=node('option',l);o.value=v;o.selected=v===value;s.append(o);}return s;};
+ const title=document.createElement('input');title.value=t.title;title.maxLength=140;
+ const notes=document.createElement('textarea');notes.value=t.notes||'';notes.rows=3;notes.maxLength=3000;notes.placeholder='Detalle';
+ const status=select(TASK_STATUS,t.status),priority=select(TASK_PRIORITY,t.priority),area=select(TASK_AREAS,t.area);
+ const due=document.createElement('input');due.type='date';due.value=t.due||'';
+ const grid=node('div','','task-edit-grid');grid.append(field('Estado',status),field('Prioridad',priority),field('Área',area),field('Fecha',due));
+ const save=node('button','Guardar cambios','primary');save.type='button';
+ save.onclick=async()=>{save.disabled=true;error.hidden=true;try{await changeTask({kind:'update',id:t.id,fields:{title:title.value,notes:notes.value,status:status.value,priority:priority.value,area:area.value,due:due.value||null}});}catch(e){save.disabled=false;fail(e);}};
+ // Deleting asks once more on the same button.
+ const del=node('button','Eliminar','danger');del.type='button';let armed=null;
+ del.onclick=async()=>{if(!armed){del.textContent='¿Seguro? Tocá de nuevo';armed=setTimeout(()=>{armed=null;del.textContent='Eliminar';},4000);return;}
+  clearTimeout(armed);del.disabled=true;try{openTasks.delete(t.id);await changeTask({kind:'delete',id:t.id});}catch(e){del.disabled=false;fail(e);}};
+ const actions=node('div','','task-actions');actions.append(save,del);
+ box.append(field('Título',title),field('Detalle',notes),grid,actions,error);
+ // Comments, oldest first, and a box to add one.
+ const thread=node('div','','task-thread');thread.append(node('h4','Comentarios e historial'));
+ for(const c of t.comments){
+  const line=node('div','','task-comment'+(c.kind==='status'?' is-status':''));
+  const head=node('div','','task-comment-head');head.append(node('strong',c.by||'Admin'),node('small',taskWhen(c.at)));
+  if(c.kind!=='status'){const x=node('button','Borrar','link-button');x.type='button';x.onclick=async()=>{x.disabled=true;try{await changeTask({kind:'delete-comment',id:t.id,commentId:c.id});}catch(e){x.disabled=false;fail(e);}};head.append(x);}
+  line.append(head,node('p',c.text));thread.append(line);
+ }
+ if(!t.comments.length)thread.append(node('p','Todavía no hay comentarios.','note'));
+ const reply=node('div','','task-reply'),text=document.createElement('textarea');text.rows=2;text.maxLength=1500;text.placeholder='Escribí un comentario o avance…';
+ const send=node('button','Comentar');send.type='button';
+ send.onclick=async()=>{if(!text.value.trim())return;send.disabled=true;try{await changeTask({kind:'comment',id:t.id,text:text.value});}catch(e){send.disabled=false;fail(e);}};
+ reply.append(text,send);thread.append(reply);
+ box.append(thread,node('p','Creada por '+(t.createdBy||'Admin')+' el '+taskWhen(t.createdAt)+(t.updatedAt!==t.createdAt?' · último cambio '+taskWhen(t.updatedAt):''),'note task-foot'));
+ return box;
+}
+// The new task form: quick dates fill the date field.
+for(const [id,first] of [['task-area',false],['task-area-filter',true]])for(const [v,l] of Object.entries(TASK_AREAS)){const o=node('option',l);o.value=v;if(!first&&v==='otros')o.selected=true;$(id).append(o);}
+for(const b of $('task-quick').querySelectorAll('[data-days]'))b.onclick=()=>{
+ for(const x of $('task-quick').querySelectorAll('[data-days]'))x.classList.toggle('active',x===b);
+ $('task-due').value=b.dataset.days===''?'':taskPlus(taskToday(),Number(b.dataset.days));
+};
+$('task-due').addEventListener('input',()=>{for(const x of $('task-quick').querySelectorAll('[data-days]'))x.classList.toggle('active',x.dataset.days===''&&!$('task-due').value);});
+$('task-form').addEventListener('submit',async e=>{
+ e.preventDefault();const error=$('task-form-error');error.hidden=true;
+ const button=e.submitter||$('task-form').querySelector('[type=submit]');button.disabled=true;
+ try{
+  await changeTask({kind:'create',fields:{title:$('task-title').value,notes:$('task-notes').value,priority:$('task-priority').value,area:$('task-area').value,due:$('task-due').value||null}});
+  $('task-title').value='';$('task-notes').value='';$('task-due').value='';$('task-priority').value='media';
+  for(const x of $('task-quick').querySelectorAll('[data-days]'))x.classList.toggle('active',x.dataset.days==='');
+  $('task-title').focus();
+ }catch(err){error.textContent=errorText(err);error.hidden=false;}
+ finally{button.disabled=false;}
+});
+for(const id of ['task-filter','task-area-filter','task-order'])$(id).addEventListener('change',renderTasks);
+$('task-search').addEventListener('input',renderTasks);
 // Retention: whether registered players are playing (finished online games), how many and how
 // much, for any dates and compared with other dates; below, the time spent per visit.
 const AREA_NAMES={inicio:'Pantalla de inicio',lobby:'Lobby',sala:'Sala de espera',partida:'Partida en vivo',bot:'Contra el bot',aprender:'Aprender',anotador:'Anotador',otra:'Otras páginas'};

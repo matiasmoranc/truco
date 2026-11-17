@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="es"><head><meta charset="utf-8">
-  <meta name="robots" content="noindex, nofollow"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Administración · Truco Uruguayo</title><link rel="stylesheet" href="admin.css?v=30"></head>
+  <meta name="robots" content="noindex, nofollow"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Administración · Truco Uruguayo</title><link rel="stylesheet" href="admin.css?v=31"></head>
 <body>
 <section id="access" class="access"><div class="access-card"><img src="assets/truco-v3.png" alt=""><small class="game-name">TRUCO URUGUAYO</small><h1>Administración</h1><select class="game-picker" aria-label="Juego"><option value="uy">Truco Uruguayo</option><option value="ar">Truco Argentino</option></select><p id="identity"></p><p id="access-status">Verificando sesión…</p><button id="login" class="primary" hidden>Continuar con Google</button><button id="switch-account" hidden>Usar otra cuenta</button><a href="./">Volver al juego</a></div></section>
 <div id="console" class="shell" hidden>
@@ -9,6 +9,7 @@
   <select class="game-picker" aria-label="Juego"><option value="uy">Truco Uruguayo</option><option value="ar">Truco Argentino</option></select>
   <nav aria-label="Secciones">
    <button data-tab="metrics" class="active"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Resumen</button>
+   <button data-tab="tasks"><svg viewBox="0 0 24 24"><path d="M9 6h12M9 12h12M9 18h12M3 6l1.5 1.5L7 5M3 12l1.5 1.5L7 11M3 18l1.5 1.5L7 17"/></svg>Tareas<span id="tasks-count" class="badge" hidden></span></button>
    <button data-tab="visits"><svg viewBox="0 0 24 24"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>Visitas</button>
    <button data-tab="usage"><svg viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16v4ZM13 7l4 4"/></svg>Anotador y Aprender</button>
    <button data-tab="users"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="4"/><path d="M2 21c0-4 3-7 7-7s7 3 7 7M16 4a4 4 0 0 1 0 8M22 21c0-3-2-6-5-7"/></svg>Usuarios</button>
@@ -114,6 +115,31 @@
    <h2 class="section-title">Conversaciones</h2>
    <div id="message-threads" class="thread-list"></div>
   </section>
+  <section id="tasks" hidden>
+   <div id="tasks-kpis" class="kpis compact task-kpis"></div>
+   <article class="panel task-new">
+    <form id="task-form" autocomplete="off">
+     <div class="task-new-row"><input id="task-title" maxlength="140" placeholder="¿Qué hay que hacer o revisar?" aria-label="Nueva tarea"><button class="primary" type="submit">Agregar</button></div>
+     <div class="task-new-opts">
+      <div class="task-field"><span>Para cuándo</span><div class="segmented task-quick" id="task-quick"><button type="button" data-days="" class="active">Sin fecha</button><button type="button" data-days="0">Hoy</button><button type="button" data-days="1">Mañana</button><button type="button" data-days="7">En una semana</button><button type="button" data-days="30">En un mes</button></div></div>
+      <label>Fecha<input type="date" id="task-due"></label>
+      <label>Prioridad<select id="task-priority"><option value="alta">Alta</option><option value="media" selected>Media</option><option value="baja">Baja</option></select></label>
+      <label>Área<select id="task-area"></select></label>
+     </div>
+     <textarea id="task-notes" rows="2" maxlength="3000" placeholder="Detalle (opcional): qué revisar, links, cómo saber que está hecha…"></textarea>
+     <p id="task-form-error" class="task-error" hidden></p>
+    </form>
+   </article>
+   <div class="toolbar task-toolbar">
+    <label class="grow">Buscar<input id="task-search" type="search" placeholder="Título, detalle o comentario"></label>
+    <label>Mostrar<select id="task-filter"><option value="open" selected>Abiertas</option><option value="overdue">Vencidas</option><option value="week">Próximos 7 días</option><option value="pendiente">Pendientes</option><option value="en-curso">En curso</option><option value="esperando">Esperando</option><option value="hecha">Hechas</option><option value="descartada">Descartadas</option><option value="all">Todas</option></select></label>
+    <label>Área<select id="task-area-filter"><option value="">Todas</option></select></label>
+    <label>Ordenar<select id="task-order"><option value="date" selected>Por fecha</option><option value="priority">Por prioridad</option><option value="recent">Últimos cambios</option></select></label>
+   </div>
+   <p id="task-status" class="note"></p>
+   <div id="task-list" class="task-list"></div>
+   <p class="note">Tocá una tarea para ver el detalle, cambiar su estado, editarla o comentarla. El círculo la marca como hecha. Cada cambio de estado queda anotado en sus comentarios.</p>
+  </section>
   <section id="retention" hidden>
    <article class="panel ret-filters">
     <div class="ret-row">
@@ -174,4 +200,4 @@
  </main>
 </div>
 <dialog id="edit"><form id="edit-form"><div class="dialog-head"><h2 id="edit-title"></h2><button type="button" id="close" aria-label="Cerrar">×</button></div><p id="edit-description"></p><label id="value-label">Nuevo valor<input id="value" required></label><div id="level-fields" class="level-fields" hidden><label>Nivel<input id="level-value" type="number" min="1" max="200" step="1"></label><label>Puntos totales<input id="points-value" type="number" min="0" max="1000000" step="0.1"></label><small id="level-preview"></small></div><label id="delete-label" hidden>Escribí el nombre exacto para confirmar<input id="delete-confirm" autocomplete="off"></label><label>Motivo<input id="reason" required minlength="3" maxlength="200" placeholder="Por qué realizás este cambio"></label><p id="edit-error" role="alert"></p><div class="dialog-actions"><button id="cancel" type="button">Cancelar</button><button id="save" class="primary" type="submit">Confirmar cambio</button></div></form></dialog>
-<script type="module" src="admin.js?v=48"></script></body></html>
+<script type="module" src="admin.js?v=49"></script></body></html>
