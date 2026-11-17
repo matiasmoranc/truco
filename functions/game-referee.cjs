@@ -124,7 +124,7 @@ function spokenCall(text=''){
   if(/\bresponde:\s*tiene\b/i.test(text))return 'Tiene';
   if(/\bla m[ií]a es flor\b/i.test(text))return 'La mía es flor';
   if(/se fue al mazo/i.test(text))return 'Me voy al mazo';
-  const points=text.match(/\bcanta (\d+) (tantos|son mejores|son iguales|de flor)\b/i);
+  const points=text.match(/\bcanta (\d+) (tantos?|son mejores|son iguales|de flor)\b/i);
   if(points)return `${points[1]} ${points[2]}`;
   if(/: son buenas\./i.test(text))return 'Son buenas';
   if(!/\b(canta|dice|responde|quiere)\b/i.test(text))return null;
@@ -148,7 +148,7 @@ function makeCallNotice(text,bet=state.room?.pendingBet){
   const speaker=state.room?.players?.[state.playerId]?.name||'';
   const spoken=spokenCall(speaker&&text.startsWith(speaker)?text.slice(speaker.length):text);
   if(!spoken||!['player1','player2'].includes(state.playerId))return null;
-  return {...(spoken==='Me voy al mazo'?{kind:'fold'}:{}),id:crypto.randomUUID(),from:state.playerId,to:state.playerId==='player1'?'player2':'player1',text:spoken==='Tiene'||spoken==='Me voy al mazo'?text.split('.')[0]+'.':/\bcanta \d+ (tantos|son mejores|son iguales|de flor)\b/i.test(text)?spoken:text,spoken,selfVerb:ownCallVerb(spoken,bet),time:Date.now(),handNumber:state.room?.handNumber||1};
+  return {...(spoken==='Me voy al mazo'?{kind:'fold'}:{}),id:crypto.randomUUID(),from:state.playerId,to:state.playerId==='player1'?'player2':'player1',text:spoken==='Tiene'||spoken==='Me voy al mazo'?text.split('.')[0]+'.':/\bcanta \d+ (tantos?|son mejores|son iguales|de flor)\b/i.test(text)?spoken:text,spoken,selfVerb:ownCallVerb(spoken,bet),time:Date.now(),handNumber:state.room?.handNumber||1};
 }
 function canRaiseEnvido(bet){return envidoRaiseKinds(bet).length>0;}
 function roomHasFlor(room,hand){return room?.practiceRules?.flor!==false&&hasFlor(hand,room?.muestra);}
@@ -201,7 +201,7 @@ function revealEnvido(good=false,declaredNumber=null) {
   if(!good&&(!Number.isInteger(number)||number<0||number>37||(player===second&&number<bet.reveals?.[first]))){toast('Igualá o superá los tantos.');return;}
   const reveals={...(bet.reveals||{})};if(!good)reveals[player]=number;
   let changes;
-  if(player===first){changes={pendingBet:{...bet,reveals,revealTurn:second},feed:topFeed(room,`${room.players[player].name} canta ${number} tantos.`)};}
+  if(player===first){changes={pendingBet:{...bet,reveals,revealTurn:second},feed:topFeed(room,`${room.players[player].name} canta ${number} ${number===1?'tanto':'tantos'}.`)};}
   else{
     const winner=good||number===Number(bet.reveals?.[first])?first:second;
     changes={pendingBet:bet.suspendedBet||null,envidoClosed:true,envidoAudit:{reveals,declarationOrder:[first,second].filter(p=>reveals[p]!=null),winner,stake:bet.stake,called:bet.called||'envido',calls:bet.calls||[bet.called||'envido'],handNumber:room.handNumber},feed:topFeed(room,good?`${room.players[player].name}: son buenas.`:`${room.players[player].name} canta ${number} ${number===Number(bet.reveals?.[first])?'son iguales':'son mejores'}.`)};
@@ -269,7 +269,7 @@ function buildEndEvidence(room,originals){
     for(const player of liars.length?liars:[winner]){
       if(originals[player]?.length!==3)continue;
       const declared=audit.reveals?.[player];
-      const label=liars.includes(player)?`Mintió: dijo ${declared}, tenía ${truth[player]} tantos`:`Envido · ${truth[player]} tantos`;
+      const label=liars.includes(player)?`Mintió: dijo ${declared}, tenía ${truth[player]} ${truth[player]===1?'tanto':'tantos'}`:`Envido · ${truth[player]} ${truth[player]===1?'tanto':'tantos'}`;
       groups.push({player,label,cards:envidoEvidenceCards(originals[player],room.muestra),envidoAward:{player:winner,points:Math.min(Number(audit.stake),Math.max(0,targetPoints(room)-Number(room.scores?.[winner]||0))),liars,penalty:liars.length?((room.players?.[liars[0]]?.name||'El jugador')+' mintió'+(liars.length>1?' primero':'')+'.\n'+(room.players?.[winner]?.name||'El rival')+' gana el envido y los puntos de la mano.'):''}});
     }
   }

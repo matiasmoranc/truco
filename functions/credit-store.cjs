@@ -6,8 +6,8 @@
 const {LIVE_SERVER_URL}=require('./live-server.cjs');
 const {loadedTransaction}=require('./loaded-transaction.cjs');
 
-function createCreditStore({db,secret,fetchImpl=(...args)=>fetch(...args),baseUrl=LIVE_SERVER_URL,cacheMs=30000}){
- let active=null,checkedAt=0;
+function createCreditStore({db,secret,fetchImpl=(...args)=>fetch(...args),baseUrl=LIVE_SERVER_URL,cacheMs=30000,recentMs=60000,clock=()=>Date.now()}){
+ let active=null,checkedAt=0,recent=null;
  async function call(path,{method='GET',body}={}){
   const res=await fetchImpl(baseUrl+'/internal/bank/'+path,{method,headers:{'content-type':'application/json','x-internal-secret':secret()},body:body===undefined?undefined:JSON.stringify(body)});
   const data=await res.json().catch(()=>({}));
@@ -15,12 +15,13 @@ function createCreditStore({db,secret,fetchImpl=(...args)=>fetch(...args),baseUr
   return data;
  }
  async function isActive(){
-  if(active!==null&&Date.now()-checkedAt<cacheMs)return active;
-  active=(await call('status')).active===true;checkedAt=Date.now();return active;
+  if(active!==null&&clock()-checkedAt<cacheMs)return active;
+  active=(await call('status')).active===true;checkedAt=clock();return active;
  }
  async function bankLedger(){return (await call('export')).ledger||{};}
  // Writes only the rows that changed; retried when another writer touched them.
  async function patchBank(update){
+  recent=null;
   for(let attempt=0;attempt<5;attempt++){
    const base=await bankLedger(),next=update(structuredClone(base));
    if(next===undefined)return {committed:false,value:base};
@@ -31,6 +32,13 @@ function createCreditStore({db,secret,fetchImpl=(...args)=>fetch(...args),baseUr
  }
  return {
   isActive,
+  // The admin panel only shows the ledger: one read serves every request for a minute
+  // (a page of users, the tables, the chat), so opening the panel reads the bank once.
+  // Edits always read it fresh, and any edit from here drops this copy.
+  async recentLedger(){
+   if(!recent||clock()-recent.at>=recentMs){const at=clock(),value=this.readLedger();recent={at,value};value.catch(()=>{if(recent?.value===value)recent=null;});}
+   return structuredClone(await recent.value);
+  },
   async readLedger(){return await isActive()?bankLedger():(await db.ref('creditEconomy').get()).val()||{};},
   // One player's part of the ledger (same shape), without reading the whole bank.
   async playerLedger(uid){return await isActive()?(await call('player?uid='+encodeURIComponent(uid))).ledger||{}:(await db.ref('creditEconomy').get()).val()||{};},
@@ -40,6 +48,7 @@ function createCreditStore({db,secret,fetchImpl=(...args)=>fetch(...args),baseUr
   // returns the new ledger, or undefined to leave it as it is. Before the switch an
   // unloaded (null) ledger is never replaced: empty reports that case.
   async patchLedger(update){
+   recent=null;
    if(await isActive())return patchBank(update);
    let empty=false;
    const result=await loadedTransaction(db.ref('creditEconomy'),current=>{empty=current===null;return empty?undefined:update(current);});

@@ -53,3 +53,15 @@ test('If the bank state cannot be confirmed nothing falls back to the frozen cop
  const store=createCreditStore({db:fakeDb({creditEconomy:{wallets:{a:{balance:9}}}}),secret:()=>'s',fetchImpl:async()=>{throw new Error('offline');}});
  await assert.rejects(store.readLedger(),/offline/);await assert.rejects(store.rootTransaction(r=>r),/offline/);
 });
+
+test('The admin panel reads the bank once a minute; an edit from here drops the copy',async()=>{
+ let now=0;const bank=fakeBank(),store=createCreditStore({db:fakeDb({}),secret:()=>'s',fetchImpl:bank.fetchImpl,clock:()=>now});
+ const exports=()=>bank.calls.filter(c=>c.path==='export').length;
+ const pages=await Promise.all([store.recentLedger(),store.recentLedger(),store.recentLedger()]);
+ assert.equal(exports(),1);assert.equal(pages[0].wallets.a.balance,3);
+ pages[0].wallets.a.balance=99;assert.equal((await store.recentLedger()).wallets.a.balance,3);
+ now=59000;await store.recentLedger();assert.equal(exports(),1);
+ now=60000;await store.recentLedger();assert.equal(exports(),2);
+ await store.patchBank(l=>{l.wallets.a.balance=4;return l;});const before=exports();
+ assert.equal((await store.recentLedger()).wallets.a.balance,4);assert.equal(exports(),before+1);
+});

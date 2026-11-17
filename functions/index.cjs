@@ -268,7 +268,7 @@ exports.adminConsole=onCall({...options,secrets:[liveInternalSecret]},async requ
   const stored=(await db.ref('chatLog').orderByKey().startAt(from).get()).val()||{};
   const messages=chatLogList(stored);
   // Grouped by table, with everyone who sat there (the credit ledger knows each game's players).
-  const ledger=messages.length?await creditStore.readLedger():null;
+  const ledger=messages.length?await creditStore.recentLedger():null;
   return {days,messages,groups:require('./chat-log.cjs').chatLogGroups(messages,ledger?.matches)};
  }
  if(action==='metrics'){
@@ -374,7 +374,7 @@ exports.adminConsole=onCall({...options,secrets:[liveInternalSecret]},async requ
    const result=batch.length?await getAuth().getUsers(batch.map(uid=>({uid}))):{users:[]};
    page={users:result.users,pageToken:offset+100<ids.length?String(offset+100):null};
   }else page=await getAuth().listUsers(100,data.pageToken||undefined);
-  const ledger=await creditStore.readLedger(),finished=finishedTables(ledger),wins=pastWins(ledger),played=lastPlayed(ledger);
+  const ledger=await creditStore.recentLedger(),finished=finishedTables(ledger),wins=pastWins(ledger),played=lastPlayed(ledger);
   // The device each one played on last (app or web, iPhone, Android or computer).
   const uids=page.users.map(u=>u.uid),now=Date.now();
   const [storedPlatforms,...recentDays]=await Promise.all([db.ref('adminMetrics/lastPlatform').get(),...Array.from({length:30},(_,i)=>db.ref('adminMetrics/days/'+uruguayDate(now-i*86400000).day+'/platforms').get())]);
@@ -387,7 +387,7 @@ exports.adminConsole=onCall({...options,secrets:[liveInternalSecret]},async requ
   return {users,pageToken:page.pageToken||null};
  }
  if(action==='tables'){
-  const ledger=await creditStore.readLedger();
+  const ledger=await creditStore.recentLedger();
   const userAudit=(await db.ref('adminUserAudit').get()).val()||{};
   const reports=(await db.ref('problemReports').get()).val()||{};
   const rooms=(await db.ref('rooms').get()).val()||{};

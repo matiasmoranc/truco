@@ -569,7 +569,7 @@ function spokenCall(text=''){
   if(/\bresponde:\s*tiene\b/i.test(text))return 'Tiene';
   if(/\bla m[ií]a es flor\b/i.test(text))return 'La mía es flor';
   if(/se fue al mazo/i.test(text))return 'Me voy al mazo';
-  const points=text.match(/\bcanta (\d+) (tantos|son mejores|son iguales|de flor)\b/i);
+  const points=text.match(/\bcanta (\d+) (tantos?|son mejores|son iguales|de flor)\b/i);
   if(points)return `${points[1]} ${points[2]}`;
   if(/: son buenas\./i.test(text))return 'Son buenas';
   if(!/\b(canta|dice|responde|quiere)\b/i.test(text))return null;
@@ -604,7 +604,7 @@ function makeCallNotice(text,bet=state.room?.pendingBet){
   const speaker=state.room?.players?.[state.playerId]?.name||'';
   const spoken=spokenCall(speaker&&text.startsWith(speaker)?text.slice(speaker.length):text);
   if(!spoken||!['player1','player2'].includes(state.playerId))return null;
-  return {...(spoken==='Me voy al mazo'?{kind:'fold'}:{}),id:crypto.randomUUID(),from:state.playerId,to:state.playerId==='player1'?'player2':'player1',text:spoken==='Tiene'||spoken==='Me voy al mazo'?text.split('.')[0]+'.':/\bcanta \d+ (tantos|son mejores|son iguales|de flor)\b/i.test(text)?spoken:text,spoken,selfVerb:ownCallVerb(spoken,bet),time:Date.now(),handNumber:state.room?.handNumber||1};
+  return {...(spoken==='Me voy al mazo'?{kind:'fold'}:{}),id:crypto.randomUUID(),from:state.playerId,to:state.playerId==='player1'?'player2':'player1',text:spoken==='Tiene'||spoken==='Me voy al mazo'?text.split('.')[0]+'.':/\bcanta \d+ (tantos?|son mejores|son iguales|de flor)\b/i.test(text)?spoken:text,spoken,selfVerb:ownCallVerb(spoken,bet),time:Date.now(),handNumber:state.room?.handNumber||1};
 }
 
 // Practice gives a little more time to read each result.
@@ -2010,7 +2010,7 @@ async function revealEnvido(good=false,declaredNumber=null) {
   if(!good&&(!Number.isInteger(number)||number<0||number>37||(player===second&&number<bet.reveals?.[first]))){toast('Igualá o superá los tantos.');return;}
   const reveals={...(bet.reveals||{})};if(!good)reveals[player]=number;
   let changes;
-  if(player===first){changes={pendingBet:{...bet,reveals,revealTurn:second},feed:topFeed(room,`${room.players[player].name} canta ${number} tantos.`)};}
+  if(player===first){changes={pendingBet:{...bet,reveals,revealTurn:second},feed:topFeed(room,`${room.players[player].name} canta ${number} ${number===1?'tanto':'tantos'}.`)};}
   else{
     const winner=good||number===Number(bet.reveals?.[first])?first:second;
     changes={pendingBet:bet.suspendedBet||null,envidoClosed:true,envidoAudit:{reveals,declarationOrder:[first,second].filter(p=>reveals[p]!=null),winner,stake:bet.stake,called:bet.called||'envido',calls:bet.calls||[bet.called||'envido'],handNumber:room.handNumber},feed:topFeed(room,good?`${room.players[player].name}: son buenas.`:`${room.players[player].name} canta ${number} ${number===Number(bet.reveals?.[first])?'son iguales':'son mejores'}.`)};
@@ -2147,7 +2147,7 @@ function buildEndEvidence(room,originals){
     for(const player of liars.length?liars:[winner]){
       if(originals[player]?.length!==3)continue;
       const declared=audit.reveals?.[player];
-      const label=liars.includes(player)?`Mintió: dijo ${declared}, tenía ${truth[player]} tantos`:`Envido · ${truth[player]} tantos`;
+      const label=liars.includes(player)?`Mintió: dijo ${declared}, tenía ${truth[player]} ${truth[player]===1?'tanto':'tantos'}`:`Envido · ${truth[player]} ${truth[player]===1?'tanto':'tantos'}`;
       groups.push({player,label,cards:envidoEvidenceCards(originals[player],room.muestra),envidoAward:{player:winner,points:Math.min(Number(audit.stake),Math.max(0,targetPoints(room)-Number(room.scores?.[winner]||0))),liars,penalty:liars.length?((room.players?.[liars[0]]?.name||'El jugador')+' mintió'+(liars.length>1?' primero':'')+'.\n'+(room.players?.[winner]?.name||'El rival')+' gana el envido y los puntos de la mano.'):''}});
     }
   }
@@ -4272,7 +4272,7 @@ function learningGuidance(){
   if(roomHasFlor(room,original)&&!room.florSettled&&!room.flors?.player1)return ['Tenés FLOR de '+florValue(original,muestra)+' tantos. Si querés cantarla, hacelo antes de tirar. Podés jugar sin declararla; después de tu primera carta ya no podés reclamarla. Con flor declarada no se juega envido.',explainFlor(original,muestra).explanation];
   if(room.resolvingTrick||room.pendingNextHand||room.status==='revealing')return ['Mirá las cartas y el resultado de la ronda. Cerrá este mensaje para continuar.'];
   const guidance=[];
-  if(canCallFirstRoundEnvido(room,'player1',state.hand))guidance.push('Tenés '+handEnvido(original,muestra)+' tantos. Podés cantar ENVIDO antes de tirar tu primera carta.');
+  if(canCallFirstRoundEnvido(room,'player1',state.hand))guidance.push('Tenés '+handEnvido(original,muestra)+(handEnvido(original,muestra)===1?' tanto':' tantos')+'. Podés cantar ENVIDO antes de tirar tu primera carta.');
   if(room.turn==='player1'&&state.hand.length){
     const opponent=(room.trickCards||[]).find(item=>item.playerId==='player2')?.card;
     const sorted=[...state.hand].sort((a,b)=>cardStrength(a,muestra)-cardStrength(b,muestra));
@@ -4679,7 +4679,7 @@ function checkStudy(answer){
   const max=exercise.kind==='flor-points'?47:37;
   if(exercise.kind!=='flor'&&(!Number.isInteger(answer)||answer<0||answer>max)){ $('learn-study-feedback').textContent=`Escribí un número entero entre 0 y ${max}.`;return;}
   const correct=answer===result.value;exercise.answered=true;
-  const feedback=(correct?'¡Correcto! ':exercise.kind!=='flor'?'Tu respuesta fue '+answer+'. '+(exercise.kind==='flor-points'?'Tu flor suma '+result.value+' pts. ':'Tenés '+result.value+' tantos. '):result.value?'Esta mano sí tiene flor. ':'Esta mano no tiene flor. ')+result.explanation;
+  const feedback=(correct?'¡Correcto! ':exercise.kind!=='flor'?'Tu respuesta fue '+answer+'. '+(exercise.kind==='flor-points'?'Tu flor suma '+result.value+' pts. ':'Tenés '+result.value+(result.value===1?' tanto. ':' tantos. ')):result.value?'Esta mano sí tiene flor. ':'Esta mano no tiene flor. ')+result.explanation;
   // The verdict first, in green or red, and the explanation under it.
   const verdict=document.createElement('strong'),body=document.createElement('span');
   verdict.className='study-verdict';verdict.textContent=correct?'Correcto':'Incorrecto';body.textContent=feedback.replace(/^¡Correcto! /,'').replace(/\.\s*/g,'.\n').trim();

@@ -316,6 +316,7 @@ test('La mia es flor keeps playing and the higher flower takes the stake when th
  assert.equal(c.spokenCall('Jugador responde: la mía es flor.'),'La mía es flor');
  // Declared flower points (after contra flor or con flor envido) show the number, not just "FLOR".
  assert.equal(c.spokenCall('Fede canta 33 de flor.'),'33 de flor');
+ assert.equal(c.spokenCall('Fede canta 1 tanto.'),'1 tanto');assert.equal(c.spokenCall('Fede canta 27 tantos.'),'27 tantos');
  assert.equal(JSON.stringify(c.settleSingleFlor(r,{player1:0,player2:0})),JSON.stringify({player1:3,player2:0}));
  assert.equal(c.scoringEntries(r,{player1:3,player2:0},'').map(e=>e.detail).join(' '),'3 puntos por flor');
  r.flors={player1:28,player2:28};assert.equal(JSON.stringify(c.settleSingleFlor(r,{player1:0,player2:0})),JSON.stringify({player1:3,player2:0}));

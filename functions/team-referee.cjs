@@ -187,7 +187,7 @@ const beatsLead=(b,p,n)=>{const lead=leadSeat(b);return !lead||n>b.reveals[lead]
   if(b.type==='flor'){declareFlor(p,n,good);return;}
   if(!good&&(!Number.isInteger(n)||n<0||n>37))throw new Error('Elegí un valor entre 0 y 37.');
   b.reveals??={};if(good&&!Object.values(b.reveals).some(v=>v>=0)&&active(p))throw new Error('El mano declara primero sus tantos.');
-  const word=good?passWord(b,p):'';b.reveals[p]=good?-1:n;notice(p,good?word:n+' tantos');
+  const word=good?passWord(b,p):'';b.reveals[p]=good?-1:n;notice(p,good?word:n+(n===1?' tanto':' tantos'));
   const next=nextDeclarer(b,p);
   if(next){b.revealTurn=next;b.responder=next;return;}
   const best=b.order.reduce((a,q)=>!a||(b.reveals[q]??-1)>(b.reveals[a]??-1)?q:a,null);
