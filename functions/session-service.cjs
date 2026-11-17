@@ -48,28 +48,4 @@ function sessionSummary(stored,from,to){
  return {days,daily,sessions,seconds:total,average:sessions?Math.round(total/sessions):0,buckets:SESSION_BUCKETS.map(b=>({...b,max:undefined,count:buckets[b.id]})),platforms,areas,pages,accounts};
 }
 
-// Whether players come back: activity {day:{users:{uid:true}}} (signed-in players, every day they
-// used the game). A player is new on the first day they appear, skipping the first recorded day
-// (everyone appears new there). Back after 1 day: active the next day; in a week: on any of the
-// next 7 days; in a month: on any of the next 30. Only cohorts whose window has fully passed count.
-function retentionSummary(activity,{today,exclude=new Set(),from=null}={}){
- const days=Object.keys(activity||{}).filter(d=>/^\d{4}-\d{2}-\d{2}$/.test(d)).sort();
- if(!days.length)return {cohorts:[],totals:{}};
- const active=Object.fromEntries(days.map(d=>[d,new Set(Object.keys(activity[d]?.users||{}).filter(uid=>!exclude.has(uid)))]));
- const first={};for(const d of days)for(const uid of active[d])first[uid]??=d;
- const addDays=(d,n)=>new Date(Date.parse(d+'T12:00:00Z')+n*86400000).toISOString().slice(0,10);
- const backWithin=(uid,day,n)=>{for(let i=1;i<=n;i++)if(active[addDays(day,i)]?.has(uid))return true;return false;};
- const cohorts=[];
- for(const day of days.slice(1)){
-  if(from&&day<from)continue;
-  const fresh=[...active[day]].filter(uid=>first[uid]===day);if(!fresh.length)continue;
-  const row={day,size:fresh.length};
-  for(const [key,n] of [['d1',1],['d7',7],['d30',30]])if(addDays(day,n)<today)row[key]=fresh.filter(uid=>backWithin(uid,day,n)).length;
-  cohorts.push(row);
- }
- const totals={};
- for(const key of ['d1','d7','d30']){const rows=cohorts.filter(c=>c[key]!=null);const size=rows.reduce((n,c)=>n+c.size,0);totals[key]={size,back:rows.reduce((n,c)=>n+c[key],0)};}
- return {cohorts,totals};
-}
-
-module.exports={SESSION_DAYS,SESSION_TICK,SESSION_PAGES,SESSION_AREAS,SESSION_BUCKETS,sessionUpdates,sessionSummary,retentionSummary};
+module.exports={SESSION_DAYS,SESSION_TICK,SESSION_PAGES,SESSION_AREAS,SESSION_BUCKETS,sessionUpdates,sessionSummary};

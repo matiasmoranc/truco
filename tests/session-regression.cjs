@@ -1,6 +1,6 @@
 'use strict';
 const test=require('node:test');const assert=require('node:assert/strict');
-const {sessionUpdates,sessionSummary,retentionSummary}=require('../functions/session-service.cjs');
+const {sessionUpdates,sessionSummary}=require('../functions/session-service.cjs');
 const inc=n=>({inc:n});
 
 test('A session tick is filed under the day it started, with the area that was open',()=>{
@@ -22,13 +22,6 @@ test('Time summary: visits, average, length groups, devices, areas and accounts'
  assert.deepEqual(s.buckets.map(b=>b.count),[2,0,1,0,1]);
  assert.deepEqual(s.platforms['app-android'],{n:2,t:600});assert.equal(s.areas.partida,500);assert.equal(s.areas.bot,2400);
  assert.deepEqual(s.accounts,{signed:{n:2,t:3000},guest:{n:2,t:30}});assert.equal(s.pages.anotador.n,1);
-});
-
-test('Retention: new players by first day, back the next day, within a week and a month; test accounts left out',()=>{
- const days={'2026-11-01':{users:{old:true}},'2026-11-02':{users:{old:true,ana:true,beto:true,test:true}},'2026-11-03':{users:{ana:true}},'2026-11-07':{users:{beto:true}},'2026-11-20':{users:{}}};
- const r=retentionSummary(days,{today:'2026-11-15',exclude:new Set(['test'])});
- assert.deepEqual(r.cohorts,[{day:'2026-11-02',size:2,d1:1,d7:2}]);
- assert.deepEqual(r.totals.d1,{size:2,back:1});assert.deepEqual(r.totals.d7,{size:2,back:2});assert.deepEqual(r.totals.d30,{size:0,back:0});
 });
 
 test('The session clock counts only time on screen, 30 seconds at a time',async()=>{

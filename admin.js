@@ -274,7 +274,7 @@ $('table-state').addEventListener('change',renderTables);
 $('search').addEventListener('input',renderUsers);
 // Tapping a column header orders by it; tapping it again flips the order.
 for(const button of document.querySelectorAll('[data-sort]'))button.onclick=()=>{const key=button.dataset.sort;sortBy=sortBy.key===key?{key,dir:-sortBy.dir}:{key,dir:key==='name'?1:-1};renderUsers();void loadAllUsers();};$('photo-filter').onchange=$('level-filter').onchange=()=>{renderUsers();void loadAllUsers();};$('more').onclick=()=>refresh(true);
-function showTab(name){for(const section of Object.keys(TAB_TITLES))$(section).hidden=section!==name;for(const tab of document.querySelectorAll('[data-tab]'))tab.classList.toggle('active',tab.dataset.tab===name);$('page-title').textContent=TAB_TITLES[name];if(name==='usage')refreshUsage();if(name==='chat')loadChat();if(name==='retention'){loadRetention();if(!shareView.data)loadShare();}if(name==='users')loadDevices();}
+function showTab(name){for(const section of Object.keys(TAB_TITLES))$(section).hidden=section!==name;for(const tab of document.querySelectorAll('[data-tab]'))tab.classList.toggle('active',tab.dataset.tab===name);$('page-title').textContent=TAB_TITLES[name];if(name==='usage')refreshUsage();if(name==='chat')loadChat();if(name==='retention')loadRetention();if(name==='users')loadDevices();}
 $('refresh').onclick=()=>{refresh(false,true);if(!$('usage').hidden)refreshUsage();if(!$('chat').hidden)loadChat();};
 for(const b of document.querySelectorAll('[data-tab]'))b.onclick=()=>showTab(b.dataset.tab);
 async function showUsers(scope){if(busy)return;userScope=scope;pagesLoaded=1;pageToken=null;users=[];$('search').value='';$('user-scope').value=scope;renderUsers();showTab('users');await refresh();}
@@ -606,90 +606,194 @@ async function loadDevices(){
  }catch(e){if(request===devicesRequest)$('devices-note').textContent='No se pudo cargar'+(GAME==='ar'?' (este juego todavía no lo mide).':': '+errorText(e));}
 }
 $('devices-days').addEventListener('change',loadDevices);
-// Retention: how long each visit lasts, where the time goes, and whether players come back.
+// Retention: whether registered players are playing (finished online games), how many and how
+// much, for any dates and compared with other dates; below, the time spent per visit.
 const AREA_NAMES={inicio:'Pantalla de inicio',lobby:'Lobby',sala:'Sala de espera',partida:'Partida en vivo',bot:'Contra el bot',aprender:'Aprender',anotador:'Anotador',otra:'Otras páginas'};
 const PLATFORM_NAMES={'app-android':'App Android','app-ios':'App iPhone','web-android':'Web Android','web-ios':'Web iPhone','web-desktop':'Web computadora'};
 const duration=s=>{s=Math.round(Number(s)||0);if(s<60)return s+' s';const m=Math.floor(s/60);if(m<60)return m+' min'+(s%60?' '+(s%60)+' s':'');return Math.floor(m/60)+' h '+(m%60)+' min';};
 const share=(n,d)=>d?Math.round(n/d*100)+'%':'—';
-let retentionRequest=0;
-async function loadRetention(){
- const request=++retentionRequest;$('retention-status').textContent='Cargando…';
- try{const data=(await call({action:'retention',days:Number($('retention-days').value)})).data;if(request!==retentionRequest)return;renderRetention(data);}
- catch(e){if(request===retentionRequest)$('retention-status').textContent='No se pudo cargar'+(GAME==='ar'?' (este juego todavía no lo mide).':': '+errorText(e));}
+const MONTHS=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+const ret={group:'day',metric:'players',data:null,request:0};
+const uyToday=()=>new Intl.DateTimeFormat('en-CA',{timeZone:ZONE,year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+const plusDays=(d,n)=>new Date(Date.parse(d+'T12:00:00Z')+n*86400000).toISOString().slice(0,10);
+const spanDays=(a,b)=>Math.round((Date.parse(b+'T12:00:00Z')-Date.parse(a+'T12:00:00Z'))/86400000)+1;
+// The same day n months away (the 31st becomes the month's last day).
+const plusMonths=(d,n)=>{const [y,m,day]=d.split('-').map(Number),first=new Date(Date.UTC(y,m-1+n,1)),last=new Date(Date.UTC(first.getUTCFullYear(),first.getUTCMonth()+1,0)).getUTCDate();return new Date(Date.UTC(first.getUTCFullYear(),first.getUTCMonth(),Math.min(day,last))).toISOString().slice(0,10);};
+const monthEnd=d=>plusDays(plusMonths(d.slice(0,8)+'01',1),-1);
+function presetRange(preset,today){
+ if(preset==='this-month')return {from:today.slice(0,8)+'01',to:today};
+ if(preset==='last-month'){const from=plusMonths(today.slice(0,8)+'01',-1);return {from,to:monthEnd(from)};}
+ if(preset==='year')return {from:today.slice(0,5)+'01-01',to:today};
+ const n=Number(preset)||30;return {from:plusDays(today,-(n-1)),to:today};
 }
-function renderRetention({from,to,time,returns}){
- $('retention-status').textContent=(from===to?'Período: '+longDay(from):'Período: del '+longDay(from)+' al '+longDay(to))+(time.sessions?'':' · Todavía no hay visitas medidas en este período.');
+// "The period before": a month (or the start of one) compares with the same days of the month
+// before; any other range with the same number of days just before it.
+function compareRange(kind,{from,to},today){
+ const monthly=from.endsWith('-01')&&from.slice(0,7)===to.slice(0,7)&&(to===monthEnd(to)||to===today);
+ if(kind==='month'||kind==='previous'&&monthly)return {from:plusMonths(from,-1),to:to===monthEnd(to)?monthEnd(plusMonths(from,-1)):plusMonths(to,-1)};
+ if(kind==='previous'){const n=spanDays(from,to);return {from:plusDays(from,-n),to:plusDays(from,-1)};}
+ return null;
+}
+const rangeText=(from,to)=>from===to?longDay(from):'del '+longDay(from)+' al '+longDay(to)+' ('+number(spanDays(from,to))+' días)';
+const shortRange=(from,to)=>from===to?shortDay(from):shortDay(from)+' al '+shortDay(to);
+function retDates(){
+ const today=uyToday();
+ for(const id of ['ret-from','ret-to','ret-cfrom','ret-cto'])$(id).max=today;
+ if($('ret-preset').value!=='custom'){const r=presetRange($('ret-preset').value,today);$('ret-from').value=r.from;$('ret-to').value=r.to;}
+ const kind=$('ret-compare').value,from=$('ret-from').value,to=$('ret-to').value;
+ if(kind!=='custom'&&kind!=='none'&&from&&to){const c=compareRange(kind,{from,to},today);$('ret-cfrom').value=c.from;$('ret-cto').value=c.to;}
+ for(const id of ['ret-cfrom','ret-cto']){$(id).disabled=kind!=='custom';$(id).closest('label').hidden=kind==='none';}
+}
+async function loadRetention(){
+ retDates();
+ const from=$('ret-from').value,to=$('ret-to').value,cfrom=$('ret-cfrom').value,cto=$('ret-cto').value,compare=$('ret-compare').value!=='none';
+ if(!from||!to||from>to){$('ret-status').textContent='Elegí un período válido: la fecha "Desde" no puede ser posterior a "Hasta".';return;}
+ if(compare&&(!cfrom||!cto||cfrom>cto)){$('ret-status').textContent='Elegí fechas válidas para comparar.';return;}
+ const request=++ret.request;$('ret-status').textContent='Cargando…';$('retention').classList.add('loading');
+ try{
+  const data=(await call({action:'retention',from,to,group:ret.group,...(compare?{compareFrom:cfrom,compareTo:cto}:{})})).data;
+  if(request!==ret.request)return;ret.data=data;renderRet();renderTime(data.time,from);
+ }catch(e){if(request===ret.request)$('ret-status').textContent='No se pudo cargar'+(GAME==='ar'?' (este juego todavía no lo mide).':': '+errorText(e));}
+ finally{if(request===ret.request)$('retention').classList.remove('loading');}
+}
+const atLeast=(histogram,min)=>Object.entries(histogram||{}).reduce((sum,[n,count])=>Number(n)>=min?sum+count:sum,0);
+const ratio=(part,whole)=>whole?part/whole:null;
+const pctText=v=>v==null?'—':(Math.round(v*1000)/10).toLocaleString('es-UY')+'%';
+// One indicator: its value, what it means and how it changed against the compared dates.
+function retKpi(target,label,value,sub,{now=null,before=null,pct=false,lowerIsBetter=false}={}){
+ const k=node('div','','kpi');k.append(node('small',label),node('strong',value),node('span',sub,'ret-sub'));
+ if(now!=null&&before!=null){
+  const d=node('span','','delta');let diff;
+  if(pct){diff=Math.round((now-before)*1000)/10;d.textContent=(diff>0?'+':'')+diff.toLocaleString('es-UY')+' puntos (antes '+pctText(before)+')';}
+  else if(!before){diff=now;d.textContent=now?'Antes: 0':'Igual que antes (0)';}
+  else{diff=Math.round((now-before)/before*100);d.textContent=(diff>0?'+':'')+diff+'% (antes '+number(before)+')';}
+  if(diff)d.classList.add((diff>0)!==lowerIsBetter?'up':'down');
+  k.append(d);
+ }
+ $(target).append(k);
+}
+function renderRet(){
+ const data=ret.data;if(!data)return;
+ const min=Number($('ret-min').value)||1,m=data.main,c=data.compare;
+ $('ret-status').textContent='Mostrando '+rangeText(m.from,m.to)+(c?' · comparado con '+rangeText(c.from,c.to):'');
+ // Indicators: how many play, and whether they keep playing.
+ $('ret-kpis-play').replaceChildren();$('ret-kpis-keep').replaceChildren();
+ const players=atLeast(m.histogram,min),cPlayers=c&&atLeast(c.histogram,min),any=atLeast(m.histogram,1),cAny=c&&atLeast(c.histogram,1);
+ retKpi('ret-kpis-play',min>1?'Jugaron '+min+' partidas o más':'Jugaron',number(players),pctText(ratio(players,m.registered))+' de los '+number(m.registered)+' registrados'+(c?' (antes '+pctText(ratio(cPlayers,c.registered))+')':''),{now:players,before:c?cPlayers:null});
+ retKpi('ret-kpis-play','Partidas terminadas',number(m.games),number(m.vsPeople)+' contra personas · '+number(m.vsBots)+' con bots',{now:m.games,before:c?c.games:null});
+ const perPlayer=any?Math.round(m.plays/any*10)/10:null;
+ retKpi('ret-kpis-play','Partidas por jugador',perPlayer==null?'—':perPlayer.toLocaleString('es-UY'),'Promedio de los que jugaron',{now:perPlayer,before:c&&cAny?Math.round(c.plays/cAny*10)/10:null});
+ retKpi('ret-kpis-play','Juegan más de un día',pctText(ratio(m.severalDays,any)),number(m.severalDays)+' de '+number(any)+' jugaron en 2 días distintos o más',{now:ratio(m.severalDays,any),before:c?ratio(c.severalDays,cAny):null,pct:true});
+ retKpi('ret-kpis-keep','Siguen jugando',pctText(ratio(m.previous.kept,m.previous.players)),number(m.previous.kept)+' de los '+number(m.previous.players)+' que jugaron los '+number(m.days)+' días anteriores',{now:ratio(m.previous.kept,m.previous.players),before:c?ratio(c.previous.kept,c.previous.players):null,pct:true});
+ retKpi('ret-kpis-keep','Dejaron de jugar',number(m.previous.players-m.previous.kept),'Jugaron los '+number(m.days)+' días anteriores y en estas fechas no',{now:m.previous.players-m.previous.kept,before:c?c.previous.players-c.previous.kept:null,lowerIsBetter:true});
+ retKpi('ret-kpis-keep','Cuentas nuevas que jugaron',pctText(ratio(m.newPlayed,m.newAccounts)),number(m.newPlayed)+' de '+number(m.newAccounts)+' cuentas creadas en estas fechas',{now:ratio(m.newPlayed,m.newAccounts),before:c?ratio(c.newPlayed,c.newAccounts):null,pct:true});
+ if(m.entry)retKpi('ret-kpis-keep','Entraron y no jugaron',number(m.entry.withoutPlaying),'De '+number(m.entry.entered)+' registrados que abrieron el juego'+(m.entry.partial?' (datos desde el '+shortDay(data.entryFrom)+')':''),{now:m.entry.withoutPlaying,before:c?.entry&&!c.entry.partial?c.entry.withoutPlaying:null,lowerIsBetter:true});
+ else retKpi('ret-kpis-keep','Entraron y no jugaron','—','Se guarda solo para los últimos 90 días');
+ renderRetChart();
+ // How much each registered player played.
+ const between=(a,b)=>atLeast(m.histogram,a)-atLeast(m.histogram,b+1);
+ bars($('ret-histogram'),[
+  {label:'No jugaron',value:m.registered-any,color:'#ffffff33'},{label:'1 partida',value:between(1,1)},{label:'2 a 4 partidas',value:between(2,4)},
+  {label:'5 a 9 partidas',value:between(5,9)},{label:'10 a 19 partidas',value:between(10,19)},{label:'20 o más',value:atLeast(m.histogram,20)}
+ ],{total:m.registered});
+ $('ret-histogram-note').textContent='Sobre los '+number(m.registered)+' registrados al '+shortDay(m.to)+'.'+(c?' Entre el '+shortRange(c.from,c.to)+' jugó al menos una partida el '+pctText(ratio(cAny,c.registered))+' de los '+number(c.registered)+' registrados de entonces.':'');
+ // Who kept playing, who is new, who came back and who stopped, against the same number of days just before.
+ const p=m.previous,back=Math.max(0,any-p.kept-m.newPlayed);
+ bars($('ret-flow'),[
+  {label:'Siguieron jugando',value:p.kept,color:'var(--green)'},{label:'Cuentas nuevas que jugaron',value:m.newPlayed,color:'var(--gold)'},
+  {label:'Volvieron a jugar',value:back,color:'var(--web-android)'},{label:'Dejaron de jugar',value:p.players-p.kept,color:'var(--red)'}
+ ]);
+ $('ret-flow-note').textContent='Jugadores del '+shortRange(m.from,m.to)+' contra los del '+shortRange(p.from,p.to)+'. "Volvieron": cuentas anteriores que no jugaron esos días y ahora sí. "Dejaron": jugaron esos días y ahora no.';
+ renderCohorts();
+ // Lists, with a link to each player's account.
+ const who=uid=>{const b=node('button',data.names?.[uid]||'Sin nombre','link-button');b.type='button';b.onclick=()=>{$('search').value=data.names?.[uid]||uid;showTab('users');renderUsers();};return b;};
+ const table=(headers,rows)=>{const wrap=node('div','','table-scroll'),t=node('table','','data-table'),head=node('tr');head.append(...headers.map(h=>node('th',h)));t.append(head);for(const cells of rows){const tr=node('tr');for(const cell of cells){const td=node('td',typeof cell==='string'?cell:'');if(typeof cell!=='string')td.append(cell);tr.append(td);}t.append(tr);}wrap.append(t);return wrap;};
+ $('ret-top').replaceChildren(m.top.length?table(['Jugador','Partidas','Días que jugó','Última'],m.top.map(r=>[who(r.uid),number(r.games),number(r.days),shortDay(r.last)])):node('p','Nadie terminó una partida en estas fechas.','empty'));
+ $('ret-stopped-note').textContent='Jugaron entre el '+shortRange(p.from,p.to)+' y no terminaron ninguna partida entre el '+shortRange(m.from,m.to)+'.';
+ $('ret-stopped').replaceChildren(m.stopped.length?table(['Jugador','Partidas antes','Última partida'],m.stopped.map(r=>[who(r.uid),number(r.games),shortDay(r.last)])):node('p','Nadie dejó de jugar.','empty'));
+}
+const groupLabel=(s,group,long=false)=>group==='month'?(long?MONTHS[Number(s.from.slice(5,7))-1]+' '+s.from.slice(0,4):MONTHS[Number(s.from.slice(5,7))-1].slice(0,3)):group==='week'?(long?'Semana del '+shortRange(s.from,s.to):shortDay(s.from)):long?longDay(s.from):shortDay(s.from);
+// Bars for the dates shown and a dashed line for the compared ones (lined up by position).
+function renderRetChart(){
+ const data=ret.data;if(!data)return;
+ const min=Number($('ret-min').value)||1,group=data.group,metric=ret.metric;
+ const valueOf=s=>metric==='games'?s.games:metric==='accounts'?s.newAccounts:atLeast(s.histogram,min);
+ const unit=metric==='games'?'partidas':metric==='accounts'?'cuentas nuevas':'jugadores';
+ $('ret-chart-title').textContent=(metric==='games'?'Partidas terminadas':metric==='accounts'?'Cuentas nuevas':min>1?'Registrados que jugaron '+min+' partidas o más':'Registrados que jugaron')+' por '+(group==='month'?'mes':group==='week'?'semana':'día');
+ const cur=data.main.series,prev=data.compare?.series||[],box=$('ret-chart');
+ const values=cur.map(valueOf),before=prev.map(valueOf);
+ if(!values.some(Boolean)&&!before.some(Boolean)){box.replaceChildren(node('p','Todavía no hay datos para estas fechas.','empty'));$('ret-legend').replaceChildren();return;}
+ const W=Math.max(320,box.clientWidth||800),H=240,left=34,right=8,top=18,bottom=24,plotW=W-left-right,plotH=H-top-bottom,n=cur.length;
+ const raw=Math.max(1,...values,...before.slice(0,n)),quarter=raw/4,scale=Math.pow(10,Math.floor(Math.log10(quarter))),tick=Math.max(1,[1,1.5,2,2.5,3,4,5,6,8,10].map(f=>Math.round(f*scale*1000)/1000).find(v=>v>=quarter&&Number.isInteger(v))||Math.ceil(quarter));
+ const max=tick*4,x=i=>left+plotW*(i+.5)/n,y=v=>top+plotH*(1-v/max),bw=Math.max(2,Math.min(42,plotW/n*.64));
+ const ns='http://www.w3.org/2000/svg',el=(tag,attrs,text)=>{const e=document.createElementNS(ns,tag);for(const [k,v] of Object.entries(attrs))e.setAttribute(k,v);if(text!=null)e.textContent=text;return e;};
+ const svg=el('svg',{viewBox:`0 0 ${W} ${H}`,role:'img','aria-label':$('ret-chart-title').textContent});
+ for(let t=0;t<=4;t++){const v=tick*t,yy=y(v);svg.append(el('line',{x1:left,x2:W-right,y1:yy,y2:yy,stroke:'#ffffff14'}),el('text',{x:left-6,y:yy+4,'text-anchor':'end','font-size':11,fill:'#9db3a7'},v.toLocaleString('es-UY')));}
+ const every=Math.ceil(n/12);
+ cur.forEach((s,i)=>{
+  const g=el('g',{}),v=values[i],h=Math.max(v?2:0,plotH*v/max);
+  const tip=groupLabel(s,group,true)+': '+number(v)+' '+unit+(prev[i]?'\n'+groupLabel(prev[i],group,true)+': '+number(before[i])+' '+unit:'');
+  g.append(el('title',{},tip),el('rect',{x:x(i)-plotW/n/2,y:top,width:plotW/n,height:plotH,fill:'transparent'}),el('rect',{x:x(i)-bw/2,y:top+plotH-h,width:bw,height:h,rx:Math.min(3,bw/2),fill:'#e8c983'}));
+  if(v&&n<=31)g.append(el('text',{x:x(i),y:top+plotH-h-4,'text-anchor':'middle','font-size':10,fill:'#eef2ea'},number(v)));
+  if(i%every===0)g.append(el('text',{x:x(i),y:H-6,'text-anchor':'middle','font-size':11,fill:'#9db3a7'},groupLabel(s,group)));
+  svg.append(g);
+ });
+ const points=before.slice(0,n).map((v,i)=>[x(i),y(v)]);
+ if(points.length){svg.append(el('polyline',{points:points.map(p=>p.join(',')).join(' '),fill:'none',stroke:'#6fb7e8','stroke-width':2,'stroke-dasharray':'5 4','pointer-events':'none'}));for(const [px,py] of points)svg.append(el('circle',{cx:px,cy:py,r:2.5,fill:'#6fb7e8','pointer-events':'none'}));}
+ box.replaceChildren(svg);
+ const legend=[],item=(cls,text)=>{const s=node('span',text);s.prepend(node('i','',cls));legend.push(s);};
+ item('bar',shortRange(data.main.from,data.main.to));
+ if(data.compare)item('line','Comparado: '+shortRange(data.compare.from,data.compare.to)+(prev.length!==n?' (tiene otra cantidad de '+(group==='month'?'meses':group==='week'?'semanas':'días')+')':''));
+ $('ret-legend').replaceChildren(...legend);
+}
+// Sign-up groups: share of each group that finished a game in its 1st, 2nd… week (or 30 days).
+function renderCohorts(){
+ const {span,columns,rows}=ret.data.cohorts,monthly=span===30,box=$('ret-cohorts');
+ $('ret-cohort-note').textContent='Cada fila son las cuentas creadas '+(monthly?'ese mes':'esa semana')+' dentro de las fechas elegidas. Cada columna muestra qué porcentaje terminó al menos una partida en su '+(monthly?'1º, 2º… período de 30 días':'1ª, 2ª… semana')+' desde que creó la cuenta (la primera incluye el día en que la creó). Con * todavía no terminó para todos.';
+ if(!rows.length){box.replaceChildren(node('p','No se crearon cuentas en estas fechas.','empty'));return;}
+ const wrap=node('div','','table-scroll'),t=node('table','','data-table ret-cohorts'),head=node('tr');
+ head.append(node('th',monthly?'Mes en que crearon la cuenta':'Semana en que crearon la cuenta'),node('th','Cuentas'),...Array.from({length:columns},(_,k)=>node('th',monthly?'Mes '+(k+1):'Sem. '+(k+1))));t.append(head);
+ for(const r of rows){
+  const tr=node('tr');tr.append(node('td',monthly?groupLabel(r,'month',true).replace(/^./,ch=>ch.toUpperCase()):'Semana del '+shortDay(r.from)),node('td',number(r.size)));
+  for(let k=0;k<columns;k++){
+   const cell=r.cells[k],td=node('td',cell?share(cell.played,cell.players)+(cell.complete?'':'*'):'');
+   if(cell){const v=cell.players?cell.played/cell.players:0;td.style.background='rgba(232,201,131,'+(0.05+v*0.55).toFixed(2)+')';td.title=cell.played+' de '+cell.players+(cell.complete?'':' (todavía en curso)');if(!cell.complete)td.classList.add('partial');}
+   tr.append(td);
+  }
+  t.append(tr);
+ }
+ wrap.append(t);box.replaceChildren(wrap);
+}
+// Time spent per visit, for the same dates (visits are kept for 90 days).
+function renderTime(time,from){
+ if(!time){for(const id of ['retention-kpis','retention-daily','retention-buckets','retention-areas','retention-platforms','retention-accounts'])$(id).replaceChildren();$('retention-status').textContent='No hay visitas medidas en estas fechas: se guardan los últimos 90 días.';return;}
+ $('retention-status').textContent='Visitas '+rangeText(time.from,time.to)+(time.from>from?' (las visitas se guardan los últimos 90 días)':'')+(time.sessions?'':' · Todavía no hay visitas medidas en estas fechas.');
  const kpis=$('retention-kpis');kpis.replaceChildren();
  const kpi=(label,value,note)=>{const k=node('div','','kpi');k.append(node('small',label),node('strong',value),node('span',note||'','delta'));kpis.append(k);};
- const quick=time.buckets.find(b=>b.id==='lt1')?.count||0,t=returns.totals||{};
+ const quick=time.buckets.find(b=>b.id==='lt1')?.count||0;
  kpi('Visitas',number(time.sessions),'Cada vez que abren la app o la página');
  kpi('Tiempo promedio',duration(time.average),'Por visita');
  kpi('Tiempo total',duration(time.seconds),'Sumando todas las visitas');
  kpi('Se van en menos de 1 min',share(quick,time.sessions),number(quick)+' visitas');
- kpi('Vuelven al día siguiente',share(t.d1?.back,t.d1?.size),t.d1?.size?'De '+number(t.d1.size)+' jugadores nuevos':'Todavía sin datos');
- kpi('Vuelven en la semana',share(t.d7?.back,t.d7?.size),t.d7?.size?'De '+number(t.d7.size)+' jugadores nuevos':'Todavía sin datos');
- kpi('Vuelven en el mes',share(t.d30?.back,t.d30?.size),t.d30?.size?'De '+number(t.d30.size)+' jugadores nuevos':'Todavía sin datos');
- columns($('retention-daily'),time.days.map(day=>{const d=time.daily[day]||{};return {label:shortDay(day),value:Math.round((d.average||0)/6)/10,tooltip:shortDay(day)+' · '+duration(d.average)+' promedio · '+number(d.sessions)+' visitas'};}),{labelEvery:time.days.length>14?3:1});
+ columns($('retention-daily'),time.days.map(day=>{const d=time.daily[day]||{};return {label:shortDay(day),value:Math.round((d.average||0)/6)/10,tooltip:shortDay(day)+' · '+duration(d.average)+' promedio · '+number(d.sessions)+' visitas'};}),{labelEvery:Math.ceil(time.days.length/15)});
  bars($('retention-buckets'),time.buckets.map(b=>({label:b.label,value:b.count,color:b.id==='lt1'?'var(--red)':undefined})));
  bars($('retention-areas'),Object.entries(time.areas).sort((a,b)=>b[1]-a[1]).map(([area,secs])=>({label:AREA_NAMES[area]||area,value:Math.round(secs/60)})));
  const rows=(entries,names)=>entries.sort((a,b)=>b[1].n-a[1].n).map(([key,v])=>[names[key]||key,number(v.n),duration(v.n?v.t/v.n:0)]);
  $('retention-platforms').replaceChildren(time.sessions?simpleTable(['Dispositivo','Visitas','Tiempo promedio'],rows(Object.entries(time.platforms),PLATFORM_NAMES)):node('p','Todavía no hay visitas medidas.','empty'));
  $('retention-accounts').replaceChildren(time.sessions?simpleTable(['','Visitas','Tiempo promedio'],rows(Object.entries(time.accounts).filter(([,v])=>v.n),{signed:'Con cuenta',guest:'Sin cuenta'})):node('p','Todavía no hay visitas medidas.','empty'));
- // Cohorts by week (Monday) of the first day.
- const weeks=new Map();
- for(const c of returns.cohorts||[]){const d=new Date(c.day+'T12:00:00Z'),monday=new Date(d.getTime()-((d.getUTCDay()+6)%7)*86400000).toISOString().slice(0,10);const w=weeks.get(monday)||{size:0,d1:[0,0],d7:[0,0],d30:[0,0]};w.size+=c.size;for(const k of ['d1','d7','d30'])if(c[k]!=null){w[k][0]+=c[k];w[k][1]+=c.size;}weeks.set(monday,w);}
- const cell=([back,size])=>size?share(back,size)+' ('+back+' de '+size+')':'—';
- const weekRows=[...weeks].sort((a,b)=>b[0].localeCompare(a[0])).map(([monday,w])=>['Semana del '+shortDay(monday),number(w.size),cell(w.d1),cell(w.d7),cell(w.d30)]);
- $('retention-cohorts').replaceChildren(weekRows.length?simpleTable(['Entraron por primera vez','Nuevos','Al día siguiente','En la semana','En el mes'],weekRows):node('p','Todavía no hay jugadores nuevos en este período.','empty'));
 }
-$('retention-days').addEventListener('change',loadRetention);
-// Registered players who came in: share per day, week or month, out of the players who had an
-// account by the end of each period, and how many times they came in.
-const shareView={kind:'day',data:null,index:null,request:0};
-const sharePct=(part,whole)=>whole?(Math.round(part*1000/whole)/10).toLocaleString('es-UY')+'%':'—';
-const MONTHS=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
-function shareLabel(p,kind,long=false){
- if(kind==='month'){const name=MONTHS[Number(p.from.slice(5,7))-1];return long?name+' '+p.from.slice(0,4):name.slice(0,3);}
- if(kind==='week')return long?'semana del '+shortDay(p.from)+' al '+shortDay(p.to):shortDay(p.from);
- if(!long)return shortDay(p.from);
- const today=shareView.data?.today,yesterday=today&&new Date(Date.parse(today+'T12:00:00Z')-86400000).toISOString().slice(0,10);
- return (p.from===today?'hoy, ':p.from===yesterday?'ayer, ':'')+longDay(p.from);
-}
-const shareActive=(p,min)=>Object.entries(p.histogram||{}).reduce((sum,[times,n])=>Number(times)>=min?sum+n:sum,0);
-async function loadShare(){
- const request=++shareView.request;$('share-status').textContent='Cargando…';
- try{
-  const data=(await call({action:'activity-share',kind:shareView.kind})).data;if(request!==shareView.request)return;
-  shareView.data=data;const last=data.periods.length-1;shareView.index=data.periods[last]?.current&&last>0?last-1:last;
-  $('share-status').textContent='';renderShare();
- }catch(e){if(request===shareView.request)$('share-status').textContent='No se pudo cargar'+(GAME==='ar'?' (este juego todavía no lo mide).':': '+errorText(e));}
-}
-function renderShare(){
- const data=shareView.data;if(!data)return;
- const min=Number($('share-min').value)||1,kind=data.kind,periods=data.periods;
- columns($('share-chart'),periods.map((p,i)=>{
-  const active=shareActive(p,min),value=p.registered?Math.round(active*1000/p.registered)/10:0;
-  return {label:shareLabel(p,kind),value,text:sharePct(active,p.registered),selected:i===shareView.index,
-   tooltip:shareLabel(p,kind,true)+(p.current?' (en curso)':'')+(p.partial?' (datos incompletos)':'')+'\n'+number(active)+' de '+number(p.registered)+' registrados · '+sharePct(active,p.registered),
-   onClick:()=>{shareView.index=i;renderShare();}};
- }),{labelEvery:periods.length>14?3:1});
- const p=periods[shareView.index];if(!p)return;
- const active=shareActive(p,min);
- $('share-summary').textContent=shareLabel(p,kind,true).replace(/^./,c=>c.toUpperCase())+(p.current?' (en curso)':'')+': '+number(active)+' de '+number(p.registered)+' registrados entraron '+$('share-min').selectedOptions[0].textContent+' · '+sharePct(active,p.registered)+(p.partial?' · datos incompletos: el jugador de cada visita se registra desde el 24/10/2026.':'');
- const h=p.histogram||{},count=(a,b=Infinity)=>Object.entries(h).reduce((sum,[t,n])=>Number(t)>=a&&Number(t)<=b?sum+n:sum,0);
- const entered=count(1);
- bars($('share-times'),[
-  {label:'No entraron',value:p.registered-entered,color:'#ffffff33'},
-  {label:'1 vez',value:count(1,1)},{label:'2 veces',value:count(2,2)},{label:'3 veces',value:count(3,3)},{label:'4 veces',value:count(4,4)},
-  {label:'5 a 9 veces',value:count(5,9)},{label:'10 a 19 veces',value:count(10,19)},{label:'20 o más',value:count(20)}
- ],{total:p.registered});
-}
-for(const button of $('share-kind').querySelectorAll('[data-kind]'))button.addEventListener('click',()=>{
- if(shareView.kind===button.dataset.kind)return;shareView.kind=button.dataset.kind;
- for(const b of $('share-kind').querySelectorAll('[data-kind]'))b.classList.toggle('active',b===button);
- loadShare();
+$('ret-preset').addEventListener('change',loadRetention);
+for(const id of ['ret-from','ret-to'])$(id).addEventListener('change',()=>{$('ret-preset').value='custom';loadRetention();});
+for(const id of ['ret-compare','ret-cfrom','ret-cto'])$(id).addEventListener('change',loadRetention);
+$('ret-min').addEventListener('change',renderRet);
+for(const button of $('ret-group').querySelectorAll('[data-group]'))button.addEventListener('click',()=>{
+ if(ret.group===button.dataset.group)return;ret.group=button.dataset.group;
+ for(const b of $('ret-group').querySelectorAll('[data-group]'))b.classList.toggle('active',b===button);loadRetention();
 });
-$('share-min').addEventListener('change',renderShare);
+for(const button of $('ret-metric').querySelectorAll('[data-metric]'))button.addEventListener('click',()=>{
+ ret.metric=button.dataset.metric;for(const b of $('ret-metric').querySelectorAll('[data-metric]'))b.classList.toggle('active',b===button);renderRetChart();
+});
+{let resize;addEventListener('resize',()=>{clearTimeout(resize);resize=setTimeout(()=>{if(!$('retention').hidden)renderRetChart();},150);});}
 let chatLog=[],chatGroups=[],chatRequest=0;
 async function loadChat(){
  const request=++chatRequest;$('chat-summary').textContent='Cargando…';

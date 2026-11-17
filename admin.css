@@ -264,7 +264,24 @@ textarea:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 .device-badge.app-android{color:#8fdc9a;border-color:#8fdc9a55}
 .device-badge.app-ios{color:#9cc8ff;border-color:#9cc8ff55}
 /* Registered players who came in (Retención). */
-.share-controls{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
-.share-panel .bar-col.selected .stack{box-shadow:0 0 0 2px var(--text,#fff)}
-.share-panel .bar-col.selected .lbl,.share-panel .bar-col.selected .val{color:var(--gold);font-weight:700}
-.share-summary{margin:14px 0 12px;font-size:14px;font-weight:600}
+/* Retention */
+.ret-filters{display:grid;gap:4px}
+.ret-row{display:flex;gap:12px;flex-wrap:wrap;align-items:end}
+.ret-row>label{flex:1 1 140px;max-width:220px}.ret-row>label:has(select#ret-min){max-width:300px;flex-basis:220px}
+@media (max-width:700px){.ret-row>label{max-width:none}.ret-row>label:first-child{flex-basis:100%}}
+.ret-field>span{display:block;font-size:12px;font-weight:500;color:var(--muted);margin-bottom:6px}
+.ret-row input:disabled{opacity:.6}
+.ret-status{margin:10px 0 0;font-size:13px;color:var(--text);font-weight:600}
+#retention.loading .ret-kpis,#retention.loading .panel:not(.ret-filters){opacity:.55;transition:opacity .2s}
+.ret-heading{font-size:13px;font-weight:650;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin:6px 0 -6px}
+.ret-kpis{grid-template-columns:repeat(4,minmax(0,1fr))}
+@media (max-width:1100px){.ret-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.ret-kpis .kpi .ret-sub{font-size:12px;color:var(--muted);line-height:1.35}
+.ret-chart{min-height:240px}.ret-chart svg{display:block;width:100%;height:240px}
+.ret-legend{display:flex;gap:18px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:10px}
+.ret-legend i{display:inline-block;width:14px;height:10px;border-radius:2px;margin-right:6px;vertical-align:middle;background:var(--gold)}
+.ret-legend i.line{height:0;background:none;border-top:2px dashed var(--usage-page);border-radius:0}
+.ret-cohorts td{color:var(--text)}.ret-cohorts td.partial{font-style:italic;color:var(--muted)}
+.link-button{background:none;border:0;padding:0;color:var(--gold);font-weight:600;font-size:13px;text-align:left}
+.link-button:hover{background:none;text-decoration:underline}
+.ret-time{display:grid;gap:16px}.ret-time>summary{cursor:pointer;font-weight:650;font-size:15px;padding:10px 0;color:var(--text)}

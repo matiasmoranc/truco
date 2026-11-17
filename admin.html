@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="es"><head><meta charset="utf-8">
-  <meta name="robots" content="noindex, nofollow"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Administración · Truco Uruguayo</title><link rel="stylesheet" href="admin.css?v=29"></head>
+  <meta name="robots" content="noindex, nofollow"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Administración · Truco Uruguayo</title><link rel="stylesheet" href="admin.css?v=30"></head>
 <body>
 <section id="access" class="access"><div class="access-card"><img src="assets/truco-v3.png" alt=""><small class="game-name">TRUCO URUGUAYO</small><h1>Administración</h1><select class="game-picker" aria-label="Juego"><option value="uy">Truco Uruguayo</option><option value="ar">Truco Argentino</option></select><p id="identity"></p><p id="access-status">Verificando sesión…</p><button id="login" class="primary" hidden>Continuar con Google</button><button id="switch-account" hidden>Usar otra cuenta</button><a href="./">Volver al juego</a></div></section>
 <div id="console" class="shell" hidden>
@@ -115,21 +115,53 @@
    <div id="message-threads" class="thread-list"></div>
   </section>
   <section id="retention" hidden>
-   <article class="panel share-panel"><div class="panel-head"><h2>Registrados que entraron</h2><div class="share-controls"><div class="segmented" id="share-kind"><button type="button" data-kind="day" class="active">Día</button><button type="button" data-kind="week">Semana</button><button type="button" data-kind="month">Mes</button></div><label>Entraron<select id="share-min"><option value="1" selected>1 vez o más</option><option value="2">2 veces o más</option><option value="3">3 veces o más</option><option value="4">4 veces o más</option><option value="5">5 veces o más</option><option value="10">10 veces o más</option><option value="20">20 veces o más</option></select></label></div></div><p id="share-status" class="note"></p><div id="share-chart" class="bar-chart"></div><p id="share-summary" class="share-summary"></p><div id="share-times" class="platform-bars"></div><p class="note">Porcentaje sobre los jugadores que ya tenían cuenta al terminar cada período (sin las cuentas de prueba). Cada vez es una visita con la cuenta iniciada. Tocá una barra para ver ese período.</p></article>
-   <div class="toolbar"><label>Período<select id="retention-days"><option value="1">Hoy</option><option value="7">Últimos 7 días</option><option value="30" selected>Últimos 30 días</option><option value="90">Últimos 90 días</option></select></label></div>
-   <p id="retention-status" class="note"></p>
-   <div id="retention-kpis" class="kpis compact"></div>
-   <article class="panel"><div class="panel-head"><h2>Tiempo promedio por visita · minutos por día</h2></div><div id="retention-daily" class="bar-chart"></div></article>
+   <article class="panel ret-filters">
+    <div class="ret-row">
+     <label>Período<select id="ret-preset"><option value="7">Últimos 7 días</option><option value="30" selected>Últimos 30 días</option><option value="90">Últimos 90 días</option><option value="this-month">Este mes</option><option value="last-month">Mes pasado</option><option value="year">Este año</option><option value="custom">Fechas elegidas</option></select></label>
+     <label>Desde<input type="date" id="ret-from"></label>
+     <label>Hasta<input type="date" id="ret-to"></label>
+    </div>
+    <div class="ret-row">
+     <label>Comparar con<select id="ret-compare"><option value="previous" selected>El período anterior</option><option value="month">Las mismas fechas del mes anterior</option><option value="custom">Otras fechas</option><option value="none">No comparar</option></select></label>
+     <label>Desde<input type="date" id="ret-cfrom"></label>
+     <label>Hasta<input type="date" id="ret-cto"></label>
+    </div>
+    <div class="ret-row ret-row-end">
+     <div class="ret-field"><span>Ver por</span><div class="segmented" id="ret-group"><button type="button" data-group="day" class="active">Día</button><button type="button" data-group="week">Semana</button><button type="button" data-group="month">Mes</button></div></div>
+     <label>Contar como jugador a quien jugó<select id="ret-min"><option value="1" selected>1 partida o más</option><option value="2">2 partidas o más</option><option value="3">3 partidas o más</option><option value="5">5 partidas o más</option><option value="10">10 partidas o más</option><option value="20">20 partidas o más</option></select></label>
+    </div>
+    <p id="ret-status" class="ret-status"></p>
+   </article>
+   <h3 class="ret-heading">Cuántos juegan</h3>
+   <div id="ret-kpis-play" class="kpis ret-kpis"></div>
+   <h3 class="ret-heading">Si siguen jugando</h3>
+   <div id="ret-kpis-keep" class="kpis ret-kpis"></div>
+   <article class="panel"><div class="panel-head"><h2 id="ret-chart-title">Registrados que jugaron</h2><div class="segmented" id="ret-metric"><button type="button" data-metric="players" class="active">Jugadores</button><button type="button" data-metric="games">Partidas</button><button type="button" data-metric="accounts">Cuentas nuevas</button></div></div><div id="ret-chart" class="ret-chart"></div><div id="ret-legend" class="ret-legend"></div></article>
    <div class="panels">
-    <article class="panel"><div class="panel-head"><h2>Cuánto duran las visitas</h2></div><div id="retention-buckets" class="platform-bars"></div></article>
-    <article class="panel"><div class="panel-head"><h2>Dónde pasan el tiempo · minutos</h2></div><div id="retention-areas" class="platform-bars"></div></article>
+    <article class="panel"><div class="panel-head"><h2>Cuánto jugó cada registrado</h2></div><div id="ret-histogram" class="platform-bars"></div><p id="ret-histogram-note" class="note"></p></article>
+    <article class="panel"><div class="panel-head"><h2>Comparado con los días anteriores</h2></div><div id="ret-flow" class="platform-bars"></div><p id="ret-flow-note" class="note"></p></article>
    </div>
+   <article class="panel"><div class="panel-head"><h2>Siguen jugando después de crear la cuenta</h2></div><p class="note" id="ret-cohort-note"></p><div id="ret-cohorts"></div></article>
    <div class="panels">
-    <article class="panel"><div class="panel-head"><h2>Por dispositivo</h2></div><div id="retention-platforms"></div></article>
-    <article class="panel"><div class="panel-head"><h2>Con cuenta y sin cuenta</h2></div><div id="retention-accounts"></div></article>
+    <article class="panel"><div class="panel-head"><h2>Los que más jugaron</h2></div><div id="ret-top"></div></article>
+    <article class="panel"><div class="panel-head"><h2>Dejaron de jugar</h2></div><p class="note" id="ret-stopped-note"></p><div id="ret-stopped"></div></article>
    </div>
-   <article class="panel"><div class="panel-head"><h2>Vuelven a jugar · jugadores con cuenta, por semana en que entraron por primera vez</h2></div><div id="retention-cohorts"></div></article>
-   <p class="note">Una visita es cada vez que se abre la página o la app. Cuenta solo el tiempo con la pantalla a la vista. En las apps se empieza a medir con la próxima versión; hasta entonces son visitas de la web. "Vuelven" toma a los jugadores con cuenta desde el primer día que usaron el juego.</p>
+   <details class="ret-time">
+    <summary>Tiempo en el juego (visitas)</summary>
+    <p id="retention-status" class="note"></p>
+    <div id="retention-kpis" class="kpis compact"></div>
+    <article class="panel"><div class="panel-head"><h2>Tiempo promedio por visita · minutos por día</h2></div><div id="retention-daily" class="bar-chart"></div></article>
+    <div class="panels">
+     <article class="panel"><div class="panel-head"><h2>Cuánto duran las visitas</h2></div><div id="retention-buckets" class="platform-bars"></div></article>
+     <article class="panel"><div class="panel-head"><h2>Dónde pasan el tiempo · minutos</h2></div><div id="retention-areas" class="platform-bars"></div></article>
+    </div>
+    <div class="panels">
+     <article class="panel"><div class="panel-head"><h2>Por dispositivo</h2></div><div id="retention-platforms"></div></article>
+     <article class="panel"><div class="panel-head"><h2>Con cuenta y sin cuenta</h2></div><div id="retention-accounts"></div></article>
+    </div>
+    <p class="note">Una visita es cada vez que se abre la página o la app. Cuenta solo el tiempo con la pantalla a la vista. Se guardan los últimos 90 días. En las apps se mide desde la versión 1.0.10.</p>
+   </details>
+   <p class="note"><strong>Jugó</strong>: terminó al menos una partida online, contra personas o en una mesa con bots. Las partidas contra la máquina sin conexión no quedan registradas por jugador. <strong>Registrados</strong>: cuentas creadas hasta el último día del período, sin las cuentas de prueba. <strong>Entraron</strong>: abrieron el juego con su cuenta (se guarda 90 días).</p>
   </section>
   <section id="chat" hidden>
    <div class="toolbar"><label>Período<select id="chat-days"><option value="1">Hoy</option><option value="7" selected>Últimos 7 días</option><option value="30">Últimos 30 días</option></select></label><label class="chat-search">Buscar<input id="chat-search" type="search" placeholder="Jugador, mesa o texto" autocomplete="off"></label></div>
@@ -142,4 +174,4 @@
  </main>
 </div>
 <dialog id="edit"><form id="edit-form"><div class="dialog-head"><h2 id="edit-title"></h2><button type="button" id="close" aria-label="Cerrar">×</button></div><p id="edit-description"></p><label id="value-label">Nuevo valor<input id="value" required></label><div id="level-fields" class="level-fields" hidden><label>Nivel<input id="level-value" type="number" min="1" max="200" step="1"></label><label>Puntos totales<input id="points-value" type="number" min="0" max="1000000" step="0.1"></label><small id="level-preview"></small></div><label id="delete-label" hidden>Escribí el nombre exacto para confirmar<input id="delete-confirm" autocomplete="off"></label><label>Motivo<input id="reason" required minlength="3" maxlength="200" placeholder="Por qué realizás este cambio"></label><p id="edit-error" role="alert"></p><div class="dialog-actions"><button id="cancel" type="button">Cancelar</button><button id="save" class="primary" type="submit">Confirmar cambio</button></div></form></dialog>
-<script type="module" src="admin.js?v=47"></script></body></html>
+<script type="module" src="admin.js?v=48"></script></body></html>
