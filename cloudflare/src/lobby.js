@@ -11,7 +11,7 @@ const send=(ws,message)=>{try{ws.send(JSON.stringify(message));}catch{}};
 
 // Open 1 vs 1 tables hosted by house players, so there is always someone to play.
 // Each one waits 10 minutes and closes; the lobby opens new ones with
-// other names, keeping between 6 and 8 open, each one 10 minutes, staggered apart.
+// other names, keeping between 12 and 16 open, each one 10 minutes, staggered apart.
 // House players are bots and their names say so: "Bot Juan". Real names cannot have spaces.
 const HOUSE_NAMES=['Bot Juan','Bot Pepe','Bot Nacho','Bot Facu','Bot Santi','Bot Gonza','Bot Rodri','Bot Mati','Bot Chino','Bot Bruno','Bot Lucho','Bot Seba','Bot Pablo','Bot Tincho','Bot Rafa','Bot Marce','Bot Gaby','Bot Diego','Bot Fede','Bot Andrés','Bot Lu','Bot Caro','Bot Vale','Bot Ceci','Bot Sofi','Bot Agus','Bot Negro','Bot Pocho','Bot Tito','Bot Coco'];
 // Besides the bots, 2 or 3 of the open house tables are hosted by house players with everyday names
@@ -20,7 +20,7 @@ const HOUSE_PEOPLE=['Nacho_Pereira','Facu.Rodriguez','ElGordoMartinez','Santi_Fe
 // Off for now (2026-11-15): only bots, to test whether players create tables. To turn it back on: 2 and 3.
 const HOUSE_PEOPLE_MIN=0,HOUSE_PEOPLE_MAX=0;
 const isBotName=name=>String(name||'').startsWith('Bot ');
-const HOUSE_MIN=6,HOUSE_MAX=8,HOUSE_TICK_MS=60000,HOUSE_TARGET_MS=30*60000;
+const HOUSE_MIN=12,HOUSE_MAX=16,HOUSE_TICK_MS=60000,HOUSE_TARGET_MS=30*60000;
 // One new table per minute at most: tables still open and close at different times, and with
 // 10 minutes each this keeps up to 10 open, enough for 6 to 8.
 const HOUSE_GAP_MS=50000;
