@@ -506,7 +506,7 @@ const chatSoundKey=text=>String(text||'').toLocaleLowerCase('es').replace(/[^a-z
 const CHAT_SOUNDS=Object.fromEntries(SOUND_MESSAGES.map(sound=>[chatSoundKey(sound.text),sound]));
 // The clips play through Web Audio: iOS only lets sound start from a gesture, so every tap
 // resumes the context (iOS also suspends it in the background) and the clips are decoded ahead.
-let chatAudioContext=null;const chatBuffers=new Map();
+let chatAudioContext=null,chatStuck=false;const chatBuffers=new Map();
 function chatContext(){const Context=window.AudioContext||window.webkitAudioContext;if(!Context)return null;chatAudioContext??=new Context();return chatAudioContext;}
 function loadChatSound(src){
   const ctx=chatContext();if(!ctx)return Promise.reject(new Error('no audio'));
@@ -533,8 +533,14 @@ function primeChatElements(){
 function playChatElement(src){const audio=chatElement(src);try{audio.currentTime=0;}catch{/* Not loaded yet. */}audio.play().catch(()=>{});}
 function unlockChatSounds(){
   if(!touchDevice())primeChatElements();
-  const ctx=chatContext();if(!ctx)return;
-  if(ctx.state!=='running'){ctx.resume().catch(()=>{});const silent=ctx.createBufferSource();silent.buffer=ctx.createBuffer(1,1,22050);silent.connect(ctx.destination);silent.start(0);}
+  let ctx=chatContext();if(!ctx)return;
+  if(ctx.state!=='running'){
+    // iOS can leave a context stuck after an interruption (a call, another app's audio, the background):
+    // it never runs again, so a fresh one is made inside this tap (decoded clips still work in it).
+    if(ctx.state==='interrupted'||chatStuck){try{ctx.close().catch(()=>{});}catch{/* Already closed. */}chatAudioContext=null;chatStuck=false;ctx=chatContext();}
+    ctx.resume().catch(()=>{});const silent=ctx.createBufferSource();silent.buffer=ctx.createBuffer(1,1,22050);silent.connect(ctx.destination);silent.start(0);
+    setTimeout(()=>{if(ctx===chatAudioContext&&ctx.state!=='running')chatStuck=true;},600);
+  }
   for(const sound of Object.values(CHAT_SOUNDS))loadChatSound(sound.src).catch(()=>{});
 }
 // iOS keeps web sounds quiet with the silent switch on; while a clip plays the page asks
@@ -548,6 +554,8 @@ function startChatSound(src){
     if(ctx.state!=='running')await Promise.race([ctx.resume().catch(()=>{}),new Promise(done=>setTimeout(done,300))]);
     // Still not running: the computer plays it through the audio element instead.
     if(ctx.state!=='running'&&!touchDevice()){playChatElement(src);return;}
+    // Still not running on a phone: the next tap makes a fresh context.
+    if(ctx.state!=='running')chatStuck=true;
     mediaSession('playback');
     const source=ctx.createBufferSource();source.buffer=buffer;source.connect(ctx.destination);
     chatClipsPlaying++;source.onended=()=>{if(--chatClipsPlaying===0)mediaSession('auto');};
