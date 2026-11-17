@@ -776,7 +776,10 @@ async function showSession(user){
  const generation=++epoch;pagesLoaded=1;userScope='all';$('user-scope').value='all';clearInterval(metricsTimer);metricsTimer=null;metrics=null;users=[];avatars.clear();pageToken=null;$('console').hidden=true;$('access').hidden=false;$('logout').hidden=!user;$('switch-account').hidden=!user;$('login').hidden=!!user;
  $('identity').textContent=user?'Tu UID: '+user.uid:'';$('access-status').textContent=user?'Verificando permisos…':'Iniciá sesión con tu cuenta administradora.';
  if(!user)return;
- try{const result=await call({action:'users'});if(generation!==epoch)return;users=result.data.users;pageToken=result.data.pageToken;$('access').hidden=true;$('console').hidden=false;renderUsers();await refresh();if(generation===epoch)metricsTimer=setInterval(()=>{if(!document.hidden&&!$('edit').open)refresh(false,true);},60000);}
+ try{const result=await call({action:'users'});if(generation!==epoch)return;users=result.data.users;pageToken=result.data.pageToken;$('access').hidden=true;$('console').hidden=false;renderUsers();await refresh();}
+  // No automatic refresh: each one read the whole credit bank (Cloudflare bills rows read).
+  // The panel updates when it opens and with the Actualizar button.
+
  catch(e){if(generation===epoch)$('access-status').textContent=errorText(e);}
 }
 start();

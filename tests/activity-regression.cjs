@@ -52,3 +52,8 @@ test('The apps say which version is installed, and the admin keeps it with the l
  assert.match(read('app.js'),/platform:visitPlatform\(\),\.\.\.\(data\.visible\?await appVersion\(\):null\)/);
  assert.match(read('mobile/entry.js'),/appVersion: .*App\.getInfo\(\)/);
 });
+
+test('The admin panel does not refresh by itself (every refresh reads the whole credit bank)',()=>{
+ const admin=require('node:fs').readFileSync(require('node:path').join(__dirname,'..','admin.js'),'utf8');
+ require('node:assert/strict').doesNotMatch(admin,/setInterval\(/);
+});
