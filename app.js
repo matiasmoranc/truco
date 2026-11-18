@@ -1482,11 +1482,16 @@ async function fillWithBots(){
     if(searchActive())renderSearchPanel();
   }
 }
+// A table opened a moment ago may still be connecting to the table server: wait a little
+// instead of answering the first tap with a connection error.
+async function waitForTableConnection(limit=8000){
+  for(let waited=0;waited<limit&&liveActionsBlocked()&&navigator.onLine!==false;waited+=100)await new Promise(resolve=>setTimeout(resolve,100));
+}
 $('search-points').addEventListener('click',async event=>{
   const button=event.target.closest('[data-search-points]');if(!button||button.disabled||!searchActive())return;
   const value=Number(button.dataset.searchPoints);if(value===targetPoints(state.room))return;
   state.search.busy=true;renderSearchPanel();
-  try{await creditCommand({kind:'set-points',value});state.search.points=value;}
+  try{await waitForTableConnection();if(!searchActive())return;await creditCommand({kind:'set-points',value});state.search.points=value;}
   catch(error){toast(error.message||'No pudimos cambiar los puntos.',true);}
   finally{if(state.search){state.search.busy=false;renderSearchPanel();}}
 });
@@ -1496,6 +1501,7 @@ $('search-mode').addEventListener('click',async event=>{
   const mode=button.dataset.searchMode;if(mode===(state.room.mode||'1v1'))return;
   const points=targetPoints(state.room),botOff=state.search.botOff;
   state.search.busy=true;renderSearchPanel();
+  await waitForTableConnection();if(!searchActive()){if(state.search){state.search.busy=false;renderSearchPanel();}return;}
   const code=state.roomCode;state.cancelingWaitingRoom=code;
   try{await creditCommand({kind:'cancel'});}
   catch(error){
