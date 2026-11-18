@@ -1263,7 +1263,7 @@ function renderLobby(rooms) {
   };
   const people=open.filter(([,value])=>!houseTable(value.public)),house=open.filter(([,value])=>houseTable(value.public));
   // Without tables from people: one short line, and a button that opens one and looks for someone.
-  paint(people.length?people.map(card).join(''):'<div class="lobby-empty-row"><span>No hay mesas<br>creadas ahora</span><button type="button" class="search-people-button" data-search-people><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6"/><path d="m20 20-4.5-4.5"/></svg>Buscar gente en línea</button></div>');
+  paint(people.length?people.map(card).join(''):'<div class="lobby-empty-row"><span>Las mesas<br>están llenas</span><button type="button" class="search-people-button" data-search-people><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6"/><path d="m20 20-4.5-4.5"/></svg>Buscar gente en línea</button></div>');
   const botList=$('bot-room-list'),botHtml=house.map(card).join('');
   if(botList.dataset.html!==botHtml){botList.innerHTML=botHtml;botList.dataset.html=botHtml;}
   $('bot-tables').classList.toggle('hidden',!house.length);
