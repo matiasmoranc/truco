@@ -5,9 +5,9 @@ import { installPlayerPanel } from './player-panel.js?v=20261013-blocklist1';
 import { installScorer,renderCompactTally } from './scorer.js?v=20261101-usage1';
 import { installActivity } from './activity.js?v=20261010-adminstats32';
 import { installCredits } from './credits.js?v=20261025-claim1';
-import { installAccount } from './account.js?v=20261115-bots1';
+import { installAccount } from './account.js?v=20261118-mesas4';
 import { initializeGameAuth } from './auth-init.js?v=20261016-android-google';
-import {installTeamTable,TEAM_SEATS,playerTeam,positionDealerDeck,renderTeamLobbySeats,renderWaitingSeats} from './team-table-ui.js?v=20261113-envido1';
+import {installTeamTable,TEAM_SEATS,playerTeam,positionDealerDeck,renderTeamLobbySeats,renderWaitingSeats} from './team-table-ui.js?v=20261118-mesas4';
 import {installTablePeople} from './table-people.js?v=20261112-qa1';
 import {createLiveTables,LiveError} from './live-tables.js?v=20261112-qa1';
 import {installMatchPhoto} from './share-photo.js?v=20261027-photo2';
@@ -1219,7 +1219,7 @@ async function openLobby() {
     state.lobbyUnsubscribe = liveTables().watchLobby((rooms) => {state.lobbyRooms=rooms||{};renderLobby(state.lobbyRooms);});
   } catch (error) {
     console.error(error);
-    $('open-room-list').innerHTML = '<p class="muted">No pudimos cargar las mesas. Revisá la conexión y las reglas de Firebase.</p>';delete $('open-room-list').dataset.html;
+    $('open-room-list').innerHTML = '<p class="muted">No pudimos cargar las mesas. Revisá tu conexión y volvé a intentar.</p>';delete $('open-room-list').dataset.html;
     toast(firebaseError(error));
   }
 }
@@ -1300,11 +1300,12 @@ function joinOpenRoom(code, seat, team=null) {
 }
 function firebaseError(error) {
   if (error instanceof LiveError) return error.message;
-  if (error?.code === 'auth/operation-not-allowed') return 'Activá el inicio de sesión anónimo en Firebase y volvé a intentar.';
-  if (error?.code?.includes('permission-denied')) return 'Firebase rechazó el acceso. Revisá las reglas de la base.';
-  if (error?.message?.includes('Failed to fetch')) return 'No se pudo conectar con Firebase. Revisá la configuración y la conexión.';
+  // Players never see setup or provider details: only what happened and what to do.
+  if (error?.code === 'auth/operation-not-allowed') return 'No pudimos iniciar tu sesión. Volvé a intentar en un momento.';
+  if (error?.code?.includes('permission-denied')) return 'No pudimos completar la acción. Volvé a intentar.';
+  if (error?.message?.includes('Failed to fetch')) return 'No hay conexión. Revisá tu internet y volvé a intentar.';
   if(error?.code?.startsWith('functions/'))return error.code==='functions/not-found'?'Falta habilitar el servidor de las mesas.':error.message||'No pudimos conectar con el servidor.';
-  return 'No pudimos conectar la mesa. Revisá la configuración de Firebase.';
+  return 'No pudimos completar la acción. Volvé a intentar.';
 }
 function watchRoom() {
   const fb = state.firebase,code=state.roomCode;
@@ -1854,6 +1855,13 @@ function openScoreDetails(){
 // Drawn again while open, so a hand that ends meanwhile shows up.
 function renderScoreDetails(){
   const history=Object.values(handScoreHistory(state.room)).sort((a,b)=>b.handNumber-a.handNumber);
+  // Points already added in the hand being played (flor, envido) show before the hand ends.
+  const room=state.room,live=Object.values(room?.handScoreEntries||{}).filter(entry=>Number(entry?.points)>0);
+  if(live.length&&!['complete','closed'].includes(room.status)&&!history.some(hand=>hand.handNumber===room.handNumber)){
+    const totals={player1:0,player2:0};live.forEach(entry=>{totals[entry.player]=(totals[entry.player]||0)+Number(entry.points);});
+    const names=room.mode==='2v2'?{player1:'Equipo 1',player2:'Equipo 2'}:{player1:room.players?.player1?.name||'Jugador 1',player2:room.players?.player2?.name||'Jugador 2'};
+    history.unshift({handNumber:(room.handNumber||1)+' (en juego)',totals,entries:live,names});
+  }
   $('score-details-title').textContent='Historial de manos';
   $('score-session-score').textContent=state.learning?'':sessionScoreText(state.room);
   $('score-details-content').innerHTML=history.length?history.map(summary=>`<section class="score-detail-hand"><h3>Mano ${summary.handNumber}</h3>${['player1','player2'].map(player=>`<section class="score-detail-player"><header><strong>${escapeHtml(summary.names[player])}</strong><b>+${summary.totals[player]||0} puntos</b></header>${(summary.entries||[]).filter(entry=>entry.player===player).map(entry=>`<p><span>+${entry.points}</span>${escapeHtml(entry.detail)}</p>`).join('')||'<p>No sumó puntos en esta mano.</p>'}</section>`).join('')}</section>`).join(''):'<p class="score-details-empty">Todavía no terminó ninguna mano.</p>';
@@ -4965,7 +4973,10 @@ async function creditCommand(command){
   if(liveActionsBlocked()&&command.kind!=='tick')throw new Error('Esperá a recuperar la conexión.');
   if(command.kind==='tick'&&(creditTickPending||state.liveAction||state.playActionInFlight||state.foldInFlight))return;
   if(command.kind==='tick')creditTickPending=true;
-  try{const result=await creditApi('creditTableAction',{code,command,expectedMatchId:matchId,requestId:crypto.randomUUID()});applyActionReceipt(result,code);return result;}
+  try{const result=await creditApi('creditTableAction',{code,command,expectedMatchId:matchId,requestId:crypto.randomUUID()});
+    // The server already applied the move: a problem redrawing the table must not report it as failed.
+    try{applyActionReceipt(result,code);}catch(error){console.error('[truco:render]',error);}
+    return result;}
   catch(error){if(command.kind!=='tick'&&error?.code!=='closed')toast(firebaseError(error),true);throw error;}
   finally{if(command.kind==='tick')creditTickPending=false;}
 }

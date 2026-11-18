@@ -138,6 +138,9 @@ function tableOperation(ledger,{code,uid,command,requestId,expectedMatchId,prese
 function publicTable(m){
  if(m.mode==='2v2'){
   const room=m.session?structuredClone(m.session.room):{mode:'2v2',managedCredits:true,creditMatch:{id:m.id,stake:m.stake,pot:4*m.stake,hasPassword:!!m.secret},status:m.status==='waiting'?'waiting':'closed',matchNumber:m.matchNumber||1,deviceMode:'two',createdAt:m.createdAt,targetPoints:m.targetPoints,table:m.players.player1,players:m.players,scores:{player1:0,player2:0},handNumber:0,trickCards:[],feed:[],lobbyChat:m.lobbyChat||{}};
+  // Who sings the next flower stays private until it is sung.
+  // The table only learns that it must wait, until when.
+  if(room.florFollow)room.florWaitUntil=room.florFollow.at;delete room.florFollow;
   room.revision=m.revision;if(m.closeReason&&!room.closeReason)room.closeReason=m.closeReason;if(m.closedAt||m.status==='refunded')room.status='closed';room.handCounts=Object.fromEntries(Object.keys(m.players).map(p=>[p,m.session?.hands?.[p]?.length||0]));room.creditResult=m.status==='settled'?{winnerUids:m.winners,pot:m.stake*4,payout:m.stake*2,stake:m.stake}:null;return room;
  }
  if(m.status==='waiting')return {...(m.house?{waitLimit:HOUSE_WAIT_MS}:{}),managedCredits:true,creditMatch:{id:m.id,stake:m.stake,pot:m.stake*2,hasPassword:!!m.secret},revision:m.revision,status:'waiting',matchNumber:m.matchNumber||1,deviceMode:'two',createdAt:m.createdAt,targetPoints:m.targetPoints,table:m.players.player1,players:m.players,scores:{player1:0,player2:0},handNumber:1,trickCards:[],feed:[]};

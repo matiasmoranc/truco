@@ -108,7 +108,7 @@ export function installAccount({ api, services, getState, rememberName, document
         // must save their profile before entering the game.
         loaded=false;
         message(cached?'No pudimos actualizar tu nombre desde la cuenta.':
-          'No pudimos cargar tu perfil. Revisá la conexión y las reglas de perfiles en Firebase.');
+          'No pudimos cargar tu perfil. Revisá tu conexión y volvé a intentar.');
       }finally{clearTimeout(timer);if(epoch===generation)render();}
     })();
     return profilePromise;
@@ -273,7 +273,7 @@ export function installAccount({ api, services, getState, rememberName, document
         message(['PERMISSION_DENIED','permission-denied','database/permission-denied'].includes(error?.code)?'Falta habilitar la reserva de nombres en Firebase. Por ahora no podemos cambiar tu nombre.':'No pudimos verificar los nombres existentes. Revisá tu conexión y volvé a intentar.');return;
       }
       try{const owner=(await fb.get(fb.ref(fb.db,'usernames/'+key))).val();if(owner&&owner!==user.uid){message('Ese nombre de usuario ya existe. Elegí otro.');return;}}catch{}
-      message('No pudimos guardar tu nombre en la cuenta. Revisá la conexión y las reglas de perfiles en Firebase.');
+      message('No pudimos guardar tu nombre. Revisá tu conexión y volvé a intentar.');
     }
   }
   el('auth-register').addEventListener('submit',event=>{

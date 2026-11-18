@@ -153,6 +153,8 @@ function answers(s,p,random){
 function mustAct(s,p){
  const r=s?.room;
  if(!r||r.status!=='started'||r.resolvingTrick||r.pendingNextHand||r.folded?.[p]||!s.hands?.[p])return false;
+ // A partner's flower is about to be sung: the table waits (only that partner may sing it).
+ if(r.florFollow)return r.florFollow.seat===p&&florWindow(s,p);
  const b=r.pendingBet;
  return b?.revealMode?b.revealTurn===p:b?b.responder===p||florWindow(s,p):r.turn===p||florWindow(s,p);
 }

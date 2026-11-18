@@ -89,3 +89,10 @@ test('Team decks sit a little farther from the center than before, on every side
  const before={self:[75,52],right:[73,21],partner:[27,21],left:[25,52]};
  for(const [seat,[x,y]] of Object.entries(before)){const pose=dealerDeckPose(seat,true,390,760);assert.ok(Math.hypot(pose.left-50,pose.top-44)>Math.hypot(x-50,y-44));}
 });
+test('A partner who went to the deck (no cards button) does not break the table drawing',()=>{
+ assert.doesNotMatch(source,/querySelector\('\.team-partner-cards'\)\.onclick/);
+ assert.match(source,/const partnerCards=i===2\?el\.querySelector\('\.team-partner-cards'\):null;if\(partnerCards\)/);
+ const app=fs.readFileSync(path.join(__dirname,'../app.js'),'utf8');
+ assert.doesNotMatch(app,/configuración de Firebase|reglas de Firebase/);
+ assert.match(app,/try\{applyActionReceipt\(result,code\);\}catch\(error\)\{console\.error\('\[truco:render\]',error\);\}/);
+});

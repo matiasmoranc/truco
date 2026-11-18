@@ -163,7 +163,7 @@ test('Team bots read son buenas and a quiet first card when guessing rival hands
 function florTable(){
  const humans={...people,player1:{uid:'u1',name:'Mati'},player3:{uid:'u3',name:'Compa'}};
  const s=newTeamSession('ABCDE',humans,30,{id:'m8',stake:1,pot:4,matchNumber:1},1000),r=s.room;
- Object.assign(r,{status:'started',mano:'player1',turn:'player1',trickNo:1,envidoClosed:false,playedBy:{},flors:{},folded:{},trickCards:[],tricks:[],trucoLevel:1,lastTrucoTeam:null,pendingBet:null,muestra:tcard('♦',6),turnClock:null});
+ Object.assign(r,{status:'started',mano:'player1',turn:'player1',trickNo:1,envidoClosed:false,playedBy:{},flors:{},folded:{},trickCards:[],tricks:[],trucoLevel:1,lastTrucoTeam:null,pendingBet:null,florFollow:null,florSettled:false,florClosed:false,muestra:tcard('♦',6),turnClock:null});
  s.hands={player1:[tcard('♥',4),tcard('♥',5),tcard('♥',7)],player2:[tcard('♠',4),tcard('♣',5),tcard('♥',2)],player3:[tcard('♣',1),tcard('♣',3),tcard('♣',7)],player4:[tcard('♠',5),tcard('♣',4),tcard('♥',3)]};
  s.originals=structuredClone(s.hands);
  return {s,r,ref:createTeamReferee(s,{now:1500})};
@@ -176,6 +176,8 @@ test('After a flor, the others sing theirs before the next card; once a card is 
  assert.equal(r.flors.player3,true);
  ({r,ref}=florTable());
  ref.action('player1',{kind:'call',value:'flor'});
+ // The partner does not sing (the automatic wait is over without it): the next card closes the flor.
+ r.florFollow=null;
  ref.action('player1',{kind:'play',cardId:'copa-4'});
  assert.equal(r.florClosed,true);
  assert.throws(()=>ref.action('player3',{kind:'call',value:'flor'}),/no se puede cantar/);

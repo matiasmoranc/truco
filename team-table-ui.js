@@ -87,6 +87,7 @@ export function installTeamTable({$,getState,command,runAction,renderPlayerHand,
  const send=(button,c)=>runAction(button,()=>command(c));
  // The pie's signal for this turn, hidden as soon as it is tapped (back after 4 s if it never arrived).
  let signalSent=null;
+ let florWaitTimer=null;
  // A bot partner waits up to 12 s for the pie's signal (vení, jugá, gritá): a yellow
  // disc beside my cards empties clockwise from its top radius. startedAt null hides it.
  const SIGNAL_WAIT_MS=12000,SIGNAL_TIMER_SIZE=36;let signalTimerHide=null;
@@ -164,7 +165,8 @@ export function installTeamTable({$,getState,command,runAction,renderPlayerHand,
    const label=el.querySelector('.team-player-name');if(avatar&&label){label.prepend(avatar);label.classList.add('with-avatar');}
    placeSeatFlor(el,positions[i]==='right');
    if(i===2&&flip&&!matchMedia('(prefers-reduced-motion: reduce)').matches)for(const card of el.querySelectorAll('.team-backs>i'))card.animate([{rotate:'y 90deg',opacity:.3,scale:'.94'},{rotate:'y 0deg',opacity:1,scale:'1'}],{duration:280,easing:'ease-out'});
-   if(i===2)el.querySelector('.team-partner-cards').onclick=()=>{showPartner();render();};
+   // A partner who went to the deck has no cards to show (the text takes their place).
+   const partnerCards=i===2?el.querySelector('.team-partner-cards'):null;if(partnerCards)partnerCards.onclick=()=>{showPartner();render();};
   }
   clearTimeout(noticeTimer);
   const notices=[r.callNotice,r.teamSignal].filter(n=>visibleTeamNotice(n,r,gameTime())&&n.text!=='Se reparte');
@@ -173,7 +175,9 @@ export function installTeamTable({$,getState,command,runAction,renderPlayerHand,
   if(notices.some(n=>n===r.callNotice&&n.text==='Flor'))for(const q of Object.keys(r.flors||{})){const speech=$('team-seat-'+q)?.querySelector('.team-speech');if(speech){speech.textContent='Flor';speech.classList.remove('hidden');}}
   if(notices.length)noticeTimer=setTimeout(()=>{if(getState().room?.mode==='2v2')render();},Math.max(1,Math.min(...notices.map(n=>n.time+5000-gameTime()))));
   const drawing=r.status==='drawing';game.classList.toggle('drawing-mode',drawing);game.classList.toggle('reveal-mode',r.status==='revealing');$('opening-draw').classList.add('hidden');
-  const playing=r.status==='started'&&!r.resolvingTrick&&!r.pendingNextHand;
+  // A partner's flower is about to be sung: nobody can play, call or answer until it is.
+  const florWait=Number(r.florWaitUntil)-gameTime();clearTimeout(florWaitTimer);if(florWait>0)florWaitTimer=setTimeout(()=>{if(getState().room?.mode==='2v2')render();},florWait+50);
+  const playing=r.status==='started'&&!r.resolvingTrick&&!r.pendingNextHand&&!(florWait>0);
   const myTurn=playing&&!pending&&r.turn===p&&!r.folded?.[p];if(!s.handGestureActive)renderPlayerHand(drawing||r.folded?.[p]?[]:orderedHand(),myTurn);$('hand').classList.toggle('team-folded',playing&&!!r.folded?.[p]);placeSelfSpeech();
   $('fold-hand').classList.toggle('hidden',!playing||!!r.folded?.[p]);$('fold-hand').textContent='IRSE AL MAZO';
   const sample=r.muestra;$('deck-stack').classList.toggle('hidden',drawing||!sample);$('muestra-card').classList.toggle('hidden',drawing||!sample);$('muestra-card').classList.toggle('sprite-card',!!sample);if(sample){const el=$('muestra-card'),key=s.roomCode+':'+r.matchNumber+':'+r.handNumber;const dx=el.dataset.dragHand===key?el.style.getPropertyValue('--muestra-dx'):'0px',dy=el.dataset.dragHand===key?el.style.getPropertyValue('--muestra-dy'):'0px';el.dataset.dragHand=key;el.style.cssText=cardImageStyle(sample);el.style.setProperty('--muestra-dx',dx);el.style.setProperty('--muestra-dy',dy);$('muestra-card').setAttribute('aria-label',cardAccessibleName(sample)+', muestra');}

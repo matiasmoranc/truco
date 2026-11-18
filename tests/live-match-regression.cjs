@@ -29,7 +29,7 @@ function dealt(mode){
 }
 for(const mode of ['1v1','2v2'])test(mode+' live play matches the full referee without reading wallets',()=>{
  const l=fixture(mode),m=l.matches.m,player=m.session.room.turn,uid=m.players[player].uid;
- const p={code:'ABCDE',uid,command:owesFlor(m.session,player)?{kind:'call',value:'flor'}:{kind:'play',cardId:m.session.hands[player][0].id},requestId:'one',expectedMatchId:'m',now:300};
+ const p={code:'ABCDE',uid,command:owesFlor(m.session,player)?{kind:'call',value:'flor'}:{kind:'play',cardId:m.session.hands[player][0].id},requestId:'one',expectedMatchId:'m',now:Math.max(300,m.session.room.florFollow?.at||0)};
  const expected=tableOperation(l,p).matches.m,actual=liveUpdate(m,p);
  assert.deepEqual(actual,expected);assert.equal(m.session.hands[player].length,3);
  assert.deepEqual(liveUpdate(actual,p),actual,'duplicate request cannot play twice');
@@ -119,9 +119,11 @@ for(const mode of ['1v1','2v2'])test(mode+' complete game keeps credits outside 
  for(let n=0;n<2000&&l.matches.m.status==='reserved';n++){
   const m=l.matches.m,r=m.session.room;
   const answer=r.status==='started'&&r.pendingBet&&!r.pendingBet.revealMode&&!r.resolvingTrick&&!r.pendingNextHand;
-  const waiting=!answer&&(r.status!=='started'||r.resolvingTrick||r.pendingNextHand||!r.turn||r.pendingBet);
+  // A partner's flower about to be sung holds the whole table.
+  const florWait=r.florFollow&&now<r.florFollow.at;
+  const waiting=florWait||!answer&&(r.status!=='started'||r.resolvingTrick||r.pendingNextHand||!r.turn||r.pendingBet);
   now+=waiting?10000:1;
-  const player=answer?r.pendingBet.responder:waiting?'player1':r.turn;
+  const player=waiting?'player1':answer?r.pendingBet.responder:r.turn;
   // Holding a flower the player goes to the deck, which sings it first.
   // A sung flor (sung automatically for the first holder) is answered by a flower holder: they sing theirs.
   const command=waiting?{kind:'tick'}:answer?{kind:'call',value:r.pendingBet.type==='flor'?'yes':'no'}:owesFlor(m.session,player)?{kind:'fold'}:{kind:'play',cardId:m.session.hands[player][0].id};
