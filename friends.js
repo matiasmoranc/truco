@@ -143,7 +143,7 @@ export function installFriends({$,api,services,getState,toast,tableToInvite,join
   const link=$('friends-share');if(link)link.href='https://wa.me/?text='+encodeURIComponent(text);
  }
  async function open(){
-  shareLink();showView('friends-view');$('friends-search').value='';$('friends-filter').value='';searchResults=null;recent=null;open$.requests=overview.incoming.length>0;open$.list=false;render();
+  shareLink();showView('friends-view');$('friends-search').value='';$('friends-filter').value='';searchResults=null;recent=null;open$.requests=overview.incoming.length>0;open$.list=true;render();
   versus?.load().then(()=>render()).catch(()=>{});
   try{recent=(await call('recent'))?.results||[];}catch(e){recent=[];toast(e?.message||'No se pudieron cargar los últimos jugadores.',true);}
   render();

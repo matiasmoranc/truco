@@ -2,9 +2,10 @@
 // - versus: the numbers per friend (from the server, kept a minute).
 // - notebookElement: the notebook page with the numbers, used on the table and in the friend's card.
 // - match notebook: when two friends start a 1 vs 1 game, the notebook lies on the table
-//   for 4 seconds (the countdown shows 3, the first second does not count) and nobody can play.
+//   for 6 seconds (the countdown shows 5, the first second does not count) and nobody can play.
+//   It slides in from the left side and leaves the same way.
 // - friend card: a friend's numbers, last games and an invite button.
-const INTRO_MS=4000;
+const INTRO_MS=6000,OUT_MS=650;
 
 export function createVersus({api,now=()=>Date.now()}){
  let cache=null,at=0,pending=null;
@@ -70,15 +71,17 @@ export function installMatchNotebook({document,getState,relationOf,versus,now}){
  function show(person){
   clear();
   layer=el(document,'div','versus-layer');layer.setAttribute('role','dialog');layer.setAttribute('aria-label','Partidas entre ustedes');
-  const slot=el(document,'div','versus-slot'),pill=el(document,'div','versus-countdown');pill.hidden=true;
+  const slot=el(document,'div','versus-slot'),pill=el(document,'div','versus-countdown');
   layer.append(slot,pill);document.body.append(layer);
+  // Reading the layout fixes the starting position (off the left side) before sliding in.
+  void slot.getBoundingClientRect().width;layer.classList.add('in');
   const put=stats=>{if(!layer)return;slot.replaceChildren(notebookElement(document,stats,person.name));};
   const known=versus.cached()?.[person.uid];put(known||null);
   versus.load(true).then(all=>put(all?.[person.uid]||null)).catch(()=>{});
   // The first second the notebook settles; then 3, 2, 1.
-  const count=n=>{if(!layer)return;pill.hidden=false;pill.replaceChildren(el(document,'span','versus-ring',String(n)),'Empieza en '+plural(n,'segundo','segundos'));};
-  timers.push(setTimeout(()=>count(3),1000),setTimeout(()=>count(2),2000),setTimeout(()=>count(1),3000));
-  timers.push(setTimeout(()=>{layer?.classList.add('leaving');pill.hidden=true;},INTRO_MS-450),setTimeout(clear,INTRO_MS));
+  const count=n=>{if(!layer)return;pill.classList.add('show');pill.replaceChildren(el(document,'span','versus-ring',String(n)),'Empieza en '+plural(n,'segundo','segundos'));};
+  for(let n=5;n>=1;n--)timers.push(setTimeout(()=>count(n),(6-n)*1000));
+  timers.push(setTimeout(()=>{layer?.classList.remove('in');layer?.classList.add('leaving');},INTRO_MS-OUT_MS),setTimeout(clear,INTRO_MS));
  }
  return {check,clear};
 }
