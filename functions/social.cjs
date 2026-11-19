@@ -71,6 +71,13 @@ function createSocialFunctions({db,identity,rateLimit,options,readLedger,playerL
     const named=await names(recent.map(r=>r.uid));
     return {results:recent.filter(r=>named[r.uid]).map(r=>({...r,name:named[r.uid]||r.name,relation:S.relation(user.uid,r.uid,mine)}))};
    }
+   // How the player does against each friend (only friends: the scores are between them).
+   case 'versus':{
+    const [ledger,mine]=await Promise.all([playerLedger(user.uid),lists(user.uid)]);
+    const all=S.versusStats(ledger,user.uid);
+    const results=Object.values(all).filter(r=>mine.friends[r.uid]).map(r=>({...r,name:mine.friends[r.uid]?.name||r.name}));
+    return {results};
+   }
    case 'request':{
     const peerName=await peer(user,data.uid),mine=await lists(user.uid);
     if(mine.friends[data.uid])return {relation:'friend'};

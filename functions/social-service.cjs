@@ -24,6 +24,35 @@ function recentOpponents(ledger,uid,limit=10){
  }
  return [...seen.values()];
 }
+// Head to head with each person: settled games only. As rivals (1 vs 1, or opposite teams in 2 vs 2)
+// they count as won or lost; in 2 vs 2 on the same team they count apart, as partners.
+function versusStats(ledger,uid){
+ const teamOf=seat=>['player1','player3'].includes(seat)?'player1':'player2';
+ const out={};
+ const matches=Object.values(ledger?.matches||{}).filter(m=>m?.status==='settled'&&Object.values(m.players||{}).some(p=>p?.uid===uid)).sort((a,b)=>(a.settledAt||a.createdAt||0)-(b.settledAt||b.createdAt||0));
+ for(const m of matches){
+  const seats=Object.keys(m.players||{}),mine=seats.find(q=>m.players[q]?.uid===uid);if(!mine)continue;
+  const team=m.mode==='2v2'||seats.some(q=>q==='player3'||q==='player4');
+  const winners=Array.isArray(m.winners)?m.winners:[m.winner];
+  const won=winners.includes(uid),tie=!winners.some(Boolean);
+  const scores=m.session?.room?.scores||null,myKey=team?teamOf(mine):mine,otherKey=myKey==='player1'?'player2':'player1';
+  for(const seat of seats){
+   const other=m.players[seat]?.uid;if(!other||other===uid||isBotUid(other))continue;
+   const together=team&&teamOf(seat)===teamOf(mine);
+   const s=out[other]??={uid:other,name:'',won:0,lost:0,tied:0,one:{won:0,lost:0},teamVs:{won:0,lost:0},together:{won:0,lost:0},streak:null,last:[],lastAt:null};
+   s.name=m.players[seat].name||s.name;s.lastAt=m.settledAt||m.createdAt||s.lastAt;
+   const result=tie?'tied':won?'won':'lost';
+   if(together){if(!tie)s.together[result]++;}
+   else{
+    if(tie)s.tied++;else{s[result]++;s[team?'teamVs':'one'][result]++;}
+    s.streak=s.streak?.result===result?{result,count:s.streak.count+1}:{result,count:1};
+   }
+   s.last.unshift({result,together,mode:team?'2v2':'1v1',mine:Number(scores?.[myKey])||0,theirs:Number(scores?.[otherKey])||0,at:m.settledAt||m.createdAt||null});
+   if(s.last.length>5)s.last.pop();
+  }
+ }
+ return out;
+}
 // Friendship as the viewer sees someone: friend, request sent, request received or none.
 function relation(viewer,uid,{friends,incoming,outgoing}){
  if(uid===viewer)return 'self';
@@ -63,4 +92,4 @@ function inviteAllowance(sentAt,now){
  return {allowed:false,waitMinutes:Math.max(1,Math.ceil((recent[recent.length-INVITES_PER_FRIEND]+INVITE_WINDOW_MS-now)/60000)),next:recent};
 }
 const inviteText=invite=>`${invite.fromName} te invita a jugar al truco: `+[invite.mode==='2v2'?'2 vs 2':'1 vs 1',invite.targetPoints?`a ${invite.targetPoints} puntos`:null].filter(Boolean).join(', ')+'.';
-module.exports={INVITE_MS,nameKey,keyName,searchPrefix,recentOpponents,relation,requestUpdates,acceptUpdates,declineUpdates,removeUpdates,inviteRecord,inviteText,PLAYING_FRESH_MS,isPlaying,INVITES_PER_FRIEND,INVITE_WINDOW_MS,inviteAllowance};
+module.exports={INVITE_MS,nameKey,keyName,searchPrefix,recentOpponents,versusStats,relation,requestUpdates,acceptUpdates,declineUpdates,removeUpdates,inviteRecord,inviteText,PLAYING_FRESH_MS,isPlaying,INVITES_PER_FRIEND,INVITE_WINDOW_MS,inviteAllowance};

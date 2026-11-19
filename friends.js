@@ -4,7 +4,7 @@
 // friend, who gets the invitation live in the game (and as a phone notification)
 // with Entrar / Rechazar.
 const coinIcon='<svg class="credit-coin-icon" viewBox="-2 -2 52 54" aria-hidden="true"><g transform="rotate(-9 21 35)"><path d="M6 35v7a15 6 0 0 0 30 0v-7"/><ellipse cx="21" cy="35" rx="15" ry="6"/></g><g transform="rotate(9 27 23)"><path d="M12 23v7a15 6 0 0 0 30 0v-7"/><ellipse cx="27" cy="23" rx="15" ry="6"/></g><g transform="rotate(-12 20 12)"><path d="M5 12v7a15 6 0 0 0 30 0v-7"/><ellipse cx="20" cy="12" rx="15" ry="6"/></g></svg>';
-export function installFriends({$,api,services,getState,toast,tableToInvite,joinInvite,showView,openLobby,profiles=null,createTable=()=>{},isPlaying=()=>false,balance=()=>undefined,canClaim=()=>false,claimCredits=async()=>{},onChange=()=>{},document}){
+export function installFriends({$,api,services,getState,toast,tableToInvite,joinInvite,showView,openLobby,profiles=null,createTable=()=>{},isPlaying=()=>false,balance=()=>undefined,canClaim=()=>false,claimCredits=async()=>{},onChange=()=>{},versus=null,openCard=null,document}){
  let overview={friends:[],incoming:[],outgoing:[]},recent=null,unsubscribers=[],listening=null,statusTimer=null;
  // Friends' presence (presence/{uid}: lobby, playing or off, and since when), one listener each.
  let presence={},presenceSubs=new Map(),presenceFb=null,pendingInvite=null;
@@ -79,6 +79,15 @@ export function installFriends({$,api,services,getState,toast,tableToInvite,join
   if(remove){const x=button('×',async()=>{if(!confirm('¿Quitar a '+f.name+' de tus amigos?'))return;await call('remove',{uid:f.uid});});x.classList.add('icon-only');x.setAttribute('aria-label','Quitar a '+f.name);b.push(x);}
   return b;
  }
+ // How you do against a friend, next to the name; touching the row opens the friend's card.
+ function withRecord(item,f){
+  const s=versus?.cached()?.[f.uid];
+  if(s){const games=s.won+s.lost+s.tied,chip=el('span','friend-record '+(!games?'none':s.won>s.lost?'up':s.won<s.lost?'down':'even'));
+   chip.append(el('b','',games?s.won+' – '+s.lost:'Sin partidas'),el('small','',!games?'todavía':s.won>s.lost?'vas ganando':s.won<s.lost?'vas perdiendo':'parejos'));
+   item.querySelector('.friend-actions')?.before(chip);}
+  if(openCard){item.classList.add('is-tappable');item.onclick=e=>{if(e.target.closest('button'))return;openCard(f);};}
+  return item;
+ }
  function renderOnline(){
   const people=online().sort(byPresence),n=people.length;
   $('friends-online-text').textContent=n+' en línea';$('friends-online').classList.toggle('has-online',n>0);
@@ -101,7 +110,7 @@ export function installFriends({$,api,services,getState,toast,tableToInvite,join
   if(open$.list){
    const query=$('friends-filter').value.trim().toLocaleLowerCase('es');
    const shown=overview.friends.filter(f=>f.name.toLocaleLowerCase('es').includes(query)).sort(byPresence);
-   list($('friends-list'),shown.map(f=>personRow(f,null,friendButtons(f,{remove:true}),{live:true})),overview.friends.length?'Ningún amigo con ese nombre.':'Todavía no tenés amigos. Buscalos por nombre o sumá a los que jugaron con vos.');
+   list($('friends-list'),shown.map(f=>withRecord(personRow(f,null,friendButtons(f,{remove:true}),{live:true}),f)),overview.friends.length?'Ningún amigo con ese nombre.':'Todavía no tenés amigos. Buscalos por nombre o sumá a los que jugaron con vos.');
   }
   // While searching, the results take the place of the folded lists and the recent players.
   const searching=searchResults!==null;
@@ -135,6 +144,7 @@ export function installFriends({$,api,services,getState,toast,tableToInvite,join
  }
  async function open(){
   shareLink();showView('friends-view');$('friends-search').value='';$('friends-filter').value='';searchResults=null;recent=null;open$.requests=overview.incoming.length>0;open$.list=false;render();
+  versus?.load().then(()=>render()).catch(()=>{});
   try{recent=(await call('recent'))?.results||[];}catch(e){recent=[];toast(e?.message||'No se pudieron cargar los últimos jugadores.',true);}
   render();
  }
@@ -297,5 +307,5 @@ export function installFriends({$,api,services,getState,toast,tableToInvite,join
  // For the table and the result screen: how someone relates to me, and asking or accepting.
  const requestFriend=async(uid,name)=>{const r=(await call('request',{uid}))?.relation;toast(r==='friend'?'Ahora son amigos.':'Solicitud enviada a '+name+'.');return r;};
  const acceptFriend=async uid=>{await call('respond',{uid,accept:true});toast('Ahora son amigos.');};
- return {start,stop,open,render,relationOf,requestFriend,acceptFriend,friendNames:()=>overview.friends.map(f=>f.name)};
+ return {start,stop,open,render,relationOf,inviteFriend,friends:()=>overview.friends,requestFriend,acceptFriend,friendNames:()=>overview.friends.map(f=>f.name)};
 }

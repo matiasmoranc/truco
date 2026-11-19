@@ -38,3 +38,17 @@ test('The same friend gets at most 2 invitations every 20 minutes',()=>{
  const full=S.inviteAllowance([now-5*min,now-2*min],now);assert.equal(full.allowed,false);assert.equal(full.waitMinutes,15);
  assert.equal(S.inviteAllowance([now-25*min,now-21*min],now).allowed,true);
 });
+
+test('Head to head with a friend: rivals in 1v1 and 2v2 count as won or lost, partners apart, bots never',()=>{
+ const L={matches:{
+  a:{status:'settled',settledAt:1,players:{player1:{uid:'me'},player2:{uid:'caro',name:'Caro'}},winner:'me',session:{room:{scores:{player1:30,player2:22}}}},
+  b:{status:'settled',settledAt:2,mode:'2v2',players:{player1:{uid:'me'},player2:{uid:'caro',name:'Caro'},player3:{uid:'bot:x'},player4:{uid:'fede',name:'Fede'}},winners:['caro','fede'],session:{room:{scores:{player1:10,player2:15}}}},
+  c:{status:'settled',settledAt:3,mode:'2v2',players:{player1:{uid:'me'},player3:{uid:'caro',name:'Caro'},player2:{uid:'x1'},player4:{uid:'x2'}},winners:['me','caro'],session:{room:{scores:{player1:15,player2:3}}}},
+  d:{status:'refunded',players:{player1:{uid:'me'},player2:{uid:'caro'}}}}};
+ const all=S.versusStats(L,'me'),caro=all.caro;
+ assert.equal(caro.won,1);assert.equal(caro.lost,1);assert.equal(caro.tied,0);
+ assert.deepEqual(caro.one,{won:1,lost:0});assert.deepEqual(caro.teamVs,{won:0,lost:1});assert.deepEqual(caro.together,{won:1,lost:0});
+ assert.deepEqual(caro.streak,{result:'lost',count:1});
+ assert.equal(caro.last[0].together,true);assert.equal(caro.last[2].mine,30);assert.equal(caro.last[2].theirs,22);
+ assert.equal(all['bot:x'],undefined);assert.equal(all.fede.lost,1);
+});

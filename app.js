@@ -1,13 +1,14 @@
 import './chat-moderation.js?v=20261013-moderation1';
 import { visitPlatform,takeVisit,markTestDevice,markGuestVisit,trackUsage,journeyStep } from './visit.js?v=20261115-time1';
-import { installFriends } from './friends.js?v=20261111-fix1';
-import { installPlayerPanel } from './player-panel.js?v=20261013-blocklist1';
+import { installFriends } from './friends.js?v=20261119-amigos1';
+import { installPlayerPanel } from './player-panel.js?v=20261119-amigos1';
+import { createVersus,installMatchNotebook,installFriendCard } from './friend-notebook.js?v=20261119-amigos1';
 import { installScorer,renderCompactTally } from './scorer.js?v=20261101-usage1';
 import { installActivity } from './activity.js?v=20261010-adminstats32';
 import { installCredits } from './credits.js?v=20261025-claim1';
 import { installAccount } from './account.js?v=20261118-mesas4';
 import { initializeGameAuth } from './auth-init.js?v=20261016-android-google';
-import {installTeamTable,TEAM_SEATS,playerTeam,positionDealerDeck,renderTeamLobbySeats,renderWaitingSeats} from './team-table-ui.js?v=20261118-mesas4';
+import {installTeamTable,TEAM_SEATS,playerTeam,positionDealerDeck,renderTeamLobbySeats,renderWaitingSeats} from './team-table-ui.js?v=20261119-amigos1';
 import {installTablePeople} from './table-people.js?v=20261112-qa1';
 import {createLiveTables,LiveError} from './live-tables.js?v=20261112-qa1';
 import {installMatchPhoto} from './share-photo.js?v=20261027-photo2';
@@ -769,7 +770,10 @@ const profiles=installProfiles({$,document,services:firebaseServices,getState:()
 // Friends' avatars arrive after the list: redraw it then (friends is installed just below).
 function refreshFriends(){try{if($('friends-view').classList.contains('active'))friends.render();}catch{}}
 // Friends and table invitations (friends.js).
-const friends=installFriends({$,api:creditApi,services:firebaseServices,getState:()=>state,document,showView,profiles,createTable:()=>{warmGameConnection();configureSetup();},isPlaying:()=>!!state.room&&!state.learning&&$("game-view").classList.contains("active")&&!["waiting","complete"].includes(state.room.status),balance:()=>credits.wallet()?.balance,canClaim:()=>credits.canClaim(),claimCredits:()=>credits.claim(),openLobby:()=>openLobby(),onChange:()=>tablePeople?.refresh(),
+// Games against each friend: the notebook on the table, the friend's card and the stats tab.
+const versus=createVersus({api:creditApi});
+const friendCard=installFriendCard({document,versus,profiles,onInvite:f=>friends.inviteFriend(f),toast:(message,error=false)=>toast(message,true,2600)});
+const friends=installFriends({$,api:creditApi,versus,openCard:f=>friendCard.open(f),services:firebaseServices,getState:()=>state,document,showView,profiles,createTable:()=>{warmGameConnection();configureSetup();},isPlaying:()=>!!state.room&&!state.learning&&$("game-view").classList.contains("active")&&!["waiting","complete"].includes(state.room.status),balance:()=>credits.wallet()?.balance,canClaim:()=>credits.canClaim(),claimCredits:()=>credits.claim(),openLobby:()=>openLobby(),onChange:()=>tablePeople?.refresh(),
   toast:(message,error=false,duration=2600)=>toast(message,true,duration),
   tableToInvite:()=>{const room=state.room;if(!state.roomCode||state.localGame||room?.status!=='waiting')return null;
     return {code:state.roomCode,mode:room.mode==='2v2'?'2v2':'1v1',targetPoints:Number(room.targetPoints)||null,stake:Number(room.creditMatch?.stake)||null,password:state.hostTablePassword?.code===state.roomCode?state.hostTablePassword.password:''};},
@@ -1856,7 +1860,7 @@ function openScoreDetails(){
 function renderScoreDetails(){
   const history=Object.values(handScoreHistory(state.room)).sort((a,b)=>b.handNumber-a.handNumber);
   // Points already added in the hand being played (flor, envido) show before the hand ends.
-  const room=state.room,live=Object.values(room?.handScoreEntries||{}).filter(entry=>Number(entry?.points)>0);
+  const room=state.room,live=Object.values(room?.handScoreEntries||{}).filter(entry=>Number(entry?.points)!==0);
   if(live.length&&!['complete','closed'].includes(room.status)&&!history.some(hand=>hand.handNumber===room.handNumber)){
     const totals={player1:0,player2:0};live.forEach(entry=>{totals[entry.player]=(totals[entry.player]||0)+Number(entry.points);});
     const names=room.mode==='2v2'?{player1:'Equipo 1',player2:'Equipo 2'}:{player1:room.players?.player1?.name||'Jugador 1',player2:room.players?.player2?.name||'Jugador 2'};
@@ -1864,7 +1868,7 @@ function renderScoreDetails(){
   }
   $('score-details-title').textContent='Historial de manos';
   $('score-session-score').textContent=state.learning?'':sessionScoreText(state.room);
-  $('score-details-content').innerHTML=history.length?history.map(summary=>`<section class="score-detail-hand"><h3>Mano ${summary.handNumber}</h3>${['player1','player2'].map(player=>`<section class="score-detail-player"><header><strong>${escapeHtml(summary.names[player])}</strong><b>+${summary.totals[player]||0} puntos</b></header>${(summary.entries||[]).filter(entry=>entry.player===player).map(entry=>`<p><span>+${entry.points}</span>${escapeHtml(entry.detail)}</p>`).join('')||'<p>No sumó puntos en esta mano.</p>'}</section>`).join('')}</section>`).join(''):'<p class="score-details-empty">Todavía no terminó ninguna mano.</p>';
+  $('score-details-content').innerHTML=history.length?history.map(summary=>`<section class="score-detail-hand"><h3>Mano ${summary.handNumber}</h3>${['player1','player2'].map(player=>`<section class="score-detail-player"><header><strong>${escapeHtml(summary.names[player])}</strong><b>+${summary.totals[player]||0} puntos</b></header>${(summary.entries||[]).filter(entry=>entry.player===player).map(entry=>`<p><span>${Number(entry.points)<0?'−'+Math.abs(entry.points):'+'+entry.points}</span>${escapeHtml(entry.detail)}</p>`).join('')||'<p>No sumó puntos en esta mano.</p>'}</section>`).join('')}</section>`).join(''):'<p class="score-details-empty">Todavía no terminó ninguna mano.</p>';
 }
 
 async function writeRoom(changes) {
@@ -2283,11 +2287,21 @@ function sideScore(room,player,points,detail,extra){
   const scores=capScores(room,{...room.scores,[player]:(Number(room.scores?.[player])||0)+points});
   return {...(extra||{}),scores,handScoreEntries:[...(room.handScoreEntries||[]),{player,points:scores[player]-(Number(room.scores?.[player])||0),detail}]};
 }
+// A flower counts only if its holder does not go to the deck before showing it: two pieces, or the three cards, on the table.
+function florShown(room,player){
+  const cards=[...(room.tricks||[]).flatMap(trick=>trick.played||[]),...(room.trickCards||[])].filter(item=>item?.playerId===player).map(item=>item.card);
+  return cards.length>=3?hasFlor(cards,room.muestra):cards.filter(card=>pieceOrder(card,room.muestra)>0).length>=2;
+}
 function foldHandChanges(room,loser){
   const winner=otherPlayer(loser);
-  const loserHand=state.localHands?.[loser]||(loser===state.playerId?state.hand:[]);
-  const sung=foldFlorChanges(room,loser,loserHand,state.localHands?.[winner]||[]);
-  if(sung)return foldWithFlor(room,loser,sung);
+  // Going to the deck, the flower of whoever leaves stops counting.
+  let extra={};
+  if(room.flors?.[loser]!=null&&room.flors?.[winner]==null&&room.florSettled&&!florShown(room,loser)){
+    const back=Math.min(3,Number(room.scores?.[loser])||0);
+    if(back)extra=sideScore(room,loser,-back,'Se descuentan '+ptsText(back)+' de flor: se fue al mazo sin mostrarla');
+  }
+  if(room.flors?.[loser]!=null&&room.flors?.[winner]!=null&&room.florDeferred&&!room.florSettled)extra={...extra,flors:{[winner]:room.flors[winner]}};
+  room={...room,...extra};
   const unopened=Number(room.playedCount||0)===0&&Number(room.trucoLevel||1)===1&&!room.pendingBet&&!room.envidoClosed&&!room.envidoAudit&&!Object.keys(room.flors||{}).length;
   const winnerCards=state.localOriginalHands?.[winner]||[];
   const earlyFlor=unopened&&room.practiceRules?.flor!==false&&hasFlor(winnerCards,room.muestra);
@@ -2297,7 +2311,7 @@ function foldHandChanges(room,loser){
   if(bet&&['envido','flor'].includes(bet.type))Object.assign(sideChanges,pendingSideAward(room,winner)||{envidoClosed:true});
   const notice={kind:'fold',id:crypto.randomUUID(),from:loser,to:winner,text:(room.players?.[loser]?.name||'El rival')+' se fue al mazo.',spoken:'Me voy al mazo',time:Date.now(),handNumber:room.handNumber||1};
   if(earlyFlor)Object.assign(notice,{kind:'flor',from:winner,to:loser,text:(room.players?.[winner]?.name||'El rival')+' canta FLOR.',spoken:'Flor',selfVerb:'Cantaste'});
-  return {...sideChanges,callNotice:notice,turn:null,turnClock:null,pendingBet:null,pendingNextHand:{id:'fold:'+crypto.randomUUID(),winner,foldPoints:points,message,endsAt:gameTime()+3000},feed:topFeed(room,message)};
+  return {...extra,...sideChanges,callNotice:notice,turn:null,turnClock:null,pendingBet:null,pendingNextHand:{id:'fold:'+crypto.randomUUID(),winner,foldPoints:points,message,endsAt:gameTime()+3000},feed:topFeed(room,message)};
 }
 // Cards leaving the table fly to the deck, turning face down on the way and ending the
 // size of the deck. Each card is measured now, so the caller may remove it right after.
@@ -2497,16 +2511,6 @@ function endTurnClockWrite(token){
   if(turnClockWritePending===token)turnClockWritePending=false;
 }
 // The flower is sung, any envido waiting is cancelled by it, and the hand goes to the rival.
-function foldWithFlor(room,loser,sung){
-  const winner=otherPlayer(loser),loserName=room.players?.[loser]?.name||'El jugador',winnerName=room.players?.[winner]?.name||'El rival';
-  const bet=room.pendingBet,hand=Number(room.trucoLevel)||1;
-  // A truco waiting for an answer is lost at the level already accepted; a flor call from the rival is kept.
-  const flor=sung.rivalFlor?(bet?.type==='flor'?declinedFlorPoints(bet):3):0,points=hand+flor;
-  const florScore=flor?sideScore({...room,...sung.changes},winner,flor,ptsText(flor)+' por flor'):{};
-  const message=loserName+' canta FLOR y se va al mazo. '+(sung.rivalFlor?winnerName+' también tiene flor: gana la flor y la mano y suma '+points+' tantos.':loserName+' suma 3 de flor. '+winnerName+' gana la mano y suma '+hand+' '+(hand===1?'tanto.':'tantos.'));
-  const notice={kind:'fold',id:crypto.randomUUID(),from:loser,to:winner,text:loserName+' canta flor y se va al mazo.',spoken:'Flor y me voy al mazo',time:Date.now(),handNumber:room.handNumber||1};
-  return {...sung.changes,...florScore,callNotice:notice,turn:null,turnClock:null,pendingBet:null,pendingNextHand:{id:'fold:'+crypto.randomUUID(),winner,foldPoints:hand,message,endsAt:gameTime()+3000},feed:topFeed(room,message)};
-}
 function turnClockPlayer(room=state.room){
   if(room?.status==='timed-out')return room.turnTimeout?.loser||otherPlayer(room.turnTimeout?.winner);
   if(room?.pendingBet)return room.pendingBet.revealMode?room.pendingBet.revealTurn:room.pendingBet.responder;
@@ -2545,12 +2549,10 @@ function turnTimeoutChanges(room){
   timeoutCounts[loser]=(Number(timeoutCounts[loser])||0)+1;
   const name=room.players?.[loser]?.name||'El jugador';
   if(timeoutCounts[loser]<3){
-    // Out of time with an unsung flower: it is sung first, then the hand is lost.
-    const sung=foldFlorChanges(room,loser,state.localHands?.[loser]||(loser===state.playerId?state.hand:[]),state.localHands?.[winner]||[]);
-    const florPoints=sung?.rivalFlor?3:0,said=sung?': cantó flor, se va al mazo y':' y';
-    const side=florPoints?sideScore({...room,...sung.changes},winner,florPoints,'3 puntos por flor'):sung?null:pendingSideAward(room,winner);
-    const notice=sung?{kind:'fold',id:crypto.randomUUID(),from:loser,to:winner,text:name+' canta flor y se va al mazo.',spoken:'Flor y me voy al mazo',time:Date.now(),handNumber:room.handNumber||1}:null;
-    return {timeoutCounts,...(sung?{...sung.changes,callNotice:notice}:{}),...(side||{}),status:'timed-out',turn:null,turnClock:null,pendingBet:null,turnTimeout:{winner,loser,florPoints:0,message:name+' agotó su tiempo'+said+' pierde la mano ('+timeoutCounts[loser]+' de 3 faltas por inactividad).'}};
+    // Running out of time costs exactly the same as going to the deck.
+    const fold=foldHandChanges(room,loser),pending=fold.pendingNextHand;
+    const message=name+' agotó su tiempo ('+timeoutCounts[loser]+' de 3 faltas por inactividad) y pierde la mano. '+String(pending.message||'').replace(/^.*? se fue al mazo\. /,'');
+    return {...fold,timeoutCounts,callNotice:{...fold.callNotice,text:name+' agotó su tiempo.',spoken:''},pendingNextHand:{...pending,message},feed:topFeed(room,message)};
   }
   const message=name+' agotó los 45 segundos por tercera vez y pierde la partida. '+(room.players?.[winner]?.name||'El rival')+' gana por inactividad.';
   return {timeoutCounts,status:'complete',turn:null,turnClock:null,turnTimeout:null,
@@ -2567,6 +2569,7 @@ async function expireTurnClock(clock){
     if(state.localGame){
       if(turnClockKey()!==clock.key||!turnClockRemaining(clock).expired)return;
       Object.assign(state.room,turnTimeoutChanges(state.room));
+      if(state.room.pendingNextHand)scheduleLocalNextHand(state.room);
       await settleTurnTimeout(state.room);renderGame();return;
     }
     const fb=state.firebase,code=state.roomCode;
@@ -2798,6 +2801,7 @@ function renderGame() {
   $('game-view').classList.toggle('team-mode',state.room.mode==='2v2');
   // Team tables count down their pauses (tricks, shown flowers and envidos) like 1v1.
   if(state.room.mode==='2v2'){syncPrivateHand();syncMatchChat();renderCallNotice();teamTable.render();tablePeople.decorateTeamSeats();tablePeople.renderEnd();tablePeople.renderSeats();renderTurnTimer();renderRoundPauseTimer();placeMyFlor();finishRoomPreparation();return;}
+  try{matchNotebook?.check();}catch(error){console.error('[truco:notebook]',error);}
   $('opponent-hand').classList.remove('hidden');
   $('team-seats')?.remove();
   syncMatchChat();
@@ -4204,13 +4208,6 @@ function mustSingFlor(room,player,hand){
 }
 // Going to the deck (or running out of time) with an unsung flower sings it first:
 // with no flower on the other side it is worth 3; if the rival also holds one, the rival's wins.
-function foldFlorChanges(room,loser,loserHand,winnerHand){
-  if(!mustSingFlor(room,loser,loserHand))return null;
-  const winner=otherPlayer(loser),rivalFlor=room.flors?.[winner]!=null||(winnerHand?.length===3&&roomHasFlor(room,winnerHand));
-  const flors={...(room.flors||{}),[loser]:florValue(loserHand,room.muestra)};
-  if(rivalFlor&&room.flors?.[winner]==null)flors[winner]=florValue(winnerHand,room.muestra);
-  return {rivalFlor,changes:{flors,envidoClosed:true,...(rivalFlor?{florSettled:true}:{})}};
-}
 function hasStartedLearningPractice(){
   if(state.learningPracticeStarted)return true;
   try{return localStorage.getItem('truco-learning-started-v1')==='true';}catch{return false;}
@@ -5099,7 +5096,8 @@ installScorer({document,showView,renderTally:renderCompactTally,onEvent:(event,e
   people:()=>[$('account-username').textContent,...friends.friendNames()],
   onShare:score=>matchPhoto.start(()=>score)});
 
-installPlayerPanel({document,api:creditApi,getState:()=>state});
+installPlayerPanel({document,api:creditApi,getState:()=>state,versus,profiles,openCard:f=>friendCard.open(f)});
+const matchNotebook=installMatchNotebook({document,getState:()=>state,relationOf:uid=>friends.relationOf(uid),versus,now:()=>gameTime()});
 
 // Online features ask a guest to sign in first.
 $('guest-signin-open').addEventListener('click',()=>account.askSignIn());

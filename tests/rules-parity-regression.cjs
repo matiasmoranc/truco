@@ -76,10 +76,13 @@ test('2v2: with flowers on both teams the first holder to play sings; the rival 
  assert.deepEqual(r.flors,{});
  at(200).action('player1',{kind:'play',cardId:s.hands.player1[0].id});
  assert.equal(r.flors.player2,true);assert.equal(r.flors.player3,undefined);
+ // Every other flower is sung by itself a moment later; until then nobody answers.
+ assert.throws(()=>at(250).action('player3',{kind:'call',value:'no'}),/flor/i);
+ at(1700).advance();assert.equal(r.flors.player3,true);
  assert.equal(r.pendingBet.type,'flor');assert.equal(r.pendingBet.responder,'player3');
  // As in 1v1 there is no "con flor me achico": someone holding a flower sings it or raises.
- assert.throws(()=>at(250).action('player3',{kind:'call',value:'no'}),/flor/i);
- at(300).action('player3',{kind:'call',value:'yes'});assert.equal(r.flors.player3,true);assert.equal(r.florDeferred,3);assert.equal(r.pendingBet,null);
+ assert.throws(()=>at(1750).action('player3',{kind:'call',value:'no'}),/flor/i);
+ at(1800).action('player3',{kind:'call',value:'yes'});assert.equal(r.flors.player3,true);assert.equal(r.florDeferred,3);assert.equal(r.pendingBet,null);
 });
 test('2v2: a sung flor annuls an envido already accepted, which is never paid',()=>{
  const {s,r,at}=table([['♥6','♥2','♣3'],PLAIN[1],PLAIN[2],PLAIN[3]]);
@@ -135,6 +138,7 @@ test('2v2: a team going to the deck before any card or call gives 2 points, as i
 test('2v2: going to the deck while a rival flor waits gives that flor and the hand, as in 1v1',()=>{
  const {r,at}=table([FLOR,FLOR2,PLAIN[2],PLAIN[3]]);
  assert.equal(r.pendingBet.type,'flor');assert.equal(r.pendingBet.callerTeam,'player1');
- at(200).action('player2',{kind:'fold'});at(201).action('player4',{kind:'fold'});at(3300).advance();
+ // player2's flower is sung by itself first; going to the deck, it no longer counts.
+ at(1700).advance();at(1800).action('player2',{kind:'fold'});at(1801).action('player4',{kind:'fold'});at(4900).advance();
  assert.deepEqual(r.scores,{player1:4,player2:0});
 });

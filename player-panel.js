@@ -1,4 +1,4 @@
-export function installPlayerPanel({document,api,getState}){
+export function installPlayerPanel({document,api,getState,versus=null,openCard=null,profiles=null}){
  const $=id=>document.getElementById(id);
  const node=(tag,text,cls)=>{const n=document.createElement(tag);n.textContent=text;if(cls)n.className=cls;return n;};
  const dialog=document.createElement('dialog');dialog.className='player-overlay';
@@ -18,8 +18,39 @@ export function installPlayerPanel({document,api,getState}){
    for(const [label,value] of [['Partidas ganadas',won],['Partidas perdidas',lost],['Porcentaje de victorias',percentage+'%']]){
     const box=node('div','','player-stat');box.append(node('strong',String(value)),node('small',label));stats.append(box);
    }
-   body.append(stats);
+   const general=node('div','','player-tab-panel');general.append(stats);
+   if(!versus){body.append(general);return;}
+   // Two tabs: everything, or against each friend.
+   const tabs=node('div','','player-tabs'),friendsPanel=node('div','','player-tab-panel');friendsPanel.hidden=true;
+   const tab=(text,panel,other)=>{const b=node('button',text,'player-tab');b.type='button';b.onclick=()=>{for(const t of tabs.children)t.classList.toggle('on',t===b);panel.hidden=false;other.hidden=true;if(panel===friendsPanel)againstFriends(friendsPanel,token);};return b;};
+   const first=tab('General',general,friendsPanel);first.classList.add('on');tabs.append(first,tab('Contra amigos',friendsPanel,general));
+   body.append(tabs,general,friendsPanel);
   }catch(e){if(token===generation)body.replaceChildren(node('p',e.message||'No pudimos cargar tus estadísticas.'));}
+ }
+ async function againstFriends(panel,token){
+  panel.replaceChildren(node('p','Cargando…','player-friends-empty'));
+  let all;try{all=Object.values(await versus.load()||{});}catch(e){if(token===generation)panel.replaceChildren(node('p',e.message||'No pudimos cargar las partidas con amigos.','player-friends-empty'));return;}
+  if(token!==generation)return;
+  const games=s=>s.won+s.lost+s.tied,played=all.filter(s=>games(s)>0).sort((a,b)=>games(b)-games(a)||(b.lastAt||0)-(a.lastAt||0));
+  panel.replaceChildren();
+  if(!played.length){panel.append(node('p','Todavía no jugaste contra tus amigos. Invitalos desde Amigos.','player-friends-empty'));return;}
+  const total=played.reduce((n,s)=>n+games(s),0),won=played.reduce((n,s)=>n+s.won,0),lost=played.reduce((n,s)=>n+s.lost,0);
+  const sum=node('div','','player-stats player-friends-sum');
+  for(const [value,label,cls] of [[String(total),'partidas con amigos',''],[won+' – '+lost,'ganadas – perdidas',won>lost?'up':won<lost?'down':'']]){const box=node('div','','player-stat');box.append(node('strong',value,cls),node('small',label));sum.append(box);}
+  panel.append(sum,node('h4','Con quién jugás más','player-friends-title'));
+  const list=node('ul','','player-friends-list');
+  const ago=at=>{if(!at)return '';const d=Math.floor((Date.now()-at)/86400000);return d<1?'última hoy':d<2?'última ayer':d<7?'hace '+d+' días':d<14?'hace 1 semana':'hace '+Math.floor(d/7)+' semanas';};
+  for(const f of played){
+   const li=node('li','','player-friend'),n=games(f),cls=f.won>f.lost?'up':f.won<f.lost?'down':'even';
+   const av=node('span','','friend-avatar');if(profiles)av.innerHTML=profiles.avatarHtml(profiles.profileOf(f.uid,f.name)||{},'player-avatar');
+   const who=node('div','','player-friend-who'),bar=node('div','','player-friend-bar'),fill=node('span','');fill.style.width=Math.round(f.won/Math.max(1,f.won+f.lost)*100)+'%';bar.append(fill);
+   who.append(node('strong',f.name),node('small',n+(n===1?' partida':' partidas')+(f.lastAt?' · '+ago(f.lastAt):'')),bar);
+   const score=node('div','','player-friend-score '+cls);score.append(node('b',f.won+' – '+f.lost),node('small',cls==='up'?'vas ganando':cls==='down'?'vas perdiendo':'parejos'));
+   li.append(av,who,score);
+   if(openCard){li.classList.add('is-tappable');li.onclick=()=>openCard(f);}
+   list.append(li);
+  }
+  panel.append(list,node('p','Las partidas 2 vs 2 cuentan contra un amigo cuando jugó en el equipo rival.','player-friends-note'));
  }
  async function blockedUsers(){
   const token=open('Jugadores bloqueados'),state=getState(),uid=state.uid,fb=state.firebase;

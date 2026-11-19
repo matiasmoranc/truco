@@ -19,13 +19,14 @@ function action(player,command){
  // A command answers the hand the player saw: if the clock ran out first and a new hand was dealt, it is refused.
  const handBefore=state.room.handNumber;
  state.playerId=player;state.hand=localHand(player);advance(false);const room=state.room;
- if(command?.kind!=='draw'&&handBefore!=null&&room.handNumber!==handBefore)throw new Error('Se terminó el tiempo de esa mano.');
+ // A tap that arrives just after the hand ended (a fold, a timeout) is simply dropped.
+ if(command?.kind!=='draw'&&handBefore!=null&&room.handNumber!==handBefore)return save();
  if(!['player1','player2'].includes(player))throw new Error('Invalid player.');
  if(command.kind==='draw'){
   if(room.status!=='drawing'||room.openingDraw.cards[player])throw new Error('El sorteo ya cambió.');
   room.openingDraw.cards[player]=session.drawPool.shift();if(room.openingDraw.cards.player1&&room.openingDraw.cards.player2)room.openingDraw.resolveAt=now+2000;
  }else{
-  if(room.status!=='started'||room.resolvingTrick||room.pendingNextHand)throw new Error('Esperá a que termine la pausa.');
+  if(room.status!=='started'||room.resolvingTrick||room.pendingNextHand){if(['started','timed-out','revealing','complete'].includes(room.status))return save();throw new Error('Esperá a que termine la pausa.');}
   if(command.kind==='play'){if(room.turn!==player||room.pendingBet)throw new Error('No te corresponde jugar una carta.');const card=localHand(player).find(c=>c.id===command.cardId);if(!card)throw new Error('Esa carta no está en tu mano.');localPlay(card);}
   else if(command.kind==='call'){
    if(!['truco','retruco','vale4','envido','real','falta','flor','yes','no','raise','raise-envido','raise-real','raise-falta','raise-conflor','raise-faltaflor'].includes(command.value))throw new Error('Canto inválido.');

@@ -190,9 +190,10 @@ test('1v1: the mano flor is sung automatically and the pie with flor answers it 
  createReferee(s,{now:500}).action('player1',{kind:'call',value:'yes'});assert.equal(s.room.florDeferred,3);assert.equal(s.room.pendingBet,null);
  assert.doesNotThrow(()=>createReferee(s,{now:600}).action('player1',{kind:'play',cardId:'♣-1'}));
 });
-test('1v1: going to the deck with a flor sings it, scores it and then gives up the hand',()=>{const s=florFixture();createReferee(s,{now:200}).action('player1',{kind:'fold'});assert.equal(s.room.callNotice.spoken,'Flor y me voy al mazo');assert.ok(s.room.flors.player1>0);createReferee(s,{now:3500}).advance();assert.equal(s.room.scores.player1,3);assert.equal(s.room.scores.player2,1);});
+// A flower of someone who goes to the deck before showing it does not count: it is not even sung.
+test('1v1: going to the deck holding an unsung flor does not sing it nor score it',()=>{const s=florFixture();s.room.flors={};createReferee(s,{now:200}).action('player1',{kind:'fold'});assert.equal(s.room.callNotice.spoken,'Me voy al mazo');assert.equal(s.room.flors?.player1,undefined);createReferee(s,{now:3500}).advance();assert.equal(s.room.scores.player1,0);assert.equal(s.room.scores.player2,2);});
 test('1v1: going to the deck with a flor against a rival flor gives the rival the flor and the hand',()=>{const s=florFixture(true);createReferee(s,{now:200}).action('player1',{kind:'fold'});createReferee(s,{now:3500}).advance();assert.equal(s.room.scores.player1,0);assert.equal(s.room.scores.player2,4);});
-test('1v1: a flower is sung on its holder turn, and running out of time after it still loses the hand',()=>{const s=florFixture();createReferee(s,{now:200}).advance();assert.ok(s.room.flors.player1>0);assert.equal(s.room.scores.player1,3);createReferee(s,{now:46000}).advance();assert.equal(s.room.scores.player1,3);assert.equal(s.room.scores.player2,1);});
+test('1v1: a flower sung on its holder turn is taken back when time runs out before showing it, as going to the deck',()=>{const s=florFixture();createReferee(s,{now:200}).advance();assert.ok(s.room.flors.player1>0);assert.equal(s.room.scores.player1,3);createReferee(s,{now:46000}).advance();createReferee(s,{now:49500}).advance();assert.equal(s.room.scores.player1,0);assert.equal(s.room.scores.player2,1);});
 
 test('A raise accepts the call it answers: going to the deck then gives that value',()=>{
  const s=fixture();
@@ -232,10 +233,12 @@ test('An envido that does not decide the match lets the hand go on',()=>{
  assert.ok(!s.room.pendingNextHand);assert.equal(s.room.turn,'player1');assert.equal(s.room.status,'started');
 });
 
-test('A command that arrives after the clock ran out is refused instead of acting on the next hand',()=>{
+test('A command that arrives after the clock ran out is dropped (no error) and the timeout costs what going to the deck costs',()=>{
  const s=fixture();createReferee(s,{now:100}).advance();
- assert.throws(()=>createReferee(s,{now:100+45001}).action('player1',{kind:'call',value:'truco'}));
- assert.equal(s.room.scores.player2,1);assert.equal(s.room.scores.player1,0);
+ assert.doesNotThrow(()=>createReferee(s,{now:100+45001}).action('player1',{kind:'call',value:'truco'}));
+ createReferee(s,{now:100+48500}).advance();
+ // Nothing was played or sung: as going to the deck before playing, 2 points.
+ assert.equal(s.room.scores.player2,2);assert.equal(s.room.scores.player1,0);
  assert.notEqual(s.room.pendingBet?.type,'truco');
 });
 
@@ -243,7 +246,7 @@ test('Running out of time with an envido open pays what going to the deck pays, 
  const s=fixture();
  createReferee(s,{now:200}).action('player1',{kind:'call',value:'envido'});
  createReferee(s,{now:300}).action('player2',{kind:'call',value:'raise-real'});
- createReferee(s,{now:300+45001}).advance();
+ createReferee(s,{now:300+45001}).advance();createReferee(s,{now:300+48500}).advance();
  // Envido (2) was accepted by raising; the real envido is left unanswered: 2 points plus the hand.
  assert.equal(s.room.scores.player2,3);
  const lines=Object.values(s.room.handScoreHistory||{}).flatMap(h=>h.entries||[]).map(e=>e.detail);
@@ -306,4 +309,17 @@ test('A name ending in "no" does not turn QUIERO into NO QUIERO (the call is rea
  createReferee(d,{now:200}).action('player1',{kind:'call',value:'falta'});
  createReferee(d,{now:300}).action('player2',{kind:'call',value:'no'});
  assert.equal(d.room.callNotice.spoken,'No quiero');assert.equal(d.room.pendingBet,null);
+});
+test('1v1: running out of time before playing costs what going to the deck costs, 4 when the rival holds a flower',()=>{
+ const s=fixture();s.hands.player2=[card('♥',1),card('♥',7),card('♥',2)];s.originals=structuredClone(s.hands);
+ createReferee(s,{now:100}).advance();createReferee(s,{now:100+45001}).advance();createReferee(s,{now:100+48500}).advance();
+ assert.equal(s.room.scores.player2,4);assert.equal(s.room.scores.player1,0);assert.equal(s.room.timeoutCounts.player1,1);
+});
+test('1v1: a flower already scored counts once it was shown, even going to the deck afterwards',()=>{
+ const s=florFixture();createReferee(s,{now:200}).advance();assert.equal(s.room.scores.player1,3);
+ // Two pieces of the muestra on the table show the flower.
+ s.room.trickCards=[];s.room.tricks=[{winner:'player1',played:[{playerId:'player1',card:s.originals.player1[0]}]},{winner:'player1',played:[{playerId:'player1',card:s.originals.player1[1]}]}];
+ const pieces=s.originals.player1.filter(c=>c.suit===s.room.muestra.suit).length;
+ createReferee(s,{now:300}).action('player1',{kind:'fold'});createReferee(s,{now:3500}).advance();
+ assert.equal(s.room.scores.player1,pieces>=2?3:0);
 });

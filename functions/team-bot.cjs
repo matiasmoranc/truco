@@ -154,7 +154,7 @@ function mustAct(s,p){
  const r=s?.room;
  if(!r||r.status!=='started'||r.resolvingTrick||r.pendingNextHand||r.folded?.[p]||!s.hands?.[p])return false;
  // A partner's flower is about to be sung: the table waits (only that partner may sing it).
- if(r.florFollow)return r.florFollow.seat===p&&florWindow(s,p);
+ if(r.florFollow)return florWindow(s,p);
  const b=r.pendingBet;
  return b?.revealMode?b.revealTurn===p:b?b.responder===p||florWindow(s,p):r.turn===p||florWindow(s,p);
 }
@@ -189,6 +189,8 @@ function botCommands(s,p,random=Math.random){
  if(!mustAct(s,p))return [];
  const r=s.room,b=r.pendingBet;
  if(b?.revealMode)return declarations(s,p);
+ // While the flowers are being sung, a holder only sings theirs (answering comes after).
+ if(r.florFollow&&florWindow(s,p))return [call('flor')];
  if(florWindow(s,p)&&(b?b.responder!==p:r.turn!==p))return [call('flor')];
  if(b)return owesFlor(s,p)&&b.type!=='flor'?[call('flor'),...answers(s,p,random)]:answers(s,p,random);
  const moves=owesFlor(s,p)?[call('flor')]:[],tantos=teamTantos(s,p);
