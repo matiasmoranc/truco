@@ -158,10 +158,10 @@ test('La mia es flor in 2v2 keeps playing and the higher flower takes 3 points w
  let room=l.matches.m1.session.room;
  assert.equal(room.pendingBet,null);assert.equal(room.callNotice.text,'La mía es flor');assert.equal(room.scores.player1+room.scores.player2,0);assert.equal(room.florDeferred,3);
  const sess=l.matches.m1.session,best=['player3','player4'].reduce((a,p)=>florValue(sess.originals[p],room.muestra)>florValue(sess.originals[a],room.muestra)?p:a);
- // Team 1 goes to the deck: player3's flower no longer counts, so player4's takes the 3 points.
+ // Team 1 goes to the deck: player3's flower was sung, so it is still compared; only the higher one is shown.
  l=act(l,'a',{kind:'fold'},3002);l=act(l,'c',{kind:'fold'},3003);l=act(l,'b',{kind:'tick'},6200);room=l.matches.m1.session.room;
- const groups=room.endReveal.groups;assert.equal(groups.length,1);assert.equal(groups[0].player,'player4');void best;assert.match(groups[0].label,/FLOR · /);
- assert.ok(room.handScoreEntries.some(e=>e.player==='player2'&&e.points===3&&e.detail==='3 puntos por flor'));
+ const groups=room.endReveal.groups;assert.equal(groups.length,1);assert.equal(groups[0].player,best);assert.match(groups[0].label,/FLOR · /);
+ assert.ok(room.handScoreEntries.some(e=>e.player===(best==='player3'?'player1':'player2')&&e.points===3&&e.detail==='3 puntos por flor'));
 });
 test('A raise against a sung flor is answered by the player who sang it, and only the winning flor is shown',()=>{
  let l=started(),s=l.matches.m1.session;
@@ -344,9 +344,11 @@ test('Rivals going to the deck during an accepted con flor envido lose it whole 
  l=act(l,'b',{kind:'fold'},5002);l=act(l,'d',{kind:'fold'},5003);const r=l.matches.m1.session.room;
  assert.equal(r.scores.player1,8);assert.ok(r.handScoreEntries.some(e=>e.points===8&&/con flor envido/.test(e.detail)));
 });
-test('A flower scored alone is taken back when its holder goes to the deck before showing it',()=>{
+test('A sung flower still counts when its holder goes to the deck and is shown when the hand ends',()=>{
  let l=started(),s=l.matches.m1.session;s.hands.player1=[card('♦',2),card('♠',7),card('♠',1)];s.originals=structuredClone(s.hands);
  l=act(l,'a',{kind:'tick'},1000);assert.equal(l.matches.m1.session.room.scores.player1,3);
- l=act(l,'a',{kind:'fold'},1100);const r=l.matches.m1.session.room;assert.equal(r.scores.player1,0);
- assert.ok(r.handScoreEntries.some(e=>e.points===-3&&/sin mostrarla/.test(e.detail)));
+ l=act(l,'a',{kind:'fold'},1100);l=act(l,'c',{kind:'fold'},1200);let r=l.matches.m1.session.room;assert.equal(r.scores.player1,3);
+ assert.ok(!r.handScoreEntries.some(e=>e.points<0));
+ l=act(l,'b',{kind:'tick'},5000);r=l.matches.m1.session.room;assert.equal(r.status,'revealing');
+ assert.deepEqual(r.endReveal.groups.map(g=>g.player),['player1']);
 });

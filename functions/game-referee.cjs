@@ -252,7 +252,7 @@ function envidoEvidenceCards(hand,muestra){
 function buildEndEvidence(room,originals){
   const groups=[];
   const flowers=Object.keys(room.flors||{});
-  const florWinner=flowers.length===1?flowers[0]:flowers.length>1?(Number(room.flors.player1)===Number(room.flors.player2)?room.mano:Number(room.flors.player1)>Number(room.flors.player2)?'player1':'player2'):null;
+  const florWinner=room.flors?.[room.florWinner]!=null?room.florWinner:flowers.length===1?flowers[0]:flowers.length>1?(Number(room.flors.player1)===Number(room.flors.player2)?room.mano:Number(room.flors.player1)>Number(room.flors.player2)?'player1':'player2'):null;
   if(florWinner){
     const cards=originals[florWinner]||[];
     if(cards.length===3)groups.push({player:florWinner,label:room.florCompared||room.florDeferred?'Flor · '+florValue(cards,room.muestra)+' tantos':'Flor',cards});
@@ -343,7 +343,7 @@ function localResolveFlor(bet,declared=null){
   const values=state.room.flors||{};if(values.player1==null||values.player2==null)return;
   const winner=declared||(values.player1===values.player2?(state.room.mano||'player1'):(values.player1>values.player2?'player1':'player2'));
   localScore(winner,bet.stake||3,ptsText(bet.stake||3)+' por flor');
-  state.room.florCompared=bet.called==='conflor'||bet.called==='falta';state.room.pendingBet=bet.suspendedBet||null;state.room.envidoClosed=true;state.room.florSettled=true;
+  state.room.florWinner=winner;state.room.florCompared=bet.called==='conflor'||bet.called==='falta';state.room.pendingBet=bet.suspendedBet||null;state.room.envidoClosed=true;state.room.florSettled=true;
 }
 function localCallAction(kind){
   if(state.learning?.paused)return;
@@ -506,7 +506,7 @@ function localDealAfterHand(){
   state.localHands={player1:deck.slice(0,3),player2:deck.slice(3,6)};
   state.localOriginalHands=structuredClone(state.localHands);
   state.localTruth={player1:handEnvido(state.localHands.player1,deck[6]),player2:handEnvido(state.localHands.player2,deck[6])};
-  Object.assign(room,{status:'started',resolutionEndsAt:null,resolvingTrick:false,endReveal:null,mano,dealer:otherPlayer(mano),turn:mano,handNumber:room.handNumber+1,tricks:[],trickCards:[],trickNo:1,muestra:deck[6],deckCount:33,playedCount:0,trucoLevel:1,pendingBet:null,lastTrucoCaller:null,flors:{},florCompared:false,florSettled:false,florDeferred:null,envidoClosed:false,callNotice:null});
+  Object.assign(room,{status:'started',resolutionEndsAt:null,resolvingTrick:false,endReveal:null,mano,dealer:otherPlayer(mano),turn:mano,handNumber:room.handNumber+1,tricks:[],trickCards:[],trickNo:1,muestra:deck[6],deckCount:33,playedCount:0,trucoLevel:1,pendingBet:null,lastTrucoCaller:null,flors:{},florCompared:false,florSettled:false,florDeferred:null,florWinner:null,envidoClosed:false,callNotice:null});
   state.hand=[...state.localHands[state.playerId]];
   localFeed(`${room.players[room.dealer].name} reparte. Empieza ${room.players[mano].name}.`);localAction('auto-flor');renderGame();
 }
@@ -514,20 +514,14 @@ function canFoldHand(room,player){
   if(room?.mode==='2v2')return room.status==='started'&&!!room.players?.[player]&&!room.folded?.[player]&&!room.resolvingTrick&&!room.pendingNextHand;
   return !!room&&['player1','player2'].includes(player)&&room.status==='started'&&!room.resolvingTrick&&!room.pendingNextHand;
 }
-// A flower counts only if its holder does not go to the deck before showing it: two pieces, or the three cards, on the table.
-function florShown(room,player){
-  const cards=[...(room.tricks||[]).flatMap(trick=>trick.played||[]),...(room.trickCards||[])].filter(item=>item?.playerId===player).map(item=>item.card);
-  return cards.length>=3?hasFlor(cards,room.muestra):cards.filter(card=>pieceOrder(card,room.muestra)>0).length>=2;
-}
 function foldHandChanges(room,loser){
   const winner=otherPlayer(loser);
-  // Going to the deck, the flower of whoever leaves stops counting.
-  let extra={};
-  if(room.flors?.[loser]!=null&&room.flors?.[winner]==null&&room.florSettled&&!florShown(room,loser)){
-    const back=Math.min(3,Number(room.scores?.[loser])||0);
-    if(back)extra=sideScore(room,loser,-back,'Se descuentan '+ptsText(back)+' de flor: se fue al mazo sin mostrarla');
-  }
-  if(room.flors?.[loser]!=null&&room.flors?.[winner]!=null&&room.florDeferred&&!room.florSettled)extra={...extra,flors:{[winner]:room.flors[winner]}};
+  // A flower already sung counts even if its holder goes to the deck: it is compared and shown when the hand ends
+  // (an unsung one does not count). A flor call still open (con flor envido, contra flor al resto) is won by the
+  // one who stays, and only their flower is shown. A plain flor against a sung flor is compared as "la mía es flor".
+  const open=room.pendingBet,bothFlors=room.flors?.[winner]!=null&&room.flors?.[loser]!=null;
+  const compare=open?.type==='flor'&&open.called==='flor'&&!open.revealMode&&bothFlors;
+  const extra=compare?{florDeferred:open.stake||3,pendingBet:null,envidoClosed:true}:open?.type==='flor'&&room.flors?.[winner]!=null?{florWinner:winner}:{};
   room={...room,...extra};
   const unopened=Number(room.playedCount||0)===0&&Number(room.trucoLevel||1)===1&&!room.pendingBet&&!room.envidoClosed&&!room.envidoAudit&&!Object.keys(room.flors||{}).length;
   const winnerCards=state.localOriginalHands?.[winner]||[];

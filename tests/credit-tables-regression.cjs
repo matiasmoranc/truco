@@ -193,7 +193,7 @@ test('1v1: the mano flor is sung automatically and the pie with flor answers it 
 // A flower of someone who goes to the deck before showing it does not count: it is not even sung.
 test('1v1: going to the deck holding an unsung flor does not sing it nor score it',()=>{const s=florFixture();s.room.flors={};createReferee(s,{now:200}).action('player1',{kind:'fold'});assert.equal(s.room.callNotice.spoken,'Me voy al mazo');assert.equal(s.room.flors?.player1,undefined);createReferee(s,{now:3500}).advance();assert.equal(s.room.scores.player1,0);assert.equal(s.room.scores.player2,2);});
 test('1v1: going to the deck with a flor against a rival flor gives the rival the flor and the hand',()=>{const s=florFixture(true);createReferee(s,{now:200}).action('player1',{kind:'fold'});createReferee(s,{now:3500}).advance();assert.equal(s.room.scores.player1,0);assert.equal(s.room.scores.player2,4);});
-test('1v1: a flower sung on its holder turn is taken back when time runs out before showing it, as going to the deck',()=>{const s=florFixture();createReferee(s,{now:200}).advance();assert.ok(s.room.flors.player1>0);assert.equal(s.room.scores.player1,3);createReferee(s,{now:46000}).advance();createReferee(s,{now:49500}).advance();assert.equal(s.room.scores.player1,0);assert.equal(s.room.scores.player2,1);});
+test('1v1: a flower sung on its holder turn still counts when time runs out, as going to the deck',()=>{const s=florFixture();createReferee(s,{now:200}).advance();assert.ok(s.room.flors.player1>0);assert.equal(s.room.scores.player1,3);createReferee(s,{now:46000}).advance();createReferee(s,{now:49500}).advance();assert.equal(s.room.scores.player1,3);assert.equal(s.room.scores.player2,1);});
 
 test('A raise accepts the call it answers: going to the deck then gives that value',()=>{
  const s=fixture();
@@ -315,13 +315,26 @@ test('1v1: running out of time before playing costs what going to the deck costs
  createReferee(s,{now:100}).advance();createReferee(s,{now:100+45001}).advance();createReferee(s,{now:100+48500}).advance();
  assert.equal(s.room.scores.player2,4);assert.equal(s.room.scores.player1,0);assert.equal(s.room.timeoutCounts.player1,1);
 });
-test('1v1: a flower already scored counts once it was shown, even going to the deck afterwards',()=>{
+test('1v1: a sung flower counts going to the deck and is shown when the hand ends',()=>{
  const s=florFixture();createReferee(s,{now:200}).advance();assert.equal(s.room.scores.player1,3);
- // Two pieces of the muestra on the table show the flower.
- s.room.trickCards=[];s.room.tricks=[{winner:'player1',played:[{playerId:'player1',card:s.originals.player1[0]}]},{winner:'player1',played:[{playerId:'player1',card:s.originals.player1[1]}]}];
- const pieces=s.originals.player1.filter(c=>c.suit===s.room.muestra.suit).length;
  createReferee(s,{now:300}).action('player1',{kind:'fold'});createReferee(s,{now:3500}).advance();
- assert.equal(s.room.scores.player1,pieces>=2?3:0);
+ assert.equal(s.room.scores.player1,3);assert.equal(s.room.scores.player2,1);
+ assert.equal(s.room.status,'revealing');assert.deepEqual(s.room.endReveal.groups.map(g=>g.player),['player1']);
+});
+test('1v1: going to the deck during a con flor envido, the one who stays wins it and only their flower is shown',()=>{
+ const s=florFixture(true);createReferee(s,{now:200}).action('player1',{kind:'play',cardId:'♣-1'});
+ createReferee(s,{now:300}).action('player2',{kind:'call',value:'raise-conflor'});
+ createReferee(s,{now:400}).action('player1',{kind:'fold'});createReferee(s,{now:3600}).advance();
+ assert.ok(s.room.scores.player2>=4);assert.equal(s.room.scores.player1,0);
+ assert.deepEqual(s.room.endReveal.groups.filter(g=>/Flor/.test(g.label)).map(g=>g.player),['player2']);
+});
+test('1v1: flor against flor is compared even if one goes to the deck; only the winning flower is shown',()=>{
+ const s=florFixture(true);createReferee(s,{now:200}).action('player1',{kind:'play',cardId:'♣-1'});
+ createReferee(s,{now:300}).action('player2',{kind:'call',value:'yes'});assert.ok(s.room.flors.player1>0&&s.room.flors.player2>0);
+ const best=s.room.flors.player1>=s.room.flors.player2?'player1':'player2';
+ createReferee(s,{now:400}).action('player1',{kind:'fold'});createReferee(s,{now:3600}).advance();
+ const flor=s.room.endReveal.groups.filter(g=>/Flor/.test(g.label));assert.deepEqual(flor.map(g=>g.player),[best]);
+ assert.ok(s.room.lastHandScore.entries.some(e=>e.player===best&&/flor/.test(e.detail)));
 });
 
 test('Two friends: the first turn clock starts when their notebook leaves (6 s) and nobody plays before',()=>{

@@ -62,7 +62,7 @@ function createTeamReferee(s,{now=Date.now(),deckFactory=deck}={}){
  const pts=n=>Number(n)===1?'1 punto':n+' puntos',trucoName=l=>({1:'truco',2:'truco',3:'retruco',4:'vale cuatro'})[l]||'truco',envidoName=k=>({envido:'envido',real:'real envido',falta:'falta envido'})[k]||'envido';
  // The history records the points actually added (the score never passes the target), as in 1v1.
  function award(t,n,detail){const before=r.scores[t];r.scores[t]=Math.min(r.targetPoints,before+n);if(r.scores[t]>=r.targetPoints&&!r.firstToTarget)r.firstToTarget=t;r.handScoreEntries??=[];r.handScoreEntries.push({player:t,points:r.scores[t]-before,detail});feed(detail);}
- function evidence(){const groups=[];for(const p of r.florWinner?[r.florWinner]:Object.keys(r.flors||{}).filter(active))groups.push({player:p,name:r.players[p].name,cards:s.originals[p],label:'FLOR'+(r.florCompared?' · '+florValue(s.originals[p],r.muestra):'')});if(r.envidoAudit){const p=r.envidoAudit.winner;groups.push({player:p,name:r.players[p].name,cards:envidoCards(s.originals[p],r.muestra),label:r.envidoAudit.value+' TANTOS'});}return groups;}
+ function evidence(){const groups=[];for(const p of r.florWinner?[r.florWinner]:Object.keys(r.flors||{}))groups.push({player:p,name:r.players[p].name,cards:s.originals[p],label:'FLOR'+(r.florCompared?' · '+florValue(s.originals[p],r.muestra):'')});if(r.envidoAudit){const p=r.envidoAudit.winner;groups.push({player:p,name:r.players[p].name,cards:envidoCards(s.originals[p],r.muestra),label:r.envidoAudit.value+' TANTOS'});}return groups;}
  function finish(winner,points,reason=''){
   if(r.status!=='started')return;
   if(r.envidoAudit&&!r.envidoAudit.settled){
@@ -71,7 +71,7 @@ function createTeamReferee(s,{now=Date.now(),deckFactory=deck}={}){
    award(team(a.winner),a.stake,pts(a.stake)+' por '+envidoName(a.called)+(liar?' ('+r.players[liar].name+' mintió: dijo '+a.reveals[liar]+' y tenía '+s.truth[liar]+')':''));a.settled=true;
   }
   if(r.florDeferred&&!r.florSettled){
-   const best=ordered(r.mano).filter(p=>r.flors[p]!=null&&active(p)).reduce((a,p)=>!a||florValue(s.originals[p],r.muestra)>florValue(s.originals[a],r.muestra)?p:a,null);
+   const best=ordered(r.mano).filter(p=>r.flors[p]!=null).reduce((a,p)=>!a||florValue(s.originals[p],r.muestra)>florValue(s.originals[a],r.muestra)?p:a,null);
    if(best){award(team(best),r.florDeferred,pts(r.florDeferred)+' por flor');r.florWinner=best;r.florCompared=true;}r.florSettled=true;
   }
   if(points)award(winner,points,reason||pts(points)+(r.trucoLevel>1?' por '+trucoName(r.trucoLevel):' de la mano'));
@@ -91,18 +91,18 @@ function createTeamReferee(s,{now=Date.now(),deckFactory=deck}={}){
   autoFlor();
  }
  function clock(){const p=r.pendingBet?.revealMode?r.pendingBet.revealTurn:r.pendingBet?.responder||r.turn;const key=r.status==='started'&&!r.resolvingTrick&&!r.pendingNextHand&&p?`${r.handNumber}:${r.trickNo}:${r.playedCount}:${p}:${r.pendingBet?.id||''}:${r.pendingBet?.revealTurn||''}`:null;if(!key)r.turnClock=null;else if(r.turnClock?.key!==key)r.turnClock={key,player:p,startedAt:now};}
- // Going to the deck with an unsung flower sings it first (it may score, or the rivals answer it).
- // A flower counts only if its holder does not go to the deck before showing it: two pieces, or the three cards, on the table.
- function florShown(p){const cards=[...(r.tricks||[]).flatMap(t=>t.cards||[]),...(r.trickCards||[])].filter(c=>c.playerId===p).map(c=>c.card);return cards.length>=3?flower(cards,r.muestra):cards.filter(c=>piece(c,r.muestra)).length>=2;}
+ // A flower already sung counts even if its holder goes to the deck (it is compared and shown when the hand ends);
+ // an unsung one does not count.
  function fold(p){const sings=false;if(r.florFollow?.seat===p)r.florFollow=null;
-  if(r.florPaid?.[p]&&!florShown(p)){const t=team(p),back=Math.min(r.florPaid[p],r.scores[t]);r.scores[t]-=back;r.handScoreEntries??=[];r.handScoreEntries.push({player:t,points:-back,detail:'Se descuentan '+pts(back)+' de flor: '+r.players[p].name+' se fue al mazo sin mostrarla'});feed(r.players[p].name+' se fue al mazo sin mostrar la flor.');delete r.florPaid[p];}
   r.folded??={};r.folded[p]=true;notice(p,sings?'Flor y me voy al mazo':'Me voy al mazo');if(sings)feed(r.players[p].name+' cantó flor.');feed(r.players[p].name+' se fue al mazo.');const t=team(p);if(!members(t).length){const b=r.pendingBet,w=opponent(t);
   // As in 1v1: the whole team goes to the deck before any card, call or flor: 2 points, or 4 when a
   // rival holds a flower (it is sung: 3 of flor and 1 of the hand).
   const unopened=!r.playedCount&&(Number(r.trucoLevel)||1)===1&&!b&&!r.envidoClosed&&!r.envidoAudit&&!Object.keys(r.flors||{}).length;
   const florHolder=unopened?ordered(r.mano).find(q=>team(q)===w&&canSing(q)):null;
   if(florHolder){r.flors[florHolder]=true;r.florWinner=florHolder;r.florSettled=true;r.envidoClosed=true;notice(florHolder,'Flor');award(w,3,'3 puntos por flor');}
-  if(b&&b.type!=='truco'){
+  // A plain flor against sung flowers of the team that leaves is compared as "la mía es flor".
+  if(b?.type==='flor'&&b.called==='flor'&&!b.revealMode&&Object.keys(r.flors||{}).some(q=>team(q)===t)&&Object.keys(r.flors||{}).some(q=>team(q)===w)){r.florDeferred=b.stake||3;r.envidoClosed=true;}
+  else if(b&&b.type!=='truco'){
    // The flowers of a team that went to the deck no longer count: an accepted flor is won whole by the
    // team that stays (not as a "no quiero"); an open one pays the flowers of the team that stays.
    const wFlors=members(w).filter(holdsFlor).length;
