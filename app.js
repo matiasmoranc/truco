@@ -1,6 +1,6 @@
 import './chat-moderation.js?v=20261013-moderation1';
 import { visitPlatform,takeVisit,markTestDevice,markGuestVisit,trackUsage,journeyStep } from './visit.js?v=20261115-time1';
-import { installFriends } from './friends.js?v=20261119-amigos3';
+import { installFriends } from './friends.js?v=20261119-amigos5';
 import { installPlayerPanel } from './player-panel.js?v=20261119-amigos2';
 import { createVersus,installMatchNotebook,installFriendCard } from './friend-notebook.js?v=20261119-amigos4';
 import { installScorer,renderCompactTally } from './scorer.js?v=20261101-usage1';

@@ -80,11 +80,13 @@ export function installFriends({$,api,services,getState,toast,tableToInvite,join
   return b;
  }
  // How you do against a friend, next to the name; touching the row opens the friend's card.
+ // In the friend list: no level, and the record next to the name, so the second line (En línea, Hace 2 minutos) fits whole.
  function withRecord(item,f){
-  const s=versus?.cached()?.[f.uid];
-  if(s){const games=s.won+s.lost,chip=el('span','friend-record '+(!games?'none':s.won>s.lost?'up':s.won<s.lost?'down':'even'));
-   chip.append(el('b','',games?s.won+' – '+s.lost:'Sin partidas'),el('small','',!games?'todavía':s.won>s.lost?'vas ganando':s.won<s.lost?'vas perdiendo':'parejos'));
-   item.querySelector('.friend-actions')?.before(chip);}
+  item.classList.add('with-record');item.querySelector('.friend-level')?.remove();
+  const s=versus?.cached()?.[f.uid],games=s?s.won+s.lost:0;
+  const name=item.querySelector('.friend-who strong');
+  if(name&&games){const line=el('div','friend-name-line'),chip=el('span','friend-record '+(s.won>s.lost?'up':s.won<s.lost?'down':'even'),s.won+' – '+s.lost);
+   chip.title=s.won>s.lost?'Vas ganando':s.won<s.lost?'Vas perdiendo':'Parejos';name.replaceWith(line);line.append(name,chip);}
   if(openCard){item.classList.add('is-tappable');item.onclick=e=>{if(e.target.closest('button'))return;openCard(f);};}
   return item;
  }
