@@ -31,7 +31,7 @@ export function installPlayerPanel({document,api,getState,versus=null,openCard=n
   panel.replaceChildren(node('p','Cargando…','player-friends-empty'));
   let all;try{all=Object.values(await versus.load()||{});}catch(e){if(token===generation)panel.replaceChildren(node('p',e.message||'No pudimos cargar las partidas con amigos.','player-friends-empty'));return;}
   if(token!==generation)return;
-  const games=s=>s.won+s.lost+s.tied,played=all.filter(s=>games(s)>0).sort((a,b)=>games(b)-games(a)||(b.lastAt||0)-(a.lastAt||0));
+  const games=s=>s.won+s.lost,played=all.filter(s=>games(s)>0).sort((a,b)=>games(b)-games(a)||(b.lastAt||0)-(a.lastAt||0));
   panel.replaceChildren();
   if(!played.length){panel.append(node('p','Todavía no jugaste contra tus amigos. Invitalos desde Amigos.','player-friends-empty'));return;}
   const total=played.reduce((n,s)=>n+games(s),0),won=played.reduce((n,s)=>n+s.won,0),lost=played.reduce((n,s)=>n+s.lost,0);

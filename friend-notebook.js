@@ -17,29 +17,29 @@ export function createVersus({api,now=()=>Date.now()}){
 }
 
 const el=(document,tag,cls,text)=>{const n=document.createElement(tag);if(cls)n.className=cls;if(text!=null)n.textContent=text;return n;};
-const empty={won:0,lost:0,tied:0,last:[],one:{won:0,lost:0},teamVs:{won:0,lost:0},together:{won:0,lost:0},streak:null};
+const empty={won:0,lost:0,last:[],one:{won:0,lost:0},teamVs:{won:0,lost:0},together:{won:0,lost:0},streak:null};
 const plural=(n,one,many)=>n+' '+(n===1?one:many);
 export const firstName=name=>String(name||'').split(/[._\s-]/)[0]||String(name||'');
 
 // The short line under the numbers: who is ahead, or how the last game went.
 export function versusLine(stats,other){
- const s=stats||empty,games=s.won+s.lost+s.tied,diff=s.won-s.lost;
+ const s=stats||empty,games=s.won+s.lost,diff=s.won-s.lost;
  if(!games)return {last:'',mood:'Primera partida entre ustedes. ¡Suerte!'};
- const lastRival=(s.last||[]).find(g=>!g.together);
- const last=lastRival?(lastRival.result==='won'?'La última la ganaste vos':lastRival.result==='lost'?'La última la ganó '+other:'La última terminó empatada')+(lastRival.mine||lastRival.theirs?', '+Math.max(lastRival.mine,lastRival.theirs)+' a '+Math.min(lastRival.mine,lastRival.theirs)+'.':'.'):'';
+ const lastRival=(s.last||[]).find(g=>!g.together&&g.result!=='tied');
+ const last=lastRival?(lastRival.result==='won'?'La última la ganaste vos':'La última la ganó '+other)+(lastRival.mine||lastRival.theirs?', '+Math.max(lastRival.mine,lastRival.theirs)+' a '+Math.min(lastRival.mine,lastRival.theirs)+'.':'.'):'';
  const mood=diff>0?{lead:'Vas ganando por '+diff,tail:' ¡dale!'}:diff<0?{lead:other+' va ganando por '+(-diff),tail:' ¡a remontar!'}:{lead:'Están parejos',tail:' ¡a desempatar!'};
  return {last,mood};
 }
 
-// The notebook page: "Vos vs Caro", the wins of each one and the ties, and one line below.
+// The notebook page: "Vos vs Caro", the wins of each one (truco has no ties) and one line below.
 export function notebookElement(document,stats,otherName){
- const s=stats||empty,other=firstName(otherName),games=s.won+s.lost+s.tied;
+ const s=stats||empty,other=firstName(otherName),games=s.won+s.lost;
  const page=el(document,'div','versus-notebook');
  const rings=el(document,'div','versus-rings');for(let i=0;i<10;i++)rings.append(el(document,'i'));
  const inner=el(document,'div','versus-page');
  const h=el(document,'h3','','Vos vs '+other+' ');h.append(el(document,'small','','· '+plural(games,'partida','partidas')));
  inner.append(h);
- for(const [name,value,lead] of [['Vos',s.won,s.won>s.lost],[other,s.lost,s.lost>s.won],['Empates',s.tied,false]]){
+ for(const [name,value,lead] of [['Vos',s.won,s.won>s.lost],[other,s.lost,s.lost>s.won]]){
   const row=el(document,'div','versus-row'+(lead?' lead':''));const n=el(document,'b','',String(value));
   row.append(el(document,'span','',name),n);inner.append(row);
  }
@@ -108,9 +108,9 @@ export function installFriendCard({document,versus,profiles=null,onInvite=null,t
   content.append(grid);
   if(s.last?.length){
    content.append(el(document,'h4','versus-section','Últimas partidas'));const list=el(document,'ul','versus-last');
-   for(const g of s.last){
-    const li=el(document,'li'),mark=el(document,'i',g.result==='won'?'w':g.result==='lost'?'l':'t',g.result==='won'?'G':g.result==='lost'?'P':'E');
-    const text=(g.result==='won'?'Ganaste':g.result==='lost'?'Perdiste':'Empataron')+(g.mine||g.theirs?' '+g.mine+' a '+g.theirs:'')+(g.together?' juntos':'');
+   for(const g of s.last.filter(g=>g.result!=='tied')){
+    const li=el(document,'li'),mark=el(document,'i',g.result==='won'?'w':'l',g.result==='won'?'G':'P');
+    const text=(g.result==='won'?'Ganaste':'Perdiste')+(g.mine||g.theirs?' '+g.mine+' a '+g.theirs:'')+(g.together?' juntos':'');
     li.append(mark,el(document,'span','',text),el(document,'small','',(g.mode==='2v2'?'2 vs 2':'1 vs 1')+(g.at?' · '+when(g.at):'')));list.append(li);
    }
    content.append(list);

@@ -82,7 +82,7 @@ export function installFriends({$,api,services,getState,toast,tableToInvite,join
  // How you do against a friend, next to the name; touching the row opens the friend's card.
  function withRecord(item,f){
   const s=versus?.cached()?.[f.uid];
-  if(s){const games=s.won+s.lost+s.tied,chip=el('span','friend-record '+(!games?'none':s.won>s.lost?'up':s.won<s.lost?'down':'even'));
+  if(s){const games=s.won+s.lost,chip=el('span','friend-record '+(!games?'none':s.won>s.lost?'up':s.won<s.lost?'down':'even'));
    chip.append(el('b','',games?s.won+' – '+s.lost:'Sin partidas'),el('small','',!games?'todavía':s.won>s.lost?'vas ganando':s.won<s.lost?'vas perdiendo':'parejos'));
    item.querySelector('.friend-actions')?.before(chip);}
   if(openCard){item.classList.add('is-tappable');item.onclick=e=>{if(e.target.closest('button'))return;openCard(f);};}
