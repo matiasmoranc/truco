@@ -108,10 +108,10 @@ export function createTableEngine({code,bank,clock=()=>Date.now()}){
    try{await accounting('create',{id,uid:user.uid,name:user.name,stake,targetPoints,mode,secret,...(house?{house:true}:{})},{creating:true,initial});}
    catch(error){if(!m)m=previous;throw error;}
   },
-  async join(user,{password='',team,initial}){
+  async join(user,{password='',team,friends=false,initial}){
    if(!m)throw new Error('La mesa ya no está disponible.');
    if(findPlayer(m,user.uid))return;
-   await accounting('join',{uid:user.uid,name:user.name,password,team},{initial});
+   await accounting('join',{uid:user.uid,name:user.name,password,team,friends},{initial});
    if(m.house){const host=m.players[m.house];presence={...presence,[m.house]:{uid:host.uid,matchNumber:m.matchNumber,online:true}};}
    scheduleBot();
   },
@@ -179,7 +179,7 @@ export function createTableEngine({code,bank,clock=()=>Date.now()}){
     for(const p of Object.values(presence))if(p?.online===false&&Number.isFinite(p.disconnectedAt))times.push(p.disconnectedAt+WAITING_DROP_MS);}
    const r=m.session?.room;
    if(m.status==='reserved'&&r){
-    times.push(r.pendingBet?.florAt,r.florFollow?.at,r.resolutionEndsAt,r.pendingNextHand?.endsAt,r.status==='revealing'?r.endReveal?.endsAt:null,r.openingDraw?.resolveAt,r.openingDraw?.endsAt);
+    times.push(r.pendingBet?.florAt,r.introUntil>now?r.introUntil:null,r.florFollow?.at,r.resolutionEndsAt,r.pendingNextHand?.endsAt,r.status==='revealing'?r.endReveal?.endsAt:null,r.openingDraw?.resolveAt,r.openingDraw?.endsAt);
     if(r.turnClock?.startedAt)times.push(r.turnClock.startedAt+45000);
     times.push(botDueAt);
     if(botSeat()&&Number.isFinite(r.turnClock?.startedAt))times.push(r.turnClock.startedAt+overdueAfter());

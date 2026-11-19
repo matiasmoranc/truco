@@ -29,7 +29,8 @@ function createTable(ledger,{code,id,uid,name,stake,targetPoints,mode='1v1',secr
  next.matches??={};next.tables??={};next.tables[code]=id;
  next.matches[id]={id,code,mode,player1:uid,player2:null,stake,targetPoints,status:'waiting',createdAt:now,secret,revision:1,players:{player1:{uid,name,online:true}},requests:{},matchNumber:1,...(house?{house:'player1'}:{})};return next;
 }
-function joinTable(ledger,{code,uid,name,password='',team,now}){
+// friends: the person joining and the one who created the table are friends (read by the caller).
+function joinTable(ledger,{code,uid,name,password='',team,friends=false,now}){
  const next=structuredClone(ledger),m=tableFor(next,code);
  if(findPlayer(m,uid))return next;
  if(m.status!=='waiting'||now-m.createdAt>=waitFor(m))fail('La mesa ya no está disponible.');
@@ -38,7 +39,8 @@ function joinTable(ledger,{code,uid,name,password='',team,now}){
  const wallet=checkWallet(next,uid,m.stake),host=next.wallets[m.player1];
  if(!m.house&&m.stake>0&&host?.locked!==m.stake)fail('La reserva de la mesa no es válida.');
  if(wallet){wallet.balance-=m.stake;wallet.locked=m.stake;}m.player2=uid;m.players.player2={uid,name,online:true};m.status='reserved';
- m.session=newSession(code,m.players,m.targetPoints,{id:m.id,stake:m.stake,pot:m.stake*2,hasPassword:!!m.secret,matchNumber:1},now);m.revision++;return next;
+ if(friends===true&&!m.house)m.friends=true;
+ m.session=newSession(code,m.players,m.targetPoints,{id:m.id,stake:m.stake,pot:m.stake*2,hasPassword:!!m.secret,matchNumber:1,...(m.friends?{friends:true}:{})},now);m.revision++;return next;
 }
 function cancelWaiting(ledger,m,now,reason='waiting-canceled'){if(!m.house&&m.stake>0){const wallet=ledger.wallets[m.player1];if(wallet.locked!==m.stake)fail('La reserva cambió.');wallet.balance+=m.stake;wallet.locked=0;}m.status='refunded';m.closedAt=now;m.closeReason=reason;m.revision++;}
 function finishAccounting(ledger,m,now){
@@ -122,8 +124,8 @@ function tableOperation(ledger,{code,uid,command,requestId,expectedMatchId,prese
   const r=m.session.room;if(['request','accept'].includes(command.value))checkWallet(next,uid,m.stake);if(command.value==='request'&&!r.rematch){r.rematch={id:requestId,requester:player,status:'pending'};}
   else if(r.rematch?.status==='pending'&&r.rematch.requester!==player&&['request','accept'].includes(command.value)){
    const newId=code+'_'+now+'_m'+(m.matchNumber+1),funded=m.stake>0?reserveStakes(next,{id:newId,player1:m.player1,player2:m.player2,stake:m.stake,now}):{...next,matches:{...next.matches,[newId]:{player1:m.player1,player2:m.player2,stake:0,status:'reserved',reservedAt:now}}};
-   const record=funded.matches[newId];Object.assign(record,{id:newId,code,players:m.players,targetPoints:m.targetPoints,secret:m.secret??null,createdAt:now,revision:m.revision+1,requests:{},matchNumber:m.matchNumber+1});
-   record.session=newSession(code,m.players,m.targetPoints,{id:newId,stake:m.stake,pot:m.stake*2,hasPassword:!!m.secret,matchNumber:record.matchNumber},now);
+   const record=funded.matches[newId];Object.assign(record,{id:newId,code,players:m.players,targetPoints:m.targetPoints,secret:m.secret??null,createdAt:now,revision:m.revision+1,requests:{},matchNumber:m.matchNumber+1,...(m.friends?{friends:true}:{})});
+   record.session=newSession(code,m.players,m.targetPoints,{id:newId,stake:m.stake,pot:m.stake*2,hasPassword:!!m.secret,matchNumber:record.matchNumber,...(m.friends?{friends:true}:{})},now);
    record.session.room.sessionResults={...(r.sessionResults||{}),[m.matchNumber]:{winner:r.matchResult?.winner||['player1','player2'].find(p=>r.scores[p]>=r.targetPoints),scores:r.scores}};
    funded.tables[code]=newId;return funded;
   }else if(command.value==='decline'&&r.rematch?.status==='pending'&&r.rematch.requester!==player){r.rematch={...(r.rematch||{}),status:'declined'};}else fail('La revancha cambió.');

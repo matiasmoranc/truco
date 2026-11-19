@@ -114,9 +114,9 @@ export class TableRoom extends DurableObject{
    const match=this.engine.match;
    if(!match)throw new Error('La mesa ya no está disponible.');
    if(!this.engine.playerFor(uid)){
-    const [user,blocked,initial]=await Promise.all([this.identity(uid),this.blockedWithPlayers(uid),this.bank.prefetch()]);
+    const [user,blocked,initial,friends]=await Promise.all([this.identity(uid),this.blockedWithPlayers(uid),this.bank.prefetch(),this.friendsWithHost(uid)]);
     if(blocked)throw new Error('No pueden entrar a la misma mesa porque uno bloqueó al otro.');
-    await this.engine.join(user,{password:message.password||'',team:message.team,initial});
+    await this.engine.join(user,{password:message.password||'',team:message.team,friends,initial});
    }
    this.engine.setOnline(uid,true);
    await this.commit();return this.result(uid);
@@ -165,6 +165,11 @@ export class TableRoom extends DurableObject{
   if(cached&&Date.now()-cached.at<60000)return cached.promise;
   const promise=playerIdentity(this.db,uid);this.identities.set(uid,{promise,at:Date.now()});
   promise.catch(()=>this.identities.delete(uid));return promise;
+ }
+ // A 1 vs 1 between friends starts with their notebook on the table; a failed read just skips it.
+ async friendsWithHost(uid){
+  const m=this.engine.match;if(!m||m.mode==='2v2'||m.house||!m.player1||m.player1===uid)return false;
+  try{return !!(await this.db.get('friends/'+uid+'/'+m.player1));}catch{return false;}
  }
  async blockedWithPlayers(uid){
   const people=Object.values(this.engine.match?.players||{}).filter(p=>p&&!p.bot);

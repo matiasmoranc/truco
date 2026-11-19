@@ -323,3 +323,21 @@ test('1v1: a flower already scored counts once it was shown, even going to the d
  createReferee(s,{now:300}).action('player1',{kind:'fold'});createReferee(s,{now:3500}).advance();
  assert.equal(s.room.scores.player1,pieces>=2?3:0);
 });
+
+test('Two friends: the first turn clock starts when their notebook leaves (6 s) and nobody plays before',()=>{
+ let l=join(create(),{friends:true});
+ let m=l.matches.game1,r=m.session.room;
+ assert.equal(m.friends,true);assert.equal(r.introUntil,6200);
+ assert.equal(r.turnClock.startedAt,6200);
+ const turn=r.turn,uid=turn==='player1'?'a':'b',card=m.session.hands[turn][0].id;
+ assert.throws(()=>op(l,uid,{kind:'play',cardId:card},3000),/Esperá un momento/);
+ // The clock has not run during the notebook: at 6200+44000 the turn is still there.
+ l=op(l,uid,{kind:'tick'},6200+44000);assert.equal(l.matches.game1.session.room.status,'started');
+ // (With a random deal a flower may be sung when the notebook leaves; then the hand goes on from there.)
+ const after=l.matches.game1.session.room;assert.equal(after.turnTimeout??null,null);
+ if(after.turn===turn&&!after.pendingBet){l=op(l,uid,{kind:'play',cardId:card},6200+44100);assert.equal(l.matches.game1.session.room.playedCount,1);}
+});
+test('Not friends: no notebook and the turn clock starts at once',()=>{
+ const r=join(create()).matches.game1.session.room;
+ assert.equal(r.introUntil,undefined);assert.equal(r.turnClock.startedAt,200);
+});

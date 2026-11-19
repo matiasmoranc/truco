@@ -118,7 +118,8 @@ async function joinTableRequest(request){
  try{
   const [user,,table]=await Promise.all([measured(stages,'identityMs',identity(request)),request.auth?measured(stages,'rateLimitMs',rateLimit(request.auth.uid)):Promise.resolve(),measured(stages,'lookupMs',readTable())]);
   if((await measured(stages,'blocksMs',Promise.all(Object.values(table.players||{}).filter(person=>person?.uid).map(person=>usersBlockEachOther(db,user.uid,person.uid))))).some(Boolean))throw new HttpsError('failed-precondition','No pueden entrar a la misma mesa porque uno bloqueó al otro.');
-  const ledger=await measured(stages,'accountingMs',mutate(current=>joinTable(current,{...user,code,password,team,now:Date.now()})));
+  const friends=table.mode!=='2v2'&&!!table.player1&&table.player1!==user.uid&&!!(await db.ref('friends/'+user.uid+'/'+table.player1).once('value').catch(()=>null))?.val();
+  const ledger=await measured(stages,'accountingMs',mutate(current=>joinTable(current,{...user,code,password,team,friends,now:Date.now()})));
   const result=await measured(stages,'projectionMs',publish(ledger,code)),m=tableFor(ledger,code),seat=Object.keys(m.players).find(p=>m.players[p]?.uid===user.uid);
   return {...result,privateHand:seat?privateTableHand(m,seat):null,timing:{...stages,totalMs:Date.now()-started}};
  }finally{console.info('Table entry timing',{kind:'join',...stages,totalMs:Date.now()-started});}

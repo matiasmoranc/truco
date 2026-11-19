@@ -2,7 +2,7 @@ import './chat-moderation.js?v=20261013-moderation1';
 import { visitPlatform,takeVisit,markTestDevice,markGuestVisit,trackUsage,journeyStep } from './visit.js?v=20261115-time1';
 import { installFriends } from './friends.js?v=20261119-amigos3';
 import { installPlayerPanel } from './player-panel.js?v=20261119-amigos2';
-import { createVersus,installMatchNotebook,installFriendCard } from './friend-notebook.js?v=20261119-amigos3';
+import { createVersus,installMatchNotebook,installFriendCard } from './friend-notebook.js?v=20261119-amigos4';
 import { installScorer,renderCompactTally } from './scorer.js?v=20261101-usage1';
 import { installActivity } from './activity.js?v=20261010-adminstats32';
 import { installCredits } from './credits.js?v=20261025-claim1';
@@ -3537,6 +3537,8 @@ function localAction(action){
     const room=state.room;
     // In Aprender the player practises singing the flower: there it stays manual.
     if(state.learning||state.singingAutoFlor||room?.status!=='started'||room.resolvingTrick||room.pendingNextHand||Object.keys(room.flors||{}).length||room.florSettled)return false;
+    // Two friends' notebook is still on the table: the flower waits until it leaves.
+    if(now<Number(room.introUntil||0))return false;
     const bet=room.pendingBet;if(bet?.revealMode||bet?.type==='flor')return false;
     const holder=bet?bet.responder:room.turn;
     if(!holder||localHand(holder).length!==3||!roomHasFlor(room,localHand(holder)))return false;

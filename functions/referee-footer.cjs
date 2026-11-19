@@ -1,5 +1,5 @@
 function save(){session.hands=state.localHands;session.originals=state.localOriginalHands;session.truth=state.localTruth;return session;}
-function clock(){const key=turnClockKey();if(!key){state.room.turnClock=null;return;}if(state.room.turnClock?.key!==key)state.room.turnClock={key,startedAt:now};}
+function clock(){const key=turnClockKey();if(!key){state.room.turnClock=null;return;}if(state.room.turnClock?.key!==key)state.room.turnClock={key,startedAt:Math.max(now,Number(state.room.introUntil)||0)};}
 function advance(sing=true){const room=state.room;
  if(room.status==='drawing')start();
 
@@ -21,6 +21,8 @@ function action(player,command){
  state.playerId=player;state.hand=localHand(player);advance(false);const room=state.room;
  // A tap that arrives just after the hand ended (a fold, a timeout) is simply dropped.
  if(command?.kind!=='draw'&&handBefore!=null&&room.handNumber!==handBefore)return save();
+ // Two friends see their notebook on the table first: nobody plays until it leaves.
+ if(command?.kind!=='draw'&&now<Number(room.introUntil||0))throw new Error('Esperá un momento.');
  if(!['player1','player2'].includes(player))throw new Error('Invalid player.');
  if(command.kind==='draw'){
   if(room.status!=='drawing'||room.openingDraw.cards[player])throw new Error('El sorteo ya cambió.');
@@ -46,9 +48,11 @@ function start(){state.room.mano='player2';state.room.status='started';state.roo
 return {action,advance,start};
 }
 function serverDeck(){const cards=[];for(const [suit,name] of [['♦','oro'],['♥','copa'],['♠','espada'],['♣','basto']])for(const rank of [1,2,3,4,5,6,7,10,11,12])cards.push({id:name+'-'+rank,rank,suit,red:['♦','♥'].includes(suit),label:String(rank)});for(let i=cards.length-1;i>0;i--){const j=crypto.randomInt(i+1);[cards[i],cards[j]]=[cards[j],cards[i]];}return cards;}
+// Two friends starting a 1 vs 1 see the games between them for 6 seconds; the first turn clock starts after that.
+const FRIENDS_INTRO_MS=6000;
 function newSession(code,players,targetPoints,creditMatch,now=Date.now()){
  if(![10,20,30,40,50,60].includes(targetPoints))throw new Error('Puntaje inválido.');
- const session={code,hands:{},originals:{},truth:{},drawPool:serverDeck(),room:{managedCredits:true,creditMatch,deviceMode:'two',status:'drawing',createdAt:now,matchNumber:creditMatch.matchNumber||1,targetPoints,table:players.player1,players,scores:{player1:0,player2:0},handNumber:1,trickNo:1,playedCount:0,tricks:[],trickCards:[],feed:[],trucoLevel:1,flors:{},timeoutCounts:{},openingDraw:{cards:{},endsAt:now+30000}}};
+ const session={code,hands:{},originals:{},truth:{},drawPool:serverDeck(),room:{managedCredits:true,creditMatch,deviceMode:'two',status:'drawing',createdAt:now,matchNumber:creditMatch.matchNumber||1,...(creditMatch.friends?{introUntil:now+FRIENDS_INTRO_MS}:{}),targetPoints,table:players.player1,players,scores:{player1:0,player2:0},handNumber:1,trickNo:1,playedCount:0,tricks:[],trickCards:[],feed:[],trucoLevel:1,flors:{},timeoutCounts:{},openingDraw:{cards:{},endsAt:now+30000}}};
  return createReferee(session,{now}).start();
 }
 module.exports={createReferee,newSession};

@@ -1,11 +1,12 @@
 // Head to head with friends: how many games each one won against the other.
 // - versus: the numbers per friend (from the server, kept a minute).
 // - notebookElement: the notebook page with the numbers, used on the table and in the friend's card.
-// - match notebook: when two friends start a 1 vs 1 game, the notebook lies on the table
-//   for 6 seconds (the countdown shows 5, the first second does not count) and nobody can play.
+// - match notebook: when two friends start a 1 vs 1 game the server gives the room introUntil: until then the
+//   notebook lies on the table (6 seconds, the countdown shows 5: the first second does not count),
+//   nobody can play and the first turn clock has not started.
 //   It slides in from the left side and leaves the same way.
 // - friend card: a friend's numbers, last games and an invite button.
-const INTRO_MS=6000,OUT_MS=650;
+const OUT_MS=650;
 
 export function createVersus({api,now=()=>Date.now()}){
  let cache=null,at=0,pending=null;
@@ -59,16 +60,13 @@ export function installMatchNotebook({document,getState,relationOf,versus,now}){
   if(!room||state.learning||state.localGame||!room.managedCredits||room.mode==='2v2')return;
   const key=String(room.creditMatch?.id||room.table||'')+':'+String(room.matchNumber||1);
   if(shown.has(key))return;
-  if(room.status!=='started'||Number(room.handNumber)!==1||Number(room.playedCount)>0)return;
+  const end=Number(room.introUntil)||0;
+  if(room.status!=='started'||end<=now())return;
   const me=state.playerId,other=me==='player1'?'player2':me==='player2'?'player1':null,person=other&&room.players?.[other];
   if(!person?.uid)return;
-  shown.add(key);
-  if(relationOf(person.uid)!=='friend')return;
-  // A game that started a while ago (reconnecting) does not stop again.
-  if(Number.isFinite(room.createdAt)&&now()-room.createdAt>8000)return;
-  show(person);
+  shown.add(key);show(person,end);
  }
- function show(person){
+ function show(person,end){
   clear();
   layer=el(document,'div','versus-layer');layer.setAttribute('role','dialog');layer.setAttribute('aria-label','Partidas entre ustedes');
   const slot=el(document,'div','versus-slot'),pill=el(document,'div','versus-countdown');
@@ -78,10 +76,11 @@ export function installMatchNotebook({document,getState,relationOf,versus,now}){
   const put=stats=>{if(!layer)return;slot.replaceChildren(notebookElement(document,stats,person.name));};
   const known=versus.cached()?.[person.uid];put(known||null);
   versus.load(true).then(all=>put(all?.[person.uid]||null)).catch(()=>{});
-  // The first second the notebook settles; then 3, 2, 1.
+  // The first second the notebook settles; then 5 … 1, and it leaves right when the turn clock starts.
+  const left=end-now(),at=ms=>Math.max(0,left-ms);
   const count=n=>{if(!layer)return;pill.classList.add('show');pill.replaceChildren(el(document,'span','versus-ring',String(n)),'Empieza en '+plural(n,'segundo','segundos'));};
-  for(let n=5;n>=1;n--)timers.push(setTimeout(()=>count(n),(6-n)*1000));
-  timers.push(setTimeout(()=>{layer?.classList.remove('in');layer?.classList.add('leaving');},INTRO_MS-OUT_MS),setTimeout(clear,INTRO_MS));
+  for(let n=5;n>=1;n--)if(left>n*1000-1000)timers.push(setTimeout(()=>count(n),at(n*1000)));
+  timers.push(setTimeout(()=>{layer?.classList.remove('in');layer?.classList.add('leaving');},at(OUT_MS)),setTimeout(clear,left));
  }
  return {check,clear};
 }
