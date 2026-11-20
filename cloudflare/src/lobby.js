@@ -1,8 +1,9 @@
 // The list of open tables. Table objects push changes here; every client in
 // the lobby receives each change as soon as it happens.
 import {DurableObject} from 'cloudflare:workers';
-import {verifyIdToken} from './firebase.js';
-import {tableStub} from './routing.js';
+import {verifyIdToken,createDatabase,createDevDatabase,isAdministrator} from './firebase.js';
+import {tableStub,lobbyStub} from './routing.js';
+import {allowListed} from './bar-core.js';
 import botSeat from '../../functions/bot-seat.cjs';
 
 const {isHouseUid,houseUid}=botSeat;
@@ -33,10 +34,11 @@ const housePoints=()=>pick([[20,6],[10,2],[30,2]]);
 export class Lobby extends DurableObject{
  constructor(ctx,env){
   super(ctx,env);
-  this.rooms={};
+  this.rooms={};this.live={};this.names=new Map();
   ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair('ping','pong'));
   ctx.blockConcurrencyWhile(async()=>{
    this.rooms=(await ctx.storage.get('rooms'))||{};
+   this.live=(await ctx.storage.get('live'))||{};
    this.house=(await ctx.storage.get('house'))||{target:0,targetAt:0,recent:[]};
    if(this.env.INTERNAL_SECRET&&!(await ctx.storage.getAlarm()))await ctx.storage.setAlarm(Date.now()+5000);
   });
@@ -44,10 +46,20 @@ export class Lobby extends DurableObject{
  async fetch(request){
   const url=new URL(request.url);
   if(url.pathname==='/update'&&request.method==='POST'){
-   const {code,room}=await request.json();
-   if(room)this.rooms[code]=room;else delete this.rooms[code];
-   await this.ctx.storage.put('rooms',this.rooms);
-   for(const ws of this.ctx.getWebSockets())if(ws.deserializeAttachment()?.uid)send(ws,{t:'lobby-update',code,room:room||null});
+   const {code,room,live}=await request.json();
+   // Open tables: every client in the lobby gets each change, as before.
+   if(JSON.stringify(this.rooms[code]??null)!==JSON.stringify(room??null)){
+    if(room)this.rooms[code]=room;else delete this.rooms[code];
+    await this.ctx.storage.put('rooms',this.rooms);
+    for(const ws of this.ctx.getWebSockets())if(ws.deserializeAttachment()?.uid)send(ws,{t:'lobby-update',code,room:room||null});
+   }
+   // Tables in play: only BAR sockets hear about them (see bar-core.js liveTableEntry).
+   const {at:_,...previous}=this.live[code]||{};
+   if(JSON.stringify(this.live[code]?previous:null)!==JSON.stringify(live??null)){
+    if(live)this.live[code]={...live,at:Date.now()};else delete this.live[code];
+    await this.ctx.storage.put('live',this.live);
+    for(const ws of this.ctx.getWebSockets())if(ws.deserializeAttachment()?.bar)send(ws,{t:'bar-table',code,live:live||null});
+   }
    return new Response('ok');
   }
   if(url.pathname==='/dev-ledger'&&this.env.DEV_MODE==='1'){
@@ -67,11 +79,16 @@ export class Lobby extends DurableObject{
  async alarm(){
   try{await this.dropStaleRooms();}catch(error){console.error('stale rooms',error);}
   try{await this.keepHouseTables();}catch(error){console.error('house tables',error);}
+  try{await this.sendBarOnline();}catch(error){console.error('bar online',error);}
   await this.ctx.storage.setAlarm(Date.now()+HOUSE_TICK_MS);
  }
  // A waiting table lasts 10 minutes (a house table 20): anything listed well past that is gone.
  async dropStaleRooms(){
   const now=Date.now(),stale=Object.entries(this.rooms).filter(([,r])=>Number.isFinite(r?.createdAt)&&now-r.createdAt>=10*60000+3*60000).map(([code])=>code);
+  // A table in play reports every move; one silent for 30 minutes is gone.
+  const quiet=Object.entries(this.live).filter(([,t])=>!(now-t.at<30*60000)).map(([code])=>code);
+  if(quiet.length){for(const code of quiet)delete this.live[code];await this.ctx.storage.put('live',this.live);
+   for(const ws of this.ctx.getWebSockets())if(ws.deserializeAttachment()?.bar)for(const code of quiet)send(ws,{t:'bar-table',code,live:null});}
   if(!stale.length)return;for(const code of stale)delete this.rooms[code];await this.ctx.storage.put('rooms',this.rooms);
   for(const ws of this.ctx.getWebSockets())if(ws.deserializeAttachment()?.uid)for(const code of stale)send(ws,{t:'lobby-update',code,room:null});
  }
@@ -104,11 +121,29 @@ export class Lobby extends DurableObject{
   if(message?.t!=='auth')return;
   try{
    const user=await verifyIdToken(message.token,this.env.FIREBASE_PROJECT_ID,this.env);
-   ws.serializeAttachment({uid:user.uid});
+   // The BAR asks for the tables in play and who is online; only people on its list get them.
+   const bar=message.bar===true;
+   if(bar&&!(await this.barAllowed(user.uid))){send(ws,{t:'res',id:message.id,ok:false,error:'El bar todavía no está abierto.',code:'bar-closed'});return;}
+   ws.serializeAttachment(bar?{uid:user.uid,bar:true}:{uid:user.uid});
    send(ws,{t:'res',id:message.id,ok:true,data:{uid:user.uid}});
    send(ws,{t:'lobby',rooms:this.rooms});
    // Tells the client where to read its balance and claim daily credits.
    send(ws,{t:'config',creditsBackend:this.env.CREDITS_BACKEND==='bank'?'bank':'firebase'});
+   if(bar){send(ws,{t:'bar-live',tables:Object.fromEntries(Object.entries(this.live).map(([code,{at,...t}])=>[code,t]))});await this.sendBarOnline(ws);}
   }catch(error){send(ws,{t:'res',id:message.id,ok:false,error:error.message});}
+ }
+ database(){return this.db??=this.env.DEV_MODE==='1'?createDevDatabase(()=>lobbyStub(this.env)):createDatabase(this.env);}
+ async barAllowed(uid){return allowListed(this.env,uid)||await isAdministrator(this.database(),uid).catch(()=>false);}
+ // People with the game open in the lobby and not seated at a table, for the BAR (names read once and kept).
+ async sendBarOnline(only){
+  const sockets=this.ctx.getWebSockets(),bars=only?[only]:sockets.filter(ws=>ws.deserializeAttachment()?.bar);
+  if(!bars.length)return;
+  const seated=new Set();
+  for(const t of [...Object.values(this.live),...Object.values(this.rooms)])for(const p of Object.values(t?.players||{}))if(p?.uid)seated.add(p.uid);
+  const uids=[...new Set(sockets.map(ws=>ws.deserializeAttachment()).filter(a=>a?.uid&&!a.bar&&!seated.has(a.uid)&&!isHouseUid(a.uid)).map(a=>a.uid))].slice(0,80);
+  const db=this.database();
+  await Promise.all(uids.filter(uid=>!this.names.has(uid)).map(async uid=>{const name=await db.get('profiles/'+uid+'/name').catch(()=>null);if(typeof name==='string'&&name)this.names.set(uid,name);}));
+  const people=uids.filter(uid=>this.names.has(uid)).map(uid=>({uid,name:this.names.get(uid)}));
+  for(const ws of bars)send(ws,{t:'bar-online',people});
  }
 }

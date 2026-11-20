@@ -1,8 +1,9 @@
 import {TableRoom} from './table-room.js';
 import {Lobby} from './lobby.js';
 import {Bank} from './bank.js';
-import {lobbyStub,tableStub,bankStub} from './routing.js';
-export {TableRoom,Lobby,Bank};
+import {Bar} from './bar.js';
+import {lobbyStub,tableStub,bankStub,barStub} from './routing.js';
+export {TableRoom,Lobby,Bank,Bar};
 
 function originAllowed(request,env){
  const origin=request.headers.get('origin');
@@ -19,6 +20,8 @@ export default {
   if(env.DEV_MODE==='1'&&!['localhost','127.0.0.1'].includes(url.hostname))return new Response('Modo desarrollo solo en localhost.',{status:503});
   if(!originAllowed(request,env))return new Response('Origen no permitido.',{status:403});
   if(url.pathname==='/lobby')return lobbyStub(env).fetch(request);
+  // The BAR (trucouruguayo.uy/bar): walking and nearby chat, apart from the lobby and the tables.
+  if(url.pathname==='/bar')return barStub(env).fetch(request);
   // Live balance and daily claim (only while the bank holds the credits).
   if(url.pathname==='/bank')return env.CREDITS_BACKEND==='bank'?bankStub(env).fetch(request):new Response('El banco no está activo.',{status:503});
   const table=/^\/tables\/([A-Z2-9]{5})$/.exec(url.pathname);

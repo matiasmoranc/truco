@@ -188,13 +188,14 @@ export class TableRoom extends DurableObject{
  // Persist, push the new state to every seat, refresh the lobby and re-arm the timer.
  async commit(){
   for(const ws of this.sockets()){const uid=ws.deserializeAttachment()?.uid;if(uid)this.sendState(ws,uid);}
-  const entry=JSON.stringify(this.engine.lobbyEntry());
+  // The lobby gets the open table (or null) and, for the BAR, the table in play (or null).
+  const lobbyRoom=this.engine.lobbyEntry(),live=this.engine.liveEntry(),entry=JSON.stringify({room:lobbyRoom,live});
   const previousLobby=this.lastLobby,lobbyChanged=entry!==previousLobby;this.lastLobby=entry;
   const m=this.engine.match,award=m?.status==='settled'&&m.id!==this.awarded?m:null;if(award)this.awarded=m.id;
   await this.ctx.storage.put('state',{code:this.code,lastLobby:this.lastLobby,awarded:this.awarded||null,...this.engine.snapshot()});
   if(award)this.ctx.waitUntil(this.awardLevels(award).catch(error=>console.error('level award failed',this.code,error)));
   // If the lobby did not get it, the next commit tries again (lastLobby goes back to what the lobby has).
-  if(lobbyChanged)this.ctx.waitUntil(lobbyStub(this.env).fetch('https://lobby/update',{method:'POST',body:JSON.stringify({code:this.code,room:JSON.parse(entry)})}).then(r=>{if(!r.ok)throw new Error('status '+r.status);}).catch(error=>{console.error('lobby update failed',error);if(this.lastLobby===entry)this.lastLobby=previousLobby;}));
+  if(lobbyChanged)this.ctx.waitUntil(lobbyStub(this.env).fetch('https://lobby/update',{method:'POST',body:JSON.stringify({code:this.code,room:lobbyRoom,live})}).then(r=>{if(!r.ok)throw new Error('status '+r.status);}).catch(error=>{console.error('lobby update failed',error);if(this.lastLobby===entry)this.lastLobby=previousLobby;}));
   await this.arm();
  }
  // A finished game adds level points to each winning person (once per game, see levelAwards/{id}).
@@ -232,7 +233,7 @@ export class TableRoom extends DurableObject{
     const closedAt=staleSettled?0:m?.closedAt||m?.settledAt||m?.refundedAt||0;
     if(Date.now()-closedAt>=CLEANUP_MS){
      // Always tell the lobby, even if the last notice may have been lost.
-     await lobbyStub(this.env).fetch('https://lobby/update',{method:'POST',body:JSON.stringify({code:this.code,room:null})}).catch(()=>{});
+     await lobbyStub(this.env).fetch('https://lobby/update',{method:'POST',body:JSON.stringify({code:this.code,room:null,live:null})}).catch(()=>{});
      await this.ctx.storage.deleteAll();this.engine.load(null);this.lastLobby='null';return;
     }
    }

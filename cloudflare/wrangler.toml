@@ -10,6 +10,8 @@ FIREBASE_DATABASE_URL = "https://truco-6553d-default-rtdb.firebaseio.com"
 # Where credits live: "firebase" (creditEconomy in Realtime Database) or "bank" (Bank Durable Object).
 CREDITS_BACKEND = "bank"
 # Browser origins allowed to open sockets. Native apps send capacitor:// or https://localhost.
+# Who may enter the BAR while it is tried (comma-separated uids; now Alejo and Nahuelcas); administrators always can.
+BAR_ALLOW = "XYniLjLwfHcizLAYEBL5tuxQhMo2,q2IVvTWWD3e4iC0L11ltKhmpL5U2"
 ALLOWED_ORIGINS = "https://trucouruguayo.uy,https://matiasmoranc.github.io,https://truco-6553d.web.app,https://truco-6553d.firebaseapp.com,capacitor://localhost,https://localhost"
 
 # Secrets (set with `npx wrangler secret put NAME`, never committed):
@@ -28,6 +30,10 @@ class_name = "Lobby"
 name = "BANK"
 class_name = "Bank"
 
+[[durable_objects.bindings]]
+name = "BAR"
+class_name = "Bar"
+
 # SQLite-backed Durable Objects are available on the Workers free plan.
 [[migrations]]
 tag = "v1"
@@ -36,3 +42,7 @@ new_sqlite_classes = ["TableRoom", "Lobby"]
 [[migrations]]
 tag = "v2"
 new_sqlite_classes = ["Bank"]
+
+[[migrations]]
+tag = "v3"
+new_sqlite_classes = ["Bar"]

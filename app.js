@@ -1072,7 +1072,18 @@ async function openInitialRoom(){
   if(code&&await restoreRoom(code))return;
   if(epoch!==(state.navigationEpoch||0)||state.room)return;
   if(invitedRoom&&new URLSearchParams(location.search).get('mesa')===invitedRoom)await openInvitation(invitedRoom);
-  else if(firebaseConfigValid(state.config))await openLobby();
+  else if(firebaseConfigValid(state.config)){await openLobby();openTableFromBar();}
+}
+// The BAR (bar/) sends people here to sit at a free table: ?crear=1v1|2v2&puntos=10|20|30|40
+// opens a public table with those choices, as if they had pressed Crear mesa themselves.
+function openTableFromBar(){
+  const params=new URLSearchParams(location.search),mode=params.get('crear'),points=params.get('puntos');
+  if(!['1v1','2v2'].includes(mode)||account.isGuest()||state.room)return;
+  const url=new URL(location.href);url.searchParams.delete('crear');url.searchParams.delete('puntos');history.replaceState(null,'',url);
+  configureSetup();
+  document.querySelector(`[data-table-mode="${mode}"]`)?.click();
+  if(['10','20','30','40'].includes(points)){$('target-points').value=points;renderPointsPicker();}
+  enterRoom();
 }
 
 async function enterRoom() {

@@ -6,6 +6,7 @@ import tableService from '../../functions/table-service.cjs';
 import teamBot from '../../functions/team-bot.cjs';
 import duelBot from '../../functions/duel-bot.cjs';
 import {ACTIVE,CodeTakenError} from './ledger-ops.js';
+import {liveTableEntry} from './bar-core.js';
 
 const {tableOperation,publicTable,privateTableHand,createTable,waitFor}=tableService;
 const {SIGNAL_WAIT_MS,mustAct,awaitsSignal,signalFor,botCommands}=teamBot;
@@ -168,6 +169,8 @@ export function createTableEngine({code,bank,clock=()=>Date.now()}){
    // The lobby only needs the table, not its waiting-room chat (that stays among the seated players).
    const room=publicTable(m);if(room.status!=='waiting')return null;delete room.lobbyChat;delete room.revision;return room;
   },
+  // The BAR shows tables in play: who sits there, the score and the last call (see bar-core.js).
+  liveEntry(){return liveTableEntry(m);},
   isFinished(){return !m||!!m.closedAt||m.status==='refunded'||m.session?.room?.status==='closed';},
   nextDeadline(){
    if(!m)return null;
