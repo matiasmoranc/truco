@@ -2,5 +2,6 @@ User-agent: *
 Allow: /
 Disallow: /admin.html
 Disallow: /bar/
+Disallow: /bar3d/
 
 Sitemap: https://trucouruguayo.uy/sitemap.xml

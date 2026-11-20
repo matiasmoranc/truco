@@ -6,7 +6,9 @@ test('BAR: steps stay on the floor and not faster than allowed',()=>{
  assert.deepEqual(clampPosition(-50,99999),{x:20,y:WORLD.h-20});
  assert.equal(acceptMove({movedAt:1000},{x:10,y:10},1050),null);
  assert.equal(acceptMove({movedAt:0},{x:'a',y:10},5000),null);
- assert.deepEqual(acceptMove({movedAt:0},{x:500.4,y:600},5000),{x:500,y:600});
+ assert.deepEqual(acceptMove({movedAt:0},{x:500.4,y:600},5000),{x:500,y:600,a:0,s:false});
+ assert.deepEqual(acceptMove({movedAt:0},{x:500,y:600,a:7,s:true},5000),{x:500,y:600,a:0.72,s:true},'the turn is kept within one circle');
+ assert.equal(acceptMove({movedAt:0},{x:500,y:600,s:'yes'},5000).s,false);
  const at=spawnPosition(()=>0.5);assert.ok(at.x>1300&&at.y>=190);
 });
 

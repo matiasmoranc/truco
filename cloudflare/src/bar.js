@@ -24,7 +24,7 @@ export class Bar extends DurableObject{
   return new Response(null,{status:101,webSocket:pair[0]});
  }
  inside(){return this.ctx.getWebSockets().map(ws=>({ws,p:ws.deserializeAttachment()})).filter(e=>e.p?.uid);}
- walker(p){return {uid:p.uid,name:p.name,x:p.x,y:p.y};}
+ walker(p){return {uid:p.uid,name:p.name,x:p.x,y:p.y,a:p.a||0,s:!!p.s};}
  async webSocketMessage(ws,raw){
   let message;try{message=JSON.parse(raw);}catch{return;}
   const person=ws.deserializeAttachment()||{};
@@ -34,7 +34,7 @@ export class Bar extends DurableObject{
   if(message.t==='move'){
    const at=acceptMove(person,message,now);if(!at)return;
    ws.serializeAttachment({...person,...at,movedAt:now});
-   for(const {ws:other} of this.inside())if(other!==ws)send(other,{t:'walk',uid:person.uid,x:at.x,y:at.y});
+   for(const {ws:other} of this.inside())if(other!==ws)send(other,{t:'walk',uid:person.uid,x:at.x,y:at.y,a:at.a,s:at.s});
    return;
   }
   if(message.t==='say'){

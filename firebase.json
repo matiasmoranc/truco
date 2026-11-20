@@ -6,7 +6,9 @@
     "public": ".",
     "headers": [
       {"source": "/", "headers": [{"key": "Cache-Control", "value": "no-cache, max-age=0, must-revalidate"}]},
-      {"source": "**/*.html", "headers": [{"key": "Cache-Control", "value": "no-cache, max-age=0, must-revalidate"}]}
+      {"source": "**/*.html", "headers": [{"key": "Cache-Control", "value": "no-cache, max-age=0, must-revalidate"}]},
+      {"source": "/bar{,/**}", "headers": [{"key": "Cache-Control", "value": "no-cache, max-age=0, must-revalidate"}]},
+      {"source": "/bar3d{,/**}", "headers": [{"key": "Cache-Control", "value": "no-cache, max-age=0, must-revalidate"}]}
     ],
     "ignore": [
       "firebase.json",

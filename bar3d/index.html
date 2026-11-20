@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#0b1712">
+<title>BAR 3D · Truco Uruguayo</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--gold:#f3cf73;--ink:#f1e6c8;--panel:#0d1f17;--line:rgba(243,207,115,.45);--muted:#a9bbb0}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;overflow:hidden;background:#0b1712;color:var(--ink);font-family:"DM Sans",system-ui,sans-serif;-webkit-tap-highlight-color:transparent;touch-action:none;user-select:none}
+#scene{position:fixed;inset:0;width:100%;height:100%;display:block;cursor:pointer}
+.top{position:fixed;top:max(10px,env(safe-area-inset-top));left:10px;right:10px;display:flex;gap:8px;align-items:center;pointer-events:none;z-index:3}
+.pill{pointer-events:auto;background:var(--panel);border:1px solid var(--line);color:var(--ink);border-radius:999px;padding:8px 14px;font:700 14px "DM Sans",sans-serif;text-decoration:none;white-space:nowrap}
+.pill.count{margin-left:auto;font-weight:600;font-size:13px;overflow:hidden;text-overflow:ellipsis}
+.zoom{position:fixed;right:10px;bottom:calc(90px + env(safe-area-inset-bottom));display:flex;flex-direction:column;z-index:3;background:var(--panel);border:1px solid var(--line);border-radius:999px;overflow:hidden}
+.zoom button{width:46px;height:46px;border:0;background:transparent;color:var(--ink);font:700 26px "DM Sans",sans-serif;cursor:pointer}
+.zoom button+button{border-top:1px solid #29473a}
+.status{position:fixed;inset:0;display:grid;place-items:center;z-index:9;background:rgba(6,14,10,.92);padding:20px}
+.status[hidden]{display:none}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:20px;max-width:360px;width:100%;text-align:center;box-shadow:0 18px 50px rgba(0,0,0,.5)}
+.card h2{margin:0 0 8px;color:var(--gold);font-size:22px}
+.card p{margin:0 0 14px;color:#cfd8d1;line-height:1.4}
+.btn{display:inline-block;border:0;border-radius:999px;padding:11px 18px;font:800 15px "DM Sans",sans-serif;background:var(--gold);color:#2a1a0e;cursor:pointer;text-decoration:none}
+.btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+.btn:disabled{opacity:.5}
+.sheet{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(14px + env(safe-area-inset-bottom));width:min(420px,calc(100% - 20px));z-index:5;background:rgba(13,31,23,.96);border:1px solid var(--line);border-radius:18px;padding:14px;box-shadow:0 14px 40px rgba(0,0,0,.55)}
+.sheet[hidden]{display:none}
+.sheet h3{margin:0 0 4px;color:var(--gold);font-size:17px}
+.sheet .sub{margin:0 0 12px;color:#cfd8d1;font-size:14px}
+.sheet .row{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+.points{display:flex;gap:6px;margin:0 0 12px}
+.points button{flex:1;border:1px solid var(--line);background:transparent;color:var(--ink);border-radius:10px;padding:8px 0;font:700 14px "DM Sans",sans-serif;cursor:pointer}
+.points button[aria-pressed=true]{background:var(--gold);color:#2a1a0e}
+.chat{position:fixed;left:10px;bottom:calc(10px + env(safe-area-inset-bottom));width:min(380px,calc(100% - 76px));z-index:4;background:rgba(13,31,23,.94);border:1px solid var(--line);border-radius:16px;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,.5);user-select:text}
+.chat[hidden]{display:none}
+.chat header{padding:8px 12px;font-size:12.5px;color:var(--gold);font-weight:700;border-bottom:1px solid #29473a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chat ol{list-style:none;margin:0;padding:8px 12px;max-height:150px;overflow-y:auto;display:flex;flex-direction:column;gap:4px;font-size:14px;touch-action:pan-y}
+.chat li b{color:var(--gold);font-weight:700}
+.chat li.me b{color:#9fd3ff}
+.chat li.note{color:var(--muted);font-size:12.5px}
+.chat form{display:flex;border-top:1px solid #29473a}
+.chat input{flex:1;min-width:0;background:transparent;border:0;color:var(--ink);padding:11px 12px;font:15px "DM Sans",sans-serif;outline:none;user-select:text}
+.chat button{border:0;background:var(--gold);color:#2a1a0e;font:800 14px "DM Sans",sans-serif;padding:0 14px;cursor:pointer}
+.toast{position:fixed;top:calc(64px + env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:8;background:#3b2a10;color:#ffe1a0;border:1px solid var(--line);border-radius:12px;padding:9px 14px;font-size:14px;max-width:calc(100% - 30px);text-align:center}
+.toast[hidden]{display:none}
+.hint{position:fixed;left:50%;transform:translateX(-50%);top:calc(60px + env(safe-area-inset-top));z-index:2;color:#cfd8d1;font-size:13px;background:rgba(13,31,23,.8);border-radius:999px;padding:6px 12px;pointer-events:none;white-space:nowrap}
+.labels{position:fixed!important;inset:0;pointer-events:none;z-index:1}
+.tag{display:flex;align-items:center;gap:5px;background:rgba(15,42,31,.9);border:1px solid var(--line);color:var(--ink);border-radius:999px;padding:2px 9px 2px 3px;font:700 12px "DM Sans",sans-serif;white-space:nowrap}
+.tag img{width:20px;height:20px;border-radius:50%;object-fit:cover;background:#f1e6c8}
+.tag.me{background:#173a52;border-color:#9fd3ff}
+.tag.mozo{padding:2px 9px;background:#f4f1ea;color:#1a1a1a}
+.sign{border-radius:999px;padding:4px 12px;font:800 13px "DM Sans",sans-serif;white-space:nowrap;box-shadow:0 4px 14px rgba(0,0,0,.4)}
+.sign.free{background:rgba(13,31,23,.92);color:var(--gold);border:1px solid var(--line)}
+.sign.score,.sign.wait{background:var(--gold);color:#2a1a0e}
+.call{background:#fff6dc;color:#8a2b2b;font:900 16px "DM Sans",sans-serif;padding:6px 12px;border-radius:12px;box-shadow:0 6px 18px rgba(0,0,0,.45)}
+.bubble{background:#fff6dc;color:#2a1a0e;font:700 14px "DM Sans",sans-serif;padding:7px 11px;border-radius:12px;max-width:220px;white-space:normal;text-align:center;box-shadow:0 6px 18px rgba(0,0,0,.45)}
+.call[hidden],.bubble[hidden]{display:none}
+.zoom,.top,.chat,.sheet,.toast,.status,.hint,.stick{z-index:6}
+.stick{position:fixed;left:18px;bottom:calc(18px + env(safe-area-inset-bottom));width:132px;height:132px;border-radius:50%;background:rgba(13,31,23,.55);border:2px solid rgba(243,207,115,.45);touch-action:none;box-shadow:inset 0 0 24px rgba(0,0,0,.45)}
+.stick-knob{position:absolute;left:50%;top:50%;width:56px;height:56px;margin:-28px 0 0 -28px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#ffe7a8,#d7a948);box-shadow:0 6px 16px rgba(0,0,0,.5);pointer-events:none;transition:transform .08s}
+.chat{left:auto!important;right:10px;width:min(360px,calc(100% - 175px))!important}
+.zoom{bottom:auto!important;top:calc(70px + env(safe-area-inset-top))}
+</style>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
+</head>
+<body>
+<canvas id="scene" aria-label="El bar con las mesas de truco"></canvas>
+<div class="top"><a class="pill" href="/">← Lobby</a><span class="pill count" id="count">Conectando…</span></div>
+<div class="hint" id="hint">Arrastrá para mirar · joystick para caminar · tocá una mesa para sentarte</div>
+<div class="stick" id="stick" aria-label="Joystick para caminar"><div class="stick-knob" id="stick-knob"></div></div>
+<div class="zoom"><button id="zoom-in" aria-label="Acercar">+</button><button id="zoom-out" aria-label="Alejar">−</button></div>
+<section class="chat" id="chat" hidden aria-label="Chat con los que están cerca">
+ <header id="chat-who">Cerca</header>
+ <ol id="chat-log"></ol>
+ <form id="chat-form" autocomplete="off"><input id="chat-input" maxlength="140" placeholder="Escribí a los que están cerca…" enterkeyhint="send"><button>Enviar</button></form>
+</section>
+<section class="sheet" id="sheet" hidden></section>
+<div class="toast" id="toast" hidden></div>
+<div class="status" id="status"><div class="card"><h2>BAR</h2><p id="status-text">Entrando al bar…</p><div id="status-actions"></div></div></div>
+<script type="module" src="/bar3d/bar3d.js?v=20261120-3d3"></script>
+</body>
+</html>

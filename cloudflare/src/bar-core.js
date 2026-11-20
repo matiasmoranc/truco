@@ -18,12 +18,14 @@ export const clampPosition=(x,y)=>({x:Math.round(clamp(x,20,WORLD.w-20)),y:Math.
 // New people come in by the door (right wall, near the counter), a little apart from each other.
 export function spawnPosition(random=Math.random){return clampPosition(1480-random()*80,300+random()*120);}
 
-// A step: a finite point, not more often than MOVE_MIN_MS. Returns the new position or null.
+// A step: a finite point, not more often than MOVE_MIN_MS, with where the person faces (radians)
+// and whether they sit on a chair. Returns {x, y, a, s} or null.
 export function acceptMove(person,message,now){
  const x=Number(message?.x),y=Number(message?.y);
  if(!Number.isFinite(x)||!Number.isFinite(y))return null;
  if(now-(person.movedAt||0)<MOVE_MIN_MS)return null;
- return clampPosition(x,y);
+ const turn=Number(message?.a),a=Number.isFinite(turn)?Math.round(Math.atan2(Math.sin(turn),Math.cos(turn))*100)/100:0;
+ return {...clampPosition(x,y),a,s:message?.s===true};
 }
 
 // Links, e-mails and phone numbers stay out of a chat with strangers.
