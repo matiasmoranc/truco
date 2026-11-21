@@ -984,7 +984,9 @@ async function loadChat(){
 function renderChat(){
  const query=$('chat-search').value.trim().toLocaleLowerCase(),has=v=>String(v||'').toLocaleLowerCase().includes(query);
  const all=chatGroups.length?chatGroups:chatLog.length?[{key:'all',code:'',mode:'',players:[],messages:[...chatLog].reverse(),lastAt:chatLog[0].at,games:1}]:[];
- const groups=all.filter(g=>!query||has(g.code)||g.players.some(p=>has(p.name))||g.messages.some(m=>has(m.name)||has(m.text)));
+ // Mostrar: every chat, only the tables' games, or only the Lobby Virtual (code BAR).
+ const kind=$('chat-kind').value,ofKind=g=>kind==='all'||(kind==='bar')===(g.code==='BAR');
+ const groups=all.filter(g=>ofKind(g)&&(!query||has(g.code)||g.players.some(p=>has(p.name))||g.messages.some(m=>has(m.name)||has(m.text))));
  const total=groups.reduce((n,g)=>n+g.messages.length,0);
  $('chat-summary').textContent=groups.length?groups.length+(groups.length===1?' mesa':' mesas')+' · '+total+(total===1?' mensaje':' mensajes')+(query?' que coinciden con la búsqueda':''):(query?'Ninguna mesa coincide con la búsqueda.':'Todavía no hay mensajes escritos en este período.');
  const time=at=>new Date(at).toLocaleTimeString('es-UY',{timeZone:ZONE,hour:'2-digit',minute:'2-digit'});
@@ -1033,6 +1035,7 @@ function renderBar(){
 $('bar-day').addEventListener('change',()=>{if($('bar-day').value)loadBar($('bar-day').value);});
 $('bar-tests').addEventListener('change',()=>loadBar(barStats?.day));
 $('chat-search').addEventListener('input',renderChat);
+$('chat-kind').addEventListener('change',renderChat);
 async function loadMessages(){
  try{threads=(await call({action:'messages'})).data.threads||[];}catch(e){return;}
  const unread=threads.reduce((n,t)=>n+t.unread,0);$('messages-count').hidden=!unread;$('messages-count').textContent=unread||'';
