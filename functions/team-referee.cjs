@@ -55,8 +55,9 @@ function createTeamReferee(s,{now=Date.now(),deckFactory=deck}={}){
  const rest=()=>Math.max(1,r.targetPoints-Math.max(...Object.values(r.scores)));
  // The envido never plays for more than the leader still needs to win the match.
  // Raises never go down: any number of envidos, then any number of real envidos, then the falta (nothing after it).
- // When the leader needs a single point, only the falta envido is offered.
- const envidoRaiseKinds=b=>{const calls=b.calls?.length?b.calls:[b.called||'envido'];if(b.revealMode||calls.includes('falta'))return [];if(rest()===1)return ['falta'];return calls.includes('real')?['real','falta']:['envido','real','falta'];};
+ // When the leader needs a single point, only the falta envido is offered; when they need two, only the
+ // envido, answered with quiero or no quiero (no raises).
+ const envidoRaiseKinds=b=>{const calls=b.calls?.length?b.calls:[b.called||'envido'];if(b.revealMode||calls.includes('falta'))return [];if(rest()===1)return ['falta'];if(rest()===2)return [];return calls.includes('real')?['real','falta']:['envido','real','falta'];};
  const envidoStake=(kind,base=0)=>kind==='falta'?rest():Math.min(base+(kind==='real'?3:2),rest());
  // Short lines for the points history: "1 punto por envido no querido", "3 puntos por retruco".
  const pts=n=>Number(n)===1?'1 punto':n+' puntos',trucoName=l=>({1:'truco',2:'truco',3:'retruco',4:'vale cuatro'})[l]||'truco',envidoName=k=>({envido:'envido',real:'real envido',falta:'falta envido'})[k]||'envido';
@@ -169,6 +170,8 @@ function createTeamReferee(s,{now=Date.now(),deckFactory=deck}={}){
   }
   if(b?!(b.type==='truco'&&b.responder===p&&['envido','real','falta'].includes(v)):r.turn!==p)throw new Error('Esperá tu turno.');
   if(canSing(p))throw new Error('Tenés flor. Cantala primero.');
+  // Two points from winning: any envido call (a bot's, an older app's) is played as an envido.
+  if(['real','falta'].includes(v)&&rest()===2)v='envido';
   if(['envido','real','falta'].includes(v)){if(r.envidoClosed||r.trucoLevel>1||(r.playedBy?.[p]||0)>0||r.trickNo!==1)throw new Error('El envido ya está cerrado.');r.pendingBet={id:crypto.randomUUID(),type:'envido',caller:p,callerTeam:team(p),responder:responder(opponent(team(p)),false,'envido'),stake:envidoStake(v),accepted:0,called:v,calls:[v],suspendedBet:b||null};}
   else if(['truco','retruco','vale4'].includes(v)){const wanted={truco:2,retruco:3,vale4:4}[v];if(b||wanted!==r.trucoLevel+1||wanted>4||r.lastTrucoTeam===team(p))throw new Error('Ese grito no está disponible.');r.pendingBet={id:crypto.randomUUID(),type:'truco',caller:p,callerTeam:team(p),responder:responder(opponent(team(p))),stake:wanted,called:v};}
   else throw new Error('Canto inválido.');notice(p,({truco:'Truco',retruco:'Retruco',vale4:'Vale cuatro',envido:'Envido',real:'Real envido',falta:'Falta envido'})[v]);

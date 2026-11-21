@@ -83,12 +83,14 @@
     },
     "tableInviteLog": {".read": false, ".write": false},
     "levels": {
+      ".indexOn": ["wins", "points"],
       "$uid": {
         ".read": "auth != null",
         ".write": false
       }
     },
     "levelAwards": {".read": false, ".write": false},
+    "weeklyWins": {".read": false, ".write": false, "$week": {".indexOn": ".value"}},
     "avatars": {
       "$uid": {
         ".read": "auth != null",

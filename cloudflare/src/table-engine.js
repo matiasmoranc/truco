@@ -170,7 +170,7 @@ export function createTableEngine({code,bank,clock=()=>Date.now()}){
    const room=publicTable(m);if(room.status!=='waiting')return null;delete room.lobbyChat;delete room.revision;return room;
   },
   // The BAR shows tables in play: who sits there, the score and the last call (see bar-core.js).
-  liveEntry(){return liveTableEntry(m);},
+  liveEntry(){this.prunePresence();return liveTableEntry(m,presence);},
   isFinished(){return !m||!!m.closedAt||m.status==='refunded'||m.session?.room?.status==='closed';},
   nextDeadline(){
    if(!m)return null;

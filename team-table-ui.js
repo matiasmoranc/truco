@@ -72,9 +72,11 @@ export function renderTeamLobbySeats(code,room,safe,disabled=false){
  const group=(team,index)=>`<div class="lobby-team" role="group" aria-label="Equipo ${index}">${TEAM_SEATS.filter(p=>playerTeam(p)===team).map(p=>room.players?.[p]?`<span class="lobby-team-name" title="${safe(room.players[p].name)}">${safe(room.players[p].name)}</span>`:`<button class="lobby-team-join" data-room="${safe(code)}" data-seat="player" data-team="${team}" aria-label="Entrar al equipo ${index}" ${disabled?'disabled':''}>Entrar</button>`).join('<span class="lobby-team-dash" aria-hidden="true">–</span>')}</div>`;
  return `<div class="lobby-team-row">${group('player1',1)}<span class="lobby-team-versus">vs</span>${group('player2',2)}</div>`;
 }
-// The leader needs a single point: only the falta envido is offered (same rule as the server).
-const oneToWin=r=>Math.max(1,(Number(r.targetPoints)||30)-Math.max(0,...Object.values(r.scores||{}).map(Number).filter(Number.isFinite)))===1;
-const envidoCallsFor=r=>oneToWin(r)?[['falta','FALTA']]:[['envido','ENVIDO'],['real','REAL'],['falta','FALTA']];
+// The leader needs a single point: only the falta envido is offered; two points: only the envido, with
+// no raises (the same rules as the server).
+const toWin=r=>Math.max(1,(Number(r.targetPoints)||30)-Math.max(0,...Object.values(r.scores||{}).map(Number).filter(Number.isFinite)));
+const oneToWin=r=>toWin(r)===1,twoToWin=r=>toWin(r)===2;
+const envidoCallsFor=r=>oneToWin(r)?[['falta','FALTA']]:twoToWin(r)?[['envido','ENVIDO']]:[['envido','ENVIDO'],['real','REAL'],['falta','FALTA']];
 export function installTeamTable({$,getState,command,runAction,renderPlayerHand,orderedHand,cardImageStyle,cardAccessibleName,escapeHtml,renderTally,syncHeader,setTurnBadge,syncControls,gameTime,hasFlor,florPoints=()=>0,speakCall=()=>{},mountDeclarationWheel}){
  let scope='',known=new Set(),noticeKey='',partnerMatch='',partnerVisibleUntil=0,partnerTimer=null,noticeTimer=null,partnerFaceScope='',partnerWasFaceUp=false;
  function showPartner(){
@@ -210,7 +212,7 @@ export function installTeamTable({$,getState,command,runAction,renderPlayerHand,
    if(owesFlor)add('flor','FLOR',true);
    else if(pending&&!pending.revealMode&&pending.responder===p){const florHolder=pending.type==='flor'&&pending.called==='flor'&&(r.flors?.[p]!=null||hasFlor(r,s.hand));add('yes',florHolder?'LA MÍA ES FLOR':'QUIERO',true);
     // Holding a flower, a plain flor is answered with yours or a raise, never declined.
-    if(!florHolder)add('no','NO QUIERO');if(pending.type==='truco'){if(pending.stake<4)add('raise',pending.stake===2?'RETRUCO':'VALE 4');if(!r.envidoClosed&&!(r.trucoLevel>1)&&(r.playedBy?.[p]||0)===0){for(const [k,l] of envidoCallsFor(r))add(k,l);}}if(pending.type==='envido'){const calls=pending.calls?.length?pending.calls:[pending.called||'envido'];if(!calls.includes('falta')){if(oneToWin(r))add('raise-falta','FALTA');else{if(!calls.includes('real'))add('raise-envido','ENVIDO');add('raise-real','REAL');add('raise-falta','FALTA');}}}if(pending.type==='flor'&&pending.called==='flor'){add('raise-conflor','CON FLOR ENVIDO');add('raise-faltaflor','CONTRA FLOR AL RESTO');}}
+    if(!florHolder)add('no','NO QUIERO');if(pending.type==='truco'){if(pending.stake<4)add('raise',pending.stake===2?'RETRUCO':'VALE 4');if(!r.envidoClosed&&!(r.trucoLevel>1)&&(r.playedBy?.[p]||0)===0){for(const [k,l] of envidoCallsFor(r))add(k,l);}}if(pending.type==='envido'){const calls=pending.calls?.length?pending.calls:[pending.called||'envido'];if(!calls.includes('falta')){if(oneToWin(r))add('raise-falta','FALTA');else if(!twoToWin(r)){if(!calls.includes('real'))add('raise-envido','ENVIDO');add('raise-real','REAL');add('raise-falta','FALTA');}}}if(pending.type==='flor'&&pending.called==='flor'){add('raise-conflor','CON FLOR ENVIDO');add('raise-faltaflor','CONTRA FLOR AL RESTO');}}
    // Someone sang flor, or an envido is waiting: anyone else holding one sings it now, turn or not.
    if(mayFlor&&(Object.keys(r.flors||{}).length||pending?.type==='envido')&&!pending?.revealMode&&!buttons.some(b=>b.includes('data-team-action="flor"')))add('flor','FLOR',true);
   }

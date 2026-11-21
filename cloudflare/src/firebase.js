@@ -58,13 +58,18 @@ async function accessToken(env){
 
 export function createDatabase(env){
  const base=env.FIREBASE_DATABASE_URL.replace(/\/$/,'');
- async function request(path,init={}){
+ async function request(path,init={},search=''){
   const started=Date.now(),token=await accessToken(env),authorized=Date.now();
-  const res=await fetch(base+'/'+path+'.json',{...init,headers:{authorization:'Bearer '+token,...(init.headers||{})}});
+  const res=await fetch(base+'/'+path+'.json'+search,{...init,headers:{authorization:'Bearer '+token,...(init.headers||{})}});
   if(Date.now()-started>200)console.info('rtdb slow',init.method||'GET',path,res.status,'token',authorized-started,'ms request',Date.now()-authorized,'ms bytes',res.headers.get('content-length'));
   return res;
  }
  async function get(path){const res=await request(path);if(!res.ok)throw new Error('No se pudo leer la base ('+res.status+').');return res.json();}
+ // The last `count` children ordered by a child key ('$value' for plain numbers); needs an .indexOn in the rules.
+ async function top(path,orderBy,count){
+  const res=await request(path,{},'?orderBy='+encodeURIComponent(JSON.stringify(orderBy))+'&limitToLast='+count);
+  if(!res.ok)throw new Error('No se pudo leer la base ('+res.status+').');return (await res.json())||{};
+ }
  // Value plus ETag; started early, it lets a transaction skip its first read.
  async function read(path){
   const res=await request(path,{headers:{'x-firebase-etag':'true'}});
@@ -94,7 +99,7 @@ export function createDatabase(env){
   const res=await request(path,{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify(value)});
   if(!res.ok)throw new Error('No se pudo guardar en la base ('+res.status+').');
  }
- return {get,read,transaction,patch,put};
+ return {get,read,top,transaction,patch,put};
 }
 
 // Local development only (wrangler dev with DEV_MODE=1 in .dev.vars): a fake

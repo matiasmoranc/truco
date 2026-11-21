@@ -7,6 +7,7 @@ import {createDatabase,createDevDatabase,verifyIdToken,playerIdentity,usersBlock
 import {createFirebaseBank} from './firebase-bank.js';
 import {lobbyStub,bankStub} from './routing.js';
 import {levelAwards} from '../../levels.js';
+import {weekKey} from './bar-core.js';
 import chatLog from '../../functions/chat-log.cjs';
 
 const {passwordHash}=tableService;
@@ -206,7 +207,9 @@ export class TableRoom extends DurableObject{
   if(!first.committed)return;
   const levels=Object.fromEntries(await Promise.all(people.map(async uid=>[uid,Number((await this.db.get('levels/'+uid+'/points'))||0)])));
   for(const [uid,points] of Object.entries(levelAwards(m,levels)))
-   await this.db.transaction('levels/'+uid,current=>({...(current||{}),points:(Number(current?.points)||0)+points,wins:(Number(current?.wins)||0)+1,updatedAt:Date.now()}));
+  {await this.db.transaction('levels/'+uid,current=>({...(current||{}),points:(Number(current?.points)||0)+points,wins:(Number(current?.wins)||0)+1,updatedAt:Date.now()}));
+   // This week's wins too, for the board in the BAR (weeklyWins/{monday}/{uid}).
+   await this.db.transaction('weeklyWins/'+weekKey(Date.now())+'/'+uid,current=>(Number(current)||0)+1).catch(error=>console.error('weekly win',error));}
  }
  async arm(){
   let at=this.engine.nextDeadline();

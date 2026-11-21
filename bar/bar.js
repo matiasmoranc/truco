@@ -10,7 +10,7 @@ const FIREBASE_VERSION='12.4.0';
 const LOCAL=['localhost','127.0.0.1'].includes(location.hostname);
 const LIVE_URL=(LOCAL?location.origin.replace(/^http/,'ws')+'/live':'wss://truco-live.mati-moran-castro.workers.dev');
 const DEV_NAME=LOCAL?new URLSearchParams(location.search).get('dev'):null;
-const WORLD={w:1600,h:2400},HEAR_RADIUS=230,WALK_SPEED=280;
+const WORLD={w:1600,h:2400},HEAR_RADIUS=115,WALK_SPEED=280;
 const DOOR={x:1560,y:330};
 const $=id=>document.getElementById(id);
 
@@ -40,7 +40,7 @@ class Channel{
 }
 
 // ---------- state ----------
-const state={me:null,walkers:new Map(),rooms:{},live:{},online:[],slots:[],trips:[],mozo:null,muted:new Set(),
+const state={me:null,walkers:new Map(),rooms:{},live:{},layout:null,online:[],slots:[],trips:[],mozo:null,muted:new Set(),
  cam:{x:0,y:0,s:.6},follow:true,lastCall:{},chat:[],nearIds:'',lastNearAt:0};
 let lobby=null,bar=null,services=null;
 if(LOCAL)Object.assign(globalThis,{barState:state,barWalk:(x,y)=>walkTo(x,y)});
@@ -66,36 +66,31 @@ const shirtOf=uid=>{let h=7;for(const c of String(uid))h=(h*31+c.charCodeAt(0))>
 const COLS=[200,500,800,1100,1400],ROW0=560,ROW_H=310,MAX_ROWS=6;
 const cellAt=i=>({x:COLS[i%COLS.length],y:ROW0+Math.floor(i/COLS.length)*ROW_H});
 const tableKind=t=>t?.mode==='2v2'||Object.keys(t?.players||{}).length>2?'2v2':'1v1';
-function currentTables(){
- const all=new Map();
- // A bot waiting alone at its table is not shown: only tables with a person waiting or playing.
- for(const [code,room] of Object.entries(state.rooms))if(room?.status==='waiting'&&!Object.values(room.players||{}).every(p=>!p?.uid||String(p.uid).startsWith('house_')))all.set(code,{code,kind:room.mode==='2v2'?'2v2':'1v1',waiting:true,room});
- for(const [code,t] of Object.entries(state.live))if(t)all.set(code,{code,kind:tableKind(t),waiting:false,live:t});
- return all;
+const botUid=uid=>/^(bot:|house_)/.test(String(uid||''));
+// The server lays the room out (cloudflare/src/bar-core.js barLayout) so every page, 2D or 3D, shows each
+// table in the same place: people sit on chairs by position. state.layout = {"<cell>":{k:'1v1'|'2v2',c:code|null}}.
+function tableOf(code){
+ if(!code)return null;
+ const live=state.live[code];if(live)return {code,kind:tableKind(live),waiting:false,live};
+ const room=state.rooms[code];if(room?.status==='waiting')return {code,kind:room.mode==='2v2'?'2v2':'1v1',waiting:true,room};
+ return null;
 }
 let slotSeq=0;
-function freeCell(){const used=new Set(state.slots.map(s=>s.cell));for(let i=0;i<COLS.length*MAX_ROWS;i++)if(!used.has(i))return i;return null;}
-function newSlot(kind,animate){
- const cell=freeCell();if(cell==null)return null;
- const slot={id:++slotSeq,kind,cell,...cellAt(cell),code:null,placed:!animate};
- state.slots.push(slot);if(animate)state.trips.push({type:'bring',slot});return slot;
-}
 function syncSlots(initial){
- const tables=currentTables();
- for(const slot of state.slots)if(slot.code&&!tables.has(slot.code))slot.code=null;
- const taken=new Set(state.slots.map(s=>s.code).filter(Boolean));
- // On the first load the tables are already there; later, a new one sits at a free table of its kind.
- const fresh=[...tables.values()].filter(t=>!taken.has(t.code)).sort((a,b)=>(a.waiting-b.waiting)||a.code.localeCompare(b.code));
- for(const t of fresh){
-  const free=state.slots.find(s=>!s.code&&s.kind===t.kind&&!s.leaving);
-  const slot=free||newSlot(t.kind,!initial);if(slot)slot.code=t.code;
+ const cells=state.layout;if(!cells)return;
+ for(const slot of [...state.slots]){
+  const c=cells[slot.cell];
+  // Still in the layout: it shows what is there now (a waiting table can change kind).
+  if(c){slot.code=c.c||null;slot.kind=c.k;slot.leaving=false;continue;}
+  if(slot.leaving)continue;slot.code=null;
+  // Gone: the waiter takes it away (on the first look, or not set down yet, it just goes).
+  if(initial||!slot.placed){state.slots=state.slots.filter(o=>o!==slot);state.trips=state.trips.filter(t=>t.slot!==slot);}
+  else{slot.leaving=true;state.trips.push({type:'take',slot});}
  }
- for(const kind of ['1v1','2v2'])if(!state.slots.some(s=>!s.code&&s.kind===kind&&!s.leaving)&&!state.trips.some(t=>t.type==='bring'&&t.slot.kind===kind&&!t.slot.code))newSlot(kind,!initial);
- // More than two empty tables: the waiter takes one away, keeping one free of each kind.
- const empty=state.slots.filter(s=>!s.code&&!s.leaving&&s.placed);
- if(empty.length>2&&!state.trips.some(t=>t.type==='take')){
-  const spare=empty.reverse().find(s=>empty.filter(o=>o.kind===s.kind).length>1);
-  if(spare){spare.leaving=true;state.trips.push({type:'take',slot:spare});}
+ for(const [cell,c] of Object.entries(cells)){
+  const i=Number(cell);if(!(i>=0&&i<COLS.length*MAX_ROWS)||state.slots.some(o=>o.cell===i))continue;
+  const slot={id:++slotSeq,kind:c.k==='2v2'?'2v2':'1v1',cell:i,...cellAt(i),code:c.c||null,placed:!!initial};
+  state.slots.push(slot);if(!initial)state.trips.push({type:'bring',slot});
  }
  renderCount();
 }
@@ -103,16 +98,16 @@ function syncSlots(initial){
 function stepMozo(now){
  if(!state.mozo&&state.trips.length){
   const trip=state.trips.shift();
-  if(trip.type==='take'&&trip.slot.code){trip.slot.leaving=false;return;}
+  if(trip.type==='take'&&!trip.slot.leaving)return;
   const d=Math.hypot(trip.slot.x-DOOR.x,trip.slot.y-DOOR.y);state.mozo={...trip,start:now,leg:Math.max(900,d/WALK_SPEED*1000)};
  }
  const m=state.mozo;if(!m)return null;
  const t=(now-m.start)/m.leg,{slot}=m;
  if(t>=1&&m.type==='bring')slot.placed=true;
- if(t>=1&&m.type==='take'&&!slot.code){state.slots=state.slots.filter(s=>s!==slot);}
+ if(t>=1&&m.type==='take'&&slot.leaving){state.slots=state.slots.filter(s=>s!==slot);m.took=true;}
  if(t>=2){state.mozo=null;syncSlots(false);return null;}
  const k=t<1?t:2-t,x=DOOR.x+(slot.x-DOOR.x)*k,y=DOOR.y+(slot.y+60-DOOR.y)*k;
- const carrying=(m.type==='bring'&&t<1)||(m.type==='take'&&t>=1&&!slot.code);
+ const carrying=(m.type==='bring'&&t<1)||(m.type==='take'&&t>=1&&!!m.took);
  return {x,y,carrying,kind:slot.kind,facing:t<1?Math.atan2(slot.y-DOOR.y,slot.x-DOOR.x):Math.atan2(DOOR.y-slot.y,DOOR.x-slot.x)};
 }
 
@@ -169,7 +164,7 @@ const CALLS={truco:'¡TRUCO!',retruco:'¡RETRUCO!',vale4:'¡VALE CUATRO!',envido
 const callText=c=>CALLS[c]||('¡'+String(c).replace(/[-_]/g,' ').toUpperCase()+'!');
 function drawSlot(slot,now){
  if(!slot.placed)return;
- const {x,y,kind}=slot,t=slot.code?currentTables().get(slot.code):null,seats=SEATS[kind];
+ const {x,y,kind}=slot,t=slot.code?tableOf(slot.code):null,seats=SEATS[kind];
  const lamp=ctx.createRadialGradient(x,y,0,x,y,kind==='2v2'?210:170);lamp.addColorStop(0,'rgba(255,217,138,.32)');lamp.addColorStop(1,'rgba(255,207,112,0)');ctx.fillStyle=lamp;ctx.fillRect(x-220,y-220,440,440);
  const people=t?(t.live?.players||t.room?.players||{}):{};
  const glow=s=>!t||(t.waiting&&!people[s]?.uid);
@@ -376,14 +371,14 @@ const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',
 function closeSheet(){$('sheet').hidden=true;$('sheet').innerHTML='';}
 function sheet(html){const s=$('sheet');s.innerHTML=html;s.hidden=false;return s;}
 function openTable(slot){
- const t=slot.code?currentTables().get(slot.code):null,mode=slot.kind==='2v2'?'2 vs 2':'1 vs 1';
+ const t=slot.code?tableOf(slot.code):null,mode=slot.kind==='2v2'?'2 vs 2':'1 vs 1';
  if(!t){
   let points=20;
   const s=sheet(`<h3>Mesa libre · ${mode}</h3><p class="sub">Te sentás y esperás rival. Elegí a cuántos puntos:</p>
    <div class="points">${[10,20,30,40].map(n=>`<button type="button" data-p="${n}" aria-pressed="${n===20}">${n}</button>`).join('')}</div>
    <div class="row"><button class="btn ghost" data-close>Cancelar</button><button class="btn" data-sit>Sentarme</button></div>`);
   s.querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>{points=Number(b.dataset.p);s.querySelectorAll('[data-p]').forEach(o=>o.setAttribute('aria-pressed',String(o===b)));});
-  s.querySelector('[data-sit]').onclick=()=>{location.href='/?crear='+slot.kind+'&puntos='+points;};
+  s.querySelector('[data-sit]').onclick=()=>{if(!state.slots.includes(slot)||slot.leaving){closeSheet();toast('Esa mesa ya no está. Elegí otra.');return;}if(slot.code){openTable(slot);return;}location.href='/?crear='+slot.kind+'&puntos='+points;};
   s.querySelector('[data-close]').onclick=closeSheet;return;
  }
  const players=Object.values((t.live||t.room).players||{}).filter(p=>p?.uid),names=players.map(p=>esc(p.name)).join(', ');
@@ -461,12 +456,12 @@ function onLobby(m){
  else if(m.t==='bar-live'){state.live=m.tables||{};}
  else if(m.t==='bar-table'){if(m.live)state.live[m.code]=m.live;else delete state.live[m.code];}
  else if(m.t==='bar-online'){state.online=m.people||[];renderCount();return;}
+ else if(m.t==='bar-layout'){state.layout=m.cells||{};syncSlots(firstTables);firstTables=false;return;}
  else return;
- if(m.t==='bar-live'){syncSlots(firstTables);firstTables=false;}
- else if(!firstTables)syncSlots(false);
+ renderCount();
 }
 function renderCount(){
- const tables=currentTables(),playing=[...tables.values()].filter(t=>t.live&&!t.live.finished).length,waiting=[...tables.values()].filter(t=>t.waiting).length;
+ const tables=state.slots.filter(o=>!o.leaving).map(o=>tableOf(o.code)).filter(Boolean),playing=tables.filter(t=>t.live&&!t.live.finished).length,waiting=tables.filter(t=>t.waiting).length;
  $('count').textContent=`${playing} en juego · ${waiting} esperando · ${state.walkers.size} en el bar · ${state.online.length} en línea`;
 }
 
@@ -492,10 +487,17 @@ async function start(){
   if(!fb?.user){showStatus('Para entrar al bar, primero iniciá sesión en el juego con tu cuenta y después volvé a esta página.',[['Ir al juego',null,'/']]);return;}
   token=()=>fb.auth.currentUser.getIdToken();
  }
- const refused=m=>{showStatus(m?.code==='bar-closed'?'El bar todavía no está abierto. Por ahora es solo para algunos jugadores.':(m?.error||'No se pudo entrar al bar.'),[['Volver al juego',null,'/']]);};
- lobby=new Channel('/lobby',token,{bar:true},onLobby,(status,data)=>{if(status==='refused')refused(data);});
+ let blocked=false,gotTables=false;
+ const refused=m=>{blocked=true;showStatus(m?.code==='bar-closed'?'El bar todavía no está abierto. Por ahora es solo para algunos jugadores.':(m?.error||'No se pudo entrar al bar.'),[['Volver al juego',null,'/']]);};
+ const openLobby=()=>new Channel('/lobby',token,{bar:true},m=>{if(m.t==='bar-layout')gotTables=true;onLobby(m);},(status,data)=>{
+  if(status!=='refused')return;
+  if(data?.code==='bar-closed'){refused(data);return;}
+  setTimeout(()=>{lobby=openLobby();},2000);
+ });
+ lobby=openLobby();
+ setInterval(()=>{if(!gotTables&&!blocked&&lobby?.ws?.readyState!==0){lobby.closed=true;try{lobby.ws.close();}catch{}lobby=openLobby();}},10000);
  bar=new Channel('/bar',token,{},onBar,(status,data)=>{
-  if(status==='ready'){state.me=data;if(!state.walkers.has(data.uid))addWalker(data);$('status').hidden=true;
+  if(status==='ready'){state.me=data;if(!state.walkers.has(data.uid))addWalker(data);if(!blocked)$('status').hidden=true;
    const s=state.cam.s=Math.max(.45,Math.min(1,W/1100));state.cam.x=data.x-W/2/s;state.cam.y=data.y-H/2/s;}
   else if(status==='refused')refused(data);
   else if(status==='reconnecting')toast('Reconectando…');

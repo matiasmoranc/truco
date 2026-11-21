@@ -21,7 +21,7 @@ export default {
   if(!originAllowed(request,env))return new Response('Origen no permitido.',{status:403});
   if(url.pathname==='/lobby')return lobbyStub(env).fetch(request);
   // The BAR (trucouruguayo.uy/bar): walking and nearby chat, apart from the lobby and the tables.
-  if(url.pathname==='/bar')return barStub(env).fetch(request);
+  if(url.pathname==='/bar'||url.pathname==='/bar/status')return barStub(env).fetch(request);
   // Live balance and daily claim (only while the bank holds the credits).
   if(url.pathname==='/bank')return env.CREDITS_BACKEND==='bank'?bankStub(env).fetch(request):new Response('El banco no está activo.',{status:503});
   const table=/^\/tables\/([A-Z2-9]{5})$/.exec(url.pathname);

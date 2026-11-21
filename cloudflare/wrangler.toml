@@ -11,7 +11,11 @@ FIREBASE_DATABASE_URL = "https://truco-6553d-default-rtdb.firebaseio.com"
 CREDITS_BACKEND = "bank"
 # Browser origins allowed to open sockets. Native apps send capacitor:// or https://localhost.
 # Who may enter the BAR while it is tried (comma-separated uids; now Alejo and Nahuelcas); administrators always can.
-BAR_ALLOW = "XYniLjLwfHcizLAYEBL5tuxQhMo2,q2IVvTWWD3e4iC0L11ltKhmpL5U2"
+# Who can walk behind the counter in the BAR (bar-core.js barStaff): only the owner's account, Mati93.
+BAR_STAFF = "4E51mttuGza69selOHip9U3CfGF3"
+BAR_ALLOW = "XYniLjLwfHcizLAYEBL5tuxQhMo2,q2IVvTWWD3e4iC0L11ltKhmpL5U2,5aWBQgWBhIUuZlXD18m22Cf1i3v2,FlwOoFpE3vezgqH2S6gvf2pqohp2,c6lUSrTqDtbAZTYy4mBRwey97to2"
+# The BAR open to everyone with an account (at most 50 at once). "0" closes it again (then only BAR_ALLOW).
+BAR_OPEN = "1"
 ALLOWED_ORIGINS = "https://trucouruguayo.uy,https://matiasmoranc.github.io,https://truco-6553d.web.app,https://truco-6553d.firebaseapp.com,capacitor://localhost,https://localhost"
 
 # Secrets (set with `npx wrangler secret put NAME`, never committed):

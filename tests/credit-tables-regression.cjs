@@ -275,6 +275,14 @@ test('Envido rules: any number of envidos, then only real envidos, then the falt
  assert.equal(one.room.pendingBet.calls.length,1);
  createReferee(one,{now:400}).action('player2',{kind:'call',value:'raise-falta'});
  assert.deepEqual(one.room.pendingBet.calls,['envido','falta']);
+ // Two points from winning: only the envido, answered with quiero or no quiero.
+ const two=fixture();two.room.scores={player1:8,player2:3};
+ createReferee(two,{now:200}).action('player1',{kind:'call',value:'real'});
+ assert.deepEqual(two.room.pendingBet.calls,['envido'],'a real envido is played as an envido');assert.equal(two.room.pendingBet.stake,2);
+ for(const kind of ['envido','real','falta'])createReferee(two,{now:300}).action('player2',{kind:'call',value:'raise-'+kind});
+ assert.deepEqual(two.room.pendingBet.calls,['envido'],'no raises');
+ createReferee(two,{now:400}).action('player2',{kind:'call',value:'no'});
+ assert.equal(two.room.scores.player1,9);
  for(const [calls,declined] of [[['envido'],1],[['envido','envido'],2],[['envido','real'],2],[['real'],1]]){
   const t=fixture();
   createReferee(t,{now:200}).action('player1',{kind:'call',value:calls[0]});

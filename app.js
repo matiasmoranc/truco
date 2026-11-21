@@ -8,9 +8,9 @@ import { installActivity } from './activity.js?v=20261010-adminstats32';
 import { installCredits } from './credits.js?v=20261025-claim1';
 import { installAccount } from './account.js?v=20261118-mesas4';
 import { initializeGameAuth } from './auth-init.js?v=20261016-android-google';
-import {installTeamTable,TEAM_SEATS,playerTeam,positionDealerDeck,renderTeamLobbySeats,renderWaitingSeats} from './team-table-ui.js?v=20261119-amigos1';
+import {installTeamTable,TEAM_SEATS,playerTeam,positionDealerDeck,renderTeamLobbySeats,renderWaitingSeats} from './team-table-ui.js?v=20261120-envido2';
 import {installTablePeople} from './table-people.js?v=20261112-qa1';
-import {createLiveTables,LiveError} from './live-tables.js?v=20261112-qa1';
+import {createLiveTables,LiveError,LIVE_SERVER_URL} from './live-tables.js?v=20261112-qa1';
 import {installMatchPhoto} from './share-photo.js?v=20261027-photo2';
 import {installProfiles,SOUND_MESSAGES} from './profile-level.js?v=20261115-people1';
 import {installIosPromo} from './ios-promo.js?v=20261112-qa1';
@@ -1069,10 +1069,22 @@ async function openInitialRoom(){
   const epoch=state.navigationEpoch||0;
   const invitedRoom=new URLSearchParams(location.search).get('mesa');
   const code=invitedRoom||savedRoomSeat()?.code;
-  if(code&&await restoreRoom(code))return;
+  if(code&&await restoreRoom(code)){if(await leaveForBarTable())openTableFromBar();return;}
   if(epoch!==(state.navigationEpoch||0)||state.room)return;
   if(invitedRoom&&new URLSearchParams(location.search).get('mesa')===invitedRoom)await openInvitation(invitedRoom);
   else if(firebaseConfigValid(state.config)){await openLobby();openTableFromBar();}
+}
+// Coming from the BAR to open a table while an older table of mine is still waiting with only me at it
+// (a "Buscar gente en línea" left open, say): that one is closed, so the table opened is the one chosen in
+// the BAR (its kind and points). A table with other people at it, or a game in play, is kept.
+async function leaveForBarTable(){
+  const params=new URLSearchParams(location.search),mode=params.get('crear'),points=Number(params.get('puntos'))||20;
+  const room=state.room;if(!['1v1','2v2'].includes(mode)||!room||room.status!=='waiting')return false;
+  if((room.mode||'1v1')===mode&&Number(room.targetPoints)===points)return false;
+  if(Object.values(room.players||{}).filter(p=>p?.uid).length>1){toast('Ya estás esperando en otra mesa con gente.',true);return false;}
+  state.cancelingWaitingRoom=state.roomCode;
+  try{if(room.managedCredits)await creditCommand({kind:'cancel'});}catch(error){state.cancelingWaitingRoom=null;console.warn('[truco:bar] could not leave the old table',error);return false;}
+  returnToLobby();return true;
 }
 // The BAR (bar/) sends people here to sit at a free table: ?crear=1v1|2v2&puntos=10|20|30|40
 // opens a public table with those choices, as if they had pressed Crear mesa themselves.
@@ -1083,6 +1095,8 @@ function openTableFromBar(){
   configureSetup();
   document.querySelector(`[data-table-mode="${mode}"]`)?.click();
   if(['10','20','30','40'].includes(points)){$('target-points').value=points;renderPointsPicker();}
+  // The kind is set directly too, so nothing on the way leaves the default 1 vs 1.
+  $('play-bot').checked=false;$('table-mode').value=mode;$('table-mode').dispatchEvent(new Event('change'));updateBotSetup();
   enterRoom();
 }
 
@@ -1962,16 +1976,19 @@ function scheduleLocalNextHand(room){
 
 // Declining an envido pays what was accepted before (1 if nothing).
 // Raises never go down: any number of envidos, then any number of real envidos, then the falta (nothing after it).
-// When the leader needs a single point, only the falta envido is offered.
+// When the leader needs a single point, only the falta envido is offered; when they need two, only the
+// envido, and it is answered with quiero or no quiero (no raises).
 function envidoRaiseKinds(bet,room=state.room){
   if(bet?.type!=='envido'||bet.revealMode)return [];
   const calls=bet.calls?.length?bet.calls:[bet.called||'envido'];
   if(calls.includes('falta'))return [];
   if(room&&faltanParaGanar(room)===1)return ['falta'];
+  if(room&&faltanParaGanar(room)===2)return [];
   return calls.includes('real')?['real','falta']:['envido','real','falta'];
 }
-// The envido calls offered to start one: all three, or only the falta when the leader needs a single point.
-function envidoCallKinds(room=state.room){return room&&faltanParaGanar(room)===1?['falta']:['envido','real','falta'];}
+// The envido calls offered to start one: all three; only the falta when the leader needs a single point;
+// only the envido when they need two.
+function envidoCallKinds(room=state.room){const left=room&&faltanParaGanar(room);return left===1?['falta']:left===2?['envido']:['envido','real','falta'];}
 function envidoCallButtons(room,short=false){
   const labels=short?{envido:'ENVIDO',real:'REAL',falta:'FALTA'}:{envido:'ENVIDO',real:'REAL ENVIDO',falta:'FALTA ENVIDO'};
   return envidoCallKinds(room).map(kind=>'<button class="pass-button" data-action="'+kind+'"><strong>'+labels[kind]+'</strong></button>').join('');
@@ -3478,6 +3495,8 @@ function localCallAction(kind){
   if(!overTruco&&room.turn!==caller)return;
   if(['envido','real','falta'].includes(kind)){
     if(!canCallFirstRoundEnvido(room,caller,localHand(caller))){toast('El envido está cerrado o hay flor.');return;}
+    // Two points from winning: any envido call (a bot's, an older app's) is played as an envido.
+    if(faltanParaGanar(room)===2)kind='envido';
     const base=pending?.type==='envido'?(pending.stake||0):0;
     room.pendingBet={type:'envido',caller,responder:other,stake:envidoBetPoints(room,kind,base),accepted:base,called:kind,calls:[kind],reveals:{},suspendedBet:overTruco?pending:null};
     queueLearningAction(kind);localFeed(`${room.players[caller].name} canta ${kind==='real'?'real envido':kind==='falta'?'falta envido':'envido'}.`);renderGame();return;
@@ -5109,6 +5128,21 @@ const matchNotebook=installMatchNotebook({document,getState:()=>state,relationOf
 // Online features ask a guest to sign in first.
 $('guest-signin-open').addEventListener('click',()=>account.askSignIn());
 $('guest-online-signin').addEventListener('click',()=>{$('guest-online-dialog').close();account.askSignIn();});
+// "Lobby Virtual": the BAR in 3D (trucouruguayo.uy/bar). Only on the web: the apps never show it. It holds
+// 50 people at once (the server refuses the 51st); the button asks first, to say so before leaving.
+// The Lobby Virtual (the 3D BAR): also in the apps (1.0.14 on), when the phone can run it (import maps and WebGL).
+const barSupported=()=>{try{return (!globalThis.trucoNative?.isNative||HTMLScriptElement.supports?.('importmap'))&&!!document.createElement('canvas').getContext('webgl');}catch{return false;}};
+if(barSupported())$('virtual-lobby').hidden=false;
+$('virtual-lobby').addEventListener('click',async()=>{
+  if(account.isGuest()){$('guest-online-dialog').showModal();return;}
+  const button=$('virtual-lobby');if(button.dataset.busy)return;button.dataset.busy='1';
+  try{
+    const status=await fetch(LIVE_SERVER_URL+'/bar/status',{cache:'no-store'}).then(r=>r.ok?r.json():null).catch(()=>null);
+    if(status&&Number(status.inside)>=Number(status.max)){$('vlobby-full-count').textContent=status.max+'/'+status.max;$('vlobby-full').showModal();return;}
+    trackUsage('lobby-virtual-open');location.href=globalThis.trucoNative?.isNative?'/bar/index.html':'/bar';
+  }finally{delete button.dataset.busy;}
+});
+$('vlobby-full-ok').addEventListener('click',()=>$('vlobby-full').close());
 $('guest-online-bot').addEventListener('click',()=>$('guest-online-dialog').close());
 for(const id of ['open-friends','level-open'])$(id).addEventListener('click',event=>{if(!account.isGuest())return;event.stopImmediatePropagation();account.askSignIn();},true);
 

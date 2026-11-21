@@ -2752,3 +2752,13 @@ input,textarea,[contenteditable=""],[contenteditable="true"]{-webkit-user-select
 .player-friend-score{display:grid;text-align:right;font-weight:900}.player-friend-score b{font-size:16px}.player-friend-score small{font-size:10px}
 .player-friend-score.up{color:#9ff0c8}.player-friend-score.down{color:#ffb3b1}.player-friend-score.even{color:#e7dfcb}
 .player-friends-note,.player-friends-empty{color:#a9b8ad;font-size:13px;text-align:center;line-height:1.4}
+
+/* "Lobby Virtual" on the home (web only): the BAR in 3D. */
+.vlobby{display:flex;align-items:center;gap:10px;width:100%;margin-top:0;padding:8px 12px;border-radius:14px;border:1px solid #d8ba7666;background:#00271c66;color:#f7f3e9;font:inherit;text-align:left;cursor:pointer;box-shadow:inset 0 1px 0 #ffffff0d}
+.vlobby[hidden]{display:none}
+.vlobby:active{transform:scale(.99)}
+.vlobby-icon{width:30px;height:30px;flex:none;border-radius:9px;background:#d8b875;display:grid;place-items:center}
+.vlobby-icon svg{width:20px;height:20px;fill:none;stroke:#14301f;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.vlobby-title{font-size:16px;color:#e8c983}
+.vlobby-new{background:#d67869;color:#fff;font-size:10px;font-weight:800;letter-spacing:.06em;padding:2px 7px;border-radius:999px}
+.vlobby-chevron{margin-left:auto;font-size:22px;line-height:1;color:#d8b875;opacity:.8}

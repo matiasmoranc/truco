@@ -34,6 +34,12 @@ const root = path.resolve(__dirname, '..');
   await fs.writeFile(nativeHtml,(await fs.readFile(nativeHtml,'utf8')).replace('viewport-fit=cover','viewport-fit=auto'));
   await fs.copyFile(path.join(root,'favicon.svg'), path.join(root,'www/favicon.svg'));
   await Promise.all(['privacidad.html','soporte.html','eliminar-cuenta.html','reglas.html','legal.css','aprender-truco-uruguayo.html','cartas-truco-uruguayo.html','guia.css','anotador-de-truco.html','scorer.js','visit.js'].map(file=>fs.copyFile(path.join(root,file),path.join(root,'www',file))));
+  // The Lobby Virtual (the 3D BAR): its page at bar/index.html (the home button opens it), its code under
+  // bar3d/ and the Firebase settings it imports by path. Three.js and Firebase come from their CDNs, online.
+  await fs.mkdir(path.join(root,'www/bar'),{recursive:true});await fs.mkdir(path.join(root,'www/bar3d'),{recursive:true});
+  await fs.writeFile(path.join(root,'www/bar/index.html'),(await fs.readFile(path.join(root,'bar/index.html'),'utf8')).replace('viewport-fit=cover','viewport-fit=auto'));
+  for(const file of ['bar3d.js','people.js'])await fs.copyFile(path.join(root,'bar3d',file),path.join(root,'www/bar3d',file));
+  await fs.copyFile(path.join(root,'firebase-config.js'),path.join(root,'www/firebase-config.js'));
   // Code and the static pages load some images and videos by path at runtime
   // (card sprites, tutorial videos, page logos). Copy only what the packaged
   // files mention, so source photos and unused art stay out of the app.

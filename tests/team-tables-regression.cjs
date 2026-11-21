@@ -274,6 +274,10 @@ test('2v2: envido rules — no envido after an accepted truco, any number of env
  act4('player1',{kind:'call',value:'envido'});const o1=one.room.pendingBet.responder;
  assert.throws(()=>act4(o1,{kind:'call',value:'raise-envido'}));assert.throws(()=>act4(o1,{kind:'call',value:'raise-real'}));
  act4(o1,{kind:'call',value:'raise-falta'});assert.equal(one.room.pendingBet.called,'falta');
+ // Two points from winning: only the envido, and no raises.
+ const two=seatSession(hands,{scores:{player1:Number(s.room.targetPoints||30)-2,player2:0}});now=1000;const act5=(p,c)=>createTeamReferee(two,{now:now+=10}).action(p,c);
+ act5('player1',{kind:'call',value:'falta'});assert.equal(two.room.pendingBet.called,'envido');assert.equal(two.room.pendingBet.stake,2);
+ const w1=two.room.pendingBet.responder;for(const k of ['envido','real','falta'])assert.throws(()=>act5(w1,{kind:'call',value:'raise-'+k}));
  const t=seatSession(hands);now=1000;const act3=(p,c)=>createTeamReferee(t,{now:now+=10}).action(p,c);
  act3('player1',{kind:'call',value:'truco'});act3(t.room.pendingBet.responder,{kind:'call',value:'yes'});
  assert.throws(()=>act3('player1',{kind:'call',value:'envido'}));

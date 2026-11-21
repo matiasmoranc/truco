@@ -95,11 +95,13 @@ function sideScore(room,player,points,detail,extra){
   const scores=capScores(room,{...room.scores,[player]:(Number(room.scores?.[player])||0)+points});
   return {...(extra||{}),scores,handScoreEntries:[...(room.handScoreEntries||[]),{player,points:scores[player]-(Number(room.scores?.[player])||0),detail}]};
 }
+// One point from winning: only the falta raises; two points: no raises, only quiero or no quiero.
 function envidoRaiseKinds(bet,room=state.room){
   if(bet?.type!=='envido'||bet.revealMode)return [];
   const calls=bet.calls?.length?bet.calls:[bet.called||'envido'];
   if(calls.includes('falta'))return [];
   if(room&&faltanParaGanar(room)===1)return ['falta'];
+  if(room&&faltanParaGanar(room)===2)return [];
   return calls.includes('real')?['real','falta']:['envido','real','falta'];
 }
 function ptsText(n){return Number(n)===1?'1 punto':n+' puntos';}
@@ -355,6 +357,8 @@ function localCallAction(kind){
   if(!overTruco&&room.turn!==caller)return;
   if(['envido','real','falta'].includes(kind)){
     if(!canCallFirstRoundEnvido(room,caller,localHand(caller))){toast('El envido está cerrado o hay flor.');return;}
+    // Two points from winning: any envido call (a bot's, an older app's) is played as an envido.
+    if(faltanParaGanar(room)===2)kind='envido';
     const base=pending?.type==='envido'?(pending.stake||0):0;
     room.pendingBet={type:'envido',caller,responder:other,stake:envidoBetPoints(room,kind,base),accepted:base,called:kind,calls:[kind],reveals:{},suspendedBet:overTruco?pending:null};
     queueLearningAction(kind);localFeed(`${room.players[caller].name} canta ${kind==='real'?'real envido':kind==='falta'?'falta envido':'envido'}.`);renderGame();return;
