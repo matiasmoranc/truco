@@ -106,7 +106,7 @@ export class TableRoom extends DurableObject{
    const secret=visibility==='password'?passwordHash(password):null;
    // Profile checks and the ledger read run together; the transaction reuses the read.
    const [user,initial]=await Promise.all([this.identity(uid),this.bank.prefetch()]);
-   await this.engine.create(user,{id:crypto.randomUUID(),stake,targetPoints,mode,secret,initial});
+   await this.engine.create(user,{id:crypto.randomUUID(),stake,targetPoints,mode,secret,via:message.via==='bar'?'bar':null,initial});
    this.engine.setOnline(uid,true);
    await this.commit();return this.result(uid);
   }
@@ -117,7 +117,7 @@ export class TableRoom extends DurableObject{
    if(!this.engine.playerFor(uid)){
     const [user,blocked,initial,friends]=await Promise.all([this.identity(uid),this.blockedWithPlayers(uid),this.bank.prefetch(),this.friendsWithHost(uid)]);
     if(blocked)throw new Error('No pueden entrar a la misma mesa porque uno bloqueó al otro.');
-    await this.engine.join(user,{password:message.password||'',team:message.team,friends,initial});
+    await this.engine.join(user,{password:message.password||'',team:message.team,friends,via:message.via==='bar'?'bar':null,initial});
    }
    this.engine.setOnline(uid,true);
    await this.commit();return this.result(uid);

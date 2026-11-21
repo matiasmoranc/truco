@@ -286,6 +286,15 @@ exports.adminConsole=onCall({...options,secrets:[liveInternalSecret]},async requ
   result.time=timeTo>=timeFrom?{from:timeFrom,to:timeTo,...sessionSummary(sessions?.val()||{},timeFrom,timeTo)}:null;
   return result;
  }
+ // The Lobby Virtual: people who came in per day (last 30 days) and per hour of one day, and tables opened from it.
+ if(action==='bar-stats'){
+  const dayOf=at=>new Date(at-3*3600000).toISOString().slice(0,10),now=Date.now();
+  const days=Array.from({length:30},(_,i)=>dayOf(now-(29-i)*86400000)),day=/^\d{4}-\d{2}-\d{2}$/.test(String(data.day||''))?String(data.day):days.at(-1);
+  const [visits,tests,ledger]=await Promise.all([db.ref('barVisits').orderByKey().startAt(days[0]<day?days[0]:day).get(),db.ref('adminConfig/testUsers').get(),creditStore.recentLedger()]);
+  const exclude=data.includeTest?new Set():new Set(Object.keys(tests.val()||{}));
+  const stats=require('./bar-stats.cjs');
+  return {days,day,...stats.barVisitStats(visits.val()||{},{days,day,exclude}),tables:stats.tablesByOrigin(ledger,{days,dayOf})};
+ }
  if(action==='chat-log'){
   const days=Math.min(CHAT_LOG_DAYS,Math.max(1,Math.floor(Number(data.days)||7)));
   const from=chatDay(Date.now()-(days-1)*86400000);

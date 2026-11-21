@@ -1088,6 +1088,11 @@ async function leaveForBarTable(){
 }
 // The BAR (bar/) sends people here to sit at a free table: ?crear=1v1|2v2&puntos=10|20|30|40
 // opens a public table with those choices, as if they had pressed Crear mesa themselves.
+// Coming from the Lobby Virtual (?desde=bar): the next table created or joined is marked as opened from there
+// (admin statistics), once. Going back to the lobby forgets it.
+let fromBar=new URLSearchParams(location.search).get('desde')==='bar';
+if(fromBar){const url=new URL(location.href);url.searchParams.delete('desde');history.replaceState(null,'',url);}
+const takeBarOrigin=()=>{const via=fromBar?{via:'bar'}:{};fromBar=false;return via;};
 function openTableFromBar(){
   const params=new URLSearchParams(location.search),mode=params.get('crear'),points=params.get('puntos');
   if(!['1v1','2v2'].includes(mode)||account.isGuest()||state.room)return;
@@ -1144,7 +1149,7 @@ async function enterRoom() {
         const known=state.invitePassword?.code===code?state.invitePassword.password:'';
         const direct=state.directJoin===code&&(!room.creditMatch?.hasPassword||!!known);state.directJoin=null;
         if(!seat&&!state.joinConfirmed&&!direct){openCreditJoin(code,room);return;}
-        const result=await creditApi('creditJoinTable',{code,password:(state.joinConfirmed?state.joinPassword:known||state.joinPassword)||'',...(room.mode==='2v2'?{team:state.joinConfirmed?$('join-credit-team').value:state.joinTeam}:{})});
+        const result=await creditApi('creditJoinTable',{code,...takeBarOrigin(),password:(state.joinConfirmed?state.joinPassword:known||state.joinPassword)||'',...(room.mode==='2v2'?{team:state.joinConfirmed?$('join-credit-team').value:state.joinTeam}:{})});
         room=result.room;joinedHand=result.privateHand||null;seat=roomSeatForUid(room,state.uid);state.joinPassword='';state.joinConfirmed=false;
         if(!seat)throw new Error('La mesa ya no tiene lugares disponibles.');
       }
@@ -1162,7 +1167,7 @@ async function enterRoom() {
       state.roomCode=code;state.playerId=seat;joinedRoom=room;
     }else{
       const stake=0,visibility=$('table-visibility').value;
-      const data={stake,targetPoints:normalizeTargetPoints($('target-points').value),mode:$('table-mode').value,visibility,password:visibility==='password'?$('table-password').value:''};
+      const data={stake,targetPoints:normalizeTargetPoints($('target-points').value),mode:$('table-mode').value,visibility,password:visibility==='password'?$('table-password').value:'',...takeBarOrigin()};
       // The table appears at once; the server confirms the credit reservation behind it.
       const code=newTableCode();
       state.pendingCreate=code;state.cancelAfterCreate=null;

@@ -47,7 +47,7 @@ async function setTestUser(u,test){
 const number=value=>new Intl.NumberFormat('es-UY').format(Number(value)||0);
 const PLATFORM_LABELS={'app-ios':'App iPhone','app-android':'App Android','web-ios':'Web iPhone','web-android':'Web Android','web-desktop':'Web computadora'};
 const PAGE_LABELS={juego:'Juego',anotador:'Anotador',aprender:'Aprender a jugar',otra:'Reglas y otras'};
-const TAB_TITLES={metrics:'Resumen',tasks:'Tareas',visits:'Visitas',usage:'Anotador y Aprender',retention:'Retención',users:'Usuarios',tables:'Mesas y partidas',reports:'Problemas reportados',messages:'Mensajes a jugadores',chat:'Chat de las mesas',audit:'Historial de cambios'};
+const TAB_TITLES={metrics:'Resumen',tasks:'Tareas',visits:'Visitas',usage:'Anotador y Aprender',retention:'Retención',users:'Usuarios',tables:'Mesas y partidas',lobby:'Lobby Virtual',reports:'Problemas reportados',messages:'Mensajes a jugadores',chat:'Chat de las mesas',audit:'Historial de cambios'};
 function errorText(e){return e.code==='functions/not-found'?'Falta publicar las funciones de administración en Firebase.':e.message||'No se pudo completar el cambio.';}
 const AUDIT_LABELS={level:'Cambio de nivel y puntos',rename:'Cambio de nombre',block:'Bloqueo',delete:'Eliminación de cuenta',credits:'Créditos','close-table':'Cierre de mesa','close-legacy-table':'Cierre de mesa','repair-reservation':'Reparación de reserva'};
 // The device a player used last, as the panel names it.
@@ -189,10 +189,14 @@ function tableItems(kind,{from,to}){
 // Three 30-day charts drawn like "Jugadores únicos · últimos 30 días" on the summary.
 function renderTableDaily(daily){
  const charts=[['table-created-chart','created','mesas creadas'],['table-players-chart','vsPlayers','partidas entre jugadores'],['table-house-chart','vsHouse','partidas contra la casa']];
+ for(const el of document.querySelectorAll('[data-origin]'))el.replaceChildren(...[['via-lobby','Desde el lobby'],['via-bar','Desde el Lobby Virtual']].map(([k,l])=>{const span=node('span','');const i=node('i','');i.style.background='var(--'+k+')';span.append(i,l);return span;}));
+ const events=tableData?.events||{created:[],finished:[]},pick={created:events.created,vsPlayers:events.finished.filter(x=>!x.house),vsHouse:events.finished.filter(x=>x.house)};
  for(const [id,key,unit] of charts){
   const target=$(id);if(!target)continue;
   if(!daily?.days){target.replaceChildren(node('p','Este juego todavía no guarda estos datos.','empty'));continue;}
-  columns(target,daily.days.map(day=>{const n=daily[key]?.[day]||0;return {label:shortDay(day),value:n,tooltip:shortDay(day)+' · '+n+' '+unit};}),{labelEvery:3});
+  // The day's total from the daily counts; how many of them came from the Lobby Virtual from the list of events.
+  columns(target,daily.days.map(day=>{const n=daily[key]?.[day]||0,bar=Math.min(n,pick[key].filter(x=>x.day===day&&x.via==='bar').length);
+   return {label:shortDay(day),segments:[{key:'via-lobby',value:n-bar},{key:'via-bar',value:bar}],tooltip:shortDay(day)+' · '+n+' '+unit+'\nDesde el lobby: '+(n-bar)+'\nDesde el Lobby Virtual: '+bar};}),{labelEvery:3});
  }
 }
 // People who played / finished a table per day (each person once a day), for the chosen dates.
@@ -221,7 +225,8 @@ function renderTableStats(){
  $('table-period').textContent=period.from===period.to?'Período: '+longDay(period.from):'Período: del '+longDay(period.from)+' al '+longDay(period.to);
  for(const [kind,label] of Object.entries(TABLE_KINDS)){
   const k=node('button','','kpi metric-link');k.type='button';k.classList.toggle('selected',tableDetail?.kind===kind);
-  k.append(node('small',label),node('strong',number(tableItems(kind,period).length)),node('span','Ver detalle','delta'));k.onclick=()=>openTableDetail(kind);box.append(k);
+  const items=tableItems(kind,period),fromBar=items.filter(x=>x.via==='bar').length;
+  k.append(node('small',label),node('strong',number(items.length)),node('span','Lobby '+number(items.length-fromBar)+' · Lobby Virtual '+number(fromBar),'split'),node('span','Ver detalle','delta'));k.onclick=()=>openTableDetail(kind);box.append(k);
  }
  if(tableDetail)openTableDetail(tableDetail.kind,tableDetail.day);
 }
@@ -300,8 +305,8 @@ $('search').addEventListener('input',renderUsers);
 // Tapping a column header orders by it; tapping it again flips the order.
 for(const button of document.querySelectorAll('[data-sort]'))button.onclick=()=>{const key=button.dataset.sort;sortBy=sortBy.key===key?{key,dir:-sortBy.dir}:{key,dir:key==='name'?1:-1};renderUsers();void loadAllUsers();};$('photo-filter').onchange=$('level-filter').onchange=()=>{renderUsers();void loadAllUsers();};$('more').onclick=()=>refresh(true);
 // A tab always opens at the top (not where the previous one was scrolled to).
-function showTab(name){const changed=$(name)?.hidden;if(name==='users'||name==='messages')setTimeout(completeUsers,0);for(const section of Object.keys(TAB_TITLES))$(section).hidden=section!==name;for(const tab of document.querySelectorAll('[data-tab]'))tab.classList.toggle('active',tab.dataset.tab===name);$('page-title').textContent=TAB_TITLES[name];if(name==='usage')refreshUsage();if(name==='chat')loadChat();if(name==='retention')loadRetention();if(name==='tasks')loadTasks();if(name==='users')loadDevices();if(changed)window.scrollTo({top:0,left:0,behavior:'instant'});}
-$('refresh').onclick=()=>{refresh(false,true);if(!$('usage').hidden)refreshUsage();if(!$('chat').hidden)loadChat();};
+function showTab(name){const changed=$(name)?.hidden;if(name==='users'||name==='messages')setTimeout(completeUsers,0);for(const section of Object.keys(TAB_TITLES))$(section).hidden=section!==name;for(const tab of document.querySelectorAll('[data-tab]'))tab.classList.toggle('active',tab.dataset.tab===name);$('page-title').textContent=TAB_TITLES[name];if(name==='usage')refreshUsage();if(name==='chat')loadChat();if(name==='lobby')loadBar();if(name==='retention')loadRetention();if(name==='tasks')loadTasks();if(name==='users')loadDevices();if(changed)window.scrollTo({top:0,left:0,behavior:'instant'});}
+$('refresh').onclick=()=>{refresh(false,true);if(!$('lobby').hidden)loadBar(barStats?.day);if(!$('usage').hidden)refreshUsage();if(!$('chat').hidden)loadChat();};
 for(const b of document.querySelectorAll('[data-tab]'))b.onclick=()=>showTab(b.dataset.tab);
 async function showUsers(scope){if(busy)return;userScope=scope;pagesLoaded=1;pageToken=null;users=[];$('search').value='';$('user-scope').value=scope;renderUsers();showTab('users');await refresh();}
 for(const b of document.querySelectorAll('[data-scope]'))b.onclick=()=>showUsers(b.dataset.scope);
@@ -989,15 +994,44 @@ function renderChat(){
  for(const g of groups){
   const card=node('article','','chat-table'),head=node('div','','chat-table-head');
   const first=g.messages[0]?.at,last=g.lastAt;
-  head.append(node('strong',g.code?'Mesa '+g.code:'Mensajes'),node('span',(g.mode==='2v2'?'2 vs 2':g.mode==='1v1'?'1 vs 1':'')+(g.games>1?' · '+g.games+' partidas':'')),node('small',date(first)+' · '+time(first)+(last!==first?' a '+time(last):'')));
+  const bar=g.code==='BAR';
+  head.append(node('strong',bar?'Lobby Virtual':g.code?'Mesa '+g.code:'Mensajes'),node('span',bar?'Charla en el bar':(g.mode==='2v2'?'2 vs 2':g.mode==='1v1'?'1 vs 1':'')+(g.games>1?' · '+g.games+' partidas':'')),node('small',date(first)+' · '+time(first)+(last!==first?' a '+time(last):'')));
   const people=node('div','','chat-table-people');
   for(const p of g.players){const chip=node('button',(p.name||'Sin nombre')+(p.bot?' (bot)':''),'chat-person'+(p.wrote?' wrote':'')+(p.bot?' bot':''));chip.type='button';chip.title=p.wrote?'Escribió en esta mesa':'No escribió';if(p.bot)chip.disabled=true;else chip.onclick=()=>toUser(p.name,p.uid);people.append(chip);}
   const log=node('div','','chat-table-log');
-  for(const m of g.messages){const row=node('div','','chat-line'),who=node('button',m.name||'Sin nombre','chat-who');who.type='button';who.onclick=()=>toUser(m.name,m.uid);row.append(node('time',time(m.at)),who,node('span',m.text,'chat-text'));log.append(row);}
+  for(const m of g.messages){const row=node('div','','chat-line'),who=node('button',m.name||'Sin nombre','chat-who');who.type='button';who.onclick=()=>toUser(m.name,m.uid);row.append(node('time',time(m.at)),who,node('span',m.text,'chat-text'));if(m.mode==='bar')row.append(node('small',m.near?.length?'lo leyeron: '+m.near.join(', '):'nadie cerca','chat-near'));log.append(row);}
   card.append(head,people,log);box.append(card);
  }
 }
 $('chat-days').addEventListener('change',loadChat);
+// ---------- the Lobby Virtual: who comes in, per day and per hour, and the tables opened from it ----------
+let barStats=null,barRequest=0;
+async function loadBar(day){
+ const request=++barRequest;
+ try{const data=(await call({action:'bar-stats',...(day?{day}:{}),includeTest:$('bar-tests').checked})).data;if(request!==barRequest)return;barStats=data;renderBar();}
+ catch(e){if(request===barRequest)$('bar-kpis').replaceChildren(node('p',errorText(e),'empty'));}
+}
+function renderBar(){
+ const d=barStats;if(!d)return;
+ if(!$('bar-day').value||$('bar-day').value!==d.day){$('bar-day').value=d.day;}$('bar-day').max=d.days.at(-1);
+ const today=d.days.at(-1),yesterday=d.days.at(-2),values=d.days.map(x=>d.perDay[x]||0),avg=values.reduce((a,b)=>a+b,0)/(values.length||1);
+ const kpis=[['Entraron hoy',d.perDay[today]||0],['Entraron ayer',d.perDay[yesterday]||0],['Promedio por día · 30 días',avg.toFixed(1).replace('.',',')],['Día con más gente',Math.max(0,...values)]];
+ $('bar-kpis').replaceChildren(...kpis.map(([l,v])=>{const k=node('div','','kpi');k.append(node('small',l),node('strong',typeof v==='number'?number(v):v));return k;}));
+ columns($('bar-day-chart'),d.days.map(day=>({label:shortDay(day),value:d.perDay[day]||0,selected:day===d.day,tooltip:longDay(day)+' · '+(d.perDay[day]||0)+' personas · tocá para verlo por hora',onClick:()=>loadBar(day)})),{labelEvery:3});
+ $('bar-hour-title').textContent='Personas por hora · '+longDay(d.day);
+ columns($('bar-hour-chart'),d.perHour.map((n,h)=>({label:String(h).padStart(2,'0'),value:n,tooltip:String(h).padStart(2,'0')+':00 a '+String(h).padStart(2,'0')+':59 · '+n+' personas'})),{labelEvery:2});
+ const t=d.tables||{};
+ columns($('bar-table-chart'),d.days.map(day=>{const c=t.created?.[day]?.bar||0,h=t.vsHouse?.[day]?.bar||0,p=t.vsPlayers?.[day]?.bar||0;
+  return {label:shortDay(day),segments:[{key:'via-bar',value:c},{key:'via-house',value:h}],tooltip:longDay(day)+'\nMesas creadas: '+c+'\nPartidas terminadas entre jugadores: '+p+'\nPartidas terminadas contra bots: '+h};}),{labelEvery:3});
+ $('bar-people-title').textContent='Quiénes entraron · '+longDay(d.day)+' ('+d.people.length+')';
+ const box=node('div','','bar-people');
+ for(const p of d.people){const row=node('div','','bar-person'),who=node('button',p.name||'Sin nombre','chat-who');who.type='button';who.onclick=()=>{$('search').value=p.name||p.uid;showTab('users');renderUsers();};
+  row.append(who,node('small',p.hours.map(h=>String(h).padStart(2,'0')+'h').join(' · ')));box.append(row);}
+ if(!d.people.length)box.append(node('p','Nadie entró ese día.','empty'));
+ $('bar-people').replaceChildren(box);
+}
+$('bar-day').addEventListener('change',()=>{if($('bar-day').value)loadBar($('bar-day').value);});
+$('bar-tests').addEventListener('change',()=>loadBar(barStats?.day));
 $('chat-search').addEventListener('input',renderChat);
 async function loadMessages(){
  try{threads=(await call({action:'messages'})).data.threads||[];}catch(e){return;}

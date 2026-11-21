@@ -34,7 +34,7 @@ function tableEvents(ledger,now,days=90){
  for(const [id,m] of Object.entries(ledger?.matches||{})){
   if(!m)continue;
   const players=Object.values(m.players||{}).map(p=>p?.name||'').filter(Boolean);
-  const base={id,code:m.code||'',players,stake:Number(m.stake)||0,targetPoints:Number(m.targetPoints)||null,mode:m.mode||'1v1',house:!!m.house};
+  const base={id,code:m.code||'',players,stake:Number(m.stake)||0,targetPoints:Number(m.targetPoints)||null,mode:m.mode||'1v1',house:!!m.house,via:m.via==='bar'?'bar':'lobby'};
   if(!m.house&&(m.matchNumber||1)===1&&Number.isFinite(m.createdAt)&&day(m.createdAt)>=since)created.push({...base,at:m.createdAt,day:day(m.createdAt),status:m.status});
   const at=Number(m.settledAt)||null;
   if(m.status==='settled'&&at&&day(at)>=since){const winner=Object.values(m.players||{}).find(p=>p?.uid===m.winner)?.name||'';const scores=m.session?.room?.scores||null;finished.push({...base,at,day:day(at),winner,scores,reason:m.session?.room?.matchResult?.reason||null});}

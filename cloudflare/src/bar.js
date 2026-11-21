@@ -3,6 +3,7 @@
 // chose to look (look:<uid>). It is its own object, apart from the lobby and the tables, so trying
 // it never touches a game.
 import {DurableObject} from 'cloudflare:workers';
+import chatLog from '../../functions/chat-log.cjs';
 import {verifyIdToken,createDatabase,createDevDatabase,playerIdentity,usersBlockEachOther,isAdministrator} from './firebase.js';
 import {lobbyStub} from './routing.js';
 import {spawnPosition,acceptMove,acceptSay,hears,cleanLook,acceptGesture,acceptInvite,inviteOpen,cleanArming,acceptOrder,BAR_MAX,barOpen,barFull,cleanProblem,barStaff} from './bar-core.js';
@@ -51,7 +52,10 @@ export class Bar extends DurableObject{
    ws.serializeAttachment({...person,said:result.said});
    const near=this.inside().filter(e=>e.ws===ws||hears(person,e.p));
    const said={t:'said',uid:person.uid,name:person.name,text:result.text,at:now};
-   for(const e of near)if(e.ws===ws||!(await this.blocked(person.uid,e.p.uid)))send(e.ws,said);
+   const heard=[];for(const e of near)if(e.ws===ws||!(await this.blocked(person.uid,e.p.uid))){send(e.ws,said);if(e.ws!==ws&&e.p.uid!==person.uid)heard.push(e.p.name);}
+   // A copy for the admin panel (Chats, "Lobby Virtual"), kept 30 days like the tables' chat.
+   const record=chatLog.chatLogRecord({at:now,code:'BAR',uid:person.uid,name:person.name,text:result.text,mode:'bar',id:message.id||crypto.randomUUID(),x:person.x,y:person.y,near:[...new Set(heard)]});
+   if(record)this.ctx.waitUntil(this.database().put(record.path,record.value).catch(error=>console.warn('bar chat log',error.message)));
    return;
   }
   // How I look: kept for next time and shown to everyone now.
@@ -151,6 +155,9 @@ export class Bar extends DurableObject{
    const at=spawnPosition(),person={uid:user.uid,name,...at,movedAt:0,said:[],look,...(barStaff(this.env,user.uid)?{staff:true}:{})};
    ws.serializeAttachment(person);
    send(ws,{t:'res',id:message.id,ok:true,data:this.walker(person)});
+   // Who came in and when (Uruguay day and hour), for the admin's "Lobby Virtual" tab: one record per person and day.
+   {const uy=new Date(Date.now()-3*3600000),day=uy.toISOString().slice(0,10),hour=String(uy.getUTCHours()).padStart(2,'0');
+    this.ctx.waitUntil(db.patch('barVisits/'+day+'/'+user.uid,{name:String(name||'').slice(0,40),last:Date.now(),['h'+hour]:true}).catch(error=>console.warn('bar visit',error.message)));}
    send(ws,{t:'walkers',list:this.inside().map(e=>this.walker(e.p))});
    this.others(ws,{t:'walker',walker:this.walker(person)});
   }catch(error){send(ws,{t:'res',id:message.id,ok:false,error:error.message});}

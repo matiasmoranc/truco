@@ -2,7 +2,7 @@
 :root{color-scheme:dark;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
  --bg:#0b231b;--side:#0e2a20;--surface:#12332a;--surface-2:#173d32;--line:#ffffff14;--line-2:#ffffff22;
  --text:#eef2ea;--muted:#9db3a7;--gold:#e8c983;--green:#8fd19e;--red:#ff9b8f;
- --usage-page:#6fb7e8;--usage-game:#e8c983;--app-ios:#e8c983;--app-android:#8fd19e;--web-ios:#f0a35e;--web-android:#6fb7e8;--web-desktop:#b79ce8;--unknown:#6b7f78}
+ --usage-page:#6fb7e8;--usage-game:#e8c983;--app-ios:#e8c983;--app-android:#8fd19e;--web-ios:#f0a35e;--web-android:#6fb7e8;--web-desktop:#b79ce8;--unknown:#6b7f78;--via-lobby:#6fb7e8;--via-bar:#e8c983;--via-house:#8fd19e}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--text);font-size:14px;min-height:100dvh}
 a{color:var(--gold)}p{line-height:1.5;color:var(--muted);margin:0 0 12px}
@@ -340,3 +340,6 @@ textarea:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 
 .people-range{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.people-range label{display:flex;align-items:center;gap:6px;font-size:13px}.people-range input,.people-range select{width:auto;margin:0;min-height:34px;padding:5px 9px;font-size:13px}
 .people-title{font-size:14px;margin:18px 0 8px}.people-title span{font-weight:400;color:var(--muted,#6b7280);font-size:13px;margin-left:6px}
+.chat-near{grid-column:2/-1;color:var(--muted);font-size:12px;margin-top:-4px}
+.bar-people{display:grid;gap:6px}.bar-person{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;font-size:14px}.bar-person small{color:var(--muted)}
+.kpi .split{display:block;margin-top:4px;font-size:12px;color:var(--muted)}

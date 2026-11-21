@@ -101,18 +101,18 @@ export function createTableEngine({code,bank,clock=()=>Date.now()}){
   load(saved){m=saved?.match||null;presence=saved?.presence||{};botDueAt=saved?.botDueAt??null;botKey=saved?.botKey??null;scheduleBot();},
   snapshot(){return {match:m,presence,botDueAt,botKey};},
   playerFor(uid){return findPlayer(m,uid);},
-  async create(user,{id,stake,targetPoints,mode,secret,house=false,initial}){
+  async create(user,{id,stake,targetPoints,mode,secret,house=false,via=null,initial}){
    if(m&&!(m.closedAt||['settled','refunded'].includes(m.status)))throw new CodeTakenError();
    const previous=m;m=null;presence={};
    // A house table moves no credits until someone joins, so it lives only here until then.
    if(house){const next=createTable({wallets:{},matches:{},tables:{}},{code,id,uid:user.uid,name:user.name,stake,targetPoints,mode,secret,house:true,now:clock()});m=next.matches[id];return;}
-   try{await accounting('create',{id,uid:user.uid,name:user.name,stake,targetPoints,mode,secret,...(house?{house:true}:{})},{creating:true,initial});}
+   try{await accounting('create',{id,uid:user.uid,name:user.name,stake,targetPoints,mode,secret,...(house?{house:true}:{}),...(via==='bar'?{via:'bar'}:{})},{creating:true,initial});}
    catch(error){if(!m)m=previous;throw error;}
   },
-  async join(user,{password='',team,friends=false,initial}){
+  async join(user,{password='',team,friends=false,via=null,initial}){
    if(!m)throw new Error('La mesa ya no está disponible.');
    if(findPlayer(m,user.uid))return;
-   await accounting('join',{uid:user.uid,name:user.name,password,team,friends},{initial});
+   await accounting('join',{uid:user.uid,name:user.name,password,team,friends,...(via==='bar'?{via:'bar'}:{})},{initial});
    if(m.house){const host=m.players[m.house];presence={...presence,[m.house]:{uid:host.uid,matchNumber:m.matchNumber,online:true}};}
    scheduleBot();
   },

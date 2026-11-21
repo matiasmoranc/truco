@@ -13,10 +13,13 @@ const isQuickMessage=text=>QUICK.has(fold(text));
 const chatDay=at=>new Date(at-3*3600000).toISOString().slice(0,10);
 
 // {path, value} to store, or null when the message is a quick one or is not usable.
-function chatLogRecord({at,code,uid,name,text,mode,id}){
+// A message in the Lobby Virtual (mode 'bar', code BAR) also keeps where it was said (x, y) and the names
+// of those close enough to read it (near).
+function chatLogRecord({at,code,uid,name,text,mode,id,x,y,near}){
  if(typeof text!=='string'||!text.trim()||!Number.isFinite(at)||isQuickMessage(text))return null;
  const key=at.toString(36).padStart(9,'0')+'-'+String(id||Math.random().toString(36).slice(2,10)).replace(/[.#$/[\]]/g,'_').slice(0,40);
- return {path:'chatLog/'+chatDay(at)+'/'+key,value:{at,code:String(code||''),uid:String(uid||''),name:String(name||'').slice(0,40),text:text.trim().slice(0,200),...(mode==='2v2'?{mode:'2v2'}:{})}};
+ return {path:'chatLog/'+chatDay(at)+'/'+key,value:{at,code:String(code||''),uid:String(uid||''),name:String(name||'').slice(0,40),text:text.trim().slice(0,200),...(mode==='2v2'?{mode:'2v2'}:{}),
+  ...(mode==='bar'?{mode:'bar',x:Math.round(Number(x)||0),y:Math.round(Number(y)||0),near:(Array.isArray(near)?near:[]).map(n=>String(n||'').slice(0,40)).filter(Boolean).slice(0,12)}:{})}};
 }
 
 // Newest first, from the stored days ({day:{key:entry}}).

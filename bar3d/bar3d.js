@@ -989,7 +989,7 @@ function openTable(slot){
    ${slot.p?'':`<div class="points">${[10,20,30,40].map(n=>`<button type="button" data-p="${n}" aria-pressed="${n===20}">${n}</button>`).join('')}</div>`}
    <div class="row"><button class="btn ghost" data-close>Cancelar</button><button class="btn" data-sit>Sentarme</button></div>`);
   s.querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>{points=Number(b.dataset.p);s.querySelectorAll('[data-p]').forEach(o=>o.setAttribute('aria-pressed',String(o===b)));});
-  s.querySelector('[data-sit]').onclick=()=>{if(!state.slots.includes(slot)||slot.leaving){closeSheet();toast('Esa mesa ya no está. Elegí otra.');return;}if(slot.code){openTable(slot);return;}location.href='/?crear='+slot.kind+'&puntos='+points;};
+  s.querySelector('[data-sit]').onclick=()=>{if(!state.slots.includes(slot)||slot.leaving){closeSheet();toast('Esa mesa ya no está. Elegí otra.');return;}if(slot.code){openTable(slot);return;}location.href='/?crear='+slot.kind+'&puntos='+points+'&desde=bar';};
   s.querySelector('[data-close]').onclick=closeSheet;return;
  }
  const players=Object.values((t.live||t.room).players||{}).filter(p=>p?.uid),names=players.map(p=>esc(p.name)).join(', ');
@@ -997,7 +997,7 @@ function openTable(slot){
  const mine=players.some(p=>p.uid===state.me?.uid),pts=t.room.targetPoints||20;
  const s=sheet(`<h3>${mine?'Tu mesa':'Mesa de '+esc(players[0]?.name||'alguien')}</h3><p class="sub">${mode} · a ${pts} puntos${t.room.creditMatch?.hasPassword?' · con contraseña':''}${players.length>1?'<br>Sentados: '+names:''}</p>
   <div class="row"><button class="btn ghost" data-close>Cancelar</button><button class="btn" data-sit>${mine?'Volver a la mesa':'Sentarme y jugar'}</button></div>`);
- s.querySelector('[data-sit]').onclick=()=>{location.href='/?mesa='+encodeURIComponent(t.code);};
+ s.querySelector('[data-sit]').onclick=()=>{location.href='/?mesa='+encodeURIComponent(t.code)+'&desde=bar';};
  s.querySelector('[data-close]').onclick=closeSheet;
 }
 function openPerson(w){
@@ -1257,7 +1257,7 @@ function renderArming(){
  armLabel.el.querySelector('[data-sit]').onclick=e=>{e.stopPropagation();const slot=a.slot;
   if(!state.slots.includes(slot)||slot.leaving){stopArming();toast('Esa mesa ya no está. Elegí otra.');return;}
   if(slot.code){stopArming();openTable(slot);return;}
-  location.href='/?crear='+slot.kind+'&puntos='+a.points;};
+  location.href='/?crear='+slot.kind+'&puntos='+a.points+'&desde=bar';};
 }
 function stopArming(){if(!state.arming)return;state.arming=null;bar?.send({t:'arming',cell:null});if(armLabel){scene.remove(armLabel.o);armLabel.el.remove();armLabel=null;}}
 function tendArming(){
@@ -1286,12 +1286,12 @@ function onInviteAnswer(m){
  if(state.inviting?.uid!==m.uid)return;state.inviting.answered=true;
  if(!m.yes){state.inviting=null;toast(m.name+' no puede ahora.');return;}
  const points=state.inviting.points;toast('¡'+m.name+' aceptó! Abriendo la mesa…');
- setTimeout(()=>{location.href='/?crear=1v1&puntos='+points;},800);
+ setTimeout(()=>{location.href='/?crear=1v1&puntos='+points+'&desde=bar';},800);
 }
 function checkJoin(){
  const j=state.joining;if(!j)return;
  if(performance.now()>j.until){state.joining=null;showWait(null);toast(j.name+' no abrió la mesa.');return;}
- for(const [code,room] of Object.entries(state.rooms))if(room?.status==='waiting'&&room.mode!=='2v2'&&room.players?.player1?.uid===j.uid&&!room.players?.player2?.uid){state.joining=null;location.href='/?mesa='+encodeURIComponent(code);return;}
+ for(const [code,room] of Object.entries(state.rooms))if(room?.status==='waiting'&&room.mode!=='2v2'&&room.players?.player1?.uid===j.uid&&!room.players?.player2?.uid){state.joining=null;location.href='/?mesa='+encodeURIComponent(code)+'&desde=bar';return;}
 }
 function showWait(text){$('wait').hidden=!text;if(text)$('wait-text').textContent=text;}
 $('wait-cancel').onclick=()=>{state.joining=null;showWait(null);};

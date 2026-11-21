@@ -24,6 +24,9 @@ test('Chat log stores typed messages by Uruguay day, newest first',()=>{
  const stored={};for(const r of [a,b]){const [,day,key]=r.path.split('/');(stored[day]??={})[key]=r.value;}
  assert.deepEqual(chatLogList(stored).map(m=>m.text),['hola','qué mano tenías']);
  assert.equal(chatLogRecord({at,code:'X',uid:'u',name:'n',text:'   '}),null);
+ // A message in the Lobby Virtual keeps where it was said and who could read it.
+ const bar=chatLogRecord({at,code:'BAR',uid:'u1',name:'Ana',text:'hola gente',mode:'bar',id:'b1',x:812.4,y:300,near:['Beto','',null,'Caro']});
+ assert.deepEqual(bar.value,{at,code:'BAR',uid:'u1',name:'Ana',text:'hola gente',mode:'bar',x:812,y:300,near:['Beto','Caro']});
 });
 
 test('Chat log groups messages by table, rematches included, listing every player even if silent',()=>{
