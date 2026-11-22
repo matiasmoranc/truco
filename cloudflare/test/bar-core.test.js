@@ -121,7 +121,7 @@ test('BAR: a free table asked from the waiter at the back',()=>{
  const t0=1000;
  let layout=barLayout(null,barTables({},{}),{now:t0});
  layout=barRequest(layout,{uid:'ana',k:'2v2',p:30,now:t0});
- assert.deepEqual(layout.cells[2],{k:'2v2',c:null,p:30,by:'ana',at:t0});
+ assert.deepEqual(layout.cells[29],{k:'2v2',c:null,p:30,by:'ana',at:t0});
  // It stays as it is; the usual free tables too.
  assert.deepEqual(barLayout(layout,barTables({},{}),{now:t0+1}),layout);
  // A new one from the same person replaces it; bad kinds or points are refused.

@@ -185,8 +185,10 @@ export function barRequest(prev,{uid,k,p,now=Date.now()}){
  const cells={...(prev?.cells||{})};
  for(const [cell,v] of Object.entries(cells))if(isRequest(v)&&(v.by===uid||now-v.at>=REQUEST_MS))delete cells[cell];
  if(Object.values(cells).filter(isRequest).length>=REQUEST_MAX)return null;
- let i=0;while(i<BAR_CELLS&&cells[i])i++;
- if(i>=BAR_CELLS)return null;
+ // From the back, where he stands: a cell just left at the front may still have its old table on screen
+ // (the door waiter has not taken it yet), and the new one must be brought, not swapped in.
+ let i=BAR_CELLS-1;while(i>=0&&cells[i])i--;
+ if(i<0)return null;
  cells[i]={k,c:null,p,by:uid,at:now};
  return {cells};
 }

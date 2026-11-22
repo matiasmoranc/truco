@@ -87,6 +87,9 @@ function syncSlots(initial){
  for(const slot of [...state.slots]){
   const c=cells[slot.cell];
   // Still in the layout: it shows what is there now (a waiting table can change kind).
+  // A table being taken away whose place now holds another one: the old one goes now, and the new one is
+  // brought (by the waiter at the back when it was asked for), not swapped in on the spot.
+  if(c&&slot.leaving){state.slots=state.slots.filter(o=>o!==slot);state.trips=state.trips.filter(t=>t.slot!==slot);fondo.trips=fondo.trips.filter(t=>t.slot!==slot);continue;}
   if(c){slot.code=c.c||null;slot.kind=c.k;slot.p=c.c?null:c.p??null;slot.by=c.by||null;slot.leaving=false;continue;}
   if(slot.leaving)continue;slot.code=null;
   // Gone: the waiter takes it away (on the first look, or not set down yet, it just goes).
@@ -1535,12 +1538,17 @@ async function start(){
  if(DEV_NAME)token=async()=>'dev:'+DEV_NAME;
  else{
   services=(async()=>{
-   const [{initializeApp},{getAuth,onAuthStateChanged},{getDatabase,ref,get}]=await Promise.all([
+   const [{initializeApp},A,{getDatabase,ref,get}]=await Promise.all([
     import(`https://www.gstatic.com/firebasejs/${FIREBASE_VERSION}/firebase-app.js`),
     import(`https://www.gstatic.com/firebasejs/${FIREBASE_VERSION}/firebase-auth.js`),
     import(`https://www.gstatic.com/firebasejs/${FIREBASE_VERSION}/firebase-database.js`)]);
-   const app=initializeApp(firebaseConfig),auth=getAuth(app);
-   const user=await new Promise(resolve=>{const off=onAuthStateChanged(auth,u=>{off();resolve(u);});});
+   // Like the game (auth-init.js): initializeAuth with the saved session and no sign-in iframe. getAuth() loads
+   // that iframe, which never answers inside the iPhone app (capacitor:// page), so the bar stayed "Entrando…".
+   const app=initializeApp(firebaseConfig);let auth;
+   try{auth=A.initializeAuth(app,{persistence:[A.browserLocalPersistence,A.indexedDBLocalPersistence,A.browserSessionPersistence,A.inMemoryPersistence]});}
+   catch(error){if(error?.code!=='auth/already-initialized')throw error;auth=A.getAuth(app);}
+   await Promise.race([auth.authStateReady(),new Promise((_,reject)=>setTimeout(()=>reject(new Error('auth timeout')),20000))]);
+   const user=auth.currentUser;
    return {auth,user,db:getDatabase(app),ref,get};
   })();
   const fb=await services.catch(()=>null);
