@@ -315,13 +315,14 @@ const wallClock={hands:[]};
 // stays a few seconds) or for TV_HOLD_MS when there are others to show. Tapping it watches that table.
 // Web only for now (TV_ON): the apps get it with their next version.
 const TV_ON=!globalThis.Capacitor?.isNativePlatform?.();
-const TV_HOLD_MS=90000,TV_RESULT_MS=7000,TV_W=768,TV_H=432,TV_AT={x:715,y:3.9,w:2.2};
+const TV_HOLD_MS=90000,TV_RESULT_MS=7000,TV_W=768,TV_H=432,TV_SCALE=2,TV_AT={x:715,y:3.9,w:2.2};
 const tv={code:null,since:0,endedAt:0,drawn:'',mesh:null,canvas:null,tex:null,images:{}};
 if(TV_ON){
  const fr=mat('#141414',{roughness:.35,metalness:.3});wallMats.push(fr);
  const h=TV_AT.w*TV_H/TV_W;scene.add(box(TV_AT.w+.14,h+.14,.08,fr,TV_AT.x*U,TV_AT.y,.08));
- tv.canvas=document.createElement('canvas');tv.canvas.width=TV_W;tv.canvas.height=TV_H;
- tv.tex=new THREE.CanvasTexture(tv.canvas);tv.tex.colorSpace=THREE.SRGBColorSpace;tv.tex.anisotropy=8;
+ // Drawn at twice its layout size (TV_SCALE), so text and cards stay sharp up close.
+ tv.canvas=document.createElement('canvas');tv.canvas.width=TV_W*TV_SCALE;tv.canvas.height=TV_H*TV_SCALE;
+ tv.tex=new THREE.CanvasTexture(tv.canvas);tv.tex.colorSpace=THREE.SRGBColorSpace;tv.tex.anisotropy=renderer.capabilities.getMaxAnisotropy();
  const screenMat=new THREE.MeshBasicMaterial({map:tv.tex,toneMapped:false});wallMats.push(screenMat);
  tv.mesh=new THREE.Mesh(new THREE.PlaneGeometry(TV_AT.w,h),screenMat);tv.mesh.position.set(TV_AT.x*U,TV_AT.y,.125);scene.add(tv.mesh);
  // A small arm holding it to the wall.
@@ -352,7 +353,7 @@ function tvDraw(now){
  const L=tv.code?state.live?.[tv.code]:null,blink=Math.floor(now/700)%2;
  const key=JSON.stringify([tv.code,L,blink,Object.keys(tv.images).filter(k=>tv.images[k].complete).length]);
  if(key===tv.drawn)return;tv.drawn=key;
- const g=tv.canvas.getContext('2d'),W2=TV_W,H2=TV_H,font=(w,px)=>w+' '+px+'px "DM Sans",sans-serif';
+ const g=tv.canvas.getContext('2d'),W2=TV_W,H2=TV_H;g.setTransform(TV_SCALE,0,0,TV_SCALE,0,0);const font=(w,px)=>w+' '+px+'px "DM Sans",sans-serif';
  const bg=g.createRadialGradient(W2/2,H2*.55,40,W2/2,H2*.55,W2*.7);bg.addColorStop(0,'#1f6b48');bg.addColorStop(1,'#0c2e21');g.fillStyle=bg;g.fillRect(0,0,W2,H2);
  g.textAlign='center';g.textBaseline='middle';
  if(!L){g.fillStyle='#f3cf73';g.font=font(900,40);g.fillText('Sin partidas en este momento',W2/2,H2/2-24);
@@ -944,11 +945,19 @@ function sendMyStep(me,now){
 
 // ---------- camera: follows me, drag to look around, pinch or wheel to zoom ----------
 // The camera orbits around me: drag sideways to turn it (yaw), up and down to tilt it (pitch).
-const cam={target:new THREE.Vector3(),dist:PHONE?13:15,pitch:.75,yaw:0};
+// lift: dragging up past the flattest angle raises the eyes (up to CAM_LIFT_MAX m), to see the TV and the board.
+const CAM_LIFT_MAX=2.6;
+const cam={target:new THREE.Vector3(),dist:PHONE?13:15,pitch:.75,yaw:0,lift:0};
 function placeCamera(){
  // The angle never changes near a wall: the camera may go past it (it fades), only never under the floor.
- const h=Math.cos(cam.pitch)*cam.dist;
- camera.position.set(cam.target.x+Math.sin(cam.yaw)*h,cam.target.y+Math.sin(cam.pitch)*cam.dist,cam.target.z+Math.cos(cam.yaw)*h);camera.lookAt(cam.target);
+ const h=Math.cos(cam.pitch)*cam.dist,lift=state.watching||state.editingLook?0:cam.lift,t=cam.target.clone();t.y+=lift;
+ camera.position.set(t.x+Math.sin(cam.yaw)*h,t.y+Math.sin(cam.pitch)*cam.dist,t.z+Math.cos(cam.yaw)*h);camera.lookAt(t);
+}
+// Dragging down tilts the camera down; dragging up flattens it and, once flat, lifts the eyes (lowering them first on the way back).
+function lookDrag(d){
+ if(d<0){const room=cam.pitch-.06;if(-d<=room)cam.pitch+=d;else{cam.pitch=.06;cam.lift=Math.min(CAM_LIFT_MAX,cam.lift+(-d-room)*3);}}
+ else if(cam.lift>0){const back=Math.min(cam.lift,d*3);cam.lift-=back;cam.pitch=Math.min(1.3,cam.pitch+(d-back/3));}
+ else cam.pitch=Math.min(1.3,cam.pitch+d);
 }
 function clampTarget(){const b=worldBottom();cam.target.x=Math.min(WORLD.w*U,Math.max(0,cam.target.x));cam.target.z=Math.min(b*U,Math.max(3,cam.target.z));}
 // The whole floor can be walked, to the back of the room, with tables or without.
@@ -977,7 +986,11 @@ function frame(now){
  for(const w of state.walkers.values())w.uid===state.me?.uid?moveMe(w,dt):moveOther(w,dt);
  const me=state.me&&state.walkers.get(state.me.uid);
  if(state.watching)watchCamera(dt,now);
- else if(me&&state.follow)cam.target.lerp(P(me.dx,me.dy,1.1),Math.min(1,dt*5));
+ else if(me&&state.follow){
+  // Walking brings the eyes back down from a look up (see lookDrag).
+  const moved=cam.lastMe&&Math.hypot(me.dx-cam.lastMe.x,me.dy-cam.lastMe.y)>.5;cam.lastMe={x:me.dx,y:me.dy};
+  if(moved&&cam.lift>0)cam.lift=Math.max(0,cam.lift-dt*2.5);
+  cam.target.lerp(P(me.dx,me.dy,1.1),Math.min(1,dt*5));}
  else if(state.watchCam)cam.target.lerp(P(state.watchCam.x,state.watchCam.y,1.1),Math.min(1,dt*3));
  if(state.editingLook)lookCamera(dt);
  if(now-(tickClock.at||0)>1000){tickClock.at=now;tickClock();}
@@ -1033,7 +1046,7 @@ canvas.addEventListener('pointermove',e=>{
  if(pinch&&pointers.size===2){const [a,b]=[...pointers.values()],d=Math.hypot(a.x-b.x,a.y-b.y);zoomBy(d/pinch.d);pinch.d=d;return;}
  if(drag){if(Math.hypot(e.clientX-drag.x,e.clientY-drag.y)>8)drag.moved=true;
   // Dragging turns the view around me; the joystick then walks toward where I look.
-  if(drag.moved){state.watchEase=0;cam.yaw-=(e.clientX-drag.lx)*.0065;cam.pitch=Math.min(1.3,Math.max(.06,cam.pitch+(e.clientY-drag.ly)*.0045));if(!state.watchCam)state.follow=true;$('hint').hidden=true;}
+  if(drag.moved){state.watchEase=0;cam.yaw-=(e.clientX-drag.lx)*.0065;lookDrag((e.clientY-drag.ly)*.0045);if(!state.watchCam)state.follow=true;$('hint').hidden=true;}
   drag.lx=e.clientX;drag.ly=e.clientY;}
 });
 const up=e=>{
@@ -1141,7 +1154,7 @@ $('chat-input').addEventListener('pointerdown',e=>e.stopPropagation());
 // When the lists change, the waiter goes behind the counter, wipes the board and writes it again.
 const BOARD_W=2048,BOARD_H=Math.round(2048*(BOARD.y1-BOARD.y0)/((BOARD.x1-BOARD.x0)*U));
 const boardCanvas=document.createElement('canvas');boardCanvas.width=BOARD_W;boardCanvas.height=BOARD_H;
-const boardTex=new THREE.CanvasTexture(boardCanvas);boardTex.colorSpace=THREE.SRGBColorSpace;boardTex.anisotropy=8;
+const boardTex=new THREE.CanvasTexture(boardCanvas);boardTex.colorSpace=THREE.SRGBColorSpace;boardTex.anisotropy=renderer.capabilities.getMaxAnisotropy();
 const boardMat=new THREE.MeshBasicMaterial({map:boardTex});wallMats.push(boardMat);
 const boardMesh=new THREE.Mesh(new THREE.PlaneGeometry((BOARD.x1-BOARD.x0)*U,BOARD.y1-BOARD.y0),boardMat);
 boardMesh.position.set((BOARD.x0+BOARD.x1)/2*U,(BOARD.y0+BOARD.y1)/2,.03);scene.add(boardMesh);
