@@ -77,11 +77,9 @@ test('Head to head counts each bot of the house apart, never the 2 vs 2 seat bot
  assert.equal(out.house_Bot_Pepe.name,'Bot Pepe');
 });
 
-test('A game against a bot of the house opens with the rivalry notebook, like two friends',()=>{
+test('A game against a bot of the house starts without the friends notebook',()=>{
  const T=require('../functions/table-service.cjs'),{houseUid}=require('../functions/bot-seat.cjs');
  let l=T.createTable({wallets:{u2:{balance:5,locked:0}},matches:{},tables:{}},{code:'ABCDE',id:'m1',uid:houseUid('Bot Pepe'),name:'Bot Pepe',stake:0,targetPoints:20,house:true,now:1000});
  l=T.joinTable(l,{code:'ABCDE',uid:'u2',name:'Ana',now:2000});
- assert.equal(l.matches.m1.session.room.introUntil,8000);
- const {firstName}=require('node:fs').readFileSync(require('node:path').join(__dirname,'..','friend-notebook.js'),'utf8').includes('/^Bot /')?{firstName:true}:{};
- assert.ok(firstName,'the notebook keeps the whole name of a bot ("Vos vs Bot Pepe")');
+ assert.equal(l.matches.m1.session.room.introUntil,undefined);
 });

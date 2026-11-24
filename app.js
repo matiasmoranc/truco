@@ -1,8 +1,8 @@
 import './chat-moderation.js?v=20261013-moderation1';
 import { visitPlatform,takeVisit,markTestDevice,markGuestVisit,trackUsage,journeyStep } from './visit.js?v=20261115-time1';
 import { installFriends } from './friends.js?v=20261119-amigos5';
-import { installPlayerPanel } from './player-panel.js?v=20261123-bots1';
-import { createVersus,installMatchNotebook,installFriendCard } from './friend-notebook.js?v=20261123-bots1';
+import { installPlayerPanel } from './player-panel.js?v=20261124-bots2';
+import { createVersus,installMatchNotebook,installFriendCard } from './friend-notebook.js?v=20261124-bots2';
 import { installScorer,renderCompactTally } from './scorer.js?v=20261101-usage1';
 import { installActivity } from './activity.js?v=20261010-adminstats32';
 import { installCredits } from './credits.js?v=20261025-claim1';

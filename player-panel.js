@@ -20,11 +20,11 @@ export function installPlayerPanel({document,api,getState,versus=null,openCard=n
    }
    const general=node('div','','player-tab-panel');general.append(stats);
    if(!versus){body.append(general);return;}
-   // Three tabs: everything, against each friend, or against each bot of the house.
-   const tabs=node('div','','player-tabs'),friendsPanel=node('div','','player-tab-panel'),botsPanel=node('div','','player-tab-panel');friendsPanel.hidden=true;botsPanel.hidden=true;
-   const panels=[general,friendsPanel,botsPanel];
-   const tab=(text,panel)=>{const b=node('button',text,'player-tab');b.type='button';b.onclick=()=>{for(const t of tabs.children)t.classList.toggle('on',t===b);for(const p of panels)p.hidden=p!==panel;if(panel===friendsPanel)againstFriends(friendsPanel,token);if(panel===botsPanel)againstFriends(botsPanel,token,true);};return b;};
-   const first=tab('General',general);first.classList.add('on');tabs.append(first,tab('Contra amigos',friendsPanel),tab('Contra bots',botsPanel));
+   // Two tabs: everything, or against each friend.
+   const tabs=node('div','','player-tabs'),friendsPanel=node('div','','player-tab-panel');friendsPanel.hidden=true;
+   const panels=[general,friendsPanel];
+   const tab=(text,panel)=>{const b=node('button',text,'player-tab');b.type='button';b.onclick=()=>{for(const t of tabs.children)t.classList.toggle('on',t===b);for(const p of panels)p.hidden=p!==panel;if(panel===friendsPanel)againstFriends(friendsPanel,token);};return b;};
+   const first=tab('General',general);first.classList.add('on');tabs.append(first,tab('Contra amigos',friendsPanel));
    body.append(tabs,...panels);
   }catch(e){if(token===generation)body.replaceChildren(node('p',e.message||'No pudimos cargar tus estadísticas.'));}
  }

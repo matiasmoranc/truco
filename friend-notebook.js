@@ -12,7 +12,7 @@ export function createVersus({api,now=()=>Date.now()}){
  let cache=null,at=0,pending=null;
  async function load(force=false){
   if(!force&&cache&&now()-at<60000)return cache;
-  pending??=api('playerSocial',{action:'versus',houses:true}).then(r=>{cache=Object.fromEntries((r?.results||[]).map(x=>[x.uid,x]));at=now();return cache;}).finally(()=>{pending=null;});
+  pending??=api('playerSocial',{action:'versus'}).then(r=>{cache=Object.fromEntries((r?.results||[]).map(x=>[x.uid,x]));at=now();return cache;}).finally(()=>{pending=null;});
   return pending;
  }
  return {load,cached:()=>cache,forget(){cache=null;at=0;}};
