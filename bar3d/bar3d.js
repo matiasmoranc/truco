@@ -309,6 +309,95 @@ const wallClock={hands:[]};
  const c=new THREE.Mesh(new THREE.CylinderGeometry(.55,.55,.06,40),fm);c.rotation.x=Math.PI/2;c.position.set(150*U,3.95,.06);c.rotation.y=0;scene.add(c);
  const faceFix=new THREE.Mesh(new THREE.CircleGeometry(.53,40),fm);faceFix.position.set(150*U,3.95,.095);scene.add(faceFix);
  for(const [len,w] of [[.3,.04],[.45,.025]]){const pivot=new THREE.Group();pivot.position.set(150*U,3.95,.11);const hnd=box(w,len,.01,hm,0,len/2-.04,0);pivot.add(hnd);scene.add(pivot);wallClock.hands.push(pivot);}}
+// ---------- the TV: a game being played right now, live ----------
+// On the back wall, between the BAR sign and the board. It shows one table in play, chosen at random: a game
+// between people first; with none, one against a bot of the house. It stays on a game until it ends (the result
+// stays a few seconds) or for TV_HOLD_MS when there are others to show. Tapping it watches that table.
+// Web only for now (TV_ON): the apps get it with their next version.
+const TV_ON=!globalThis.Capacitor?.isNativePlatform?.();
+const TV_HOLD_MS=90000,TV_RESULT_MS=7000,TV_W=768,TV_H=432,TV_AT={x:715,y:3.9,w:2.2};
+const tv={code:null,since:0,endedAt:0,drawn:'',mesh:null,canvas:null,tex:null,images:{}};
+if(TV_ON){
+ const fr=mat('#141414',{roughness:.35,metalness:.3});wallMats.push(fr);
+ const h=TV_AT.w*TV_H/TV_W;scene.add(box(TV_AT.w+.14,h+.14,.08,fr,TV_AT.x*U,TV_AT.y,.08));
+ tv.canvas=document.createElement('canvas');tv.canvas.width=TV_W;tv.canvas.height=TV_H;
+ tv.tex=new THREE.CanvasTexture(tv.canvas);tv.tex.colorSpace=THREE.SRGBColorSpace;tv.tex.anisotropy=8;
+ const screenMat=new THREE.MeshBasicMaterial({map:tv.tex,toneMapped:false});wallMats.push(screenMat);
+ tv.mesh=new THREE.Mesh(new THREE.PlaneGeometry(TV_AT.w,h),screenMat);tv.mesh.position.set(TV_AT.x*U,TV_AT.y,.125);scene.add(tv.mesh);
+ // A small arm holding it to the wall.
+ scene.add(box(.3,.06,.06,fr,TV_AT.x*U,TV_AT.y+h/2+.1,.05));
+}
+// A card picture for the TV: the same sheets as the game, four cards per file.
+function tvCard(r,suit){
+ const group={'♦':0,'♥':3,'♠':6,'♣':9}[suit]??6,i=r-1,file=group+Math.floor(i/4)+1;
+ let img=tv.images[file];if(!img){img=tv.images[file]=new Image();img.onload=()=>{tv.drawn='';};img.src='/assets/cards/'+file+'.jpg';}
+ return img.complete&&img.naturalWidth?{img,col:i%4}:null;
+}
+const tvPeople=L=>Object.values(L?.players||{}).every(p=>p?.uid&&!botUid(p.uid));
+// Which game the TV shows: the current one while it lasts; else a random one, people before bots.
+function tvPick(now){
+ const live=state.live||{},cur=tv.code&&live[tv.code];
+ if(cur&&!cur.finished){tv.endedAt=0;
+  const others=Object.entries(live).filter(([c,L])=>c!==tv.code&&!L.finished);
+  const better=!tvPeople(cur)&&others.some(([,L])=>tvPeople(L));
+  if(!(better||others.length&&now-tv.since>TV_HOLD_MS))return;}
+ else if(cur&&cur.finished){tv.endedAt||=now;if(now-tv.endedAt<TV_RESULT_MS)return;}
+ const open=Object.entries(live).filter(([c,L])=>!L.finished&&c!==tv.code),people=open.filter(([,L])=>tvPeople(L));
+ const pool=people.length?people:open;
+ const next=pool.length?pool[Math.floor(Math.random()*pool.length)][0]:(cur&&!cur.finished?tv.code:null);
+ if(next!==tv.code){tv.code=next;tv.since=now;tv.endedAt=0;}
+}
+function tvRound(g,x,y,w,h,r){g.beginPath();g.moveTo(x+r,y);g.arcTo(x+w,y,x+w,y+h,r);g.arcTo(x+w,y+h,x,y+h,r);g.arcTo(x,y+h,x,y,r);g.arcTo(x,y,x+w,y,r);g.closePath();}
+function tvDraw(now){
+ const L=tv.code?state.live?.[tv.code]:null,blink=Math.floor(now/700)%2;
+ const key=JSON.stringify([tv.code,L,blink,Object.keys(tv.images).filter(k=>tv.images[k].complete).length]);
+ if(key===tv.drawn)return;tv.drawn=key;
+ const g=tv.canvas.getContext('2d'),W2=TV_W,H2=TV_H,font=(w,px)=>w+' '+px+'px "DM Sans",sans-serif';
+ const bg=g.createRadialGradient(W2/2,H2*.55,40,W2/2,H2*.55,W2*.7);bg.addColorStop(0,'#1f6b48');bg.addColorStop(1,'#0c2e21');g.fillStyle=bg;g.fillRect(0,0,W2,H2);
+ g.textAlign='center';g.textBaseline='middle';
+ if(!L){g.fillStyle='#f3cf73';g.font=font(900,40);g.fillText('Sin partidas en este momento',W2/2,H2/2-24);
+  g.fillStyle='#e9efe9';g.font=font(700,28);g.fillText('¡Sentate en una mesa y armá una!',W2/2,H2/2+28);tv.tex.needsUpdate=true;return;}
+ const two=L.mode==='2v2',name=seat=>String(L.players?.[seat]?.name||'');
+ const side=t=>two?name(t)+' y '+name(t==='player1'?'player3':'player4'):name(t);
+ // Top strip: EN VIVO (or TERMINÓ), the hint and the mode with the points.
+ g.fillStyle='#000a';g.fillRect(0,0,W2,44);
+ g.textAlign='left';g.font=font(900,22);
+ if(L.finished){g.fillStyle='#f3cf73';g.fillText('TERMINÓ',18,23);}
+ else{g.fillStyle=blink?'#ff4d4d':'#a33';g.beginPath();g.arc(26,23,8,0,Math.PI*2);g.fill();g.fillStyle='#fff';g.fillText('EN VIVO',42,23);}
+ g.textAlign='center';g.fillStyle='#ffffff99';g.font=font(700,15);g.fillText('Tocá la tele para mirar',W2/2,23);
+ g.textAlign='right';g.fillStyle='#cfe3d6';g.font=font(800,20);g.fillText((two?'2 vs 2':'1 vs 1')+' · a '+(Number(L.targetPoints)||30),W2-18,23);
+ // The score: each side's name and points, in thin bars so the cards have room.
+ const fit=(text,max,px,weight=800)=>{let size=px;g.font=font(weight,size);while(g.measureText(text).width>max&&size>14){size-=2;g.font=font(weight,size);}};
+ for(const [team,y] of [['player2',68],['player1',H2-22]]){
+  g.fillStyle='#0009';tvRound(g,10,y-19,W2-20,38,12);g.fill();
+  g.textAlign='left';g.fillStyle='#fff';fit(side(team),W2-150,24);g.fillText(side(team),24,y+1);
+  g.textAlign='right';g.fillStyle='#f3cf73';g.font=font(900,32);g.fillText(String(Number(L.scores?.[team])||0),W2-24,y+2);}
+ // Big cards: the muestra on the left, the cards played in the middle (each side on its own row, in trick order).
+ const CW=86,CH=129,drawCard=(c,x,y,rot=0,cw=CW,ch=CH)=>{g.save();g.translate(x,y);g.rotate(rot);g.fillStyle='#fff';tvRound(g,-cw/2-4,-ch/2-4,cw+8,ch+8,10);g.fill();
+  const pic=c&&tvCard(c.r,c.s);if(pic){const sw=pic.img.naturalWidth/4,sh=pic.img.naturalHeight;g.drawImage(pic.img,pic.col*sw,0,sw,sh,-cw/2,-ch/2,cw,ch);}else{g.fillStyle='#8a2b2b';g.fillRect(-cw/2,-ch/2,cw,ch);}g.restore();};
+ const top=87,bottom=H2-41,midY=(top+bottom)/2;
+ if(L.muestra){drawCard(L.muestra,66,midY+12,-.1,74,111);g.textAlign='center';g.fillStyle='#e9efe9';g.font=font(800,16);g.fillText('MUESTRA',66,midY-55-14);}
+ const teamOf=p=>p==='player1'||p==='player3'?'player1':'player2';
+ const played=Array.isArray(L.played)?L.played:[];
+ for(const [team,dy] of [['player2',-CH/2-5],['player1',CH/2+5]]){
+  const row=played.filter(c=>teamOf(c.p)===team),step=row.length>3?Math.min(70,250/(row.length-1)):100;
+  row.forEach((c,i)=>drawCard(c,178+i*step,midY+dy,(i%2?.04:-.04)));}
+ // The last thing said at the table, in a bubble on the right.
+ const say=(L.says||[]).at(-1);
+ if(say?.w){const who=String(L.players?.[say.p]?.name||'').split(/[._\s-]/)[0],text=String(say.w);
+  g.font=font(900,28);const w=Math.min(230,Math.max(140,g.measureText(text).width+36)),x=W2-16-w,y=midY-40;
+  g.fillStyle='#fff7df';tvRound(g,x,y,w,80,18);g.fill();g.textAlign='center';
+  g.fillStyle='#6b5a2a';g.font=font(800,16);g.fillText(who,x+w/2,y+19);
+  g.fillStyle='#2b2208';fit(text,w-20,28,900);g.fillText(text,x+w/2,y+50);}
+ tv.tex.needsUpdate=true;
+}
+function tickTv(now){if(!TV_ON)return;if(now-(tickTv.at||0)<250)return;tickTv.at=now;tvPick(now);tvDraw(now);}
+// Tapping the TV: watch that table (if it is in the room), or say there is none.
+function tapTv(){
+ const slot=tv.code&&state.slots.find(s=>s.placed&&s.code===tv.code);
+ if(slot&&state.live?.[tv.code]&&!state.live[tv.code].finished){closeSheet();startWatching(slot);return;}
+ const L=tv.code&&state.live?.[tv.code];toast(!tv.code?'No hay partidas en este momento.':L&&!L.finished?'El mozo está trayendo esa mesa. Probá en un momento.':'Esa partida ya terminó.');
+}
 function tickClock(){const d=new Date(),m=d.getMinutes()+d.getSeconds()/60,hr=(d.getHours()%12)+m/60;wallClock.hands[0].rotation.z=-hr/12*Math.PI*2;wallClock.hands[1].rotation.z=-m/60*Math.PI*2;}
 {const flag=new THREE.BufferGeometry();flag.setAttribute('position',new THREE.Float32BufferAttribute([-.17,0,0,.17,0,0,0,-.32,0],3));flag.computeVertexNormals();
  const fm=new THREE.MeshStandardMaterial({side:THREE.DoubleSide,roughness:.8});wallMats.push(fm);const list=[];
@@ -892,6 +981,7 @@ function frame(now){
  else if(state.watchCam)cam.target.lerp(P(state.watchCam.x,state.watchCam.y,1.1),Math.min(1,dt*3));
  if(state.editingLook)lookCamera(dt);
  if(now-(tickClock.at||0)>1000){tickClock.at=now;tickClock();}
+ tickTv(now);
  clampTarget();placeCamera();fadeWalls(dt);
  sun.position.set(cam.target.x+6,22,cam.target.z+14);sun.target.position.copy(cam.target);
  for(const slot of state.slots)drawSlot(slot,now,dt);
@@ -955,6 +1045,8 @@ canvas.addEventListener('pointerup',up);canvas.addEventListener('pointercancel',
 canvas.addEventListener('wheel',e=>{e.preventDefault();zoomBy(e.deltaY<0?1.12:1/1.12);},{passive:false});
 $('zoom-in').onclick=()=>zoomBy(1.25);$('zoom-out').onclick=()=>zoomBy(1/1.25);
 function tap(sx,sy){
+ // The TV on the wall first: looking up at it, the tap may not reach the floor.
+ if(tv.mesh){ray.setFromCamera(new THREE.Vector2(sx/W*2-1,-(sy/H)*2+1),camera);if(ray.intersectObject(tv.mesh).length){closeSheet();tapTv();return;}}
  const p=toWorld(sx,sy);closeSheet();if(!p)return;
  if(state.watching){const sl=state.watching;if(Math.abs(sl.x-p.x)<(sl.kind==='2v2'?140:100)&&Math.abs(sl.y-p.y)<(sl.kind==='2v2'?140:125))return;stopWatching();}
  ray.setFromCamera(new THREE.Vector2(sx/W*2-1,-(sy/H)*2+1),camera);if(ray.intersectObject(boardMesh).length){openBoard();return;}
