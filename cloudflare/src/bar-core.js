@@ -109,7 +109,9 @@ export function liveTableEntry(m,presence={}){
   targetPoints:Number(room.targetPoints)||null,finished:room.status==='complete'||m.status==='settled',
   call:bet?.called&&typeof bet.called==='string'?bet.called:null,house:!!m.house,
   here:Object.fromEntries(Object.entries(players).map(([seat,p])=>[seat,presence?.[seat]?.uid===p.uid?presence[seat].online!==false:true])),
-  hand:Number(room.handNumber)||1,dealer:typeof room.dealer==='string'?room.dealer:null,muestra:cardOf(room.muestra),played:playedCards(room),says:saysOf(room,players),sign:signOf(room)};
+  hand:Number(room.handNumber)||1,dealer:typeof room.dealer==='string'?room.dealer:null,muestra:cardOf(room.muestra),played:playedCards(room),says:saysOf(room,players),sign:signOf(room),
+  // For the TV: who won each trick (null: tied), who sang flor (never its points) and whether the hand is over.
+  tricks:list(room.tricks).slice(0,3).map(t=>typeof t?.winner==='string'?t.winner:null),flor:Object.keys(room.flors||{}).filter(q=>room.flors[q]!=null&&players[q]),over:!!room.pendingNextHand,turn:typeof room.turn==='string'&&players[room.turn]?room.turn:null};
 }
 
 // Online in the bar means the same as "Jugando" in the admin: the game on screen, with a pulse in the

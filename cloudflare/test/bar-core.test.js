@@ -41,7 +41,7 @@ test('BAR: a table in play shows who sits, the score and the last call, never ca
  const m={mode:'1v1',status:'active',players:{player1:{uid:'a',name:'Ana',secret:'x'},player2:{uid:'b',name:'Beto'}},
   session:{room:{status:'started',scores:{player1:7,player2:3},targetPoints:20,pendingBet:{type:'truco',called:'retruco'},hands:{player1:['1-espada']}}}};
  const e=liveTableEntry(m);
- assert.deepEqual(e,{mode:'1v1',players:{player1:{uid:'a',name:'Ana'},player2:{uid:'b',name:'Beto'}},scores:{player1:7,player2:3},targetPoints:20,finished:false,call:'retruco',house:false,here:{player1:true,player2:true},hand:1,dealer:null,muestra:null,played:[],says:[],sign:null});
+ assert.deepEqual(e,{mode:'1v1',players:{player1:{uid:'a',name:'Ana'},player2:{uid:'b',name:'Beto'}},scores:{player1:7,player2:3},targetPoints:20,finished:false,call:'retruco',house:false,here:{player1:true,player2:true},hand:1,dealer:null,muestra:null,played:[],says:[],sign:null,tricks:[],flor:[],over:false,turn:null});
  assert.deepEqual(liveTableEntry(m,{player2:{uid:'b',online:false}}).here,{player1:true,player2:false},'who left the table');
  assert.equal(liveTableEntry(m,{player2:{uid:'x',online:false}}).here.player2,true,'presence of someone else does not count');
  assert.ok(!JSON.stringify(e).includes('espada'));
@@ -61,6 +61,9 @@ test('BAR: the table shows the cards already played this hand, the muestra and w
  const e=liveTableEntry(m);
  assert.equal(e.hand,3);assert.equal(e.dealer,'player2');assert.deepEqual(e.muestra,{r:11,s:'♣'});
  assert.deepEqual(e.played,[{p:'player1',r:2,s:'♥',t:0},{p:'player2',r:10,s:'♠',t:0},{p:'player2',r:7,s:'♦',t:1}]);
+ assert.deepEqual(e.tricks,['player2']);assert.deepEqual(e.flor,[]);assert.equal(e.over,false);
+ const sung=liveTableEntry({...m,session:{room:{...room,flors:{player1:33},pendingNextHand:{id:'n'}}}});
+ assert.deepEqual(sung.flor,['player1']);assert.equal(sung.over,true);assert.ok(!JSON.stringify(sung).includes('33'),'the points of the flor are not sent');
  // While a trick is being resolved its cards are in both lists: each card shows once.
  assert.equal(liveTableEntry({...m,session:{room:{...room,trickCards:room.tricks[0].played}}}).played.length,2);
  assert.ok(!JSON.stringify(e).includes('"r":1,'),'the card someone holds is never sent');

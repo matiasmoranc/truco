@@ -349,50 +349,134 @@ function tvPick(now){
  if(next!==tv.code){tv.code=next;tv.since=now;tv.endedAt=0;}
 }
 function tvRound(g,x,y,w,h,r){g.beginPath();g.moveTo(x+r,y);g.arcTo(x+w,y,x+w,y+h,r);g.arcTo(x+w,y+h,x,y+h,r);g.arcTo(x,y+h,x,y,r);g.arcTo(x,y,x+w,y,r);g.closePath();}
+// What the TV draws, simple to follow from across the bar:
+// - one player (or pair) on the left, the other on the right: name, points, a dot per trick (won, lost or
+//   tied), the cards still in the hand (backs), a flower when they sang flor and their last words in a bubble;
+// - in the middle the deck lying over the muestra, and below it only the trick being played (or the last
+//   one, with who won it, until the next card falls);
+// - at each new hand the cards fly from the deck to the players, then the muestra turns over.
+// What was said is cleared when the hand ends.
+const TV_DEAL_STEP=170,TV_DEAL_FLY=280,TV_FLIP_MS=260;
+const tvShort=n=>/^Bot /.test(String(n||''))?String(n):String(n||'').split(/[._\s-]/)[0]||String(n||'');
+const tvTeam=p=>p==='player1'||p==='player3'?'player1':'player2';
+function tvSeatOrder(L){const two=L.mode==='2v2',order=two?['player1','player2','player3','player4']:['player1','player2'];
+ const d=order.indexOf(L.dealer),start=d<0?0:(d+1)%order.length;return order.slice(start).concat(order.slice(0,start));}
+// Where each seat keeps its cards on the screen (the backs), so the deal knows where to fly.
+function tvBacks(L,seat){const two=L.mode==='2v2',cx=tvTeam(seat)==='player1'?95:673;
+ if(!two)return {cx,y:290,w:42,h:63,gap:30};
+ const i=seat==='player1'||seat==='player2'?0:1;return {cx:cx-28,y:205+i*140,w:32,h:48,gap:22};}
+function tvTrack(L,now){
+ const t=tv.track;const fresh=!(L.played||[]).length&&!(L.tricks||[]).length&&!L.finished;
+ if(!t||t.code!==tv.code){tv.track={code:tv.code,hand:L.hand,stale:new Set()};tv.deal=fresh?tvDealStart(L,now):null;return;}
+ if(L.hand!==t.hand){t.hand=L.hand;t.stale=new Set((L.says||[]).map(x=>x.id));tv.deal=tvDealStart(L,now);}
+}
+function tvDealStart(L,now){const order=tvSeatOrder(L),cards=[];for(let r=0;r<3;r++)for(const seat of order)cards.push(seat);
+ const end=now+(cards.length-1)*TV_DEAL_STEP+TV_DEAL_FLY;return {start:now,cards,end,done:end+TV_FLIP_MS};}
 function tvDraw(now){
  const L=tv.code?state.live?.[tv.code]:null,blink=Math.floor(now/700)%2;
+ if(L)tvTrack(L,now);
+ const dealing=tv.deal&&now<tv.deal.done+40;
  const key=JSON.stringify([tv.code,L,blink,Object.keys(tv.images).filter(k=>tv.images[k].complete).length]);
- if(key===tv.drawn)return;tv.drawn=key;
- const g=tv.canvas.getContext('2d'),W2=TV_W,H2=TV_H;g.setTransform(TV_SCALE,0,0,TV_SCALE,0,0);const font=(w,px)=>w+' '+px+'px "DM Sans",sans-serif';
- const bg=g.createRadialGradient(W2/2,H2*.55,40,W2/2,H2*.55,W2*.7);bg.addColorStop(0,'#1f6b48');bg.addColorStop(1,'#0c2e21');g.fillStyle=bg;g.fillRect(0,0,W2,H2);
+ if(!dealing&&key===tv.drawn)return;tv.drawn=dealing?'':key;if(!dealing)tv.deal=null;
+ const g=tv.canvas.getContext('2d'),W2=TV_W,H2=TV_H,CX=W2/2;g.setTransform(TV_SCALE,0,0,TV_SCALE,0,0);const font=(w,px)=>w+' '+px+'px "DM Sans",sans-serif';
+ const bg=g.createRadialGradient(CX,H2*.55,40,CX,H2*.55,W2*.7);bg.addColorStop(0,'#1f6b48');bg.addColorStop(1,'#0c2e21');g.fillStyle=bg;g.fillRect(0,0,W2,H2);
  g.textAlign='center';g.textBaseline='middle';
- if(!L){g.fillStyle='#f3cf73';g.font=font(900,40);g.fillText('Sin partidas en este momento',W2/2,H2/2-24);
-  g.fillStyle='#e9efe9';g.font=font(700,28);g.fillText('¡Sentate en una mesa y armá una!',W2/2,H2/2+28);tv.tex.needsUpdate=true;return;}
+ if(!L){g.fillStyle='#f3cf73';g.font=font(900,40);g.fillText('Sin partidas en este momento',CX,H2/2-24);
+  g.fillStyle='#e9efe9';g.font=font(700,28);g.fillText('¡Sentate en una mesa y armá una!',CX,H2/2+28);tv.tex.needsUpdate=true;return;}
  const two=L.mode==='2v2',name=seat=>String(L.players?.[seat]?.name||'');
- const side=t=>two?name(t)+' y '+name(t==='player1'?'player3':'player4'):name(t);
+ const sideName=t=>two?tvShort(name(t))+' y '+tvShort(name(t==='player1'?'player3':'player4')):tvShort(name(t));
+ const fit=(text,max,px,weight=800)=>{let size=px;g.font=font(weight,size);while(g.measureText(text).width>max&&size>12){size-=1;g.font=font(weight,size);}};
  // Top strip: EN VIVO (or TERMINÓ), the hint and the mode with the points.
- g.fillStyle='#000a';g.fillRect(0,0,W2,44);
- g.textAlign='left';g.font=font(900,22);
- if(L.finished){g.fillStyle='#f3cf73';g.fillText('TERMINÓ',18,23);}
- else{g.fillStyle=blink?'#ff4d4d':'#a33';g.beginPath();g.arc(26,23,8,0,Math.PI*2);g.fill();g.fillStyle='#fff';g.fillText('EN VIVO',42,23);}
- g.textAlign='center';g.fillStyle='#ffffff99';g.font=font(700,15);g.fillText('Tocá la tele para mirar',W2/2,23);
- g.textAlign='right';g.fillStyle='#cfe3d6';g.font=font(800,20);g.fillText((two?'2 vs 2':'1 vs 1')+' · a '+(Number(L.targetPoints)||30),W2-18,23);
- // The score: each side's name and points, in thin bars so the cards have room.
- const fit=(text,max,px,weight=800)=>{let size=px;g.font=font(weight,size);while(g.measureText(text).width>max&&size>14){size-=2;g.font=font(weight,size);}};
- for(const [team,y] of [['player2',68],['player1',H2-22]]){
-  g.fillStyle='#0009';tvRound(g,10,y-19,W2-20,38,12);g.fill();
-  g.textAlign='left';g.fillStyle='#fff';fit(side(team),W2-150,24);g.fillText(side(team),24,y+1);
-  g.textAlign='right';g.fillStyle='#f3cf73';g.font=font(900,32);g.fillText(String(Number(L.scores?.[team])||0),W2-24,y+2);}
- // Big cards: the muestra on the left, the cards played in the middle (each side on its own row, in trick order).
- const CW=86,CH=129,drawCard=(c,x,y,rot=0,cw=CW,ch=CH)=>{g.save();g.translate(x,y);g.rotate(rot);g.fillStyle='#fff';tvRound(g,-cw/2-4,-ch/2-4,cw+8,ch+8,10);g.fill();
-  const pic=c&&tvCard(c.r,c.s);if(pic){const sw=pic.img.naturalWidth/4,sh=pic.img.naturalHeight;g.drawImage(pic.img,pic.col*sw,0,sw,sh,-cw/2,-ch/2,cw,ch);}else{g.fillStyle='#8a2b2b';g.fillRect(-cw/2,-ch/2,cw,ch);}g.restore();};
- const top=87,bottom=H2-41,midY=(top+bottom)/2;
- if(L.muestra){drawCard(L.muestra,66,midY+12,-.1,74,111);g.textAlign='center';g.fillStyle='#e9efe9';g.font=font(800,16);g.fillText('MUESTRA',66,midY-55-14);}
- const teamOf=p=>p==='player1'||p==='player3'?'player1':'player2';
- const played=Array.isArray(L.played)?L.played:[];
- for(const [team,dy] of [['player2',-CH/2-5],['player1',CH/2+5]]){
-  const row=played.filter(c=>teamOf(c.p)===team),step=row.length>3?Math.min(70,250/(row.length-1)):100;
-  row.forEach((c,i)=>drawCard(c,178+i*step,midY+dy,(i%2?.04:-.04)));}
- // The last thing said at the table, in a bubble on the right.
- const say=(L.says||[]).at(-1);
- if(say?.w){const who=String(L.players?.[say.p]?.name||'').split(/[._\s-]/)[0],text=String(say.w);
-  g.font=font(900,28);const w=Math.min(230,Math.max(140,g.measureText(text).width+36)),x=W2-16-w,y=midY-40;
-  g.fillStyle='#fff7df';tvRound(g,x,y,w,80,18);g.fill();g.textAlign='center';
-  g.fillStyle='#6b5a2a';g.font=font(800,16);g.fillText(who,x+w/2,y+19);
-  g.fillStyle='#2b2208';fit(text,w-20,28,900);g.fillText(text,x+w/2,y+50);}
+ g.fillStyle='#000a';g.fillRect(0,0,W2,40);
+ g.textAlign='left';g.font=font(900,21);
+ if(L.finished){g.fillStyle='#f3cf73';g.fillText('TERMINÓ',16,21);}
+ else{g.fillStyle=blink?'#ff4d4d':'#a33';g.beginPath();g.arc(24,21,8,0,Math.PI*2);g.fill();g.fillStyle='#fff';g.fillText('EN VIVO',40,21);}
+ g.textAlign='center';g.fillStyle='#ffffff99';g.font=font(700,15);g.fillText('Tocá la tele para mirar',CX,21);
+ g.textAlign='right';g.fillStyle='#cfe3d6';g.font=font(800,19);g.fillText((two?'2 vs 2':'1 vs 1')+' · a '+(Number(L.targetPoints)||30),W2-16,21);
+ // Cards: a face (the game's pictures) or a back.
+ const face=(c,x,y,w,h,rot=0,glow=false)=>{g.save();g.translate(x,y);g.rotate(rot);
+  if(glow){g.shadowColor='#f3cf73';g.shadowBlur=22;}g.fillStyle=glow?'#f3cf73':'#fff';tvRound(g,-w/2-4,-h/2-4,w+8,h+8,9);g.fill();g.shadowBlur=0;
+  const pic=c&&tvCard(c.r,c.s);if(pic){const sw=pic.img.naturalWidth/4,sh=pic.img.naturalHeight;g.drawImage(pic.img,pic.col*sw,0,sw,sh,-w/2,-h/2,w,h);}else{g.fillStyle='#8a2b2b';g.fillRect(-w/2,-h/2,w,h);}g.restore();};
+ const back=(x,y,w,h,rot=0)=>{g.save();g.translate(x,y);g.rotate(rot);g.fillStyle='#f4efe2';tvRound(g,-w/2-2,-h/2-2,w+4,h+4,6);g.fill();
+  g.fillStyle='#9b2d2d';tvRound(g,-w/2+2,-h/2+2,w-4,h-4,4);g.fill();g.strokeStyle='#e7b45a88';g.lineWidth=1.5;tvRound(g,-w/2+6,-h/2+6,w-12,h-12,3);g.stroke();
+  g.fillStyle='#e7b45a';g.beginPath();g.moveTo(0,-h/5);g.lineTo(w/6,0);g.lineTo(0,h/5);g.lineTo(-w/6,0);g.closePath();g.fill();g.restore();};
+ const played=Array.isArray(L.played)?L.played:[],tricks=Array.isArray(L.tricks)?L.tricks:[];
+ const seats=two?['player1','player2','player3','player4']:['player1','player2'];
+ // The deal: how many cards each seat has received so far, and the ones in the air.
+ const deal=dealing?tv.deal:null,got={},flying=[];
+ for(const seat of seats)got[seat]=3-played.filter(c=>c.p===seat).length;
+ if(deal){for(const seat of seats)got[seat]=0;
+  deal.cards.forEach((seat,i)=>{const t0=deal.start+i*TV_DEAL_STEP,k=(now-t0)/TV_DEAL_FLY;if(k>=1)got[seat]++;else if(k>0)flying.push([seat,k]);});}
+ // The says of this hand only: none from the last one, none once it is over.
+ const said={};if(!L.over&&!deal)for(const x of L.says||[])if(!tv.track.stale.has(x.id))said[x.p]=String(x.w);
+ const flor=new Set(L.flor||[]);
+ const order=tvSeatOrder(L),mano=order[0];
+ const bubble=(text,cx,y,maxW)=>{g.font=font(900,22);const w=Math.min(maxW,Math.max(90,g.measureText(text).width+28)),h=two?36:46;
+  g.fillStyle='#fff7df';tvRound(g,cx-w/2,y-h/2,w,h,14);g.fill();g.beginPath();g.moveTo(cx-8,y-h/2+1);g.lineTo(cx,y-h/2-9);g.lineTo(cx+8,y-h/2+1);g.fill();
+  g.fillStyle='#2b2208';g.textAlign='center';fit(text,w-16,two?19:22,900);g.fillText(text,cx,y+1);};
+ const florChip=(cx,y)=>{g.fillStyle='#ffd6ea';tvRound(g,cx-38,y-14,76,28,14);g.fill();g.fillStyle='#a2346d';g.textAlign='center';g.font=font(900,16);g.fillText('🌸 FLOR',cx,y+1);};
+ const backsRow=(seat)=>{const b=tvBacks(L,seat),n=Math.max(0,got[seat]);for(let i=0;i<n;i++)back(b.cx+(i-(n-1)/2)*b.gap,b.y,b.w,b.h,(i-(n-1)/2)*.12);};
+ const dots=(team,cx,y)=>{g.textAlign='center';
+  for(let i=0;i<3;i++){const x=cx+(i-1)*44,w=tricks[i];g.lineWidth=2.5;g.beginPath();g.arc(x,y,15,0,Math.PI*2);
+   if(i>=tricks.length){g.strokeStyle='#ffffff55';g.stroke();g.fillStyle='#ffffff77';g.font=font(800,13);g.fillText((i+1)+'ª',x,y+1);continue;}
+   const won=w&&tvTeam(w)===team,tied=!w;g.fillStyle=won?'#3fbf6f':tied?'#8a948f':'#00000055';g.fill();
+   g.strokeStyle=won?'#bff5cf':tied?'#c9d1cd':'#ffffff33';g.stroke();g.fillStyle=won?'#fff':tied?'#fff':'#ffffff66';g.font=font(900,won?18:15);g.fillText(won?'✓':tied?'=':'✗',x,y+1);}};
+ // The two sides.
+ for(const team of ['player1','player2']){
+  const cx=team==='player1'?95:673,lead=(Number(L.scores?.[team])||0)>(Number(L.scores?.[team==='player1'?'player2':'player1'])||0);
+  g.fillStyle='#0000004a';tvRound(g,cx-87,50,174,374,18);g.fill();
+  if(!two){
+   g.fillStyle='#fff';g.textAlign='center';fit(name(team),160,24,900);g.fillText(name(team),cx,76);
+   if(mano===team){g.fillStyle='#ffffff22';tvRound(g,cx-28,93,56,20,10);g.fill();g.fillStyle='#e9efe9';g.font=font(800,12);g.fillText('MANO',cx,104);}
+   g.fillStyle=lead?'#f3cf73':'#e9d9a8';g.font=font(900,62);g.fillText(String(Number(L.scores?.[team])||0),cx,152);
+   g.fillStyle='#cfe3d6aa';g.font=font(700,13);g.fillText('puntos',cx,188);
+   dots(team,cx,222);backsRow(team);
+   if(flor.has(team))florChip(cx,344);
+   if(said[team])bubble(said[team],cx,392,166);
+  }else{
+   g.fillStyle=lead?'#f3cf73':'#e9d9a8';g.textAlign='center';g.font=font(900,48);g.fillText(String(Number(L.scores?.[team])||0),cx,82);
+   dots(team,cx,122);
+   for(const seat of team==='player1'?['player1','player3']:['player2','player4']){
+    const b=tvBacks(L,seat),top=b.y-45;
+    g.fillStyle='#fff';g.textAlign='center';fit(name(seat)+(mano===seat?' · mano':''),158,18,900);g.fillText(name(seat)+(mano===seat?' · mano':''),cx,top);
+    backsRow(seat);
+    if(flor.has(seat)){g.font=font(900,26);g.textAlign='center';g.fillText('🌸',cx+50,b.y);}
+    if(said[seat])bubble(said[seat],cx,b.y+52,166);
+   }
+  }
+ }
+ // The middle: the muestra face up under the deck, lying across it.
+ const MX=CX,MY=126,DY=MY+50,shown=!deal||now>=deal.end;
+ if(L.muestra&&shown){const k=deal?Math.min(1,(now-deal.end)/TV_FLIP_MS):1;
+  g.save();g.translate(MX,MY);g.scale(Math.max(.05,k),1);face(L.muestra,0,0,76,114);g.restore();
+  g.fillStyle='#e9efe9';g.textAlign='right';g.font=font(800,14);g.fillText('MUESTRA',MX-50,MY-40);}
+ for(let i=0;i<4;i++)back(MX+i*1.5,DY-i*1.5,100,64);
+ // The cards in the air during the deal.
+ for(const [seat,k] of flying){const b=tvBacks(L,seat),e=1-Math.pow(1-k,3);
+  back(MX+(b.cx-MX)*e,DY+(b.y-DY)*e,100+(b.w-100)*e,64+(b.h-64)*e,e*.2*(b.cx<MX?-1:1));}
+ // The trick: the one being played, or the last one with who won it.
+ if(!deal&&!L.finished){
+  const cur=played.filter(c=>c.t===tricks.length),resolved=!cur.length&&tricks.length>0;
+  const show=cur.length?cur:resolved?played.filter(c=>c.t===tricks.length-1):[],idx=cur.length?tricks.length:tricks.length-1;
+  const win=resolved?tricks[tricks.length-1]:undefined;
+  const CW=two?70:92,CH=two?105:138,Y=two?305:300;
+  for(const team of ['player1','player2']){
+   const mine=show.filter(c=>tvTeam(c.p)===team),sign=team==='player1'?-1:1;
+   mine.forEach((c,i)=>{const x=two?CX+sign*(48+(mine.length>1?(i===0?77:0):0)):CX+sign*58;
+    const lost=resolved&&win&&tvTeam(win)!==team;g.globalAlpha=lost?.45:1;
+    face(c,x,Y,CW,CH,sign*.05,resolved&&win&&tvTeam(win)===team);g.globalAlpha=1;});
+  }
+  if(show.length){const label=resolved?(win?'Gana '+sideName(tvTeam(win)):'Parda'):['Primera','Segunda','Tercera'][idx]||'';
+   g.textAlign='center';g.fillStyle=resolved?'#f3cf73':'#e9efe9';fit(label,360,resolved?22:18,900);g.fillText(label,CX,Y+CH/2+26);}
+  else if(!L.finished){g.fillStyle='#ffffff66';g.textAlign='center';g.font=font(700,16);g.fillText(L.over?'Termina la mano…':L.turn&&L.players?.[L.turn]?'Juega '+tvShort(name(L.turn))+'…':'…',CX,300);}
+ }
+ // The end of the game: who won, over the middle.
+ if(L.finished){const s1=Number(L.scores?.player1)||0,s2=Number(L.scores?.player2)||0,w=s1>=s2?'player1':'player2';
+  const text='¡Ganó '+sideName(w)+'!';
+  g.fillStyle='#000c';tvRound(g,200,230,368,90,20);g.fill();g.fillStyle='#f3cf73';g.textAlign='center';fit(text,340,36,900);g.fillText(text,CX,275);}
  tv.tex.needsUpdate=true;
 }
-function tickTv(now){if(!TV_ON)return;if(now-(tickTv.at||0)<250)return;tickTv.at=now;tvPick(now);tvDraw(now);}
+function tickTv(now){if(!TV_ON)return;const dealing=tv.deal&&now<tv.deal.done+40;if(!dealing&&now-(tickTv.at||0)<250)return;tickTv.at=now;tvPick(now);tvDraw(now);}
 // Tapping the TV: watch that table (if it is in the room), or say there is none.
 function tapTv(){
  const slot=tv.code&&state.slots.find(s=>s.placed&&s.code===tv.code);
@@ -980,7 +1064,7 @@ function lookCamera(dt=.016){
  cam.dist=Math.min(16,Math.max(1.1,f.h*H/(2*tan*free*.9)/(state.lookZoom||1)));
 }
 const clock=new THREE.Clock();
-if(LOCAL)Object.assign(globalThis,{barFrame:t=>frame(t),barDemo:()=>({lastWalkerPos,customLooks,actors,held,renderer,openPerson}),barState:state,barLobby:m=>onLobby(m),barEvent:m=>onBar(m),barPerf:()=>perf,barWalk:(x,y)=>walkTo(x,y),bar3d:{cam,views,scene,camera,THREE,stick,sitOn,sitOnStool:i=>sitOnStool(i),actors,get sitting(){return sitting;}}});
+if(LOCAL)Object.assign(globalThis,{barFrame:t=>frame(t),barDemo:()=>({lastWalkerPos,customLooks,actors,held,renderer,openPerson}),barState:state,barTv:tv,barLobby:m=>onLobby(m),barEvent:m=>onBar(m),barPerf:()=>perf,barWalk:(x,y)=>walkTo(x,y),bar3d:{cam,views,scene,camera,THREE,stick,sitOn,sitOnStool:i=>sitOnStool(i),actors,get sitting(){return sitting;}}});
 function frame(now){
  const raw=clock.getDelta(),dt=Math.min(LOCAL&&globalThis.barDtCap||.05,raw);adaptQuality(raw,now);
  for(const w of state.walkers.values())w.uid===state.me?.uid?moveMe(w,dt):moveOther(w,dt);
