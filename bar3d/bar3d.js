@@ -994,7 +994,7 @@ function frame(now){
  else if(state.watchCam)cam.target.lerp(P(state.watchCam.x,state.watchCam.y,1.1),Math.min(1,dt*3));
  if(state.editingLook)lookCamera(dt);
  if(now-(tickClock.at||0)>1000){tickClock.at=now;tickClock();}
- tickTv(now);
+ tickTv(now);sharpView();
  clampTarget();placeCamera();fadeWalls(dt);
  sun.position.set(cam.target.x+6,22,cam.target.z+14);sun.target.position.copy(cam.target);
  for(const slot of state.slots)drawSlot(slot,now,dt);
@@ -1508,14 +1508,21 @@ function renderNet(now){
 // ---------- quality: lighter on slow phones ----------
 // Slow for a few seconds: first fewer pixels, then no shadows. Fast again for a while: one step back.
 const perf={avg:16,level:0,since:0};
+// Looking up at the TV or the board (the eyes lifted, see lookDrag) the room is drawn sharp, whatever the level:
+// there is little to draw there, and blurry text is unreadable. Frame times are not measured meanwhile.
+const SHARP_LIFT=1.2;let sharp=false;
+function sharpView(){
+ const want=cam.lift>=SHARP_LIFT&&!state.watching&&!state.editingLook;if(want===sharp)return;
+ sharp=want;applyQuality();
+}
 function adaptQuality(raw,now){
- if(MANUAL||document.hidden||raw>=.2||raw<=0)return;perf.avg+=(raw*1000-perf.avg)*.05;
+ if(MANUAL||document.hidden||raw>=.2||raw<=0||sharp)return;perf.avg+=(raw*1000-perf.avg)*.05;
  if(now-perf.since<4000)return;
  if(perf.avg>26&&perf.level<2){perf.level++;perf.since=now;applyQuality();}
  else if(perf.avg<13&&perf.level>0&&now-perf.since>20000){perf.level--;perf.since=now;applyQuality();}
 }
 function applyQuality(){
- renderer.setPixelRatio(perf.level>=1?1:Math.min(devicePixelRatio||1,PHONE?1.5:2));resize();
+ renderer.setPixelRatio(sharp?Math.min(devicePixelRatio||1,PHONE?2.5:2):perf.level>=1?1:Math.min(devicePixelRatio||1,PHONE?1.5:2));resize();
  const shadows=perf.level<2;
  if(renderer.shadowMap.enabled!==shadows){renderer.shadowMap.enabled=shadows;sun.castShadow=shadows;
   scene.traverse(o=>{if(o.material)for(const m of [].concat(o.material))m.needsUpdate=true;});}
