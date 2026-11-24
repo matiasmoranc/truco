@@ -143,15 +143,24 @@ const isBotUid=uid=>/^(bot:|house_)/.test(String(uid||''));
 const kindOfLive=t=>t?.mode==='2v2'||Object.keys(t?.players||{}).length>2?'2v2':'1v1';
 // The tables the BAR shows, code → '1v1' | '2v2':
 // - waiting tables with a person (a bot waiting alone is not shown),
-// - two tables of the house at 20 points to sit down and play (the ones already shown first),
+// - house: tables of the house at 20 points to sit down and play, 2 by default (the ones already shown first;
+//   the lobby keeps it between 2 and 5, see lobby.js),
 // - tables in play, and a game over until every person at it has left.
-export function barTables(rooms,live,shown=new Set()){
+export function barTables(rooms,live,shown=new Set(),{house=2}={}){
  const all=new Map(),onlyHouse=room=>Object.values(room.players||{}).every(p=>!p?.uid||isHouseUid(p.uid));
  for(const [code,room] of Object.entries(rooms||{}))if(room?.status==='waiting'&&!onlyHouse(room))all.set(code,room.mode==='2v2'?'2v2':'1v1');
  Object.entries(rooms||{}).filter(([,room])=>room?.status==='waiting'&&room.mode!=='2v2'&&onlyHouse(room)&&Number(room.targetPoints)===20)
-  .sort(([a],[b])=>(shown.has(b)-shown.has(a))||a.localeCompare(b)).slice(0,2).forEach(([code])=>all.set(code,'1v1'));
+  .sort(([a],[b])=>(shown.has(b)-shown.has(a))||a.localeCompare(b)).slice(0,Math.max(0,house)).forEach(([code])=>all.set(code,'1v1'));
  for(const [code,t] of Object.entries(live||{}))if(t&&!(t.finished&&!Object.entries(t.players||{}).some(([seat,p])=>p?.uid&&!isBotUid(p.uid)&&t.here?.[seat]!==false)))all.set(code,kindOfLive(t));
  return all;
+}
+// In the BAR (Lobby Virtual) between 2 and 5 house tables wait for a rival: how many changes every 8 to 15
+// minutes. When someone sits at one, the new one comes 40 to 90 seconds later, not at once.
+export const BAR_HOUSE_MIN=2,BAR_HOUSE_MAX=5,BAR_HOUSE_REFILL_MS=[40000,90000];
+export function barHouseCount(house,now,random=Math.random){
+ if(!house.bar||now>=house.barUntil){house.bar=BAR_HOUSE_MIN+Math.floor(random()*(BAR_HOUSE_MAX-BAR_HOUSE_MIN+1));house.barUntil=now+(8+Math.floor(random()*8))*60000;}
+ house.taken=(house.taken||[]).filter(t=>t>now);
+ return Math.max(BAR_HOUSE_MIN,house.bar-house.taken.length);
 }
 // The layout: {cells:{"<cell>":{k:'1v1'|'2v2',c:code|null}}}. A table keeps its cell while it is shown
 // (and takes the kind it has now: a waiting table can change from 1 vs 1 to 2 vs 2). A new table takes

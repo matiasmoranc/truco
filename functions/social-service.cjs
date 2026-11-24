@@ -1,7 +1,7 @@
 'use strict';
 // Friends and table invitations: pure rules, so the callable only reads and writes.
 const {hasStartedMatch}=require('./match-start.cjs');
-const {isBotUid}=require('./bot-seat.cjs');
+const {isBotUid,isHouseUid}=require('./bot-seat.cjs');
 const INVITE_MS=3*60000;
 const nameKey=name=>String(name).toLowerCase().replaceAll('.','%2E');
 const keyName=key=>String(key).replaceAll('%2E','.');
@@ -26,6 +26,7 @@ function recentOpponents(ledger,uid,limit=10){
 }
 // Head to head with each person: settled games only. As rivals (1 vs 1, or opposite teams in 2 vs 2)
 // they count as won or lost; in 2 vs 2 on the same team they count apart, as partners.
+// The bots of the house ("Bot Pepe", uid house_…) count too, each one apart (house: true); the 2 vs 2 seat bots do not.
 function versusStats(ledger,uid){
  const teamOf=seat=>['player1','player3'].includes(seat)?'player1':'player2';
  const out={};
@@ -37,9 +38,9 @@ function versusStats(ledger,uid){
   const won=winners.includes(uid),tie=!winners.some(Boolean);
   const scores=m.session?.room?.scores||null,myKey=team?teamOf(mine):mine,otherKey=myKey==='player1'?'player2':'player1';
   for(const seat of seats){
-   const other=m.players[seat]?.uid;if(!other||other===uid||isBotUid(other))continue;
+   const other=m.players[seat]?.uid,house=isHouseUid(other);if(!other||other===uid||isBotUid(other)&&!house)continue;
    const together=team&&teamOf(seat)===teamOf(mine);
-   const s=out[other]??={uid:other,name:'',won:0,lost:0,tied:0,one:{won:0,lost:0},teamVs:{won:0,lost:0},together:{won:0,lost:0},streak:null,last:[],lastAt:null};
+   const s=out[other]??={uid:other,...(house?{house:true}:{}),name:'',won:0,lost:0,tied:0,one:{won:0,lost:0},teamVs:{won:0,lost:0},together:{won:0,lost:0},streak:null,last:[],lastAt:null};
    s.name=m.players[seat].name||s.name;s.lastAt=m.settledAt||m.createdAt||s.lastAt;
    const result=tie?'tied':won?'won':'lost';
    if(together){if(!tie)s.together[result]++;}

@@ -71,11 +71,13 @@ function createSocialFunctions({db,identity,rateLimit,options,readLedger,playerL
     const named=await names(recent.map(r=>r.uid));
     return {results:recent.filter(r=>named[r.uid]).map(r=>({...r,name:named[r.uid]||r.name,relation:S.relation(user.uid,r.uid,mine)}))};
    }
-   // How the player does against each friend (only friends: the scores are between them).
+   // How the player does against each friend (only friends: the scores are between them) and each bot of the house.
    case 'versus':{
     const [ledger,mine]=await Promise.all([playerLedger(user.uid),lists(user.uid)]);
     const all=S.versusStats(ledger,user.uid);
-    const results=Object.values(all).filter(r=>mine.friends[r.uid]).map(r=>({...r,name:mine.friends[r.uid]?.name||r.name}));
+    // Friends, and the bots of the house (their names are theirs: "Bot Pepe") for the pages that ask for them
+    // (houses: true); older apps list every result as a friend.
+    const results=Object.values(all).filter(r=>mine.friends[r.uid]||r.house&&data.houses===true).map(r=>({...r,name:r.house?r.name:mine.friends[r.uid]?.name||r.name}));
     return {results};
    }
    case 'request':{

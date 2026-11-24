@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {WORLD,HEAR_RADIUS,clampPosition,spawnPosition,acceptMove,acceptSay,hears,allowListed,liveTableEntry,presenceActive,weekKey,topOf,spokenWords,acceptOrder,BAR_MAX,barOpen,barFull,cleanProblem,barTables,barLayout,cleanLook,acceptGesture,acceptInvite,inviteOpen,cleanArming,barRequest,REQUEST_MS,barStaff} from '../src/bar-core.js';
+import {WORLD,HEAR_RADIUS,clampPosition,spawnPosition,acceptMove,acceptSay,hears,allowListed,liveTableEntry,presenceActive,weekKey,topOf,spokenWords,acceptOrder,BAR_MAX,barOpen,barFull,cleanProblem,barTables,barLayout,cleanLook,acceptGesture,acceptInvite,inviteOpen,cleanArming,barRequest,REQUEST_MS,barStaff,barHouseCount} from '../src/bar-core.js';
 
 test('BAR: steps stay on the floor and not faster than allowed',()=>{
  assert.deepEqual(clampPosition(-50,99999),{x:20,y:WORLD.h-20});
@@ -238,4 +238,20 @@ test('BAR: only the staff walks behind the counter',()=>{
  const boss={staff:true,x:500,y:100},ana={x:500,y:300};
  assert.equal(hears(boss,ana),true);assert.equal(hears(ana,boss),true);
  assert.equal(hears({...boss,y:200},{x:500,y:400}),false);assert.equal(hears({x:500,y:100},ana),false);
+});
+
+test('BAR: 2 to 5 tables of the house wait for a rival; one taken comes back a while later',()=>{
+ const house=code=>({status:'waiting',mode:'1v1',targetPoints:20,players:{player1:{uid:'house_'+code}}});
+ const rooms=Object.fromEntries(['H1','H2','H3','H4','H5','H6','H7'].map(c=>[c,house(c)]));
+ assert.equal(barTables(rooms,{}).size,2,'two by default');
+ assert.equal(barTables(rooms,{},new Set(),{house:5}).size,5);
+ // Already shown ones stay.
+ assert.deepEqual([...barTables(rooms,{},new Set(['H7']),{house:2}).keys()].sort(),['H1','H7']);
+ const h={};
+ for(let i=0;i<40;i++){const n=barHouseCount({},0,()=>i/40);assert.ok(n>=2&&n<=5);}
+ assert.equal(barHouseCount(h,0,()=>0.99),5);
+ // Someone sat at one: one fewer until the refill time, never under 2.
+ h.taken=[60000];assert.equal(barHouseCount(h,1000),4);
+ assert.equal(barHouseCount(h,60001),5);
+ h.taken=[9e9,9e9,9e9,9e9];assert.equal(barHouseCount(h,1000),2);
 });

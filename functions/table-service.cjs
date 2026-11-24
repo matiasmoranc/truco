@@ -43,7 +43,7 @@ function joinTable(ledger,{code,uid,name,password='',team,friends=false,via=null
  if(wallet){wallet.balance-=m.stake;wallet.locked=m.stake;}m.player2=uid;m.players.player2={uid,name,online:true};m.status='reserved';
  if(friends===true&&!m.house)m.friends=true;
  if(m.house&&via==='bar')m.via='bar';
- m.session=newSession(code,m.players,m.targetPoints,{id:m.id,stake:m.stake,pot:m.stake*2,hasPassword:!!m.secret,matchNumber:1,...(m.friends?{friends:true}:{})},now);m.revision++;return next;
+ m.session=newSession(code,m.players,m.targetPoints,{id:m.id,stake:m.stake,pot:m.stake*2,hasPassword:!!m.secret,matchNumber:1,...(m.friends?{friends:true}:m.house?{rivalry:true}:{})},now);m.revision++;return next;
 }
 function cancelWaiting(ledger,m,now,reason='waiting-canceled'){if(!m.house&&m.stake>0){const wallet=ledger.wallets[m.player1];if(wallet.locked!==m.stake)fail('La reserva cambió.');wallet.balance+=m.stake;wallet.locked=0;}m.status='refunded';m.closedAt=now;m.closeReason=reason;m.revision++;}
 function finishAccounting(ledger,m,now){
@@ -100,7 +100,7 @@ function tableOperation(ledger,{code,uid,command,requestId,expectedMatchId,prese
   if(now-m.createdAt>=waitFor(m))fail('La mesa ya no está disponible.');
   const name=BOT_NAMES[crypto.randomInt(BOT_NAMES.length)],uid=houseUid(name);
   m.player2=uid;m.players.player2={uid,name,online:true};m.house='player2';m.status='reserved';
-  m.session=newSession(code,m.players,m.targetPoints,{id:m.id,stake:m.stake,pot:m.stake*2,hasPassword:!!m.secret,matchNumber:1},now);m.revision++;if(requestId)m.requests[requestId]=true;return next;
+  m.session=newSession(code,m.players,m.targetPoints,{id:m.id,stake:m.stake,pot:m.stake*2,hasPassword:!!m.secret,matchNumber:1,rivalry:true},now);m.revision++;if(requestId)m.requests[requestId]=true;return next;
  }
  if(m.status==='waiting'){const host=presence?.player1;if(now-m.createdAt>=waitFor(m))cancelWaiting(next,m,now);else if(!m.house&&host?.uid===m.player1&&host.online===false&&Number.isFinite(host.disconnectedAt)&&now-host.disconnectedAt>=120000)cancelWaiting(next,m,now,'creator-left');return next;}
  if(!m.session)fail('La mesa está cerrada.');

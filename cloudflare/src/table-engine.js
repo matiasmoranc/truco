@@ -27,7 +27,7 @@ const PROBE_BALANCE=1000000;
 const findPlayer=(m,uid)=>Object.keys(m?.players||{}).find(p=>m.players[p]?.uid===uid)||null;
 
 export function createTableEngine({code,bank,clock=()=>Date.now()}){
- let m=null,presence={},botDueAt=null,botKey=null,lastMoveByBot=false;
+ let m=null,presence={},botDueAt=null,botKey=null,lastMoveByBot=false,houseMemory=null;
 
  // The bot seat the table is waiting for, if any.
  const botSeat=()=>{
@@ -51,7 +51,7 @@ export function createTableEngine({code,bank,clock=()=>Date.now()}){
  async function playBot(){
   const seat=botSeat();botDueAt=null;botKey=null;if(!seat)return false;
   let failure=null;
-  const commands=m.house?duelBot.botCommands(m.session,seat):botCommands(m.session,seat);
+  const commands=m.house?duelBot.botCommands(m.session,seat,Math.random,houseMemory):botCommands(m.session,seat);
   for(const command of commands){
    // A move the referee ignores without an error leaves the game as it was: try the next one.
    const before=JSON.stringify(m.session);
@@ -72,7 +72,13 @@ export function createTableEngine({code,bank,clock=()=>Date.now()}){
  }
 
  // Cheap in-memory run; escalates to the bank only if credits would move.
- async function operate(args,{forceLedger=false}={}){
+ // The house player remembers what its rival showed in this match (duel-bot.cjs observe).
+ async function operate(args,options){
+  const before=m?.session;
+  await operateNow(args,options);
+  if(m?.house&&m.session&&m.session!==before){try{houseMemory=duelBot.observe(houseMemory,before,m.session,m.house);}catch(error){console.error('house memory',error);}}
+ }
+ async function operateNow(args,{forceLedger=false}={}){
   if(args.presence&&m){const live={};for(const [seat,p] of Object.entries(presence))if(p&&m.players?.[seat]?.uid===p.uid&&p.matchNumber===m.matchNumber)live[seat]=p;presence=live;args={...args,presence:live};}
   const op=(ledger,now)=>tableOperation(ledger,{...args,code,now});
   if(!m)throw new Error('La mesa ya no está disponible.');
@@ -98,12 +104,12 @@ export function createTableEngine({code,bank,clock=()=>Date.now()}){
   get match(){return m;},
   get presence(){return presence;},
   // The bot's pending move is saved too: a table put to sleep between moves must not push it back on every wake-up.
-  load(saved){m=saved?.match||null;presence=saved?.presence||{};botDueAt=saved?.botDueAt??null;botKey=saved?.botKey??null;scheduleBot();},
-  snapshot(){return {match:m,presence,botDueAt,botKey};},
+  load(saved){m=saved?.match||null;presence=saved?.presence||{};botDueAt=saved?.botDueAt??null;botKey=saved?.botKey??null;houseMemory=saved?.houseMemory??null;scheduleBot();},
+  snapshot(){return {match:m,presence,botDueAt,botKey,houseMemory};},
   playerFor(uid){return findPlayer(m,uid);},
   async create(user,{id,stake,targetPoints,mode,secret,house=false,via=null,initial}){
    if(m&&!(m.closedAt||['settled','refunded'].includes(m.status)))throw new CodeTakenError();
-   const previous=m;m=null;presence={};
+   const previous=m;m=null;presence={};houseMemory=null;
    // A house table moves no credits until someone joins, so it lives only here until then.
    if(house){const next=createTable({wallets:{},matches:{},tables:{}},{code,id,uid:user.uid,name:user.name,stake,targetPoints,mode,secret,house:true,now:clock()});m=next.matches[id];return;}
    try{await accounting('create',{id,uid:user.uid,name:user.name,stake,targetPoints,mode,secret,...(house?{house:true}:{}),...(via==='bar'?{via:'bar'}:{})},{creating:true,initial});}

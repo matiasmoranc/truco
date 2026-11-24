@@ -1,7 +1,7 @@
 // Head to head with friends: how many games each one won against the other.
-// - versus: the numbers per friend (from the server, kept a minute).
+// - versus: the numbers per friend and per bot of the house (house: true), from the server, kept a minute.
 // - notebookElement: the notebook page with the numbers, used on the table and in the friend's card.
-// - match notebook: when two friends start a 1 vs 1 game the server gives the room introUntil: until then the
+// - match notebook: when two friends (or someone and a bot of the house) start a 1 vs 1 game the server gives the room introUntil: until then the
 //   notebook lies on the table (6 seconds, the countdown shows 5: the first second does not count),
 //   nobody can play and the first turn clock has not started.
 //   It slides in from the left side and leaves the same way.
@@ -12,7 +12,7 @@ export function createVersus({api,now=()=>Date.now()}){
  let cache=null,at=0,pending=null;
  async function load(force=false){
   if(!force&&cache&&now()-at<60000)return cache;
-  pending??=api('playerSocial',{action:'versus'}).then(r=>{cache=Object.fromEntries((r?.results||[]).map(x=>[x.uid,x]));at=now();return cache;}).finally(()=>{pending=null;});
+  pending??=api('playerSocial',{action:'versus',houses:true}).then(r=>{cache=Object.fromEntries((r?.results||[]).map(x=>[x.uid,x]));at=now();return cache;}).finally(()=>{pending=null;});
   return pending;
  }
  return {load,cached:()=>cache,forget(){cache=null;at=0;}};
@@ -21,7 +21,8 @@ export function createVersus({api,now=()=>Date.now()}){
 const el=(document,tag,cls,text)=>{const n=document.createElement(tag);if(cls)n.className=cls;if(text!=null)n.textContent=text;return n;};
 const empty={won:0,lost:0,last:[],one:{won:0,lost:0},teamVs:{won:0,lost:0},together:{won:0,lost:0},streak:null};
 const plural=(n,one,many)=>n+' '+(n===1?one:many);
-export const firstName=name=>String(name||'').split(/[._\s-]/)[0]||String(name||'');
+// A bot of the house keeps its whole name ("Bot Pepe"), a person their first part ("Caro" from "Caro.Suarez").
+export const firstName=name=>/^Bot /.test(String(name||''))?String(name):String(name||'').split(/[._\s-]/)[0]||String(name||'');
 
 // The short line under the numbers: who is ahead, or how the last game went.
 export function versusLine(stats,other){
@@ -104,7 +105,9 @@ export function installFriendCard({document,versus,profiles=null,onInvite=null,t
   const s=stats||empty;content.replaceChildren(notebookElement(document,s,friend.name));
   const grid=el(document,'div','versus-grid'),other=firstName(friend.name);
   const streak=s.streak&&s.streak.result!=='tied'?[plural(s.streak.count,'seguida','seguidas'),s.streak.result==='won'?'ganadas por vos':'ganadas por '+other]:['—','sin racha'];
-  for(const [label,value,note] of [['Racha',...streak],['1 vs 1',s.one.won+' – '+s.one.lost,'ganadas – perdidas'],['2 vs 2 en contra',s.teamVs.won+' – '+s.teamVs.lost,'ganadas – perdidas'],['2 vs 2 juntos',s.together.won+' – '+s.together.lost,'como compañeros']]){
+  // A bot of the house only plays 1 vs 1: no 2 vs 2 boxes.
+  const boxes=[['Racha',...streak],['1 vs 1',s.one.won+' – '+s.one.lost,'ganadas – perdidas'],['2 vs 2 en contra',s.teamVs.won+' – '+s.teamVs.lost,'ganadas – perdidas'],['2 vs 2 juntos',s.together.won+' – '+s.together.lost,'como compañeros']];
+  for(const [label,value,note] of friend.house?boxes.slice(0,2):boxes){
    const b=el(document,'div','versus-box');b.append(el(document,'small','',label),el(document,'b','',value),el(document,'em','',note));grid.append(b);
   }
   content.append(grid);
@@ -117,7 +120,7 @@ export function installFriendCard({document,versus,profiles=null,onInvite=null,t
    }
    content.append(list);
   }
-  if(onInvite){
+  if(onInvite&&!friend.house){
    const invite=el(document,'button','button primary versus-invite','Invitar a jugar');invite.type='button';
    invite.onclick=async()=>{invite.disabled=true;try{await onInvite(friend);dialog.close();}catch(e){toast(e?.message||'No se pudo enviar la invitación.',true);}finally{invite.disabled=false;}};
    content.append(invite);

@@ -3,7 +3,7 @@
 import {DurableObject} from 'cloudflare:workers';
 import {verifyIdToken,createDatabase,createDevDatabase,isAdministrator} from './firebase.js';
 import {tableStub,lobbyStub} from './routing.js';
-import {barOpen,presenceActive,weekKey,topOf,barTables,barLayout,barRequest} from './bar-core.js';
+import {barOpen,presenceActive,weekKey,topOf,barTables,barLayout,barRequest,barHouseCount,BAR_HOUSE_MAX,BAR_HOUSE_REFILL_MS} from './bar-core.js';
 import {levelFor} from '../../levels.js';
 import botSeat from '../../functions/bot-seat.cjs';
 
@@ -53,6 +53,10 @@ export class Lobby extends DurableObject{
    const {code,room,live}=await request.json();
    // Open tables: every client in the lobby gets each change, as before.
    if(JSON.stringify(this.rooms[code]??null)!==JSON.stringify(room??null)){
+    // A house table the BAR showed that someone just sat at: its place is filled again a while later.
+    const was=this.rooms[code];
+    if(!room&&live&&was?.status==='waiting'&&isHouseUid(was.players?.player1?.uid)&&Object.values(this.layout?.cells||{}).some(v=>v.c===code)){
+     const [a,b]=BAR_HOUSE_REFILL_MS;this.house.taken=[...(this.house.taken||[]),Date.now()+a+Math.floor(Math.random()*(b-a))];await this.ctx.storage.put('house',this.house);}
     if(room)this.rooms[code]=room;else delete this.rooms[code];
     await this.ctx.storage.put('rooms',this.rooms);
     for(const ws of this.ctx.getWebSockets())if(ws.deserializeAttachment()?.uid)send(ws,{t:'lobby-update',code,room:room||null});
@@ -120,8 +124,8 @@ export class Lobby extends DurableObject{
    const name=free.filter(n=>!house.recent.includes(n))[0]||free[Math.floor(Math.random()*Math.min(free.length,4))];if(!name)break;
    for(let attempt=0;attempt<3;attempt++){
     const code=randomCode();
-    // At least two open at 20 points (the BAR shows two of them to sit and play).
-    const points=open.filter(r=>Number(r.targetPoints)===20).length<2?20:housePoints();
+    // Enough open at 20 points for the BAR (it shows up to BAR_HOUSE_MAX of them to sit and play).
+    const points=open.filter(r=>Number(r.targetPoints)===20).length<BAR_HOUSE_MAX+1?20:housePoints();
     const response=await tableStub(this.env,code).fetch(new Request('https://table/house-create',{method:'POST',headers:{'x-table-code':code,'x-internal-secret':this.env.INTERNAL_SECRET},body:JSON.stringify({uid:houseUid(name),name,stake:0,targetPoints:points})}));
     if(response.ok){house.lastAt=now;house.recent=[...house.recent.filter(n=>n!==name),name].slice(-(HOUSE_NAMES.length+HOUSE_PEOPLE.length));open.push({players:{player1:{name}},targetPoints:points});break;}
     const body=await response.json().catch(()=>({}));if(body.code!=='code-taken'){console.error('house table failed',body.error);break;}
@@ -169,7 +173,7 @@ export class Lobby extends DurableObject{
    const shown=new Set(Object.values(this.layout?.cells||{}).map(v=>v.c).filter(Boolean));
    // A house table never takes a table someone asked for.
    const points=new Map(Object.entries(this.rooms).filter(([,r])=>!isHouseUid(r?.players?.player1?.uid)).map(([code,r])=>[code,Number(r?.targetPoints)]));
-   const next=barLayout(this.layout,barTables(this.rooms,this.live,shown),{points});
+   const next=barLayout(this.layout,barTables(this.rooms,this.live,shown,{house:barHouseCount(this.house,Date.now())}),{points});
    if(JSON.stringify(next)===JSON.stringify(this.layout))return;
    this.layout=next;await this.ctx.storage.put('barLayout',next);
    for(const ws of this.ctx.getWebSockets())if(ws.deserializeAttachment()?.bar)send(ws,{t:'bar-layout',cells:next.cells});

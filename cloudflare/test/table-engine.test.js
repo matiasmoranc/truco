@@ -340,7 +340,8 @@ test('A house bot still plays when the table was put to sleep before its move',a
  assert.equal(duel.mustAct(engine.match.session,'player1'),true);
  const saved=JSON.parse(JSON.stringify(engine.snapshot())),before=JSON.stringify(saved.match.session);
  // A fresh engine (the table woke up) a few seconds later plays the house move at once.
- let later=now()+5000;const woken=createTableEngine({code:'ABCDE',bank:createFirebaseBank(bank),clock:()=>later});
+ // (Past the rivalry notebook that opens a game against the house: nobody plays while it is on the table.)
+ let later=Math.max(now(),Number(saved.match.session.room.introUntil)||0)+5000;const woken=createTableEngine({code:'ABCDE',bank:createFirebaseBank(bank),clock:()=>later});
  woken.load(saved);await woken.tick();
  assert.notEqual(JSON.stringify(woken.match.session),before);
 });
